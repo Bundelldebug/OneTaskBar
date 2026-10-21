@@ -78,3 +78,5 @@ The dock button can independently open the app drawer or Windows Start. Connecte
 Known issue: native Start button invocation is not yet verified on the development PC; automated invocation opens SearchHost although physical Ctrl+Esc opens Start. The app drawer remains the default.
 
 0.4.2 adds retained dock cells with animated capsule growth/shrink, icon entry/exit and stable launch ordering (newest on the right), preserving manual moves. The gray control center has a more transparent neutral tint and a shutdown/sleep/lock menu. Native OSD opacity is prepared before presentation and restored on exit or watchdog recovery.
+
+0.4.3 keeps every existing dock slot fixed when its app starts or stops; only new entries append on the right. Quick settings uses a stronger translucent black tint over the live backdrop, with one shared white for enabled radio buttons, theme/audio buttons and slider fills.

@@ -15,14 +15,14 @@ namespace OneTaskBar
         static void Opened(object sender,RoutedEventArgs args)
         {
             var menu=sender as ContextMenu;if(menu==null)return;
-            var window=menu.PlacementTarget==null?null:Window.GetWindow(menu.PlacementTarget);bool gray=window is QuickWindow||window is DetailWindow||window is NotificationWindow;
-            menu.Background=Preferences.Current.Blur?(gray?GrayPanel.Glass:LightPanel.Glass):Paint.Brush(gray?"#FFBEC6C1":"#FFD4DDD6");
-            menu.Foreground=Paint.Ink;if(gray)foreach(object entry in menu.Items){var item=entry as MenuItem;if(item!=null){item.Foreground=menu.Foreground;var icon=item.Icon as Glyph;if(icon!=null)icon.Color=menu.Foreground;}}
-            LightPanel.Apply(menu);
+            var window=menu.PlacementTarget==null?null:Window.GetWindow(menu.PlacementTarget);bool dark=window is QuickWindow,gray=window is DetailWindow||window is NotificationWindow;
+            menu.Background=Preferences.Current.Blur?(dark?QuickPanel.Glass:gray?GrayPanel.Glass:LightPanel.Glass):Paint.Brush(dark?"#FF343936":gray?"#FFBEC6C1":"#FFD4DDD6");
+            menu.Foreground=dark?Paint.ControlWhite:Paint.Ink;if(dark||gray)foreach(object entry in menu.Items){var item=entry as MenuItem;if(item!=null){item.Foreground=menu.Foreground;var icon=item.Icon as Glyph;if(icon!=null)icon.Color=menu.Foreground;}}
+            if(!dark)LightPanel.Apply(menu);
             menu.Dispatcher.BeginInvoke(new Action(()=> {
                 if(!menu.IsOpen||!Preferences.Current.Blur)return;
                 try {LiveBackdrop previous;if(backdrops.TryGetValue(menu,out previous)){previous.Dispose();backdrops.Remove(menu);}var blur=new LiveBackdrop(menu,18);backdrops.Add(menu,blur);}
-                catch(Exception e){menu.Background=Paint.Brush(gray?"#FFBEC6C1":"#FFD4DDD6");AppLog.Once("menu-blur",e.Message);}
+                catch(Exception e){menu.Background=Paint.Brush(dark?"#FF343936":gray?"#FFBEC6C1":"#FFD4DDD6");AppLog.Once("menu-blur",e.Message);}
             }),DispatcherPriority.Loaded);
         }
         static void Closed(object sender,RoutedEventArgs args) {var menu=sender as ContextMenu;LiveBackdrop blur;if(menu!=null&&backdrops.TryGetValue(menu,out blur)){blur.Dispose();backdrops.Remove(menu);}}

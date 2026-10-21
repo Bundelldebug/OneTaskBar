@@ -1,3 +1,9 @@
+# Validation — 0.4.3
+
+Build/self-test passed. Dock ordering fixtures cover inactive pins being launched, pinned apps closing, already-running pins at startup, manual moves and new unpinned entries appending. Existing slots retain their relative order. The actual-window dock probe again passed intermediate growth/shrink frames, entry/exit fades, retained button objects and interrupted resizing. Quick settings was rendered after the material change; active button backgrounds and slider fills now use the same shared white color constant. Shutdown, sleep and lock were not executed during validation.
+
+The preceding native-OSD recovery probe also passed: an isolated child exited without disposing its opacity lease, then the recovery path restored the native host opacity. Reference captures and personal probe output remain excluded from the installer.
+
 # Validation — 0.4.2
 
 Actual dock window widths grew from 308 to 400 physical pixels through intermediate frames, then shrank back to 308. Entry/exit fades, retained button references, stable launch order and interrupted growth/removal all passed. Native OSD opacity was already zero before the native SHOW event; normal-exit restoration passed. Power menu wiring was inspected without executing shutdown, sleep or lock.

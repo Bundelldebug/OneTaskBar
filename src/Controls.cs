@@ -14,6 +14,12 @@ using System.Threading.Tasks;
 
 namespace OneTaskBar
 {
+    internal static class QuickPanel
+    {
+        // Black tint over the live host backdrop keeps background color without a milky layer.
+        internal static readonly Brush Glass=LightPanel.Tint("#A0000000","#94000000","#9E000000"),Card=Paint.Brush("#18FFFFFF");
+        internal const string Inactive="#2A000000";
+    }
     internal static class GrayPanel
     {
         // Neutral frosted glass retains live background color with readable dark content.
@@ -55,6 +61,8 @@ namespace OneTaskBar
             }shape.Freeze();return shape;
         }
         internal static SolidColorBrush Brush(string value) { var b=(SolidColorBrush)new BrushConverter().ConvertFromString(value); b.Freeze(); return b; }
+        internal const string ControlWhiteColor="#FFF4F8F5";
+        internal static readonly Brush ControlWhite=Brush(ControlWhiteColor);
         internal static readonly Brush Text=Brush("#FFFFFFFF"), Muted=Brush("#FFDBE3DF"), Ink=Brush("#FF19221E");
         internal static void Label(DrawingContext dc,string text,double size,Brush color,Point point,FontWeight weight)
         {
@@ -141,7 +149,7 @@ namespace OneTaskBar
         public string Kind; double value; bool dragging;
         static readonly DependencyProperty DisplayValueProperty=DependencyProperty.Register("DisplayValue",typeof(double),typeof(PillSlider),new FrameworkPropertyMetadata(0.0,FrameworkPropertyMetadataOptions.AffectsRender));
         public bool Tablet=true,AnimateValue=true;
-        public bool Light;
+        public bool Light,DarkTrack;
         public event Action<double> Changed;
         public double Value { get { return value; } set { double next=Clamp(value);if(this.value==next)return;this.value=next;double from=(double)GetValue(DisplayValueProperty);BeginAnimation(DisplayValueProperty,null);SetValue(DisplayValueProperty,next);if(AnimateValue&&!dragging&&Motion.Enabled&&IsVisible&&PresentationSource.FromVisual(this)!=null)BeginAnimation(DisplayValueProperty,Motion.Tween(from,next,160));InvalidateVisual(); } }
         public static double Clamp(double value) { return Double.IsNaN(value) || Double.IsInfinity(value) ? 0 : Math.Max(0,Math.Min(100,value)); }
@@ -154,10 +162,10 @@ namespace OneTaskBar
             double w=ActualWidth,h=ActualHeight; if(w<=0 || h<=0) return;
             double shown=(double)GetValue(DisplayValueProperty);string iconKind=Kind.StartsWith("volume",StringComparison.Ordinal)?SoundIcon.For(value,false,IsEnabled):Kind;
             var track=new Rect(0,0,w,h); var fill=new RectangleGeometry(new Rect(0,0,FillWidth(w,shown),h),h/2,h/2);
-            dc.DrawRoundedRectangle(Paint.Brush(IsEnabled ? "#3C77817F" : "#286E7775"),new Pen(Paint.Brush("#288B9692"),.7),track,h/2,h/2);
-            if(shown>0) dc.DrawGeometry(Tablet?Paint.Brush("#FFF4F8F5"):Brushes.Black,null,fill);
+            dc.DrawRoundedRectangle(Paint.Brush(DarkTrack?"#26000000":IsEnabled ? "#3C77817F" : "#286E7775"),new Pen(Paint.Brush("#288B9692"),.7),track,h/2,h/2);
+            if(shown>0) dc.DrawGeometry(Tablet?Paint.ControlWhite:Brushes.Black,null,fill);
             var c=new Point(h*.70,h/2); double icon=h*.44;
-            Paint.Icon(dc,iconKind,Tablet&&!Light?Paint.Brush("#D8E8EDEA"):Paint.Brush("#FF303A36"),c,icon);
+            Paint.Icon(dc,iconKind,DarkTrack?Paint.ControlWhite:Tablet&&!Light?Paint.Brush("#D8E8EDEA"):Paint.Brush("#FF303A36"),c,icon);
             if(shown>0) {dc.PushClip(fill);Paint.Icon(dc,iconKind,Tablet?Paint.Brush(!Light&&Kind=="brightness"?"#FFEC7D4E":"#FF35413B"):Paint.Brush("#FFF5F5F1"),c,icon);dc.Pop();}
             if(IsKeyboardFocused) dc.DrawRoundedRectangle(null,new Pen(Paint.Brush("#9ED4F0E5"),1.5),new Rect(1,1,w-2,h-2),h/2,h/2);
         }
