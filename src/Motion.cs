@@ -32,9 +32,9 @@ namespace OneTaskBar
         internal static DoubleAnimation Launcher(FrameworkElement content,bool opening)
         {
             var old=content.RenderTransform as TransformGroup;var oldScale=old==null?null:old.Children.OfType<ScaleTransform>().FirstOrDefault();var oldShift=old==null?null:old.Children.OfType<TranslateTransform>().FirstOrDefault();
-            double fromScale=oldScale!=null?oldScale.ScaleX:opening?.965:1,fromY=oldShift!=null?oldShift.Y:opening?24:0,fromOpacity=old!=null?content.Opacity:opening?.12:content.Opacity;
+            double fromScale=oldScale!=null?oldScale.ScaleX:opening?.965:1,fromY=oldShift!=null?oldShift.Y:opening?12:0,fromOpacity=old!=null?content.Opacity:opening?.12:content.Opacity;
             content.BeginAnimation(UIElement.OpacityProperty,null);var scale=new ScaleTransform(opening?1:.985,opening?1:.985);var shift=new TranslateTransform(0,opening?0:12);var group=new TransformGroup();group.Children.Add(scale);group.Children.Add(shift);content.RenderTransformOrigin=new Point(.5,1);content.RenderTransform=group;
-            if(opening){scale.BeginAnimation(ScaleTransform.ScaleXProperty,Spring(fromScale,1.005,1,340));scale.BeginAnimation(ScaleTransform.ScaleYProperty,Spring(fromScale,1.005,1,340));shift.BeginAnimation(TranslateTransform.YProperty,Spring(fromY,-1.2,0,340));}
+            if(opening){scale.BeginAnimation(ScaleTransform.ScaleXProperty,Spring(Math.Min(1,fromScale),.999,1,340));scale.BeginAnimation(ScaleTransform.ScaleYProperty,Spring(Math.Min(1,fromScale),.999,1,340));shift.BeginAnimation(TranslateTransform.YProperty,Spring(Math.Max(0,Math.Min(12,fromY)),.4,0,340));}
             else {scale.BeginAnimation(ScaleTransform.ScaleXProperty,Tween(fromScale,.985,145));scale.BeginAnimation(ScaleTransform.ScaleYProperty,Tween(fromScale,.985,145));shift.BeginAnimation(TranslateTransform.YProperty,Tween(fromY,12,145));}
             content.Opacity=opening?1:0;var fade=Tween(fromOpacity,opening?1:0,opening?135:145);if(opening)content.BeginAnimation(UIElement.OpacityProperty,fade);return fade;
         }

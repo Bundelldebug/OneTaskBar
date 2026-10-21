@@ -19,7 +19,7 @@ namespace OneTaskBar
         internal void Add(string query) {query=(query??"").Trim();if(query.Length==0||query.Length>120)return;Items.RemoveAll(v=>String.Equals(v,query,StringComparison.CurrentCultureIgnoreCase));Items.Insert(0,query);if(Items.Count>10)Items.RemoveRange(10,Items.Count-10);Save();}
         internal void Remove(string query) {Items.RemoveAll(v=>String.Equals(v,query,StringComparison.CurrentCultureIgnoreCase));Save();}
         internal void Clear() {Items.Clear();Save();}
-        void Save() {try{Directory.CreateDirectory(Path.GetDirectoryName(file));string temp=file+".tmp";File.WriteAllText(temp,new JavaScriptSerializer().Serialize(Items));if(File.Exists(file))File.Replace(temp,file,file+".previous");else File.Move(temp,file);}catch(Exception e){AppLog.Once("search-history",e.Message);}}
+        void Save() {try{Directory.CreateDirectory(Path.GetDirectoryName(file));string temp=file+".tmp";File.WriteAllText(temp,new JavaScriptSerializer().Serialize(Items));if(File.Exists(file)){try{File.Replace(temp,file,null);}catch(IOException){File.Copy(temp,file,true);File.Delete(temp);}}else File.Move(temp,file);}catch(Exception e){AppLog.Once("search-history",e.Message);}}
     }
     internal sealed class SearchSetting
     {

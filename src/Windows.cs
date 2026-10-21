@@ -74,7 +74,7 @@ namespace OneTaskBar
             var battery=Paint.Button(Battery,()=>controller.ToggleQuick(this),"배터리 · 빠른 설정"); battery.Padding=new Thickness(0); battery.Background=Brushes.Transparent;
             powerAccess=battery;
             Grid.SetColumn(battery,2);Panel.SetZIndex(battery,10);status.Children.Add(battery);
-            var time=Paint.Button(clock,()=>controller.ToggleNotifications(this),"알림 · 달력");time.Padding=new Thickness(0);time.Background=Brushes.Transparent;
+            var time=Paint.Button(clock,()=>controller.ToggleNotifications(this),"알림센터");time.Padding=new Thickness(0);time.Background=Brushes.Transparent;
             Grid.SetColumn(time,3); status.Children.Add(time); Status.Surface.Child=status;
             var menu=new ContextMenu(); var settings=new MenuItem {Header="One TaskBar 설정",Icon=new Glyph("settings",18){Color=Paint.Ink}};settings.Click+=(s,e)=>controller.ShowWelcome();menu.Items.Add(settings);
             var resetOrder=new MenuItem {Header="앱 순서 초기화"};resetOrder.Click+=(s,e)=>controller.ResetDockOrder();menu.Items.Add(resetOrder);
@@ -120,7 +120,8 @@ namespace OneTaskBar
         {
             var cell=new DockCell {Entry=entry};var content=new Grid {Width=44,Height=42};cell.Icon=entry.Icon!=null?AppIcons.Visual(entry.Icon,30):new Glyph("window",30){Color=Paint.Ink};cell.Icon.VerticalAlignment=VerticalAlignment.Top;cell.Icon.Margin=new Thickness(0,4,0,0);RenderOptions.SetBitmapScalingMode(cell.Icon,BitmapScalingMode.HighQuality);content.Children.Add(cell.Icon);
             cell.Dot=new Border {Width=4,Height=4,CornerRadius=new CornerRadius(2),Background=Paint.Ink,VerticalAlignment=VerticalAlignment.Bottom,HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(0,0,0,2)};content.Children.Add(cell.Dot);
-            cell.Button=Paint.Button(content,()=>{var before=pressedForeground;pressedForeground=IntPtr.Zero;controller.ActivateApp(cell.Entry,cell.Button,before);},entry.Name);cell.Button.Width=46;cell.Button.Height=42;cell.Button.Padding=new Thickness(0);cell.Button.Background=Brushes.Transparent;cell.Button.RenderTransform=cell.Offset;
+            cell.Button=Paint.Button(content,()=>{controller.Previews.Close();var before=pressedForeground;pressedForeground=IntPtr.Zero;controller.ActivateApp(cell.Entry,cell.Button,before);},entry.Name);cell.Button.Width=46;cell.Button.Height=42;cell.Button.Padding=new Thickness(0);cell.Button.Background=Brushes.Transparent;cell.Button.RenderTransform=cell.Offset;
+            cell.Button.MouseEnter+=(s,e)=>{ToolTipService.SetIsEnabled(cell.Button,cell.Entry.Windows.Count==0);controller.Previews.Enter(cell.Entry,cell.Button,this);};cell.Button.MouseLeave+=(s,e)=>{controller.Previews.Leave();ToolTipService.SetIsEnabled(cell.Button,true);};cell.Button.PreviewMouseLeftButtonDown+=(s,e)=>controller.Previews.Close();cell.Button.ContextMenuOpening+=(s,e)=>controller.Previews.Close();
             cell.Button.ContextMenuOpening+=(sender,args)=>cell.Button.ContextMenu=WindowPicker.Menu(cell.Entry,controller);cell.Button.ContextMenu=WindowPicker.Menu(entry,controller);Motion.Dock(cell.Button,cell.Icon);DragReorder.Attach(cell.Button,cell.Button,"dock.apps",entry.Key,Orientation.Horizontal,()=>!closed,controller.MoveDock);return cell;
         }
         void ResizeTo(DockLayout layout,bool animate)
@@ -157,6 +158,7 @@ namespace OneTaskBar
             string soundKind=SoundIcon.For(controller.Audio.Value,controller.Audio.Muted,controller.Audio.Available);
             if(wifiStatus.Kind!=wifiKind){wifiStatus.Kind=wifiKind;wifiStatus.InvalidateVisual();}wifiStatus.Opacity=wifiKind=="wifi"||wifiKind=="network"?1:.55;
             int generation=wifiKind=="wifi"?controller.WifiGeneration:0;if(wifiStatus.Generation!=generation){wifiStatus.Generation=generation;wifiStatus.InvalidateVisual();}
+            int signal=wifiKind=="wifi"?controller.WifiSignal:0,traffic=wifiKind=="wifi"?controller.WifiTraffic:-1;if(wifiStatus.Signal!=signal||wifiStatus.Traffic!=traffic){wifiStatus.Signal=signal;wifiStatus.Traffic=traffic;wifiStatus.InvalidateVisual();}
             if(volumeStatus.Kind!=soundKind){volumeStatus.Kind=soundKind;volumeStatus.InvalidateVisual();}volumeStatus.Opacity=controller.Audio.Available?1:.4;
             quickAccess.ToolTip=(controller.Services.WifiPresent==false?(controller.Services.NetworkConnected?"네트워크 연결됨":"네트워크 연결 안 됨"):radioOff?"Wi-Fi 꺼짐":controller.Wifi??(controller.Services.WifiOn.HasValue?"Wi-Fi 연결 안 됨":"Wi-Fi 상태 확인 중"))+" · "+(controller.Audio.Muted?"음소거":!controller.Audio.Available?"소리 장치 없음":"음량 "+controller.Audio.Value);
             if(generation>0)quickAccess.ToolTip="Wi-Fi "+generation+" · "+quickAccess.ToolTip;
@@ -220,8 +222,7 @@ namespace OneTaskBar
             foreach(var entry in shell.Apps.Where(a=>String.IsNullOrEmpty(query) || a.Name.IndexOf(query,StringComparison.CurrentCultureIgnoreCase)>=0)) {
                 var body=new StackPanel {Width=cellWidth-16,Height=cellHeight-12};
                 double iconSize=Math.Min(48,cellHeight-58);
-                if(entry.Icon!=null){var icon=AppIcons.Visual(entry.Icon,iconSize);icon.Margin=new Thickness(0,7,0,7);body.Children.Add(icon);}
-                else body.Children.Add(new Glyph("window",iconSize) {Color=Paint.Text,Margin=new Thickness(0,7,0,7),HorizontalAlignment=HorizontalAlignment.Center});
+                var icon=AppIcons.Visual(entry,iconSize);icon.Margin=new Thickness(0,7,0,7);icon.HorizontalAlignment=HorizontalAlignment.Center;body.Children.Add(icon);
                 var label=Paint.TextBlock(entry.Name,12,Paint.Text);label.TextAlignment=TextAlignment.Center;label.TextWrapping=TextWrapping.Wrap;label.TextTrimming=TextTrimming.CharacterEllipsis;label.MaxHeight=34;body.Children.Add(label);
                 var app=entry; var cell=Paint.Button(body,()=> { app.Launch(); Hide(); },entry.Name); cell.Padding=new Thickness(7,4,7,4); cell.Margin=new Thickness(2); cell.Background=Brushes.Transparent; items.Children.Add(cell);
                 cell.Width=cellWidth-4;cell.Height=cellHeight-4;cell.ContextMenu=WindowPicker.Menu(app,shell);

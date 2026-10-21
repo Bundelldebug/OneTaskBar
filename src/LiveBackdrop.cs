@@ -19,6 +19,9 @@ namespace OneTaskBar
         interface IDesktopInterop {void CreateDesktopWindowTarget(IntPtr window,[MarshalAs(UnmanagedType.Bool)]bool topmost,out IntPtr target);}
         static object dispatcherQueue;
         static Compositor compositor;
+        static readonly System.Collections.Generic.HashSet<LiveBackdrop> instances=new System.Collections.Generic.HashSet<LiveBackdrop>();
+        internal static int OrphanCount {get{int count=0;foreach(var item in instances)if(item.background!=IntPtr.Zero&&Native.IsWindowVisible(item.background)&&!item.Visible)count++;return count;}}
+        internal static int VisibleCount {get{int count=0;foreach(var item in instances)if(item.background!=IntPtr.Zero&&Native.IsWindowVisible(item.background))count++;return count;}}
         [DllImport("user32.dll",CharSet=CharSet.Unicode)]static extern IntPtr CreateWindowEx(int ex,string cls,string title,uint style,int x,int y,int width,int height,IntPtr parent,IntPtr menu,IntPtr instance,IntPtr data);
         [DllImport("user32.dll")]static extern bool DestroyWindow(IntPtr window);
         [DllImport("dwmapi.dll")]static extern int DwmSetWindowAttribute(IntPtr window,int attribute,ref int value,int size);
@@ -37,7 +40,7 @@ namespace OneTaskBar
         internal LiveBackdrop(Window window,double radius)
         {
             this.window=window;this.radius=radius;
-            Initialize(window.Topmost);
+            try{Initialize(window.Topmost);}catch{Dispose();throw;}
             window.IsVisibleChanged+=(s,e)=>Sync();window.LocationChanged+=(s,e)=>Sync();
             window.Activated+=(s,e)=>Sync(true);
         }
@@ -45,7 +48,7 @@ namespace OneTaskBar
         {
             this.menu=menu;this.radius=radius;
             var source=PresentationSource.FromVisual(menu) as HwndSource;if(source==null)throw new InvalidOperationException("Menu host is not ready");popupHandle=source.Handle;
-            Initialize(true);popupTimer=new DispatcherTimer {Interval=TimeSpan.FromMilliseconds(100)};popupTimer.Tick+=(s,e)=>Resize();popupTimer.Start();
+            try{Initialize(true);}catch{Dispose();throw;}popupTimer=new DispatcherTimer {Interval=TimeSpan.FromMilliseconds(100)};popupTimer.Tick+=(s,e)=>Resize();popupTimer.Start();
         }
         IntPtr Overlay {get{return window!=null?new WindowInteropHelper(window).Handle:popupHandle;}}
         bool Visible {get{return window!=null?window.IsVisible:menu.IsOpen;}}
@@ -73,11 +76,11 @@ namespace OneTaskBar
             root=compositor.CreateContainerVisual();shape=compositor.CreateRoundedRectangleGeometry();root.Clip=compositor.CreateGeometricClip(shape);
             root.BorderMode=CompositionBorderMode.Soft;
             blur=compositor.CreateSpriteVisual();blur.BorderMode=CompositionBorderMode.Soft;blur.Brush=compositor.CreateHostBackdropBrush();root.Children.InsertAtTop(blur);target.Root=root;
-            Resize();
+            instances.Add(this);Resize();
         }
         internal void Sync(bool force=false)
         {
-            if(background==IntPtr.Zero||target==null)return;if(!Visible){if(shown)Native.ShowWindow(background,0);shown=false;return;}
+            if(background==IntPtr.Zero||target==null)return;if(!Visible){root.IsVisible=false;Native.ShowWindow(background,0);shown=false;return;}root.IsVisible=true;
             Native.RectI bounds;var overlay=Overlay;if(!Bounds(out bounds))return;
             if(!force&&shown&&bounds.Left==placedBounds.Left&&bounds.Top==placedBounds.Top&&bounds.Right==placedBounds.Right&&bounds.Bottom==placedBounds.Bottom)return;
             Native.SetWindowPos(background,overlay,bounds.Left,bounds.Top,bounds.Right-bounds.Left,bounds.Bottom-bounds.Top,0x10|0x40);placedBounds=bounds;shown=true;
@@ -96,6 +99,6 @@ namespace OneTaskBar
             shape.Offset=clip.HasValue?new Vector2((float)(clip.Value.X*scale),(float)(clip.Value.Y*scale)):Vector2.Zero;shape.Size=new Vector2(cw,ch);shape.CornerRadius=new Vector2(Math.Min(c,cw/2f),Math.Min(c,ch/2f));
             Sync();
         }
-        public void Dispose() {if(popupTimer!=null)popupTimer.Stop();if(target!=null){target.Root=null;target.Dispose();target=null;}if(root!=null)root.Children.RemoveAll();if(blur!=null){var brush=blur.Brush;blur.Brush=null;blur.Dispose();blur=null;if(brush!=null)brush.Dispose();}if(root!=null){root.Dispose();root=null;}if(shape!=null){shape.Dispose();shape=null;}if(background!=IntPtr.Zero){DestroyWindow(background);background=IntPtr.Zero;}}
+        public void Dispose() {instances.Remove(this);if(popupTimer!=null)popupTimer.Stop();if(target!=null){target.Root=null;target.Dispose();target=null;}if(root!=null)root.Children.RemoveAll();if(blur!=null){var brush=blur.Brush;blur.Brush=null;blur.Dispose();blur=null;if(brush!=null)brush.Dispose();}if(root!=null){root.Dispose();root=null;}if(shape!=null){shape.Dispose();shape=null;}if(background!=IntPtr.Zero){DestroyWindow(background);background=IntPtr.Zero;}}
     }
 }

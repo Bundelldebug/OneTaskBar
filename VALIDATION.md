@@ -1,3 +1,22 @@
+# Validation — 0.5.5
+
+Windows 11 x64, .NET Framework 4.8, two monitors at 200% and 125% DPI, 143 installed apps and 16 logical processors. Results describe this development PC.
+
+- Build/self-test passed. Background-worker fixture used exactly two threads with peak concurrency two, excluded the caller/UI thread, and both Windows EcoQoS requests succeeded. No CPU affinity or machine power-policy changes were made. Windows chooses the actual core; individual E/LP-E residency was not measured.
+- Lazy icon UI fixture initially decoded 30 visible icons; scrolling loaded the last viewport, with 59 cached after the sequence. Stable backdrop, 98 edge-alpha values, 48-DIP fractional scrolling, repeated dismissal and Task Manager menu passed.
+- Actual installed app, media active on two monitors with Windows notifications allowed: a 10.11-second post-optimization sample recorded private memory 176.0–176.3 MiB, working set 231.7–232.0 MiB, and main-process CPU 0.241% normalized across 16 logical processors. No forced garbage collection or working-set trim was used. These samples preceded the final helper fix and **excluded the helper**, so they must not be used as total application CPU claims.
+- The subsequent whole-product investigation found four old recovery helpers, each consuming approximately one logical core. The message-loop path was removed entirely in favor of an EcoQoS helper that sleeps on the owner handle and checks only the emergency chord every 20 ms. The final isolated recovery regression used 1.30% of one core during a short 1.2-second cold-start sample, rejected a duplicate helper, honored the disabled emergency setting, terminated only its hung fixture when enabled, and exited afterward. Owner-lifetime waits and recovery waits now use native blocking handles.
+- Final **whole-product** measurement after six seconds of warm-up, with both processes confirmed alive: eight-second sample, main CPU 0.207%, helper CPU 0.000%, 152.4/14.5 MiB private bytes and 203.4/19.6 MiB working set respectively (16 logical processors). Total working set was 223.0 MiB. Normal installed packaged shutdown left no helpers; relaunch succeeded. These are sampled values, not a fixed resource budget.
+- Final Setup extracted exactly 19 allowlisted files with matching SHA-256 values; PowerShell parsing passed.
+- Live DWM preview content measured 292 × 171 DIP, with two real fixture thumbnails, narrow-monitor pagination, source activation, no focus stealing and thumbnail disposal all passing.
+- Shared media controls dispatched play/next/previous and seek-to-65% without changing the user's actual player; both output buttons share the same callback. Idle media height including margin is 62 DIP. Default Windows output is read from the actual multimedia endpoint, not inferred from the track.
+- Now bar: software-layered content and blur remained synchronized; original-slot click collapsed it; marquee, interrupted morph, monotonic collapse, transparent click-through and Alt+Tab exclusion passed. The fixture reached 44/188 DIP heights, had 46 edge-alpha values and a maximum sampled collapse gap of 25.3 ms.
+- Popup checks found no orphan visible backdrops; outside clicks closed and released context-menu blur. Low slider values changed both cap axes and zero left no white fill. Notification/quick panels remained mutually exclusive across 110 samples and rapid reversals.
+- Normal installed EXE launch automatically activated the registered identity and retained notification access. OneTaskBar's own suppressed-popup test toast was received with its icon and original protocol payload, then removed by its own tag/group. No user's notification was activated or cleared by this check.
+- No OS reboot, power-off, sleep or lock was performed. Battery-runtime improvements were not measured over a full discharge cycle. Unsigned local notification registration is optional and is not a production-signed package.
+
+The native Windows Start invocation limitation documented below remains; the custom app drawer is the default. Personal JSON, logs, screenshots, recordings and developer packages are excluded from Git and the installer.
+
 # Validation — 0.5.2
 
 Windows 11 x64, .NET Framework 4.8. Build and self-test passed, including compact launcher bounds, mixed-DPI Now bar placement and artwork contrast fixtures. These results are development-PC checks, not universal frame-rate or driver guarantees.

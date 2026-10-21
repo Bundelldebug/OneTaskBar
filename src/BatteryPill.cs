@@ -43,12 +43,10 @@ namespace OneTaskBar
             var outline=new RectangleGeometry(rect,height/2,height/2);
             if(!State.Known){int watts=PowerDisplay.Clamp(Preferences.Current.DesktopPowerWatts);if(watts>0){dc.DrawRoundedRectangle(Paint.Ink,null,rect,height/2,height/2);Digits(dc,watts+" W",rect,Paint.Text,false);}return;}
             double fillWidth=width*Math.Max(0,State.Level)/100*(Celebration?Reveal:1);
-            var filled=new RectangleGeometry(new Rect(rect.X,rect.Y,fillWidth,height));
             string label=State.Level>=0?State.Level.ToString():"–";bool bolt=State.Connected||Celebration;
             dc.PushClip(outline);dc.DrawRectangle(Paint.Brush(Celebration?"#FF5F7470":"#667B8581"),null,rect);
             if(fillWidth>0)dc.DrawRectangle(Celebration?ChargeBrush():Paint.Ink,null,new Rect(rect.X,rect.Y,fillWidth,height));
-            Digits(dc,label,rect,Celebration?Paint.Text:Paint.Ink,bolt);
-            if(!Celebration&&fillWidth>0){dc.PushClip(filled);Digits(dc,label,rect,Paint.Text,bolt);dc.Pop();}
+            Digits(dc,label,rect,Paint.Text,bolt);
             dc.Pop();
         }
     }

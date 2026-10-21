@@ -4,6 +4,6 @@
   <Properties><DisplayName>One TaskBar</DisplayName><PublisherDisplayName>OneTaskBar contributors</PublisherDisplayName><Logo>assets\StoreLogo.png</Logo><uap10:AllowExternalContent>true</uap10:AllowExternalContent></Properties>
   <Resources><Resource Language="ko-kr"/><Resource Language="en-us"/></Resources>
   <Dependencies><TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.22000.0" MaxVersionTested="10.0.26100.0"/></Dependencies>
-  <Applications><Application Id="OneTaskBar" Executable="OneTaskBar.exe" uap10:TrustLevel="mediumIL" uap10:RuntimeBehavior="win32App"><uap:VisualElements DisplayName="One TaskBar" Description="A desktop dock and launcher for Windows" BackgroundColor="transparent" Square150x150Logo="assets\Square150x150Logo.png" Square44x44Logo="assets\Square44x44Logo.png"/></Application></Applications>
-  <Capabilities><uap3:Capability Name="userNotificationListener"/><rescap:Capability Name="runFullTrust"/><DeviceCapability Name="bluetooth"/><DeviceCapability Name="radios"/></Capabilities>
+  <Applications><Application Id="OneTaskBar" Executable="OneTaskBar.exe" EntryPoint="Windows.FullTrustApplication" uap10:TrustLevel="mediumIL" uap10:RuntimeBehavior="packagedClassicApp"><uap:VisualElements AppListEntry="none" DisplayName="One TaskBar" Description="A desktop dock and launcher for Windows" BackgroundColor="transparent" Square150x150Logo="assets\Square150x150Logo.png" Square44x44Logo="assets\Square44x44Logo.png"/></Application></Applications>
+  <Capabilities><uap3:Capability Name="userNotificationListener"/><rescap:Capability Name="runFullTrust"/><rescap:Capability Name="unvirtualizedResources"/><DeviceCapability Name="bluetooth"/><DeviceCapability Name="radios"/></Capabilities>
 </Package>

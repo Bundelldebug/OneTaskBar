@@ -15,7 +15,8 @@ namespace OneTaskBar
     internal static class AppLog
     {
         internal static readonly string Root=AppDomain.CurrentDomain.BaseDirectory;
-        internal static readonly string Data=Environment.GetEnvironmentVariable("ONE_TASKBAR_DATA")??Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"OneTaskBar","Data");
+        internal static readonly string Data=Environment.GetEnvironmentVariable("ONE_TASKBAR_DATA")??InstalledData();
+        static string InstalledData(){string sibling=Path.GetFullPath(Path.Combine(Root,"..","Data"));return String.Equals(Path.GetFileName(Root.TrimEnd(Path.DirectorySeparatorChar)),"App",StringComparison.OrdinalIgnoreCase)&&File.Exists(Path.Combine(sibling,"installation.json"))?sibling:Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"OneTaskBar","Data");}
         static readonly object gate=new object(); static readonly HashSet<string> once=new HashSet<string>();
         internal static void Write(string area,string message) { try { lock(gate) { Directory.CreateDirectory(Data); File.AppendAllText(Path.Combine(Data,"app.log"),DateTimeOffset.Now.ToString("o")+" ["+area+"] "+message+Environment.NewLine); } } catch { } }
         internal static void Once(string area,string message) { lock(gate) { if(!once.Add(area)) return; } Write(area,message); }
@@ -25,12 +26,15 @@ namespace OneTaskBar
     {
         internal const string AppName="One TaskBar";
         internal static bool Inspectable;
-        [STAThread] static int Main(string[] args)
+        [STAThread] static int Main(string[] args){int code=Run(args);Environment.Exit(code);return code;}
+        static int Run(string[] args)
         {
             Native.SetProcessDpiAwarenessContext(new IntPtr(-4));
             Inspectable=args.Contains("--qa")||File.Exists(Path.Combine(AppLog.Data,"ui-inspection.flag"));
             if(args.Length>0 && args[0]=="--guard") { Guard(args); return 0; }
             if(args.Contains("--stop")) { Signal("Stop"); return 0; }
+            if(args.Length==3&&args[0]=="--register-notifications")return NotificationIdentity.RegisterHelper(args[1],args[2]);
+            if(args.Length>0&&args[0]=="--notification-restart")return NotificationIdentity.RestartHelper(args);
             if(args.Contains("--notification-probe")) { Signal("ProbeNotifications"); return 0; }
             if(args.Contains("--panel-probe")) { Signal("ProbePanels"); return 0; }
             if(args.Contains("--native-panels-probe")) {
@@ -51,6 +55,10 @@ namespace OneTaskBar
             if(args.Contains("--power-menu-probe"))return SystemPower.Probe();
             if(args.Contains("--quick-feature-probe"))return QuickFeatureChecks.Run();
             if(args.Contains("--nowbar-probe"))return NowBarChecks.Run();
+            if(args.Contains("--panel-transition-probe"))return PanelTransitionChecks.Run();
+            if(args.Contains("--window-preview-probe"))return WindowPreviewChecks.Run(args.Contains("--inspect"));
+            if(args.Contains("--popup-probe"))return PopupChecks.Run();
+            if(args.Contains("--identity-package-probe"))return IdentityPackage.Probe();
             if(args.Contains("--dock-motion-probe"))return DockMotionChecks.Run();
             if(args.Contains("--osd-mask-fixture")){var mask=new NativeOsdGate(()=>true,()=>false,()=>true);mask.Refresh();AppLog.Json("osd-mask-fixture.json",new {prepared=mask.Prepared,windows=mask.MaskedWindows.Select(h=>h.ToInt64()).ToArray()});return mask.Prepared>0?0:1;}
             if(args.Contains("--osd-recovery-probe"))return OsdChecks.Recovery();
@@ -67,18 +75,20 @@ namespace OneTaskBar
             if(args.Contains("--recover")) {int index=Array.IndexOf(args,"--session");DesktopLease.Recover(index>=0&&index+1<args.Length?args[index+1]:null);NativeOsdGate.Recover();return 0;}
             if(args.Contains("--guard-fixture")){Thread.Sleep(Timeout.Infinite);return 0;}
             if(args.Contains("--render")) return Render(args);
+            if(NotificationIdentity.Bootstrap(args))return 0;
             bool created;
             using(var mutex=new Mutex(true,@"Local\OneTaskBar.Desktop",out created)) {
-                if(!created) { Signal("Show"); return 0; }
+                if(!created) { Signal(args.Contains("--connect-notifications")?"ConnectNotifications":"Show"); return 0; }
                 ShellController shell=null;
                 try {
                     var app=new Application { ShutdownMode=ShutdownMode.OnExplicitShutdown };
                     app.DispatcherUnhandledException+=(s,e)=> { AppLog.Write("ui-error",e.Exception.ToString()); Native.RestoreTaskbars(); if(shell!=null) shell.Dispose(); app.Shutdown(1); e.Handled=true; };
                     shell=new ShellController();
                     app.Exit+=(s,e)=>shell.Dispose();
-                    bool packaged=false;try{packaged=Windows.ApplicationModel.Package.Current!=null;}catch{}
+                    bool packaged=NotificationIdentity.IsCurrent;
                     shell.Start(args.Contains("--desktop")||packaged&&Preferences.Current.DesktopMode&&!args.Contains("--settings"));
-                    app.Run(); return 0;
+                    if(args.Contains("--connect-notifications"))app.Dispatcher.BeginInvoke(new Action(()=>shell.ShowNotificationConnection(true)));
+                    int exitCode=app.Run();Environment.Exit(exitCode);return exitCode;
                 } catch(Exception e) { AppLog.Write("fatal",e.ToString()); if(shell!=null) shell.Dispose(); Native.RestoreTaskbars(); return 1; }
             }
         }
@@ -95,11 +105,12 @@ namespace OneTaskBar
         {
             var checks=new List<string>();
             try {
-                RuntimeDockOrder.Check();checks.Add("stable-launch-order");LauncherLayout.Check();checks.Add("compact-launcher-layout");NowBarLayout.Check();checks.Add("nowbar-monitor-layout");ArtworkPalette.Check();checks.Add("artwork-color-contrast");
+                EfficiencyChecks.Validate(checks);RuntimeDockOrder.Check();checks.Add("stable-launch-order");LauncherLayout.Check();checks.Add("compact-launcher-layout");NowBarLayout.Check();checks.Add("nowbar-monitor-layout");ArtworkPalette.Check();checks.Add("artwork-color-contrast");
                 foreach(double width in new double[] { 1,200,288,344,600 }) foreach(double value in new double[] { -20,0,1,33,99,100,120 }) {
                     double f=PillSlider.FillWidth(width,value);
                     if(f<0 || f>width || (value==100 && f!=width)) throw new Exception("Slider endpoint "+width+" "+value);
                 } checks.Add("Slider fill has exact 0/100 endpoints, clamped inputs and responsive widths");
+                foreach(double width in new[]{20.0,90,260,600})foreach(double level in new[]{0.0,1,3,9.99,10,50,100}) {var cap=PillSlider.CapsuleFillBounds(width,44,level);if(cap.Width>width||cap.Height>44||level==0&&cap.Width!=0||level<10&&cap.Width!=cap.Height||level==100&&cap.Width!=width)throw new Exception("Slider low-value morph bounds");}checks.Add("Slider shape shrinks in both axes below ten and empties at zero; semantic values remain 0–100");
                 if(PillSlider.Clamp(Double.NaN)!=0 || PillSlider.Clamp(Double.PositiveInfinity)!=0) throw new Exception("Invalid scalar accepted");
                 if(!PowerState.From(true,1,8,70).Connected || !PowerState.From(true,1,8,70).Charging) throw new Exception("Charging flag");
                 if(!PowerState.From(true,1,1,100).Connected || PowerState.From(true,1,1,100).Charging) throw new Exception("Full plugged state");
@@ -222,7 +233,7 @@ namespace OneTaskBar
                 var editingQuick=new QuickWindow(shell);editingQuick.Height=840;editingQuick.EditLayout(true);editingQuick.Refresh(new PowerState {Known=true,Level=73,Connected=true},62,37,false,true,true);Save(editingQuick.Surface,380,840,Path.Combine(output,"quick-settings-edit.png"));AppLog.Json("layout-preview.json",editingQuick.LayoutSnapshot());editingQuick.Close();
                 var center=new NotificationWindow(shell);shell.Notifications.Allowed=true;shell.Notifications.Packaged=true;
                 shell.Notifications.Items=new List<NotificationEntry>{new NotificationEntry {Id=1,App="One TaskBar",Title="알림 미리 보기",Body="알림을 누르면 원래 알림의 동작으로 연결됩니다.",Created=DateTimeOffset.Now,Icon=new BitmapImage(new Uri(Path.Combine(AppLog.Root,"assets","OneTaskBar.png")))}};
-                center.Refresh();Save(center.Surface,394,720,Path.Combine(output,"notifications-calendar.png"));
+                center.Refresh();Save(center.Surface,394,584,Path.Combine(output,"notifications.png"));
                 var settings=new WelcomeWindow(shell);Save(settings.Surface,700,650,Path.Combine(output,"settings.png"));
                 var finder=new SearchWindow(shell);finder.Configure(720,680);finder.Reset();Save(finder.Surface,720,680,Path.Combine(output,"launcher-search.png"));finder.Query.Text="ChatGPT";Save(finder.Surface,720,680,Path.Combine(output,"launcher-search-results.png"));finder.Query.Text="One UI";finder.Query.Text="소리";Save(finder.Surface,800,650,Path.Combine(output,"launcher-search-settings.png"));finder.Close();
                 var context=WindowPicker.Menu(new AppEntry {Name="One TaskBar"},shell);context.Visibility=Visibility.Visible;Save(context,300,124,Path.Combine(output,"context-menu.png"));

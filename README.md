@@ -19,10 +19,10 @@ Download **OneTaskBar-Setup.exe** from [Releases](https://github.com/Bundelldebu
 - Separate app and status capsules; original Windows/app icons, Windows system font, seconds on the clock, running indicators, and drag-to-reorder pins.
 - Rounded, antialiased surfaces using layered WPF alpha and a matching DirectComposition clip. Blur stays steady while app/search contents animate.
 - Compact app drawer and launcher search, capped at 720 × 680 DIP: apps, Windows settings, local files/images, Korean initial consonants, and removable recent searches. Type directly in the app drawer; active IME composition finishes before the transition.
-- Independent choices for Windows/custom quick settings, notification/calendar, keyboard Start, and search. Windows shortcuts continue to work with the solo Start-key option.
+- Independent choices for Windows/custom quick settings, notifications, keyboard Start, and search. Windows shortcuts continue to work with the solo Start-key option.
 - Touch panning and fractional touchpad scrolling; discrete wheel scrolling uses a short transition.
 - System volume, brightness where supported, radio/device controls, media transport and centered artwork, battery/power mode, and theme toggle.
-- Eight quick toggles read back actual state: mute, dark mode, power efficiency, keep screen awake, Wi-Fi, Bluetooth, dock animations and startup. Unsupported hardware controls are disabled or hidden. Power efficiency selects the Windows performance overlay; it is not a separate Energy Saver implementation. Keep-awake lasts only while the app is running and still allows manual sleep.
+- Nine quick toggles read back actual state: mute, dark mode, Do Not Disturb, power efficiency, keep screen awake, Wi-Fi, Bluetooth, dock animations and startup. Unsupported hardware controls are disabled or hidden. Power efficiency selects the Windows performance overlay; it is not a separate Energy Saver implementation. Keep-awake lasts only while the app is running and still allows manual sleep.
 - A bottom-left Now bar follows active Windows media sessions. Its 44-DIP capsule fits the title up to 320 DIP, scrolls longer titles, and expands into playback/seek controls when the media app supports them. Artwork supplies the background color, adjusted for readable white text. Crowded displays place it above the dock without moving existing app slots.
 - Missing radios, Samsung applications, unsupported brightness devices, and absent batteries are handled without placeholder applications. Desktop users can hide the battery slot or manually show 1–9999 W; this value is **not a measurement**.
 - Charging status updates immediately on AC connection; the battery capsule expands once per cable connection. Startup does not simulate a plug event.
@@ -40,9 +40,9 @@ The emergency shortcut is enabled by default and can be disabled in settings. It
 
 ## Notifications and optional integrations
 
-The standard EXE installer defaults to the **Windows notification center**, which works without package registration or notification-reading permission. The custom calendar remains available by selecting the custom center.
+The standard EXE installer defaults to the **Windows notification center**, which works without package registration or notification-reading permission. The custom center contains notifications without a calendar.
 
-Reading/dismissing Windows notifications in the custom center needs a Windows package identity plus explicit user consent. The unsigned developer identity is **not** installed by Setup. Source users can opt into the development-only procedure in [docs/NOTIFICATIONS.md](docs/NOTIFICATIONS.md); Windows may require elevation for that registration. A broadly distributable signed notification package is not supplied in v0.5.2. Do not expect an unregistered EXE to read notifications.
+Open One TaskBar settings → Windows notification connection to register its optional local identity and request access inside the app. Windows may require a one-time administrator approval for registration and always controls notification consent. Existing registration is reused on normal launch and login. The identity is an **unsigned local-test package**, not a production-signed MSIX; it is optional and is not silently registered by Setup. See [notification setup and limits](docs/NOTIFICATIONS.md). Native Windows notifications remain available.
 
 Samsung Settings / device-connection buttons use applications and logos already installed on the PC; those applications are not bundled. An optional, pre-existing Windhawk charging companion is paused while the dock owns the desktop and resumed on exit. Windhawk is not required for the dock or installed by Setup.
 
@@ -74,6 +74,17 @@ Interactive probes require an unlocked desktop and focus their own test windows.
 No telemetry, account, or background web service is required. Search runs locally. Preferences, recent queries, shell pin caches, and diagnostic logs stay in the data directory. The custom notification center accesses notification data only after Windows permission. An app or document you choose to open may use its own network services.
 
 Code and the original One TaskBar icon are under the [MIT license](LICENSE). [Third-party notices](THIRD_PARTY_NOTICES.txt) include the Liquid Dock reference. This repository contains no Samsung APK, extracted launcher artwork, wallpapers, fonts, or user screenshots/recordings. Installed third-party logos are read at runtime and remain their owners' property. This is an independent project and is not affiliated with Microsoft or Samsung. Open-source licensing does not guarantee that no third party will ever make a copyright or trademark complaint.
+
+## 0.5.5
+
+- Live DWM window previews with enlarged image content, monitor-aware pagination and released thumbnail handles.
+- One shared media player in quick settings and Now bar, including default output-device name and an icon button for switching outputs. Idle media becomes a slim capsule.
+- In-app Windows notification connection, Do Not Disturb toggle, calendar-free notification panel and mutually exclusive quick/notification panels.
+- Softer low-volume/brightness shapes, matched blur during transitions, signal-aware Wi-Fi arcs, click-away context menus and Now bar collapse, and white battery numbers.
+- Background work uses two reusable EcoQoS workers; Windows selects efficient cores on supported hybrid CPUs. No hard CPU affinity is imposed. Icons decode on entering the viewport, media metadata follows change events, and fallback polling is reduced. UI/animation work and urgent keyboard feedback retain their normal execution paths.
+- Battery operation lowers the general UI pulse from 10 to 5 Hz, independently of animation frames and input callbacks. This reduces periodic work; battery-runtime gains have not been measured.
+- Fixes the recovery helper's undispatched STA messages that could saturate a core and leave helpers behind after restart. The helper now uses a sleeping native owner wait with 20-ms emergency-key checks, avoids window-message and file-watcher traffic, and rejects duplicates.
+- Setup resolves physical executable paths for virtualized hosts and skips identical files during updates.
 
 ## 0.5.2
 

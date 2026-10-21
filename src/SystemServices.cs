@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Threading;
 using System.Windows.Media.Imaging;
 using Windows.Devices.Radios;
 using Windows.Media.Control;
@@ -18,8 +19,9 @@ namespace OneTaskBar
         internal double CurrentPosition(DateTime now){return Math.Max(0,Math.Min(Duration,Position+(Playing?Math.Max(0,(now-SampledUtc).TotalSeconds):0)));}
         internal BitmapSource Artwork;
     }
-    internal sealed class SystemServices
+    internal sealed class SystemServices : IDisposable
     {
+        internal string OutputName="오디오 출력";DateTime outputAt;
         internal static async Task<BitmapSource> AppLogo(string appId)
         {
             try {
@@ -45,9 +47,14 @@ namespace OneTaskBar
         internal bool? WifiOn,BluetoothOn;
         internal bool? WifiPresent,BluetoothPresent;internal bool NetworkConnected;DateTime radioProbeAt;
         internal MediaState Media=new MediaState();
-        string artworkKey;
+        string artworkKey;int propertiesDirty=1;DateTime metadataAt;bool disposed;
+        internal int MetadataReads;
+        void PropertiesChanged(GlobalSystemMediaTransportControlsSession sender,MediaPropertiesChangedEventArgs args){Interlocked.Exchange(ref propertiesDirty,1);}
+        void SelectSession(GlobalSystemMediaTransportControlsSession value){if(Object.ReferenceEquals(session,value))return;if(session!=null)try{session.MediaPropertiesChanged-=PropertiesChanged;}catch{}session=value;Interlocked.Exchange(ref propertiesDirty,1);metadataAt=DateTime.MinValue;if(session!=null)try{session.MediaPropertiesChanged+=PropertiesChanged;}catch{}}
+        public void Dispose(){disposed=true;SelectSession(null);manager=null;}
         internal async Task Refresh()
         {
+            if(disposed)return;if(DateTime.UtcNow>=outputAt){outputAt=DateTime.UtcNow.AddSeconds(2);try{OutputName=await BackgroundWork.Run(()=>Native.DefaultAudioOutputName());}catch{OutputName="오디오 출력";}}
             bool radioFailed=false;
             try {
                 if(DateTime.UtcNow>=radioProbeAt) {
@@ -67,22 +74,27 @@ namespace OneTaskBar
             try{NetworkConnected=System.Net.NetworkInformation.NetworkInterface.GetIsNetworkAvailable();}catch{}
             try {
                 if(manager==null)manager=await Wait(GlobalSystemMediaTransportControlsSessionManager.RequestAsync());
-                session=manager.GetCurrentSession(); if(session==null) {Media=new MediaState(); artworkKey=null; return;}
-                var info=session.GetPlaybackInfo();var properties=await Wait(session.TryGetMediaPropertiesAsync());
-                string key=session.SourceAppUserModelId+"|"+properties.Title+"|"+properties.Artist;
-                var state=new MediaState {Available=true,Title=String.IsNullOrWhiteSpace(properties.Title) ? "미디어" : properties.Title,Artist=properties.Artist,AppId=session.SourceAppUserModelId,
+                if(disposed)return;SelectSession(manager.GetCurrentSession()); if(session==null) {if(Media.Available)Media=new MediaState(); artworkKey=null; return;}
+                var info=session.GetPlaybackInfo();var previous=Media;
+                var state=new MediaState {Available=true,Title=previous.Title,Artist=previous.Artist,AppId=session.SourceAppUserModelId,
                     Playing=info.PlaybackStatus==GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing,Active=info.PlaybackStatus==GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing||info.PlaybackStatus==GlobalSystemMediaTransportControlsSessionPlaybackStatus.Paused,
-                    CanPlay=info.Controls.IsPlayPauseToggleEnabled,CanNext=info.Controls.IsNextEnabled,CanPrevious=info.Controls.IsPreviousEnabled,Artwork=Media.Artwork};
+                    CanPlay=info.Controls.IsPlayPauseToggleEnabled,CanNext=info.Controls.IsNextEnabled,CanPrevious=info.Controls.IsPreviousEnabled,Artwork=previous.Artwork};
                 try {var timeline=session.GetTimelineProperties();state.Duration=Math.Max(0,(timeline.EndTime-timeline.StartTime).TotalSeconds);state.Position=Math.Max(0,(timeline.Position-timeline.StartTime).TotalSeconds);state.SampledUtc=timeline.LastUpdatedTime.UtcDateTime;if(Math.Abs((DateTime.UtcNow-state.SampledUtc).TotalDays)>1)state.SampledUtc=DateTime.UtcNow;state.CanSeek=info.Controls.IsPlaybackPositionEnabled&&state.Duration>0;}catch{}
-                if(key!=artworkKey) {
-                    artworkKey=key; state.Artwork=null;
-                    if(properties.Thumbnail!=null)using(var stream=await Wait(properties.Thumbnail.OpenReadAsync()))using(var reader=new DataReader(stream)) {
-                        uint size=(uint)Math.Min(8388608UL,stream.Size);await Wait(reader.LoadAsync(size));var bytes=new byte[size];reader.ReadBytes(bytes);
-                        using(var managed=new MemoryStream(bytes)){var image=new BitmapImage();image.BeginInit();image.CacheOption=BitmapCacheOption.OnLoad;image.DecodePixelWidth=320;image.StreamSource=managed;image.EndInit();image.Freeze();state.Artwork=image;}
+                // Track changes arrive as events; retain a slow fallback for incomplete media providers.
+                if(Interlocked.Exchange(ref propertiesDirty,0)!=0||DateTime.UtcNow>=metadataAt) {
+                    var properties=await Wait(session.TryGetMediaPropertiesAsync());MetadataReads++;metadataAt=DateTime.UtcNow.AddSeconds(30);
+                    state.Title=String.IsNullOrWhiteSpace(properties.Title)?"미디어":properties.Title;state.Artist=properties.Artist;
+                    string key=state.AppId+"|"+properties.Title+"|"+properties.Artist;
+                    if(key!=artworkKey) {
+                        artworkKey=key;state.Artwork=null;
+                        if(properties.Thumbnail!=null)using(var stream=await Wait(properties.Thumbnail.OpenReadAsync()))using(var reader=new DataReader(stream)) {
+                            uint size=(uint)Math.Min(8388608UL,stream.Size);await Wait(reader.LoadAsync(size));var bytes=new byte[size];reader.ReadBytes(bytes);
+                            using(var managed=new MemoryStream(bytes)){var image=new BitmapImage();image.BeginInit();image.CacheOption=BitmapCacheOption.OnLoad;image.DecodePixelWidth=320;image.StreamSource=managed;image.EndInit();image.Freeze();state.Artwork=image;}
+                        }
                     }
                 }
                 Media=state;
-            } catch(Exception e) {AppLog.Once("media",e.Message); Media=new MediaState();artworkKey=null;}
+            } catch(Exception e) {AppLog.Once("media",e.Message); Media=new MediaState();artworkKey=null;Interlocked.Exchange(ref propertiesDirty,1);}
         }
         internal async Task<bool> ToggleRadio(string kind)
         {

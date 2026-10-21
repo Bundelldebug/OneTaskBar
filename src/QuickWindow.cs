@@ -20,12 +20,10 @@ namespace OneTaskBar
         readonly BatteryPill battery=new BatteryPill {Width=62,Height=25};
         readonly TextBlock time=Paint.TextBlock("",23,Paint.Text),date=Paint.TextBlock("",11,Paint.Muted);
         readonly TextBlock wifiName=Paint.TextBlock("연결 안 됨",11,Paint.Muted),bluetoothState=Paint.TextBlock("기기 연결",11,Paint.Muted);
-        readonly TextBlock mediaTitle=Paint.TextBlock("재생 중인 미디어 없음",14,Paint.Text),artist=Paint.TextBlock("음악이나 동영상을 재생해 보세요",11,Paint.Muted);
+        readonly MediaPlayerView mediaPlayer;
         readonly Border wifiCircle,bluetoothCircle;
-        readonly ImageBrush artworkBrush=new ImageBrush {Stretch=Stretch.UniformToFill,AlignmentX=AlignmentX.Center,AlignmentY=AlignmentY.Center};
-        readonly Border artwork=new Border {Width=52,Height=52,CornerRadius=new CornerRadius(13)};
-        readonly Glyph playGlyph=new Glyph("play",22),wifiGlyph=new Glyph("wifi",20),bluetoothGlyph=new Glyph("bluetooth",20);
-        readonly Button play,next,previous,mute,samsungSettings;
+        readonly Glyph wifiGlyph=new Glyph("wifi",20),bluetoothGlyph=new Glyph("bluetooth",20);
+        readonly Button mute,samsungSettings;
         readonly Button footerPower,topPower;readonly FrameworkElement wifiTile,bluetoothTile,devicesTile,windowsTile;readonly Grid connections;readonly UniformGrid shortcuts;
         readonly Dictionary<string,FrameworkElement> sectionFrames=new Dictionary<string,FrameworkElement>();
         readonly Button themeToggle;
@@ -38,7 +36,7 @@ namespace OneTaskBar
         internal string[] ToggleKeys {get{return toggleButtons.Keys.ToArray();}}
         readonly List<TextBlock> actionNames=new List<TextBlock>();
         readonly TextBlock notice=Paint.TextBlock("",11,Paint.Muted);
-        bool themeBusy;string currentMedia;bool? darkMode;
+        bool themeBusy;bool? darkMode;
         System.Windows.Media.ImageSource samsungIcon;
         internal bool SamsungIconLoaded {get{return samsungIcon!=null;}}
         readonly Border muteCircle;
@@ -69,7 +67,7 @@ namespace OneTaskBar
             var power=Paint.Button(battery,()=>shell.ShowDetail("power"),"배터리 및 전원");power.Background=Brushes.Transparent;power.Padding=new Thickness(0);power.HorizontalAlignment=HorizontalAlignment.Left;footer.Children.Add(power);
             footerPower=power;
             var edit=Paint.Button(editLabel,()=>EditLayout(!editing),"빠른 설정 항목 · 묶음 위치 바꾸기");edit.HorizontalAlignment=HorizontalAlignment.Center;edit.Padding=new Thickness(9,3,9,3);footer.Children.Add(edit);
-            var native=Paint.Action("알림 · 달력  ›",()=>shell.ToggleNotifications(null));native.HorizontalAlignment=HorizontalAlignment.Right;native.Background=Brushes.Transparent;native.Padding=new Thickness(8,3,0,3);footer.Children.Add(native);
+            var native=Paint.Action("알림  ›",()=>shell.ToggleNotifications(null));native.HorizontalAlignment=HorizontalAlignment.Right;native.Background=Brushes.Transparent;native.Padding=new Thickness(8,3,0,3);footer.Children.Add(native);
             DockPanel.SetDock(footer,Dock.Bottom);root.Children.Add(footer);
             sections=new ReorderGroup("quick.sections",body,Orientation.Vertical,()=>editing);groups.Add(sections);
             var scrolled=new DockPanel();
@@ -81,10 +79,11 @@ namespace OneTaskBar
             var pair=new ReorderGroup("quick.connections",connections,Orientation.Horizontal,()=>editing,PlacePair);groups.Add(pair);
             wifiTile=Connection("Wi-Fi",wifiName,wifiGlyph,()=>shell.Radio("wifi"),()=>shell.ShowDetail("wifi"),out wifiCircle);pair.Add("wifi",wifiTile);
             bluetoothTile=Connection("블루투스",bluetoothState,bluetoothGlyph,()=>shell.Radio("bluetooth"),()=>shell.ShowDetail("bluetooth"),out bluetoothCircle);pair.Add("bluetooth",bluetoothTile);AddSection("connections",connections);
-            var actions=new UniformGrid {Columns=4,Rows=2,Height=140,Margin=new Thickness(7,7,7,4),VerticalAlignment=VerticalAlignment.Top};actionButtons=actions;
+            var actions=new UniformGrid {Columns=4,Rows=3,Height=210,Margin=new Thickness(7,7,7,4),VerticalAlignment=VerticalAlignment.Top};actionButtons=actions;
             var actionOrder=new ReorderGroup("quick.actions",actions,Orientation.Horizontal,()=>editing);groups.Add(actionOrder);
             actionOrder.Add("mute",RoundAction("volume","음소거","mute"));
             actionOrder.Add("theme",RoundAction("moon","다크 모드","theme"));
+            actionOrder.Add("dnd",RoundAction("dnd","방해 금지","dnd"));
             actionOrder.Add("efficiency",RoundAction("leaf","전력 절약","efficiency"));
             actionOrder.Add("awake",RoundAction("window","화면 유지","awake"));
             actionOrder.Add("wifi",RoundAction("wifi","Wi-Fi","wifi"));
@@ -98,19 +97,11 @@ namespace OneTaskBar
             themeCircle=new Border {Width=44,Height=44,CornerRadius=new CornerRadius(22),Background=Paint.Brush(QuickPanel.Inactive),Child=themeToggle};AddSection("brightness",SliderRow(brightness,themeCircle));
             mute=IconButton("volume",()=>shell.Mute(),"음소거 전환",44);soundGlyphs.Add((Glyph)mute.Content);muteCircle=new Border {Width=44,Height=44,CornerRadius=new CornerRadius(22),Background=Paint.Brush(QuickPanel.Inactive),Child=mute};
             AddSection("volume",SliderRow(volume,muteCircle));
-            var media=new Grid {MinHeight=90,Margin=new Thickness(15,10,15,10)};
-            media.ColumnDefinitions.Add(new ColumnDefinition());media.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(60)});
-            var labels=new StackPanel {VerticalAlignment=VerticalAlignment.Top,Margin=new Thickness(0,0,8,0)};mediaTitle.FontWeight=FontWeights.SemiBold;mediaTitle.TextTrimming=TextTrimming.CharacterEllipsis;artist.TextTrimming=TextTrimming.CharacterEllipsis;
-            labels.Children.Add(mediaTitle);labels.Children.Add(artist);media.Children.Add(labels);
-            artwork.Background=artworkBrush;artwork.VerticalAlignment=VerticalAlignment.Top;Grid.SetColumn(artwork,1);media.Children.Add(artwork);
-            var transport=new StackPanel {Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Bottom,HorizontalAlignment=HorizontalAlignment.Left,Margin=new Thickness(-6,44,0,0)};
-            previous=IconButton("previous",()=>shell.Media("previous"),"이전 곡",40);next=IconButton("next",()=>shell.Media("next"),"다음 곡",40);
-            play=Paint.Button(playGlyph,()=>shell.Media("play"),"재생 · 일시 정지");play.Width=48;play.Height=40;play.Padding=new Thickness(0);play.Background=Brushes.Transparent;play.BorderBrush=Brushes.Transparent;play.BorderThickness=new Thickness(0);
-            transport.Children.Add(previous);transport.Children.Add(play);transport.Children.Add(next);media.Children.Add(transport);
-            var output=Paint.Action("출력  ›",()=>shell.ShowDetail("sound"));output.FontSize=11;output.HorizontalAlignment=HorizontalAlignment.Right;output.VerticalAlignment=VerticalAlignment.Bottom;output.Padding=new Thickness(8,6,8,6);Grid.SetColumn(output,1);media.Children.Add(output);
-            AddSection("media",Card(media,28,new Thickness(0,0,0,10)));
+            mediaPlayer=new MediaPlayerView(shell.Media,shell.SeekMedia,()=>shell.ShowDetail("sound"));
+            var mediaCard=Card(mediaPlayer,28,new Thickness(0,0,0,10));mediaPlayer.PaletteChanged=palette=>{mediaCard.Background=mediaPlayer.IsCompact?QuickPanel.Card:palette.Glass;mediaCard.CornerRadius=new CornerRadius(mediaPlayer.IsCompact?34:28);};AddSection("media",mediaCard);
             shortcuts=new UniformGrid {Columns=2};var bottomOrder=new ReorderGroup("quick.shortcuts",shortcuts,Orientation.Horizontal,()=>editing,PlacePair);groups.Add(bottomOrder);
             devicesTile=WideTile("devices","주변 기기 연결","samsung-devices",new Thickness(0));windowsTile=WideTile("windows-settings","Windows 설정","windows-settings",new Thickness(0));bottomOrder.Add("devices",devicesTile);bottomOrder.Add("focus",windowsTile);AddSection("shortcuts",shortcuts);
+            var utilities=new Grid {Margin=new Thickness(0,10,0,10)};utilities.ColumnDefinitions.Add(new ColumnDefinition());utilities.ColumnDefinitions.Add(new ColumnDefinition());var capture=WideTile("screenshot","화면 캡처","screen-capture",new Thickness(0,0,5,0));var manager=WideTile("task-manager","작업 관리자","task-manager",new Thickness(5,0,0,0));Grid.SetColumn(manager,1);utilities.Children.Add(capture);utilities.Children.Add(manager);AddSection("utilities",utilities);
             root.Children.Add(new SmoothScrollViewer {Content=scrolled,VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});Surface.Child=root;brightness.Light=volume.Light=true;brightness.DarkTrack=volume.DarkTrack=true;ApplyOrder();
             LayoutOrder.Changed+=OrderChanged;DragReorder.Finished+=DragFinished;Closed+=(s,e)=> {LayoutOrder.Changed-=OrderChanged;DragReorder.Finished-=DragFinished;};
             brightness.Changed+=v=>shell.Bright(v);volume.Changed+=v=>shell.Volume(v);
@@ -154,7 +145,7 @@ namespace OneTaskBar
         internal object AudioSnapshot() {return new {slider=volume.Kind,buttons=soundGlyphs.Select(g=>g.Kind).ToArray()};}
         void PresentActions(bool animate)
         {
-            int token=++actionMotion;bool show=expanded||editing;double from=actionArea.Height,target=show?162:62;actionArea.BeginAnimation(HeightProperty,null);actionArea.Height=target;
+            int token=++actionMotion;bool show=expanded||editing;double from=actionArea.Height,target=show?232:62;actionArea.BeginAnimation(HeightProperty,null);actionArea.Height=target;
             if(animate&&Motion.Enabled&&IsVisible)actionArea.BeginAnimation(HeightProperty,Motion.PanelTween(from,target,330));
             foreach(var name in actionNames){name.BeginAnimation(OpacityProperty,null);if(show){name.Visibility=Visibility.Visible;Motion.Fade(name,animate?0:1,1,220);}else if(animate&&Motion.Enabled&&name.IsVisible){var fade=Motion.Tween(name.Opacity,0,150);fade.Completed+=(s,e)=> {if(token==actionMotion)name.Visibility=Visibility.Collapsed;};name.Opacity=0;name.BeginAnimation(OpacityProperty,fade);}else {name.Visibility=Visibility.Collapsed;name.Opacity=0;}}
         }
@@ -166,6 +157,7 @@ namespace OneTaskBar
                 if(key=="mute"){bool before=shell.Audio.Muted;shell.Mute();shell.Audio.Read();if(shell.Audio.Muted==before)throw new InvalidOperationException("Windows 음소거 상태를 변경하지 못했습니다.");}
                 else if(key=="theme"){var before=WindowsTheme.Read(true);if(!before.Available)throw new InvalidOperationException("Windows 색 모드를 읽지 못했습니다.");await Task.Run(()=>WindowsTheme.SetDark(!before.Dark));WindowsTheme.Invalidate();}
                 else if(key=="efficiency")shell.Toggles.ToggleEfficiency();
+                else if(key=="dnd")await shell.Toggles.Disturb.Toggle();
                 else if(key=="awake")shell.Toggles.SetAwake(!shell.Toggles.Awake);
                 else if(key=="animations")Preferences.Set(p=>p.Animations=!p.Animations);
                 else if(key=="startup")shell.Toggles.ToggleStartup();
@@ -206,6 +198,7 @@ namespace OneTaskBar
         }
         void OpenPage(string page)
         {
+            if(page=="screen-capture"){shell.OpenScreenCapture();return;}if(page=="task-manager"){shell.OpenTaskManager();return;}
             if(page=="mute"){shell.Mute();return;}if(page=="notifications"){shell.ToggleNotifications(null);return;}if(page=="apps"){shell.ToggleDrawer(null);return;}if(page=="settings"){shell.OpenHomeSettings();return;}if(page=="windows-settings"){shell.OpenWindowsSettings();return;}if(page=="samsung-devices"){shell.OpenSamsungDevices();return;}
             if(page=="desktop"){foreach(var entry in shell.Running)foreach(var h in entry.Windows)Native.ShowWindow(h,6);Hide();return;}shell.ShowDetail(page);
         }
@@ -243,11 +236,10 @@ namespace OneTaskBar
             Motion.Background(wifiCircle,wifi?Paint.ControlWhiteColor:QuickPanel.Inactive);Motion.Background(bluetoothCircle,bluetooth?Paint.ControlWhiteColor:QuickPanel.Inactive);
             wifiGlyph.Color=wifi?Paint.Ink:Paint.ControlWhite;bluetoothGlyph.Color=bluetooth?Paint.Ink:Paint.ControlWhite;wifiGlyph.InvalidateVisual();bluetoothGlyph.InvalidateVisual();
             wifiGlyph.Opacity=wifi?1:.5;bluetoothGlyph.Opacity=bluetooth?1:.5;wifiName.Text=shell.Wifi??(wifi?"연결 안 됨":"꺼짐");bluetoothState.Text=shell.Services.BluetoothOn.HasValue?(bluetooth?"켜짐":"꺼짐"):"연결 설정";
-            var efficiency=shell.Toggles.Power();
-            foreach(var pair in toggleButtons){string key=pair.Key;bool value=key=="mute"?muted:key=="theme"?theme.Dark:key=="efficiency"?efficiency.Selected==QuickActions.EfficientMode:key=="awake"?shell.Toggles.Awake:key=="wifi"?wifi:key=="bluetooth"?bluetooth:key=="animations"?Preferences.Current.Animations:shell.Toggles.Startup;
-                bool available=!pendingToggles.Contains(key)&&(key=="mute"?audioAvailable:key=="theme"?theme.Available&&!themeBusy:key=="efficiency"?efficiency.Available:key=="wifi"?shell.Services.WifiPresent!=false:key=="bluetooth"?shell.Services.BluetoothPresent!=false:true);pair.Value.RefreshState(value,available);}
-            var media=shell.Services.Media;string mediaKey=media.Title+"|"+media.Artist;if(currentMedia!=mediaKey){currentMedia=mediaKey;Motion.Fade(mediaTitle,.4,1,200);Motion.Fade(artist,.4,1,200);}mediaTitle.Text=media.Title;artist.Text=media.Artist;if(artworkBrush.ImageSource!=media.Artwork){artworkBrush.ImageSource=media.Artwork;Motion.Fade(artwork,.15,1,220);}play.IsEnabled=media.Available&&media.CanPlay;next.IsEnabled=media.CanNext;previous.IsEnabled=media.CanPrevious;
-            playGlyph.Kind=media.Playing?"pause":"play";playGlyph.InvalidateVisual();
+            var efficiency=shell.Toggles.Power();var disturb=shell.Toggles.Disturb.State;
+            foreach(var pair in toggleButtons){string key=pair.Key;bool value=key=="mute"?muted:key=="theme"?theme.Dark:key=="dnd"?disturb.Enabled:key=="efficiency"?efficiency.Selected==QuickActions.EfficientMode:key=="awake"?shell.Toggles.Awake:key=="wifi"?wifi:key=="bluetooth"?bluetooth:key=="animations"?Preferences.Current.Animations:shell.Toggles.Startup;
+                bool available=!pendingToggles.Contains(key)&&(key=="mute"?audioAvailable:key=="theme"?theme.Available&&!themeBusy:key=="dnd"?disturb.Available:key=="efficiency"?efficiency.Available:key=="wifi"?shell.Services.WifiPresent!=false:key=="bluetooth"?shell.Services.BluetoothPresent!=false:true);pair.Value.RefreshState(value,available);}
+            mediaPlayer.Update(shell.Services.Media,shell.Services.OutputName);
         }
     }
 }

@@ -67,7 +67,7 @@ namespace OneTaskBar
         static TextBlock Label(string text,double size,Brush color) {var label=Paint.TextBlock(text,size,color==Paint.Ink?Paint.Text:color==LightPanel.Muted?Paint.Muted:color);label.TextTrimming=TextTrimming.CharacterEllipsis;return label;}
         void AppCard(string title,List<AppEntry> apps)
         {
-            var wrap=new WrapPanel();foreach(var entry in apps){var app=entry;var body=new StackPanel {Width=88,Height=96};FrameworkElement icon=app.Icon!=null?AppIcons.Visual(app.Icon,44):new Glyph("window",44){Color=Paint.Text};icon.HorizontalAlignment=HorizontalAlignment.Center;icon.Margin=new Thickness(0,4,0,9);body.Children.Add(icon);var text=Label(app.Name,12,Paint.Ink);text.TextAlignment=TextAlignment.Center;text.TextWrapping=TextWrapping.Wrap;text.MaxHeight=34;body.Children.Add(text);
+            var wrap=new WrapPanel();foreach(var entry in apps){var app=entry;var body=new StackPanel {Width=88,Height=96};FrameworkElement icon=AppIcons.Visual(app,44);icon.HorizontalAlignment=HorizontalAlignment.Center;icon.Margin=new Thickness(0,4,0,9);body.Children.Add(icon);var text=Label(app.Name,12,Paint.Ink);text.TextAlignment=TextAlignment.Center;text.TextWrapping=TextWrapping.Wrap;text.MaxHeight=34;body.Children.Add(text);
                 Action launch=()=>Open(()=>app.Launch(),app.Name);if(first==null)first=launch;var button=Paint.Button(body,launch,app.Name);button.Padding=new Thickness(3);button.Margin=new Thickness(2);button.Background=Brushes.Transparent;button.ContextMenu=WindowPicker.Menu(app,shell);wrap.Children.Add(button);}Card(title,wrap);
         }
         void SettingCard(string title,IEnumerable<SearchSetting> settings)

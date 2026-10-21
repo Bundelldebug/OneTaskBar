@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.IO;
 using System.Threading.Tasks;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -13,6 +14,24 @@ namespace OneTaskBar
     {
         static readonly ConcurrentDictionary<string,Lazy<ImageSource>> cache=new ConcurrentDictionary<string,Lazy<ImageSource>>(StringComparer.OrdinalIgnoreCase);
         sealed class Plate {internal bool Needed;}
+        static readonly SemaphoreSlim loaders=new SemaphoreSlim(3);
+        internal static int CachedCount {get{return cache.Count;}}
+        internal static FrameworkElement Visual(AppEntry app,double size){return app.Icon!=null?Visual(app.Icon,size):new DeferredIcon(app,size);}
+        // Decode only icons that have entered a visible viewport, with bounded parallel work.
+        sealed class DeferredIcon : Decorator
+        {
+            readonly AppEntry entry;readonly double size;ScrollViewer scroll;bool requested;
+            internal DeferredIcon(AppEntry app,double pixels){entry=app;size=pixels;Width=Height=size;Child=new Glyph("window",size){Color=Paint.Text};Loaded+=(s,e)=>Observe();Unloaded+=(s,e)=>Stop();}
+            void Stop(){if(scroll!=null)scroll.ScrollChanged-=Scrolled;scroll=null;}
+            void Scrolled(object sender,ScrollChangedEventArgs args){Check();}
+            void Observe(){if(requested)return;DependencyObject parent=this;while((parent=VisualTreeHelper.GetParent(parent))!=null){scroll=parent as ScrollViewer;if(scroll!=null)break;}if(scroll!=null)scroll.ScrollChanged+=Scrolled;Check();}
+            async void Check()
+            {
+                if(requested||!IsVisible)return;
+                if(scroll!=null){try{var bounds=TransformToAncestor(scroll).TransformBounds(new Rect(0,0,ActualWidth,ActualHeight));if(!bounds.IntersectsWith(new Rect(0,0,scroll.ActualWidth,scroll.ActualHeight)))return;}catch(InvalidOperationException){return;}}
+                requested=true;Stop();try{await loaders.WaitAsync();ImageSource icon;try{icon=await BackgroundWork.Run(()=>Get(entry));}finally{loaders.Release();}entry.Icon=icon;if(icon!=null)Child=Visual(icon,size);}catch(Exception error){AppLog.Once("icon-load",error.Message);}
+            }
+        }
         static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ImageSource,Plate> plates=new System.Runtime.CompilerServices.ConditionalWeakTable<ImageSource,Plate>();
         internal static FrameworkElement Visual(ImageSource source,double size)
         {

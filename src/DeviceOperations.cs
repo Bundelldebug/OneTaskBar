@@ -64,6 +64,12 @@ namespace OneTaskBar
                 var parameters=new WifiParameters {Profile=profile,Mode=0,Bss=3};code=WlanConnect(client,ref id,ref parameters,IntPtr.Zero);if(code!=0)throw new System.ComponentModel.Win32Exception((int)code);
             }finally{if(client!=IntPtr.Zero)WlanCloseHandle(client,IntPtr.Zero);}
         }
+        internal static string DefaultAudioOutputName()
+        {
+            IMMDeviceEnumerator enumerator=null;IMMDevice device=null;IntPtr properties=IntPtr.Zero;IPropertyStore store=null;
+            try{enumerator=(IMMDeviceEnumerator)new DeviceEnumerator();if(enumerator.GetDefaultAudioEndpoint(0,1,out device)!=0)return "출력 기기 없음";Marshal.ThrowExceptionForHR(device.OpenPropertyStore(0,out properties));store=(IPropertyStore)Marshal.GetObjectForIUnknown(properties);var key=new PropertyKey {Format=new Guid("A45C254E-DF1C-4EFD-8020-67D146A850E0"),Id=14};Variant value;store.GetValue(ref key,out value);try{return value.Type==31?Marshal.PtrToStringUni(value.Pointer):"오디오 출력";}finally{PropVariantClear(ref value);}}
+            finally{if(store!=null)Marshal.ReleaseComObject(store);if(properties!=IntPtr.Zero)Marshal.Release(properties);if(device!=null)Marshal.ReleaseComObject(device);if(enumerator!=null)Marshal.ReleaseComObject(enumerator);}
+        }
         internal static List<OutputDevice> AudioOutputs()
         {
             var result=new List<OutputDevice>();IMMDeviceEnumerator enumerator=null;IDeviceCollection collection=null;IntPtr pointer=IntPtr.Zero;

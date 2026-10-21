@@ -60,7 +60,8 @@ namespace OneTaskBar
                 path.BeginFigure(new Point(12+hole,12),true,true);path.ArcTo(new Point(12-hole,12),new Size(hole,hole),0,false,SweepDirection.Clockwise,true,false);path.ArcTo(new Point(12+hole,12),new Size(hole,hole),0,false,SweepDirection.Clockwise,true,false);
             }shape.Freeze();return shape;
         }
-        internal static SolidColorBrush Brush(string value) { var b=(SolidColorBrush)new BrushConverter().ConvertFromString(value); b.Freeze(); return b; }
+        static readonly System.Collections.Concurrent.ConcurrentDictionary<string,SolidColorBrush> brushes=new System.Collections.Concurrent.ConcurrentDictionary<string,SolidColorBrush>(StringComparer.OrdinalIgnoreCase);
+        internal static SolidColorBrush Brush(string value) {SolidColorBrush cached;if(brushes.TryGetValue(value,out cached))return cached;var b=(SolidColorBrush)new BrushConverter().ConvertFromString(value);b.Freeze();if(brushes.Count<128)brushes.TryAdd(value,b);return b;}
         internal const string ControlWhiteColor="#FFF4F8F5";
         internal static readonly Brush ControlWhite=Brush(ControlWhiteColor);
         internal static readonly Brush Text=Brush("#FFFFFFFF"), Muted=Brush("#FFDBE3DF"), Ink=Brush("#FF19221E");
@@ -76,7 +77,7 @@ namespace OneTaskBar
                 new Typeface(SystemFonts.MessageFontFamily,FontStyles.Normal,FontWeights.SemiBold,FontStretches.Normal),size,color,1.0);
             dc.DrawText(f,new Point(bounds.X+(bounds.Width-f.Width)/2,bounds.Y+(bounds.Height-f.Height)/2));
         }
-        internal static void Icon(DrawingContext dc,string kind,Brush brush,Point center,double size,int generation=0)
+        internal static void Icon(DrawingContext dc,string kind,Brush brush,Point center,double size,int generation=0,int signal=-1,int traffic=-1)
         {
             var pen=new Pen(brush,1.8) { StartLineCap=PenLineCap.Round,EndLineCap=PenLineCap.Round,LineJoin=PenLineJoin.Round };
             dc.PushTransform(new TranslateTransform(center.X-size/2,center.Y-size/2)); dc.PushTransform(new ScaleTransform(size/24,size/24));
@@ -85,10 +86,13 @@ namespace OneTaskBar
                 dc.DrawEllipse(brush,null,new Point(12,12),4.2,4.2);
                 for(int i=0;i<8;i++) { double a=i*Math.PI/4; line(12+8*Math.Cos(a),12+8*Math.Sin(a),12+10.6*Math.Cos(a),12+10.6*Math.Sin(a)); }
             } else if(kind=="wifi"||kind=="wifi-off"||kind=="wifi-disconnected") {
-                bool badge=kind=="wifi"&&generation>=4&&generation<=7;if(badge)dc.PushTransform(new ScaleTransform(.82,.82,0,20));
-                var wifiPen=new Pen(brush,2.3){StartLineCap=PenLineCap.Round,EndLineCap=PenLineCap.Round,LineJoin=PenLineJoin.Round};
-                dc.DrawGeometry(null,wifiPen,Geometry.Parse("M2.8,8.4 Q12,-.4 21.2,8.4 M6.1,12 Q12,6.3 17.9,12 M9.4,15.5 Q12,13.1 14.6,15.5"));dc.DrawEllipse(brush,null,new Point(12,19.7),1.5,1.5);
-                if(badge){dc.Pop();Label(dc,generation.ToString(CultureInfo.InvariantCulture),9,brush,new Point(17.6,.2),FontWeights.Bold);}
+                bool badge=kind=="wifi"&&generation>=4&&generation<=7;int bars=kind=="wifi"?WifiLink.Bars(signal):0;
+                var wifiPen=new Pen(brush,2.0){StartLineCap=PenLineCap.Round,EndLineCap=PenLineCap.Round,LineJoin=PenLineJoin.Round};
+                dc.PushTransform(new TranslateTransform(badge||traffic>=0?0:1.5,0));
+                string[] waves={"M7.2,15.1 C8.9,13.4 11.1,13.4 12.8,15.1","M4.3,11.9 C7.6,8.7 12.4,8.7 15.7,11.9","M1.4,8.7 C6.2,3.9 13.8,3.9 18.6,8.7"};
+                for(int i=0;i<3;i++){dc.PushOpacity(bars>i?1:.2);dc.DrawGeometry(null,wifiPen,Geometry.Parse(waves[i]));dc.Pop();}dc.DrawEllipse(brush,null,new Point(10,18.9),1.35,1.35);dc.Pop();
+                if(badge)Label(dc,generation.ToString(CultureInfo.InvariantCulture),7.4,brush,new Point(19,.2),FontWeights.Bold);
+                if(kind=="wifi"&&traffic>=0){var arrow=new Pen(brush,1.25){StartLineCap=PenLineCap.Round,EndLineCap=PenLineCap.Round,LineJoin=PenLineJoin.Round};dc.PushOpacity((traffic&1)!=0?1:.38);dc.DrawGeometry(null,arrow,Geometry.Parse("M18.5,22 L18.5,16 M16.8,17.7 L18.5,16 20.2,17.7"));dc.Pop();dc.PushOpacity((traffic&2)!=0?1:.38);dc.DrawGeometry(null,arrow,Geometry.Parse("M22.5,16 L22.5,22 M20.8,20.3 L22.5,22 24.2,20.3"));dc.Pop();}
                 if(kind=="wifi-off")line(3,3,21,21);else if(kind=="wifi-disconnected"){line(18,15,22,19);line(22,15,18,19);}
             } else if(kind=="bluetooth") {
                 dc.DrawGeometry(null,pen,Geometry.Parse("M6,6 L18,17 12,22 12,2 18,7 6,18"));
@@ -102,6 +106,10 @@ namespace OneTaskBar
             else if(kind=="grip") {for(int i=0;i<6;i++)dc.DrawEllipse(brush,null,new Point(8+(i%2)*8,5+(i/2)*7),1.6,1.6);}
             else if(kind=="edit") {dc.DrawGeometry(null,pen,Geometry.Parse("M4,16 L16,4 20,8 8,20 3,21 Z M14,6 L18,10"));}
             else if(kind=="search") { dc.DrawEllipse(null,pen,new Point(10,10),6.5,6.5); line(15,15,22,22); }
+            else if(kind=="screenshot") {dc.DrawGeometry(null,pen,Geometry.Parse("M8,3 L3,3 3,8 M16,3 L21,3 21,8 M21,16 L21,21 16,21 M8,21 L3,21 3,16"));dc.DrawRoundedRectangle(null,pen,new Rect(7,7,10,10),2,2);}
+            else if(kind=="task-manager") {dc.DrawRoundedRectangle(null,pen,new Rect(2,2,20,20),3,3);dc.DrawRoundedRectangle(brush,null,new Rect(6,12,2.5,6),.6,.6);dc.DrawRoundedRectangle(brush,null,new Rect(10.8,6,2.5,12),.6,.6);dc.DrawRoundedRectangle(brush,null,new Rect(15.5,9,2.5,9),.6,.6);}
+            else if(kind=="audio-output") {dc.DrawGeometry(brush,null,Geometry.Parse("M3,6 L12,12 3,18 Z"));dc.DrawGeometry(null,pen,Geometry.Parse("M14,6 A7,7 0 0 1 14,18 M17,2 A11,11 0 0 1 17,22"));}
+            else if(kind=="headphones") {dc.DrawGeometry(null,pen,Geometry.Parse("M4,16 L4,10 A8,8 0 0 1 20,10 L20,16"));dc.DrawRoundedRectangle(brush,null,new Rect(2,12,5,9),2,2);dc.DrawRoundedRectangle(brush,null,new Rect(17,12,5,9),2,2);}
             else if(kind=="network"||kind=="network-off") {dc.DrawRoundedRectangle(null,pen,new Rect(3,3,18,12),2,2);line(12,15,12,21);line(7,21,17,21);if(kind=="network-off")line(3,22,22,2);}
             else if(kind=="chevron") { line(8,5,15,12); line(15,12,8,19); }
             else if(kind=="up") { line(5,15,12,8); line(12,8,19,15); }
@@ -117,6 +125,7 @@ namespace OneTaskBar
             else if(kind=="pause") {dc.DrawRoundedRectangle(brush,null,new Rect(5,3,5,18),1.5,1.5);dc.DrawRoundedRectangle(brush,null,new Rect(14,3,5,18),1.5,1.5);}
             else if(kind=="next"||kind=="previous") {if(kind=="previous")dc.PushTransform(new ScaleTransform(-1,1,12,12));dc.DrawGeometry(brush,null,Geometry.Parse("M4,4 L17,12 4,20 Z"));dc.DrawRoundedRectangle(brush,null,new Rect(18,4,3,16),1,1);if(kind=="previous")dc.Pop();}
             else if(kind=="moon") dc.DrawGeometry(brush,null,Geometry.Parse("M16,2 A10,10 0 1 0 22,17 A10,10 0 0 1 16,2 Z"));
+            else if(kind=="dnd") {dc.DrawEllipse(null,pen,new Point(12,12),9,9);line(7,12,17,12);}
             else if(kind=="lock") {dc.DrawRoundedRectangle(null,pen,new Rect(5,10,14,12),2,2);dc.DrawGeometry(null,pen,Geometry.Parse("M8,10 L8,6 A4,4 0 0 1 16,6 L16,10"));dc.DrawEllipse(brush,null,new Point(12,15),1.2,1.2);line(12,15,12,18);}
             else if(kind=="leaf") {dc.DrawGeometry(null,pen,Geometry.Parse("M4,17 Q1,5 21,3 Q23,22 9,21 Q5,20 4,17 M3,23 L17,9"));}
             else if(kind=="startup") {dc.DrawRoundedRectangle(null,pen,new Rect(3,3,18,18),3,3);line(12,18,12,7);line(7,12,12,7);line(12,7,17,12);}
@@ -132,7 +141,7 @@ namespace OneTaskBar
             Button b=toggle?(Button)new QuickToggleButton():new Button();b.Content=content;b.Foreground=Text;b.Background=Brush("#1CFFFFFF");b.BorderThickness=new Thickness(0);b.Padding=new Thickness(12,8,12,8);b.Cursor=Cursors.Hand;b.ToolTip=hint;b.HorizontalContentAlignment=HorizontalAlignment.Center;
             b.Resources["ButtonRadius"]=new CornerRadius(18);
             if(buttonTemplate==null)buttonTemplate=(ControlTemplate)System.Windows.Markup.XamlReader.Parse(
-                "<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Button'><Border x:Name='p' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' Background='{TemplateBinding Background}' BorderBrush='{TemplateBinding BorderBrush}' BorderThickness='{TemplateBinding BorderThickness}' CornerRadius='{DynamicResource ButtonRadius}' Padding='{TemplateBinding Padding}'><ContentPresenter HorizontalAlignment='{TemplateBinding HorizontalContentAlignment}' VerticalAlignment='Center'/></Border></ControlTemplate>");
+                "<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Button'><Border x:Name='p' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' Background='{TemplateBinding Background}' BorderBrush='{TemplateBinding BorderBrush}' BorderThickness='{TemplateBinding BorderThickness}' CornerRadius='{DynamicResource ButtonRadius}' Padding='{TemplateBinding Padding}'><ContentPresenter HorizontalAlignment='{TemplateBinding HorizontalContentAlignment}' VerticalAlignment='{TemplateBinding VerticalContentAlignment}'/></Border></ControlTemplate>");
             b.Template=buttonTemplate;AutomationProperties.SetName(b,hint); b.Click+=(s,e)=>action();Motion.Button(b);return b;
         }
         internal static TextBlock TextBlock(string text,double size,Brush color)
@@ -141,9 +150,9 @@ namespace OneTaskBar
     }
     internal sealed class Glyph : FrameworkElement
     {
-        public string Kind; public Brush Color=Paint.Text;public int Generation;
+        public string Kind; public Brush Color=Paint.Text;public int Generation;public int Signal=-1,Traffic=-1;
         public Glyph(string kind,double size) { Kind=kind; Width=Height=size; IsHitTestVisible=false; }
-        protected override void OnRender(DrawingContext dc) { Paint.Icon(dc,Kind,Color,new Point(ActualWidth/2,ActualHeight/2),Math.Min(ActualHeight,ActualWidth)-2,Generation); }
+        protected override void OnRender(DrawingContext dc) { Paint.Icon(dc,Kind,Color,new Point(ActualWidth/2,ActualHeight/2),Math.Min(ActualHeight,ActualWidth)-2,Generation,Signal,Traffic); }
     }
     internal sealed class PillSlider : FrameworkElement
     {
@@ -156,6 +165,8 @@ namespace OneTaskBar
         public double Value { get { return value; } set { double next=Clamp(value);if(this.value==next)return;this.value=next;double from=(double)GetValue(DisplayValueProperty);BeginAnimation(DisplayValueProperty,null);SetValue(DisplayValueProperty,next);if(AnimateValue&&!dragging&&Motion.Enabled&&IsVisible&&PresentationSource.FromVisual(this)!=null)BeginAnimation(DisplayValueProperty,Motion.Tween(from,next,160));InvalidateVisual(); } }
         public static double Clamp(double value) { return Double.IsNaN(value) || Double.IsInfinity(value) ? 0 : Math.Max(0,Math.Min(100,value)); }
         public static double FillWidth(double width,double value) { return Math.Max(0,width)*Clamp(value)/100; }
+        public static Rect CapsuleFillBounds(double width,double height,double value) {width=Math.Max(0,width);height=Math.Max(0,height);double p=Clamp(value),diameter=Math.Min(width,height);if(p<10){double size=diameter*p/10;return new Rect((diameter-size)/2,(height-size)/2,size,size);}return new Rect(0,(height-diameter)/2,diameter+(width-diameter)*(p-10)/90,diameter);}
+        public static double CapsuleFillWidth(double width,double height,double value) {return CapsuleFillBounds(width,height,value).Width;}
         public PillSlider(string kind) { Kind=kind; Height=44; MinWidth=90; Focusable=true; Cursor=Cursors.Hand; SnapsToDevicePixels=true;
             AutomationProperties.SetName(this,kind=="brightness" ? "밝기" : "음량"); }
         protected override AutomationPeer OnCreateAutomationPeer() { return new PillPeer(this); }
@@ -163,16 +174,16 @@ namespace OneTaskBar
         {
             double w=ActualWidth,h=ActualHeight; if(w<=0 || h<=0) return;
             double shown=(double)GetValue(DisplayValueProperty);string iconKind=Kind.StartsWith("volume",StringComparison.Ordinal)?SoundIcon.For(value,false,IsEnabled):Kind;
-            double thickness=Slim?6:h,top=(h-thickness)/2;var track=new Rect(0,top,w,thickness); var fill=new RectangleGeometry(new Rect(0,top,FillWidth(w,shown),thickness),thickness/2,thickness/2);
+            bool capsule=Tablet&&ShowIcon&&!Slim;double thickness=Slim?6:h,top=(h-thickness)/2;var track=new Rect(0,top,w,thickness);var filled=capsule?CapsuleFillBounds(w,h,shown):new Rect(0,top,FillWidth(w,shown),thickness);double fillRadius=Math.Min(filled.Width,filled.Height)/2;var fill=new RectangleGeometry(filled,fillRadius,fillRadius);
             dc.DrawRoundedRectangle(Paint.Brush(DarkTrack?"#26000000":IsEnabled ? "#3C77817F" : "#286E7775"),new Pen(Paint.Brush("#288B9692"),.7),track,thickness/2,thickness/2);
-            if(shown>0) dc.DrawGeometry(Tablet?Paint.ControlWhite:Brushes.Black,null,fill);
-            var c=new Point(h*.70,h/2); double icon=h*.44;
+            double fillOpacity=1;if(shown>0)dc.DrawGeometry(Tablet?Paint.ControlWhite:Brushes.Black,null,fill);
+            var c=new Point(h*(capsule?.5:.70),h/2); double icon=h*.44;
             if(ShowIcon)Paint.Icon(dc,iconKind,DarkTrack?Paint.ControlWhite:Tablet&&!Light?Paint.Brush("#D8E8EDEA"):Paint.Brush("#FF303A36"),c,icon);
-            if(ShowIcon&&shown>0) {dc.PushClip(fill);Paint.Icon(dc,iconKind,Tablet?Paint.Brush(!Light&&Kind=="brightness"?"#FFEC7D4E":"#FF35413B"):Paint.Brush("#FFF5F5F1"),c,icon);dc.Pop();}
+            if(ShowIcon&&shown>0) {dc.PushOpacity(fillOpacity);dc.PushClip(fill);Paint.Icon(dc,iconKind,Tablet?Paint.Brush(!Light&&Kind=="brightness"?"#FFEC7D4E":"#FF35413B"):Paint.Brush("#FFF5F5F1"),c,icon);dc.Pop();dc.Pop();}
             if(Slim&&IsEnabled)dc.DrawEllipse(Paint.ControlWhite,null,new Point(FillWidth(Math.Max(0,w-10),shown)+5,h/2),4.5,4.5);
             if(IsKeyboardFocused) dc.DrawRoundedRectangle(null,new Pen(Paint.Brush("#9ED4F0E5"),1.5),new Rect(1,1,w-2,h-2),h/2,h/2);
         }
-        void Update(double x) { Value=Math.Round(Clamp(x/Math.Max(1,ActualWidth)*100)); if(Changed!=null) Changed(Value); }
+        void Update(double x) {bool capsule=Tablet&&ShowIcon&&!Slim;double diameter=capsule?Math.Min(ActualWidth,ActualHeight):0;Value=Math.Round(Clamp((x-diameter/2)/Math.Max(1,ActualWidth-diameter)*100));if(Changed!=null)Changed(Value);}
         protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e) { base.OnMouseLeftButtonDown(e); Focus(); dragging=true; CaptureMouse(); Update(e.GetPosition(this).X); e.Handled=true; }
         protected override void OnMouseMove(MouseEventArgs e) { if(dragging && e.LeftButton==MouseButtonState.Pressed) Update(e.GetPosition(this).X); }
         protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e) { dragging=false; ReleaseMouseCapture(); e.Handled=true; }
@@ -201,8 +212,9 @@ namespace OneTaskBar
         int motion;bool closed,hiding;Brush glassTint,solidTint;TaskCompletionSource<bool> dismissal;
         public readonly Border Surface;
         public double Radius=28; public bool Dark=true; public bool HasBlur;internal bool SoftCorners=true;
-        internal bool StableSurface;internal FrameworkElement TransitionContent;
+        internal bool StableSurface=true;internal FrameworkElement TransitionContent;
         internal Rect? BackdropClip;
+        internal bool IsDismissing {get{return hiding;}}
         public GlassWindow()
         {
             MenuTheme.Install();
@@ -241,21 +253,21 @@ namespace OneTaskBar
             ++motion;Surface.BeginAnimation(UIElement.OpacityProperty,null);Surface.Opacity=1;
             Width=width; Height=height;
             new WindowInteropHelper(this).EnsureHandle(); Native.Place(this,screen,x,y,width,height); Show();
-            Native.Place(this,screen,x,y,width,height); Native.Round(this,Radius);
+            Native.Place(this,screen,x,y,width,height);UpdateLayout(); Native.Round(this,Radius);
         }
         public new void Show() {bool resume=StableSurface&&IsVisible&&hiding;++motion;hiding=false;CompleteDismissal(false);Surface.IsHitTestVisible=true;Surface.BeginAnimation(UIElement.OpacityProperty,null);Surface.Opacity=1;Surface.RenderTransform=Transform.Identity;if(StableSurface&&TransitionContent!=null&&!resume){TransitionContent.BeginAnimation(OpacityProperty,null);TransitionContent.Opacity=1;TransitionContent.RenderTransform=Transform.Identity;}base.Show();}
         public void Pop()
         {
+            if(TransitionContent==null)TransitionContent=Surface.Child as FrameworkElement;
             if(!SystemParameters.ClientAreaAnimation||!Preferences.Current.Animations)return;
             if(StableSurface&&TransitionContent!=null){++motion;Surface.RenderTransform=Transform.Identity;Surface.Opacity=1;Motion.Launcher(TransitionContent,true);return;}
-            ++motion;Surface.RenderTransformOrigin=new Point(.85,1);var scale=new ScaleTransform(.91,.91);var translate=new TranslateTransform(0,14);var group=new TransformGroup();group.Children.Add(scale);group.Children.Add(translate);Surface.RenderTransform=group;
-            var frames=new DoubleAnimationUsingKeyFrames();frames.KeyFrames.Add(new SplineDoubleKeyFrame(1.008,KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(245)),new KeySpline(.18,.8,.16,1)));frames.KeyFrames.Add(new SplineDoubleKeyFrame(1,KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(355)),new KeySpline(.25,0,.3,1)));
-            scale.BeginAnimation(ScaleTransform.ScaleXProperty,frames);scale.BeginAnimation(ScaleTransform.ScaleYProperty,frames);
-            translate.BeginAnimation(TranslateTransform.YProperty,new DoubleAnimation(14,0,TimeSpan.FromMilliseconds(310)) {EasingFunction=new CubicEase {EasingMode=EasingMode.EaseOut}});
+            ++motion;Surface.RenderTransformOrigin=new Point(.5,.5);var scale=new ScaleTransform(.94,.94);double offset=Math.Min(14,Math.Max(0,Surface.ActualHeight)*.025);var translate=new TranslateTransform(0,offset);var group=new TransformGroup();group.Children.Add(scale);group.Children.Add(translate);Surface.RenderTransform=group;
+            scale.BeginAnimation(ScaleTransform.ScaleXProperty,Motion.PanelTween(.94,1,310));scale.BeginAnimation(ScaleTransform.ScaleYProperty,Motion.PanelTween(.94,1,310));translate.BeginAnimation(TranslateTransform.YProperty,Motion.PanelTween(offset,0,310));
             Surface.BeginAnimation(UIElement.OpacityProperty,new DoubleAnimation(0,1,TimeSpan.FromMilliseconds(150)));
         }
         public new void Hide()
         {
+            if(TransitionContent==null)TransitionContent=Surface.Child as FrameworkElement;
             if(closed||!IsVisible){CompleteDismissal(!closed);return;}if(hiding)return;
             if(!Motion.Enabled){base.Hide();CompleteDismissal(true);return;}
             if(StableSurface&&TransitionContent!=null){hiding=true;Surface.IsHitTestVisible=false;int contentToken=++motion;var fade=Motion.Launcher(TransitionContent,false);fade.Completed+=(s,e)=> {if(!closed&&contentToken==motion){base.Hide();hiding=false;Surface.IsHitTestVisible=true;TransitionContent.BeginAnimation(OpacityProperty,null);TransitionContent.Opacity=1;TransitionContent.RenderTransform=Transform.Identity;CompleteDismissal(true);}};TransitionContent.BeginAnimation(OpacityProperty,fade);return;}

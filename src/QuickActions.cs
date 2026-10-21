@@ -5,6 +5,7 @@ namespace OneTaskBar
 {
     internal sealed class QuickActions : IDisposable
     {
+        internal readonly DoNotDisturb Disturb=new DoNotDisturb();
         internal static readonly Guid EfficientMode=new Guid("961cc777-2547-4f9d-8174-7d86181b8a7a");
         [DllImport("kernel32.dll")]static extern uint SetThreadExecutionState(uint flags);
         internal bool Awake {get;private set;}uint previousExecution;
@@ -27,6 +28,6 @@ namespace OneTaskBar
             if(!enabled)previousMode=before.Selected;Guid target=enabled?(previousMode??Guid.Empty):EfficientMode;
             if(!Native.PerformanceModes().Any(m=>m.Id==target))target=Guid.Empty;Native.SetPerformanceMode(target);var after=Power(true);if(!after.Available||after.Selected!=target)throw new InvalidOperationException("Windows가 전력 절약 모드를 적용하지 못했습니다.");if(enabled)previousMode=null;
         }
-        public void Dispose(){if(Awake)try{SetAwake(false);}catch(Exception e){AppLog.Write("awake-release",e.Message);}}
+        public void Dispose(){Disturb.Dispose();if(Awake)try{SetAwake(false);}catch(Exception e){AppLog.Write("awake-release",e.Message);}}
     }
 }

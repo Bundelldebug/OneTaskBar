@@ -9,6 +9,7 @@ namespace OneTaskBar
     {
         public bool Blur=true,Animations=true,ChargeAnimation=true,Hover=true,RunningDots=true,Seconds=true,DesktopMode=true;
         public bool NativeNotifications=false,NativeQuickSettings=false;
+        public bool NotificationIntegration=true;
         public bool NativeStartKey=true,NativeSearch=false;
         public bool NativeStartButton=false;
         public int DesktopPowerWatts=0;
@@ -41,8 +42,8 @@ namespace OneTaskBar
         {
             using(var entry=Registry.CurrentUser.CreateSubKey(key)) {
                 if(!value){if(Enabled)entry.DeleteValue("OneTaskBar",false);return;}
-                string command="\""+Path.Combine(AppLog.Root,"OneTaskBar.exe")+"\" --desktop --logon";
-                try{var family=Windows.ApplicationModel.Package.Current.Id.FamilyName;command="explorer.exe \"shell:AppsFolder\\"+family+"!OneTaskBar\"";}catch{}
+                string command="\""+NotificationIdentity.PhysicalFile(Path.Combine(AppLog.Root,"OneTaskBar.exe"))+"\" --desktop --logon";
+                try{if(NotificationIdentity.IsCurrent){var family=Windows.ApplicationModel.Package.Current.Id.FamilyName;command="explorer.exe \"shell:AppsFolder\\"+family+"!OneTaskBar\"";}}catch{}
                 entry.SetValue("OneTaskBar",command,RegistryValueKind.String);
             }
         }

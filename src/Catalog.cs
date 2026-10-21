@@ -41,20 +41,20 @@ namespace OneTaskBar
     }
     internal static class Catalog
     {
-        public static List<AppEntry> Read()
+        public static List<AppEntry> Read(bool loadIcons=true)
         {
-            string cache=Path.Combine(AppLog.Data,"apps.json");
+            Directory.CreateDirectory(AppLog.Data);string cache=Path.Combine(AppLog.Data,"apps.json");
             try {
                 var p=new Process { StartInfo=new ProcessStartInfo("powershell.exe","-NoProfile -ExecutionPolicy Bypass -File \""+Path.Combine(AppLog.Root,"Read-Apps.ps1")+"\" -OutputPath \""+cache+"\"") {
                     UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden } };
-                using(p) { p.Start(); if(!p.WaitForExit(25000)) { p.Kill(); AppLog.Write("catalog","Get-StartApps timed out"); } }
+                using(p) { p.Start(); BackgroundWork.HintChild(p); if(!p.WaitForExit(25000)) { p.Kill(); AppLog.Write("catalog","Get-StartApps timed out"); } }
                 if(File.Exists(cache)) {
                     var rows=new JavaScriptSerializer().Deserialize<List<AppEntry>>(File.ReadAllText(cache,Encoding.UTF8));
-                    if(rows!=null && rows.Count>0) { Parallel.ForEach(rows,new ParallelOptions {MaxDegreeOfParallelism=4},item=>item.LoadIcon()); return rows.OrderBy(a=>a.Name,StringComparer.CurrentCultureIgnoreCase).ToList(); }
+                    if(rows!=null && rows.Count>0) { if(loadIcons)Parallel.ForEach(rows,new ParallelOptions {MaxDegreeOfParallelism=3},item=>item.LoadIcon()); return rows.OrderBy(a=>a.Name,StringComparer.CurrentCultureIgnoreCase).ToList(); }
                 }
             } catch(Exception e) { AppLog.Write("catalog",e.Message); }
             var fallback=new List<AppEntry> { new AppEntry { Name="파일 탐색기",Target="explorer.exe" },new AppEntry { Name="설정",Target="ms-settings:" },new AppEntry { Name="메모장",Target="notepad.exe" } };
-            foreach(var item in fallback) item.LoadIcon(); return fallback;
+            if(loadIcons)foreach(var item in fallback) item.LoadIcon(); return fallback;
         }
         public static List<AppEntry> Running()
         {

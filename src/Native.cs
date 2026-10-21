@@ -164,7 +164,7 @@ namespace OneTaskBar
                     if(WlanQueryInterface(client,ref guid,7,IntPtr.Zero,out size,out data,out type)!=0) continue;
                     try {
                         if(size<556 || Marshal.ReadInt32(data)!=1) continue;
-                        byte[] attributes=new byte[Math.Min(604,(int)size)];Marshal.Copy(data,attributes,0,attributes.Length);return WifiLink.Parse(attributes);
+                        byte[] attributes=new byte[Math.Min(604,(int)size)];Marshal.Copy(data,attributes,0,attributes.Length);var link=WifiLink.Parse(attributes);try{foreach(var adapter in System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()){Guid adapterId;if(Guid.TryParse(adapter.Id,out adapterId)&&adapterId==guid){var stats=adapter.GetIPStatistics();link.Sent=stats.BytesSent;link.Received=stats.BytesReceived;break;}}}catch{}return link;
                     } finally { WlanFreeMemory(data); }
                 }
             } catch { }

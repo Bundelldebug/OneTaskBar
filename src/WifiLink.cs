@@ -5,7 +5,8 @@ namespace OneTaskBar
 {
     internal sealed class WifiLink
     {
-        internal string Name;internal int Generation,Signal;
+        internal string Name;internal int Generation,Signal=-1;internal long Sent=-1,Received=-1;
+        internal static int Bars(int signal){return signal<0?3:signal>=75?3:signal>=40?2:signal>0?1:0;}
         internal static int GenerationFor(int phy){return phy==7?4:phy==8?5:phy==10?6:phy==11?7:0;}
         // WLAN_CONNECTION_ATTRIBUTES: profile WCHAR[256], then association SSID, BSS,
         // MAC[6]+alignment, DOT11_PHY_TYPE. See Microsoft's wlanapi.h structure docs.

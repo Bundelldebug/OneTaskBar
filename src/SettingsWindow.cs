@@ -34,7 +34,8 @@ namespace OneTaskBar
             startup=Row(desktopRows,"로그인 시 자동 시작","Windows 로그인 후 One TaskBar을 실행합니다",StartupPreference.Enabled,v=> {try{StartupPreference.Set(v);status.Text=v?"로그인 자동 시작을 켰습니다":"로그인 자동 시작을 껐습니다";}catch(Exception e){status.Text="자동 시작 설정을 저장하지 못했습니다: "+e.Message;}});
             Group(groups,"데스크톱",desktopRows);
             var panels=new StackPanel();
-            ChoiceRow(panels,"알림센터 · 달력","시계와 알림 버튼에서 열 화면",Preferences.Current.NativeNotifications,v=>Preferences.Set(p=>p.NativeNotifications=v));
+            ChoiceRow(panels,"알림센터","시계와 알림 버튼에서 열 화면",Preferences.Current.NativeNotifications,v=>Preferences.Set(p=>p.NativeNotifications=v));
+            var notificationLink=Paint.Action("Windows 알림 연결 · 권한 관리",()=>shell.ShowNotificationConnection());notificationLink.HorizontalContentAlignment=HorizontalAlignment.Left;notificationLink.Margin=new Thickness(12,5,12,12);panels.Children.Add(notificationLink);
             ChoiceRow(panels,"빠른 설정","Wi-Fi·소리·배터리 버튼에서 열 화면",Preferences.Current.NativeQuickSettings,v=>Preferences.Set(p=>p.NativeQuickSettings=v));
             Group(groups,"패널 선택",panels);
             var launcher=new StackPanel();
