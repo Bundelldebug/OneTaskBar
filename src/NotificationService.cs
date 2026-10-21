@@ -28,8 +28,8 @@ namespace OneTaskBar
         readonly Dictionary<string,ImageSource> icons=new Dictionary<string,ImageSource>(StringComparer.OrdinalIgnoreCase);
         readonly Dictionary<string,Guid> activators=new Dictionary<string,Guid>(StringComparer.OrdinalIgnoreCase);
         bool reading,subscribed,disposed;int dirty=1;DateTime nextRead;
-        internal int SnapshotReads;
-        void Changed(UserNotificationListener sender,UserNotificationChangedEventArgs args){Interlocked.Exchange(ref dirty,1);}
+        internal int SnapshotReads;internal bool Interactive;internal Action Updated;
+        void Changed(UserNotificationListener sender,UserNotificationChangedEventArgs args){Interlocked.Exchange(ref dirty,1);var updated=Updated;if(!disposed&&updated!=null)updated();}
         public void Dispose(){disposed=true;if(subscribed&&listener!=null)try{listener.NotificationChanged-=Changed;}catch{}subscribed=false;}
         internal void Invalidate(){Interlocked.Exchange(ref dirty,1);}
         internal void Check()
@@ -49,7 +49,7 @@ namespace OneTaskBar
         {
             var app=System.Windows.Application.Current;
             if(app!=null&&!app.Dispatcher.CheckAccess()) {if(app.Dispatcher.HasShutdownStarted)return;await app.Dispatcher.InvokeAsync(new Func<Task>(Refresh)).Task.Unwrap();return;}
-            if(reading||disposed)return;if(Interlocked.Exchange(ref dirty,0)==0&&DateTime.UtcNow<nextRead)return;nextRead=DateTime.UtcNow.AddSeconds(3);Check();if(!Allowed){if(Items.Count>0)Items=new List<NotificationEntry>();return;}reading=true;
+            if(reading||disposed)return;if(Interlocked.Exchange(ref dirty,0)==0&&DateTime.UtcNow<nextRead)return;nextRead=DateTime.UtcNow.AddSeconds(Interactive?3:30);Check();if(!Allowed){if(Items.Count>0)Items=new List<NotificationEntry>();return;}reading=true;
             try {
                 var entries=await SystemServices.Wait(listener.GetNotificationsAsync(NotificationKinds.Toast));SnapshotReads++;
                 if(!Preferences.Current.NotificationIntegration||listener.GetAccessStatus()!=UserNotificationListenerAccessStatus.Allowed){Allowed=false;Items=new List<NotificationEntry>();return;}

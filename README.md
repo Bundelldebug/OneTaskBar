@@ -75,6 +75,13 @@ No telemetry, account, or background web service is required. Search runs locall
 
 Code and the original One TaskBar icon are under the [MIT license](LICENSE). [Third-party notices](THIRD_PARTY_NOTICES.txt) include the Liquid Dock reference. This repository contains no Samsung APK, extracted launcher artwork, wallpapers, fonts, or user screenshots/recordings. Installed third-party logos are read at runtime and remain their owners' property. This is an independent project and is not affiliated with Microsoft or Samsung. Open-source licensing does not guarantee that no third party will ever make a copyright or trademark complaint.
 
+## 8.5.0
+
+- Fixes the delayed one-core CPU saturation in the packaged recovery helper. A hash-verified copy runs outside the notification package, and startup checks its readiness and unpackaged identity. Keyboard and owner-exit events replace the 20-ms polling loop.
+- Idle dock updates drop to 1 Hz on battery (0.5 Hz in fullscreen); display-off work sleeps for up to 30 seconds. Direct volume, brightness and foreground events remain responsive, and opening panels retains a faster cadence.
+- Volume, media and notification changes use callbacks; device, brightness, app and pinned-item fallback scans run less often. Battery-powered title overflow scrolls once, then rests until hovered. Stationary title pauses no longer redraw continuously.
+- The previous 0.5.5 short CPU samples did not detect the delayed helper regression. Resource measurements and test limits are recorded in [VALIDATION.md](VALIDATION.md); a full battery discharge comparison has not been performed.
+
 ## 0.5.5
 
 - Live DWM window previews with enlarged image content, monitor-aware pagination and released thumbnail handles.

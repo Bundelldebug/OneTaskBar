@@ -1,3 +1,18 @@
+# Validation — 8.5.0
+
+Windows 11 x64, .NET Framework 4.8, Intel Core Ultra X7 358H with 16 logical processors. These are development-PC checks, not a full battery-runtime benchmark.
+
+- Reproduced a packaged watchdog consuming 6.21% total CPU after startup, while its own main thread remained mostly asleep. Merely changing the polling/message loop did not fix the additional runtime thread. A hash-verified helper outside the registered package installation directory reports `packaged=False`; startup now checks its owner-specific readiness.
+- Replaced 20-ms emergency-key polling with a native input/owner-exit wait. The 65-second isolated watchdog regression recorded 0.000% of one core, rejected a duplicate, honored the disabled option, terminated its unresponsive fixture in 94 ms when enabled, and exited. The actual desktop-recovery fixture restored the exact original work area after forced termination.
+- The first installed 8.5.0 checkpoint was measured for 300.2 seconds in ten 30-second windows: main CPU averaged 0.0751% (range 0.0520–0.0944%), helper 0.0000% in every window, normalized across 16 logical processors. Working sets were 172.8–187.2 MiB and 21.5–21.7 MiB respectively. This checkpoint preceded the final brightness-event and startup-readiness refinements. No forced GC, working-set trim or affinity mask was used.
+- Final installed binaries, including brightness events and startup readiness checks, were sampled again for 180.1 seconds: main average 0.0900% CPU (range 0.0781–0.1009%), helper 0.0000% throughout. Total working set ranged from 190.2 to 207.7 MiB. Both processes stayed alive, the helper reported unpackaged readiness, and the main app retained Windows notification access. This final sample was on AC power, with panels closed and no active media session; it is an idle CPU check, not a video-playback battery test.
+- Self-test passed, including bounded EcoQoS workers and idle/interactive/fullscreen/display-off cadence. The energy fixture verified that a battery title stops after one pass, produces no idle redraws, resumes on hover, continues on AC and stops while hidden. An actual audio endpoint callback was received; the temporary 1% test change was restored to the exact original scalar.
+- Now bar fixture passed synchronized content/backdrop geometry, interrupted expansion/collapse, original-slot click-away, transport and seeking callbacks, marquee, and soft corners (46 edge-alpha levels). Maximum sampled collapse frame gap was 28.67 ms. The user's actual player was not controlled.
+- A slow brightness polling fallback initially exposed a missing brightness notification in the test session. The final path subscribes to the hardware `WmiMonitorBrightnessEvent` without an intrinsic-event polling interval; display power notifications use the application's session rather than the physical console. OSD regression passed: volume response 136 ms, brightness event 46 ms, native OSD masked before showing, and original opacity/volume/brightness restored.
+- Existing Windows notification registration is reused; no consent, certificate, third-party customization settings, system power mode or machine policy is changed by this patch. OS reboot, shutdown, sleep and lock were not performed. Actual E/LP-E core residency and battery lifetime over a full discharge remain unmeasured.
+
+The 0.5.5 measurements below were short startup samples and did not detect the delayed packaged-helper regression. They are retained as historical results, not evidence that the previous release was free of this issue.
+
 # Validation — 0.5.5
 
 Windows 11 x64, .NET Framework 4.8, two monitors at 200% and 125% DPI, 143 installed apps and 16 logical processors. Results describe this development PC.

@@ -28,6 +28,7 @@ namespace OneTaskBar
         internal ArtworkPalette Palette {get;private set;}MediaState media;ImageSource artwork;DateTime lastActive;bool expanded,wanted,closed;IntPtr previousWindow;
         internal string PlayKind {get{return expandedContent.PlayKind;}}internal bool Expanded {get{return expanded;}}internal Rect Shape {get{return current;}}internal double TitleOffset {get{return title.Offset;}}internal bool MarqueeOverflow {get{return title.NaturalWidth>title.ActualWidth+.5;}}
         internal Button CompactButton {get{return compact;}}internal Button PlayButton {get{return expandedContent.PlayButton;}}internal Button NextButton {get{return expandedContent.NextButton;}}internal Button PreviousButton {get{return expandedContent.PreviousButton;}}internal PillSlider SeekBar {get{return expandedContent.SeekBar;}}
+        internal bool TitleAnimating {get{return title.IsAnimating;}}
         internal NowBar(ShellController controller,Forms.Screen monitor,Action<string> dispatch=null,Func<double,Task<bool>> seekDispatch=null)
         {
             shell=controller;screen=monitor;command=dispatch??controller.Media;seekCommand=seekDispatch??controller.SeekMedia;Title="One TaskBar · Now bar";Width=132;Height=44;Radius=22;Dark=true;ShowActivated=false;Surface.CornerRadius=new CornerRadius(22);Surface.Background=QuickPanel.Glass;Palette=ArtworkPalette.Neutral;Surface.BorderThickness=new Thickness(0);Surface.BorderBrush=Brushes.Transparent;
@@ -38,6 +39,7 @@ namespace OneTaskBar
             root.Children.Add(expandedContent);Surface.Child=root;var decorator=(AdornerDecorator)Content;decorator.Child=null;hostCanvas.Children.Add(Surface);decorator.Child=hostCanvas;Surface.Clip=capsuleClip;compact.HorizontalAlignment=HorizontalAlignment.Left;expandedContent.HorizontalAlignment=HorizontalAlignment.Left;
             SourceInitialized+=(s,e)=>{var h=new WindowInteropHelper(this).Handle;Native.SetWindowLong(h,-20,(Native.GetWindowLong(h,-20)|0x80|0x08000000)&~0x40000);var source=HwndSource.FromHwnd(h);source.CompositionTarget.RenderMode=RenderMode.SoftwareOnly;source.AddHook((IntPtr hwnd,int msg,IntPtr wp,IntPtr lp,ref bool handled)=>{if(msg==0x21&&!expanded){handled=true;return new IntPtr(3);}return IntPtr.Zero;});};
             Deactivated+=(s,e)=> {if(expanded&&!Program.Inspectable&&!IsMouseOver)SetExpanded(false);};Closed+=(s,e)=> {closed=true;StopOutsideClick();StopMotion();title.Running=false;compactArt.Background=glow.Background=null;media=null;};
+            MouseEnter+=(s,e)=>title.Engaged=true;MouseLeave+=(s,e)=>title.Engaged=false;
         }
         protected override void OnPreviewKeyDown(KeyEventArgs e){if(e.Key==Key.Escape&&expanded){SetExpanded(false);e.Handled=true;return;}base.OnPreviewKeyDown(e);}
         static Button Transport(string icon,Action action,string hint,double size){var button=Paint.Button(new Glyph(icon,20),action,hint);button.Width=button.Height=size;button.Padding=new Thickness(0);button.Background=Brushes.Transparent;return button;}
@@ -50,7 +52,7 @@ namespace OneTaskBar
             if(artwork!=media.Artwork){artwork=media.Artwork;ApplyPalette(media.Artwork);if(artwork!=null){var brush=new ImageBrush(artwork){Stretch=Stretch.UniformToFill,AlignmentX=AlignmentX.Center,AlignmentY=AlignmentY.Center};brush.Freeze();compactArt.Background=brush;var background=new ImageBrush(artwork){Stretch=Stretch.UniformToFill,Opacity=.045};background.Freeze();glow.Background=background;compactArt.Child=null;}else {compactArt.Background=QuickPanel.Card;compactArt.Child=new Glyph("volume",16);glow.Background=null;}}
             if(artwork==null&&compactArt.Child==null){compactArt.Background=QuickPanel.Card;compactArt.Child=new Glyph("volume",16);}
             if(expanded)expandedContent.Update(media,shell.Services.OutputName);
-            layout=NowBarLayout.Fit(screen.Bounds.Width/scale,screen.Bounds.Height/scale,startX,dockY,title.NaturalWidth,expanded);title.Running=!expanded&&!animating&&Motion.Enabled;
+            layout=NowBarLayout.Fit(screen.Bounds.Width/scale,screen.Bounds.Height/scale,startX,dockY,title.NaturalWidth,expanded);title.ConservePower=shell.Power.Known&&!shell.Power.Connected;title.Running=!expanded&&!animating&&Motion.Enabled;
             if(!wanted||!IsVisible){wanted=true;expanded=false;layout=NowBarLayout.Fit(screen.Bounds.Width/scale,screen.Bounds.Height/scale,startX,dockY,title.NaturalWidth,false);compact.Opacity=1;compact.IsHitTestVisible=true;expandedContent.Visibility=Visibility.Collapsed;SetActivation(false);new WindowInteropHelper(this).EnsureHandle();Native.SetWindowPos(new WindowInteropHelper(this).Handle,IntPtr.Zero,screen.Bounds.Left+12,screen.Bounds.Top+12,0,0,0x1|0x4|0x10);current=new Rect(12,layout.CompactY,Motion.Enabled?44:layout.CompactWidth,44);target=Rect.Empty;EnsureHost(true);Place();}
             compact.Width=layout.CompactWidth;EnsureHost(false);Resize(layout.Bounds);
         }

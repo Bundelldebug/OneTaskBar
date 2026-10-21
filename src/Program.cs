@@ -55,6 +55,7 @@ namespace OneTaskBar
             if(args.Contains("--power-menu-probe"))return SystemPower.Probe();
             if(args.Contains("--quick-feature-probe"))return QuickFeatureChecks.Run();
             if(args.Contains("--nowbar-probe"))return NowBarChecks.Run();
+            if(args.Contains("--energy-probe"))return EnergyChecks.Run();
             if(args.Contains("--panel-transition-probe"))return PanelTransitionChecks.Run();
             if(args.Contains("--window-preview-probe"))return WindowPreviewChecks.Run(args.Contains("--inspect"));
             if(args.Contains("--popup-probe"))return PopupChecks.Run();
@@ -105,7 +106,7 @@ namespace OneTaskBar
         {
             var checks=new List<string>();
             try {
-                EfficiencyChecks.Validate(checks);RuntimeDockOrder.Check();checks.Add("stable-launch-order");LauncherLayout.Check();checks.Add("compact-launcher-layout");NowBarLayout.Check();checks.Add("nowbar-monitor-layout");ArtworkPalette.Check();checks.Add("artwork-color-contrast");
+                EfficiencyChecks.Validate(checks);RuntimeCadence.Check(checks);RuntimeDockOrder.Check();checks.Add("stable-launch-order");LauncherLayout.Check();checks.Add("compact-launcher-layout");NowBarLayout.Check();checks.Add("nowbar-monitor-layout");ArtworkPalette.Check();checks.Add("artwork-color-contrast");
                 foreach(double width in new double[] { 1,200,288,344,600 }) foreach(double value in new double[] { -20,0,1,33,99,100,120 }) {
                     double f=PillSlider.FillWidth(width,value);
                     if(f<0 || f>width || (value==100 && f!=width)) throw new Exception("Slider endpoint "+width+" "+value);

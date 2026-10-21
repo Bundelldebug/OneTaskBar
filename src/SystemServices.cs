@@ -47,25 +47,36 @@ namespace OneTaskBar
         internal bool? WifiOn,BluetoothOn;
         internal bool? WifiPresent,BluetoothPresent;internal bool NetworkConnected;DateTime radioProbeAt;
         internal MediaState Media=new MediaState();
-        string artworkKey;int propertiesDirty=1;DateTime metadataAt;bool disposed;
+        string artworkKey;int propertiesDirty=1,playbackDirty=1;DateTime metadataAt,playbackAt;bool disposed;
+        bool interactive;internal bool Interactive {get{return interactive;}set{if(interactive==value)return;interactive=value;if(value){outputAt=radioProbeAt=playbackAt=DateTime.MinValue;Interlocked.Exchange(ref playbackDirty,1);}}}internal Action Changed;
         internal int MetadataReads;
-        void PropertiesChanged(GlobalSystemMediaTransportControlsSession sender,MediaPropertiesChangedEventArgs args){Interlocked.Exchange(ref propertiesDirty,1);}
-        void SelectSession(GlobalSystemMediaTransportControlsSession value){if(Object.ReferenceEquals(session,value))return;if(session!=null)try{session.MediaPropertiesChanged-=PropertiesChanged;}catch{}session=value;Interlocked.Exchange(ref propertiesDirty,1);metadataAt=DateTime.MinValue;if(session!=null)try{session.MediaPropertiesChanged+=PropertiesChanged;}catch{}}
-        public void Dispose(){disposed=true;SelectSession(null);manager=null;}
+        void Notify(){Interlocked.Exchange(ref playbackDirty,1);var changed=Changed;if(!disposed&&changed!=null)changed();}
+        void PropertiesChanged(GlobalSystemMediaTransportControlsSession sender,MediaPropertiesChangedEventArgs args){Interlocked.Exchange(ref propertiesDirty,1);Notify();}
+        void PlaybackChanged(GlobalSystemMediaTransportControlsSession sender,PlaybackInfoChangedEventArgs args){Notify();}
+        void TimelineChanged(GlobalSystemMediaTransportControlsSession sender,TimelinePropertiesChangedEventArgs args){Notify();}
+        void CurrentChanged(GlobalSystemMediaTransportControlsSessionManager sender,CurrentSessionChangedEventArgs args){Interlocked.Exchange(ref propertiesDirty,1);Notify();}
+        void SelectSession(GlobalSystemMediaTransportControlsSession value)
+        {
+            if(Object.ReferenceEquals(session,value))return;
+            if(session!=null)try{session.MediaPropertiesChanged-=PropertiesChanged;session.PlaybackInfoChanged-=PlaybackChanged;session.TimelinePropertiesChanged-=TimelineChanged;}catch{}
+            session=value;Interlocked.Exchange(ref propertiesDirty,1);metadataAt=DateTime.MinValue;
+            if(session!=null)try{session.MediaPropertiesChanged+=PropertiesChanged;session.PlaybackInfoChanged+=PlaybackChanged;session.TimelinePropertiesChanged+=TimelineChanged;}catch{}
+        }
+        public void Dispose(){disposed=true;SelectSession(null);if(manager!=null)try{manager.CurrentSessionChanged-=CurrentChanged;}catch{}manager=null;}
         internal async Task Refresh()
         {
-            if(disposed)return;if(DateTime.UtcNow>=outputAt){outputAt=DateTime.UtcNow.AddSeconds(2);try{OutputName=await BackgroundWork.Run(()=>Native.DefaultAudioOutputName());}catch{OutputName="오디오 출력";}}
-            bool radioFailed=false;
+            if(disposed)return;if(DateTime.UtcNow>=outputAt){outputAt=DateTime.UtcNow.AddSeconds(Interactive?2:10);try{OutputName=await BackgroundWork.Run(()=>Native.DefaultAudioOutputName());}catch{OutputName="오디오 출력";}}
+            bool radioFailed=false,probeRadio=DateTime.UtcNow>=radioProbeAt;
             try {
                 if(DateTime.UtcNow>=radioProbeAt) {
-                    radioProbeAt=DateTime.UtcNow.AddSeconds(4);
+                    radioProbeAt=DateTime.UtcNow.AddSeconds(Interactive?4:30);
                     var radios=await Wait(Radio.GetRadiosAsync());wifi=radios.FirstOrDefault(r=>r.Kind==RadioKind.WiFi);bluetooth=radios.FirstOrDefault(r=>r.Kind==RadioKind.Bluetooth);
                     WifiPresent=wifi!=null;BluetoothPresent=bluetooth!=null;
                 }
                 WifiOn=wifi!=null ? (bool?)(wifi.State==RadioState.On) : null;
                 BluetoothOn=bluetooth!=null ? (bool?)(bluetooth.State==RadioState.On) : null;
             } catch(Exception e) {AppLog.Once("radios",e.Message);radioFailed=true;}
-            if(radioFailed){
+            if(radioFailed&&probeRadio){
                 // Unpackaged desktop installs may not have radio control permission. Hardware
                 // absence is still detectable without requesting or changing that permission.
                 try{WifiPresent=System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces().Any(n=>n.NetworkInterfaceType==System.Net.NetworkInformation.NetworkInterfaceType.Wireless80211);}catch{}
@@ -73,8 +84,10 @@ namespace OneTaskBar
             }
             try{NetworkConnected=System.Net.NetworkInformation.NetworkInterface.GetIsNetworkAvailable();}catch{}
             try {
-                if(manager==null)manager=await Wait(GlobalSystemMediaTransportControlsSessionManager.RequestAsync());
-                if(disposed)return;SelectSession(manager.GetCurrentSession()); if(session==null) {if(Media.Available)Media=new MediaState(); artworkKey=null; return;}
+                if(manager==null){manager=await Wait(GlobalSystemMediaTransportControlsSessionManager.RequestAsync());manager.CurrentSessionChanged+=CurrentChanged;}
+                if(Interlocked.Exchange(ref playbackDirty,0)==0&&Volatile.Read(ref propertiesDirty)==0&&DateTime.UtcNow<playbackAt&&DateTime.UtcNow<metadataAt)return;
+                playbackAt=DateTime.UtcNow.AddSeconds(Interactive?2:5);
+                if(disposed)return;SelectSession(manager.GetCurrentSession()); if(session==null) {if(Media.Available)Media=new MediaState();artworkKey=null;Interlocked.Exchange(ref propertiesDirty,0);metadataAt=DateTime.UtcNow.AddSeconds(60);return;}
                 var info=session.GetPlaybackInfo();var previous=Media;
                 var state=new MediaState {Available=true,Title=previous.Title,Artist=previous.Artist,AppId=session.SourceAppUserModelId,
                     Playing=info.PlaybackStatus==GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing,Active=info.PlaybackStatus==GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing||info.PlaybackStatus==GlobalSystemMediaTransportControlsSessionPlaybackStatus.Paused,
@@ -82,7 +95,7 @@ namespace OneTaskBar
                 try {var timeline=session.GetTimelineProperties();state.Duration=Math.Max(0,(timeline.EndTime-timeline.StartTime).TotalSeconds);state.Position=Math.Max(0,(timeline.Position-timeline.StartTime).TotalSeconds);state.SampledUtc=timeline.LastUpdatedTime.UtcDateTime;if(Math.Abs((DateTime.UtcNow-state.SampledUtc).TotalDays)>1)state.SampledUtc=DateTime.UtcNow;state.CanSeek=info.Controls.IsPlaybackPositionEnabled&&state.Duration>0;}catch{}
                 // Track changes arrive as events; retain a slow fallback for incomplete media providers.
                 if(Interlocked.Exchange(ref propertiesDirty,0)!=0||DateTime.UtcNow>=metadataAt) {
-                    var properties=await Wait(session.TryGetMediaPropertiesAsync());MetadataReads++;metadataAt=DateTime.UtcNow.AddSeconds(30);
+                    var properties=await Wait(session.TryGetMediaPropertiesAsync());MetadataReads++;metadataAt=DateTime.UtcNow.AddSeconds(60);
                     state.Title=String.IsNullOrWhiteSpace(properties.Title)?"미디어":properties.Title;state.Artist=properties.Artist;
                     string key=state.AppId+"|"+properties.Title+"|"+properties.Artist;
                     if(key!=artworkKey) {

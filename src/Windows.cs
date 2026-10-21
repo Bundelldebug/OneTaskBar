@@ -151,7 +151,7 @@ namespace OneTaskBar
         {
             if(closed) return;
             if(MediaBar==null&&controller.Services.Media.Active&&controller.Desktop)MediaBar=new NowBar(controller,Screen);
-            if(MediaBar!=null)MediaBar.Update(controller.Services.Media,Scale,currentStartX,currentY,visible&&controller.Desktop);
+            if(MediaBar!=null)MediaBar.Update(controller.Services.Media,Scale,currentStartX,currentY,visible&&controller.Desktop&&controller.DisplayAwake);
             double expected=PowerDisplay.Slot(state,Preferences.Current.DesktopPowerWatts);if(expected!=powerWidth)Rebuild();powerAccess.ToolTip=state.Known?"배터리 · 빠른 설정":"직접 입력한 PC 전력값 · 실시간 측정 아님";
             Battery.Update(state);clock.Text=DateTime.Now.ToString(Preferences.Current.Seconds?"tt h:mm:ss\nyyyy-MM-dd":"tt h:mm\nyyyy-MM-dd",System.Globalization.CultureInfo.GetCultureInfo("ko-KR"));
             bool radioOff=controller.Services.WifiOn==false;string wifiKind=controller.Services.WifiPresent==false?(controller.Services.NetworkConnected?"network":"network-off"):radioOff?"wifi-off":controller.Wifi==null?"wifi-disconnected":"wifi";

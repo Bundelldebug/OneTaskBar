@@ -203,7 +203,7 @@ namespace OneTaskBar
     [ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")] class DeviceEnumerator { }
     [ComImport, Guid("5CDF2C82-841E-4546-9722-0CF74078229A"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
     interface IAudioEndpointVolume {
-        int RegisterControlChangeNotify(IntPtr callback); int UnregisterControlChangeNotify(IntPtr callback); int GetChannelCount(out uint count);
+        [PreserveSig] int RegisterControlChangeNotify(IntPtr callback); [PreserveSig] int UnregisterControlChangeNotify(IntPtr callback); int GetChannelCount(out uint count);
         int SetMasterVolumeLevel(float level,ref Guid context);
         [PreserveSig] int SetMasterVolumeLevelScalar(float level,ref Guid context);
         int GetMasterVolumeLevel(out float level);
@@ -215,9 +215,22 @@ namespace OneTaskBar
         int GetVolumeStepInfo(out uint step,out uint count); int VolumeStepUp(ref Guid context); int VolumeStepDown(ref Guid context);
         int QueryHardwareSupport(out uint mask); int GetVolumeRange(out float min,out float max,out float increment);
     }
+    [ComVisible(true),Guid("657804FA-D6AD-4496-8A60-352752AF4F89"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    public interface IAudioVolumeCallback {[PreserveSig]int OnNotify(IntPtr data);}
+    [ComVisible(true),ClassInterface(ClassInterfaceType.None)]
+    public sealed class AudioVolumeCallback : IAudioVolumeCallback
+    {
+        readonly Action changed;internal AudioVolumeCallback(Action changed){this.changed=changed;}
+        public int OnNotify(IntPtr data){try{changed();}catch{}return 0;}
+    }
     internal sealed class AudioService : IDisposable
     {
         IAudioEndpointVolume endpoint;
+        readonly AudioVolumeCallback callback;IntPtr callbackPointer;
+        internal Action Changed;
+        public AudioService(){callback=new AudioVolumeCallback(()=>{var changed=Changed;if(changed!=null)changed();});}
+        internal bool NotificationsRegistered {get{return callbackPointer!=IntPtr.Zero;}}
+        internal double ExactValue {get{Ensure();float value;Marshal.ThrowExceptionForHR(endpoint.GetMasterVolumeLevelScalar(out value));return (double)value*100;}}
         string deviceId;
         DateTime nextDeviceCheck;
         public bool Available; public double Value; public bool Muted;
@@ -233,6 +246,8 @@ namespace OneTaskBar
                     Dispose(); object result; var iid=typeof(IAudioEndpointVolume).GUID;
                     Marshal.ThrowExceptionForHR(device.Activate(ref iid,23,IntPtr.Zero,out result));
                     endpoint=(IAudioEndpointVolume)result; deviceId=id;
+                    try{callbackPointer=Marshal.GetComInterfaceForObject(callback,typeof(IAudioVolumeCallback));Marshal.ThrowExceptionForHR(endpoint.RegisterControlChangeNotify(callbackPointer));}
+                    catch{if(callbackPointer!=IntPtr.Zero){Marshal.Release(callbackPointer);callbackPointer=IntPtr.Zero;}}
                 }
                 nextDeviceCheck=DateTime.UtcNow.AddSeconds(3);
             } finally { if(device!=null) Marshal.ReleaseComObject(device); if(enumerator!=null) Marshal.ReleaseComObject(enumerator); }
@@ -246,7 +261,7 @@ namespace OneTaskBar
         }
         public void Set(double value) { Ensure(); var ctx=Guid.Empty; Marshal.ThrowExceptionForHR(endpoint.SetMasterVolumeLevelScalar((float)(Math.Max(0,Math.Min(100,value))/100),ref ctx)); }
         public void Mute(bool muted) { Ensure(); var ctx=Guid.Empty; Marshal.ThrowExceptionForHR(endpoint.SetMute(muted,ref ctx)); }
-        public void Dispose() { if(endpoint!=null) { Marshal.ReleaseComObject(endpoint); endpoint=null; } }
+        public void Dispose() { if(endpoint!=null) {if(callbackPointer!=IntPtr.Zero){try{endpoint.UnregisterControlChangeNotify(callbackPointer);}catch{}Marshal.Release(callbackPointer);callbackPointer=IntPtr.Zero;}Marshal.ReleaseComObject(endpoint); endpoint=null; } }
     }
     internal static class BrightnessService
     {
