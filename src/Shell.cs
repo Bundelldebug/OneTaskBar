@@ -49,6 +49,7 @@ namespace OneTaskBar
         readonly RuntimeDockOrder dockOrder=new RuntimeDockOrder();
         List<TaskbarItem> explorerItems=ExplorerBridge.ReadSaved();
         internal readonly SystemServices Services=new SystemServices();
+        internal readonly QuickActions Toggles=new QuickActions();
         internal readonly NotificationService Notifications=new NotificationService();
         readonly List<DockHost> docks=new List<DockHost>();
         DockHost trayDock;
@@ -231,6 +232,8 @@ namespace OneTaskBar
             await Services.Refresh(); if(Quick!=null) Quick.Refresh(Power,Brightness,Audio.Value,Audio.Muted,Audio.Available,Brightness>=0);
         }
         internal async void Media(string command) {await Services.ControlMedia(command); servicesAt=DateTime.MinValue;}
+        internal async Task<bool> SeekMedia(double percent){bool changed=await Services.SeekPercent(percent);if(changed)servicesAt=DateTime.MinValue;return changed;}
+        internal void NowBarOpening(NowBar selected){foreach(var dock in docks)if(dock.MediaBar!=null&&dock.MediaBar!=selected)dock.MediaBar.SetExpanded(false);foreach(var panel in new GlassWindow[]{Quick,Center,Detail,Drawer,Finder})if(panel!=null)panel.HideImmediately();}
         internal void ShowNative(string kind,DockHost dock=null)
         {
             if(trayBusy||!Desktop||disposed)return;
@@ -311,8 +314,8 @@ namespace OneTaskBar
             if(Finder!=null)Finder.HideImmediately();if(Center!=null)Center.Hide();if(Detail!=null)Detail.Hide();
             if(Quick!=null) Quick.Hide();
             var screen=dock!=null ? dock.Screen : Forms.Screen.FromPoint(Forms.Cursor.Position); double scale=dock!=null ? dock.Scale : MonitorScale(screen,Drawer);
-            double w=screen.Bounds.Width/scale-28,h=screen.Bounds.Height/scale-84;
-            Drawer.Search.Text="";Drawer.Configure(w,h);Drawer.Reload();Drawer.ShowAt(screen.Bounds,14,14,w,h);Drawer.Pop();Drawer.Activate();Drawer.Search.Focus();
+            var layout=LauncherLayout.Fit(screen.Bounds.Width/scale,screen.Bounds.Height/scale);
+            Drawer.Search.Text="";Drawer.Configure(layout.Width,layout.Height);Drawer.Reload();Drawer.ShowAt(screen.Bounds,layout.X,layout.Y,layout.Width,layout.Height);Drawer.Pop();Drawer.Activate();Drawer.Search.Focus();
         }
         internal async void ToggleStartButton(DockHost dock)
         {
@@ -333,8 +336,8 @@ namespace OneTaskBar
             }
             if(Finder==null)Finder=new SearchWindow(this);if(Finder.IsVisible){Finder.Hide();return;}
             foreach(var panel in new GlassWindow[]{Quick,Center,Detail,Drawer})if(panel!=null)panel.HideImmediately();
-            var screen=dock!=null?dock.Screen:Forms.Screen.FromPoint(Forms.Cursor.Position);double scale=dock!=null?dock.Scale:MonitorScale(screen,Finder),w=screen.Bounds.Width/scale-28,h=screen.Bounds.Height/scale-84;
-            Finder.Configure(w,h);Finder.Reset();if(!String.IsNullOrEmpty(query))Finder.Query.Text=query;Finder.ShowAt(screen.Bounds,14,14,w,h);Finder.Pop();Finder.Activate();Finder.Query.Focus();Finder.Query.CaretIndex=Finder.Query.Text.Length;
+            var screen=dock!=null?dock.Screen:Forms.Screen.FromPoint(Forms.Cursor.Position);double scale=dock!=null?dock.Scale:MonitorScale(screen,Finder);var layout=LauncherLayout.Fit(screen.Bounds.Width/scale,screen.Bounds.Height/scale);
+            Finder.Configure(layout.Width,layout.Height);Finder.Reset();if(!String.IsNullOrEmpty(query))Finder.Query.Text=query;Finder.ShowAt(screen.Bounds,layout.X,layout.Y,layout.Width,layout.Height);Finder.Pop();Finder.Activate();Finder.Query.Focus();Finder.Query.CaretIndex=Finder.Query.Text.Length;
         }
         internal async void OpenTaskManager()
         {
@@ -475,7 +478,7 @@ namespace OneTaskBar
                 Quick.EditLayout(true);await Task.Delay(220);bool editFits=Quick.LayoutFits();var editingLayout=Quick.LayoutSnapshot();Program.Save(Quick.Surface,380,650,Path.Combine(AppLog.Data,"quick-edit-preview.png"));Quick.EditLayout(wasEditing);await Task.Delay(220);
                 menu=new ContextMenu {PlacementTarget=Quick.Surface,Placement=System.Windows.Controls.Primitives.PlacementMode.Center};menu.Items.Add(new MenuItem {Header="유리 메뉴 확인"});menu.IsOpen=true;await Task.Delay(300);bool menuBlur=MenuTheme.HasBackdrop(menu);menu.IsOpen=false;await Task.Delay(450);bool menuReleased=!MenuTheme.HasBackdrop(menu);
                 detail=new DetailWindow(this,"power");detail.ShowAt(dock.Screen.Bounds,24,24,380,540);await Task.Delay(300);Program.Save(detail.Surface,380,540,Path.Combine(AppLog.Data,"power-panel-preview.png"));
-                var samsung=SamsungSettings();var devices=SamsungDevices();AppLog.Json("panel-probe.json",new {time=DateTimeOffset.Now.ToString("o"),quickBlur=Quick.HasBlur,detailBlur=detail.HasBlur,sharedGray=Quick.Surface.Background==GrayPanel.Glass&&detail.Surface.Background==GrayPanel.Glass&&Center.Surface.Background==GrayPanel.Glass,menuBlur=menuBlur,menuReleased=menuReleased,samsungIcon=Quick.SamsungIconLoaded,samsungApp=samsung!=null?samsung.AppID:null,devicesApp=devices!=null?devices.AppID:null,outlineWidth=Quick.Surface.BorderThickness.Left,closePassed=closePassed,closeMilliseconds=closeMilliseconds,expandedFits=expandedFits,expandedLayout=expandedLayout,foldedLayout=foldedLayout,audioStates=audioStates.ToArray(),editFits=editFits,editingLayout=editingLayout,layout=Quick.LayoutSnapshot(),quick=Native.RegionInfo(Quick),detail=Native.RegionInfo(detail)});
+                var samsung=SamsungSettings();var devices=SamsungDevices();AppLog.Json("panel-probe.json",new {time=DateTimeOffset.Now.ToString("o"),quickBlur=Quick.HasBlur,detailBlur=detail.HasBlur,sharedGray=Quick.Surface.Background==QuickPanel.Glass&&detail.Surface.Background==QuickPanel.Glass&&Center.Surface.Background==QuickPanel.Glass,menuBlur=menuBlur,menuReleased=menuReleased,samsungIcon=Quick.SamsungIconLoaded,samsungApp=samsung!=null?samsung.AppID:null,devicesApp=devices!=null?devices.AppID:null,outlineWidth=Quick.Surface.BorderThickness.Left,closePassed=closePassed,closeMilliseconds=closeMilliseconds,expandedFits=expandedFits,expandedLayout=expandedLayout,foldedLayout=foldedLayout,audioStates=audioStates.ToArray(),editFits=editFits,editingLayout=editingLayout,layout=Quick.LayoutSnapshot(),quick=Native.RegionInfo(Quick),detail=Native.RegionInfo(detail)});
             }catch(Exception e){AppLog.Json("panel-probe.json",new {error=e.ToString()});}
             finally {Quick.SetExpanded(wasExpanded);Quick.EditLayout(wasEditing);if(menu!=null)menu.IsOpen=false;if(detail!=null)detail.Close();if(!wasOpen)Quick.Hide();}
         }
@@ -488,6 +491,7 @@ namespace OneTaskBar
             timer.Stop(); SystemEvents.DisplaySettingsChanged-=DisplayChanged; SystemEvents.PowerModeChanged-=PowerChanged;
             if(keys!=null) keys.Dispose();
             if(osdGate!=null)osdGate.Dispose();
+            Toggles.Dispose();
             if(Finder!=null)Finder.Close();
             if(shellEvents!=null)shellEvents.Dispose();
             Preferences.Changed-=OptionsChanged;

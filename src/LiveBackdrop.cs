@@ -33,12 +33,13 @@ namespace OneTaskBar
         readonly DispatcherTimer popupTimer;
         readonly double radius;
         int width,height,corner,popupX=Int32.MinValue,popupY=Int32.MinValue;
+        Native.RectI placedBounds;bool shown;Rect? lastClip;
         internal LiveBackdrop(Window window,double radius)
         {
             this.window=window;this.radius=radius;
             Initialize(window.Topmost);
             window.IsVisibleChanged+=(s,e)=>Sync();window.LocationChanged+=(s,e)=>Sync();
-            window.Activated+=(s,e)=>Sync();
+            window.Activated+=(s,e)=>Sync(true);
         }
         internal LiveBackdrop(ContextMenu menu,double radius)
         {
@@ -74,12 +75,12 @@ namespace OneTaskBar
             blur=compositor.CreateSpriteVisual();blur.BorderMode=CompositionBorderMode.Soft;blur.Brush=compositor.CreateHostBackdropBrush();root.Children.InsertAtTop(blur);target.Root=root;
             Resize();
         }
-        internal void Sync()
+        internal void Sync(bool force=false)
         {
-            if(background==IntPtr.Zero||target==null)return;
-            if(!Visible){Native.ShowWindow(background,0);return;}
+            if(background==IntPtr.Zero||target==null)return;if(!Visible){if(shown)Native.ShowWindow(background,0);shown=false;return;}
             Native.RectI bounds;var overlay=Overlay;if(!Bounds(out bounds))return;
-            Native.SetWindowPos(background,overlay,bounds.Left,bounds.Top,bounds.Right-bounds.Left,bounds.Bottom-bounds.Top,0x10|0x40);
+            if(!force&&shown&&bounds.Left==placedBounds.Left&&bounds.Top==placedBounds.Top&&bounds.Right==placedBounds.Right&&bounds.Bottom==placedBounds.Bottom)return;
+            Native.SetWindowPos(background,overlay,bounds.Left,bounds.Top,bounds.Right-bounds.Left,bounds.Bottom-bounds.Top,0x10|0x40);placedBounds=bounds;shown=true;
         }
         internal void Enable(bool value){if(root!=null)root.Opacity=value?1:0;}
         internal void Resize()
@@ -87,10 +88,12 @@ namespace OneTaskBar
             if(target==null)return;Native.RectI bounds;var handle=Overlay;
             if(!Bounds(out bounds))return;
             int w=bounds.Right-bounds.Left,h=bounds.Bottom-bounds.Top,c=(int)Math.Round(radius*Math.Max(96,Native.GetDpiForWindow(handle))/96.0);
-            if(menu!=null&&w==width&&h==height&&c==corner&&popupX==bounds.Left&&popupY==bounds.Top)return;
-            popupX=bounds.Left;popupY=bounds.Top;
-            if(w==width&&h==height&&c==corner){Sync();return;}width=w;height=h;corner=c;
-            var size=new Vector2(w,h);root.Size=size;blur.Size=size;shape.Size=size;shape.CornerRadius=new Vector2(Math.Min(c,w/2f),Math.Min(c,h/2f));
+            var glass=window as GlassWindow;Rect? clip=glass!=null?glass.BackdropClip:null;
+            if(w==width&&h==height&&c==corner&&clip==lastClip){Sync();return;}
+            popupX=bounds.Left;popupY=bounds.Top;lastClip=clip;
+            if(w!=width||h!=height){var size=new Vector2(w,h);root.Size=size;blur.Size=size;}width=w;height=h;corner=c;
+            double scale=Math.Max(96,Native.GetDpiForWindow(handle))/96.0;float cw=clip.HasValue?(float)(clip.Value.Width*scale):w,ch=clip.HasValue?(float)(clip.Value.Height*scale):h;
+            shape.Offset=clip.HasValue?new Vector2((float)(clip.Value.X*scale),(float)(clip.Value.Y*scale)):Vector2.Zero;shape.Size=new Vector2(cw,ch);shape.CornerRadius=new Vector2(Math.Min(c,cw/2f),Math.Min(c,ch/2f));
             Sync();
         }
         public void Dispose() {if(popupTimer!=null)popupTimer.Stop();if(target!=null){target.Root=null;target.Dispose();target=null;}if(root!=null)root.Children.RemoveAll();if(blur!=null){var brush=blur.Brush;blur.Brush=null;blur.Dispose();blur=null;if(brush!=null)brush.Dispose();}if(root!=null){root.Dispose();root=null;}if(shape!=null){shape.Dispose();shape=null;}if(background!=IntPtr.Zero){DestroyWindow(background);background=IntPtr.Zero;}}

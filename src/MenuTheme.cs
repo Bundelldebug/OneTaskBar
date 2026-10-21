@@ -15,7 +15,7 @@ namespace OneTaskBar
         static void Opened(object sender,RoutedEventArgs args)
         {
             var menu=sender as ContextMenu;if(menu==null)return;
-            var window=menu.PlacementTarget==null?null:Window.GetWindow(menu.PlacementTarget);bool dark=window is QuickWindow,gray=window is DetailWindow||window is NotificationWindow;
+            var window=menu.PlacementTarget==null?null:Window.GetWindow(menu.PlacementTarget);bool dark=window is QuickWindow||window is DetailWindow||window is NotificationWindow||window is DrawerWindow||window is SearchWindow,gray=false;
             menu.Background=Preferences.Current.Blur?(dark?QuickPanel.Glass:gray?GrayPanel.Glass:LightPanel.Glass):Paint.Brush(dark?"#FF343936":gray?"#FFBEC6C1":"#FFD4DDD6");
             menu.Foreground=dark?Paint.ControlWhite:Paint.Ink;if(dark||gray)foreach(object entry in menu.Items){var item=entry as MenuItem;if(item!=null){item.Foreground=menu.Foreground;var icon=item.Icon as Glyph;if(icon!=null)icon.Color=menu.Foreground;}}
             if(!dark)LightPanel.Apply(menu);

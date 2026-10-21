@@ -49,6 +49,8 @@ namespace OneTaskBar
             if(args.Contains("--reference-probe"))return ReferenceChecks.Run();
             if(args.Contains("--osd-probe"))return OsdChecks.Run();
             if(args.Contains("--power-menu-probe"))return SystemPower.Probe();
+            if(args.Contains("--quick-feature-probe"))return QuickFeatureChecks.Run();
+            if(args.Contains("--nowbar-probe"))return NowBarChecks.Run();
             if(args.Contains("--dock-motion-probe"))return DockMotionChecks.Run();
             if(args.Contains("--osd-mask-fixture")){var mask=new NativeOsdGate(()=>true,()=>false,()=>true);mask.Refresh();AppLog.Json("osd-mask-fixture.json",new {prepared=mask.Prepared,windows=mask.MaskedWindows.Select(h=>h.ToInt64()).ToArray()});return mask.Prepared>0?0:1;}
             if(args.Contains("--osd-recovery-probe"))return OsdChecks.Recovery();
@@ -93,7 +95,7 @@ namespace OneTaskBar
         {
             var checks=new List<string>();
             try {
-                RuntimeDockOrder.Check();checks.Add("stable-launch-order");
+                RuntimeDockOrder.Check();checks.Add("stable-launch-order");LauncherLayout.Check();checks.Add("compact-launcher-layout");NowBarLayout.Check();checks.Add("nowbar-monitor-layout");ArtworkPalette.Check();checks.Add("artwork-color-contrast");
                 foreach(double width in new double[] { 1,200,288,344,600 }) foreach(double value in new double[] { -20,0,1,33,99,100,120 }) {
                     double f=PillSlider.FillWidth(width,value);
                     if(f<0 || f>width || (value==100 && f!=width)) throw new Exception("Slider endpoint "+width+" "+value);
@@ -222,7 +224,7 @@ namespace OneTaskBar
                 shell.Notifications.Items=new List<NotificationEntry>{new NotificationEntry {Id=1,App="One TaskBar",Title="알림 미리 보기",Body="알림을 누르면 원래 알림의 동작으로 연결됩니다.",Created=DateTimeOffset.Now,Icon=new BitmapImage(new Uri(Path.Combine(AppLog.Root,"assets","OneTaskBar.png")))}};
                 center.Refresh();Save(center.Surface,394,720,Path.Combine(output,"notifications-calendar.png"));
                 var settings=new WelcomeWindow(shell);Save(settings.Surface,700,650,Path.Combine(output,"settings.png"));
-                var finder=new SearchWindow(shell);finder.Configure(1440,820);finder.Reset();Save(finder.Surface,1440,820,Path.Combine(output,"launcher-search.png"));finder.Query.Text="ChatGPT";Save(finder.Surface,1440,820,Path.Combine(output,"launcher-search-results.png"));finder.Query.Text="One UI";finder.Query.Text="소리";Save(finder.Surface,800,650,Path.Combine(output,"launcher-search-settings.png"));finder.Close();
+                var finder=new SearchWindow(shell);finder.Configure(720,680);finder.Reset();Save(finder.Surface,720,680,Path.Combine(output,"launcher-search.png"));finder.Query.Text="ChatGPT";Save(finder.Surface,720,680,Path.Combine(output,"launcher-search-results.png"));finder.Query.Text="One UI";finder.Query.Text="소리";Save(finder.Surface,800,650,Path.Combine(output,"launcher-search-settings.png"));finder.Close();
                 var context=WindowPicker.Menu(new AppEntry {Name="One TaskBar"},shell);context.Visibility=Visibility.Visible;Save(context,300,124,Path.Combine(output,"context-menu.png"));
                 var demoDock=new DockHost(shell,System.Windows.Forms.Screen.PrimaryScreen);var charging=new PowerState {Known=true,Connected=true,Level=28};demoDock.Status.Surface.Background=Paint.Brush("#FFE0E5E2");demoDock.Refresh(charging);
                 foreach(double morph in new[]{0,.4,1.0}) {demoDock.Battery.Celebration=morph>0;demoDock.Battery.Reveal=1;demoDock.Battery.Morph=morph;demoDock.Battery.Phase=.2;demoDock.Battery.InvalidateVisual();Save(demoDock.Status.Surface,282,44,Path.Combine(output,"charging-morph-"+morph.ToString(System.Globalization.CultureInfo.InvariantCulture)+".png"));}
@@ -230,7 +232,7 @@ namespace OneTaskBar
                 shell.Services.WifiOn=false;shell.Wifi=null;shell.Audio.Value=0;demoDock.Refresh(charging);Save(demoDock.Status.Surface,282,44,Path.Combine(output,"status-off-zero.png"));
                 shell.Services.WifiOn=true;shell.Audio.Value=15;demoDock.Refresh(charging);Save(demoDock.Status.Surface,282,44,Path.Combine(output,"status-disconnected-low.png"));
                 shell.Wifi="Wi-Fi";shell.Audio.Value=75;demoDock.Refresh(charging);Save(demoDock.Status.Surface,282,44,Path.Combine(output,"status-connected-volume.png"));demoDock.Close();
-                var drawer=new DrawerWindow(shell);drawer.Configure(1440,820);drawer.Reload();Save(drawer.Surface,1440,820,Path.Combine(output,"app-drawer.png"));
+                var drawer=new DrawerWindow(shell);drawer.Configure(720,680);drawer.Reload();Save(drawer.Surface,720,680,Path.Combine(output,"app-drawer.png"));
                 var hud=new HudWindow(); hud.Set("volume",37,false); Save(hud.Surface,286,62,Path.Combine(output,"keyboard-volume.png"));
                 hud.Set("brightness",100,false); Save(hud.Surface,286,62,Path.Combine(output,"keyboard-brightness.png"));
                 foreach(int level in new int[]{0,1,25,50,99,100}) {

@@ -36,7 +36,7 @@ namespace OneTaskBar
         double currentX,currentWidth,currentY,currentStartX,fromX,fromWidth,fromY,fromStartX,resizeDelay;DockLayout targetLayout;bool placed;
         bool visible=true;
         IntPtr pressedForeground;
-        bool closed;
+        bool closed;internal NowBar MediaBar {get;private set;}
         internal DockHost(ShellController shell,Forms.Screen screen)
         {
             controller=shell; Screen=screen;
@@ -140,7 +140,7 @@ namespace OneTaskBar
         }
         void PlaceFrame()
         {
-            Apps.Width=currentWidth;Apps.Height=44;Start.Width=Start.Height=40;Native.Place(Apps,Screen.Bounds,currentX,currentY,currentWidth,44);Native.Place(Start,Screen.Bounds,currentStartX,currentY+2,40,40);Native.Round(Apps,22);
+            Apps.Width=currentWidth;Apps.Height=44;Start.Width=Start.Height=40;Native.Place(Apps,Screen.Bounds,currentX,currentY,currentWidth,44);Native.Place(Start,Screen.Bounds,currentStartX,currentY+2,40,40);Native.Round(Apps,22);if(MediaBar!=null)MediaBar.ConstrainDock(currentStartX,currentY);
         }
         internal string[] ShownKeys {get{return cells.Values.Where(c=>!c.Leaving).OrderBy(c=>c.X).Select(c=>c.Entry.Key).ToArray();}}
         internal Button AppButton(string key){DockCell cell;return cells.TryGetValue(key,out cell)?cell.Button:null;}
@@ -149,6 +149,8 @@ namespace OneTaskBar
         internal void Refresh(PowerState state)
         {
             if(closed) return;
+            if(MediaBar==null&&controller.Services.Media.Active&&controller.Desktop)MediaBar=new NowBar(controller,Screen);
+            if(MediaBar!=null)MediaBar.Update(controller.Services.Media,Scale,currentStartX,currentY,visible&&controller.Desktop);
             double expected=PowerDisplay.Slot(state,Preferences.Current.DesktopPowerWatts);if(expected!=powerWidth)Rebuild();powerAccess.ToolTip=state.Known?"배터리 · 빠른 설정":"직접 입력한 PC 전력값 · 실시간 측정 아님";
             Battery.Update(state);clock.Text=DateTime.Now.ToString(Preferences.Current.Seconds?"tt h:mm:ss\nyyyy-MM-dd":"tt h:mm\nyyyy-MM-dd",System.Globalization.CultureInfo.GetCultureInfo("ko-KR"));
             bool radioOff=controller.Services.WifiOn==false;string wifiKind=controller.Services.WifiPresent==false?(controller.Services.NetworkConnected?"network":"network-off"):radioOff?"wifi-off":controller.Wifi==null?"wifi-disconnected":"wifi";
@@ -169,8 +171,8 @@ namespace OneTaskBar
             // PointToScreen already returns physical pixels under per-monitor DPI awareness.
             return new TrayPlacement(trayAccess.PointToScreen(new Point(trayAccess.ActualWidth/2,0)),Screen.Bounds,Scale);
         }
-        internal object Inspect() {return new {scale=Scale,apps=Native.RegionInfo(Apps),start=Native.RegionInfo(Start),status=Native.RegionInfo(Status),blur=Apps.HasBlur&&Status.HasBlur};}
-        internal void Close() { if(closed) return; closed=true;resizeTimer.Stop();cells.Clear(); Start.Close(); Apps.Close(); Status.Close(); }
+        internal object Inspect() {return new {scale=Scale,apps=Native.RegionInfo(Apps),start=Native.RegionInfo(Start),status=Native.RegionInfo(Status),blur=Apps.HasBlur&&Status.HasBlur,nowBar=MediaBar!=null?Native.RegionInfo(MediaBar):null};}
+        internal void Close() { if(closed) return; closed=true;resizeTimer.Stop();if(MediaBar!=null)MediaBar.Close();cells.Clear(); Start.Close(); Apps.Close(); Status.Close(); }
     }
     internal sealed class HudWindow : GlassWindow
     {
@@ -190,8 +192,8 @@ namespace OneTaskBar
         internal readonly TextBox Search=new TextBox {FontSize=15,Foreground=Paint.Ink,Background=Brushes.Transparent,BorderThickness=new Thickness(0),Padding=new Thickness(6,8,6,8)};
         internal DrawerWindow(ShellController controller)
         {
-            shell=controller;Title="One TaskBar · 앱";Width=1280;Height=730;Radius=32;Dark=false;StableSurface=true;Surface.CornerRadius=new CornerRadius(32);Surface.BorderBrush=Paint.Brush("#58FFFFFF");Surface.BorderThickness=new Thickness(.7);Surface.Background=GrayPanel.Glass;
-            var root=new DockPanel {Margin=new Thickness(36,24,36,18)};
+            shell=controller;Title="One TaskBar · 앱";Width=720;Height=680;Radius=32;Dark=true;StableSurface=true;Surface.CornerRadius=new CornerRadius(32);Surface.BorderBrush=Paint.Brush("#58FFFFFF");Surface.BorderThickness=new Thickness(.7);Surface.Background=QuickPanel.Glass;
+            var root=new DockPanel {Margin=new Thickness(24,20,24,16)};
             var header=new Grid {Height=42,Margin=new Thickness(12,0,12,20)};var title=Paint.TextBlock("앱",22,Paint.Text);title.FontWeight=FontWeights.SemiBold;header.Children.Add(title);
             var close=Paint.Action("닫기",()=>Hide()); close.HorizontalAlignment=HorizontalAlignment.Right; close.Height=32; header.Children.Add(close); DockPanel.SetDock(header,Dock.Top); root.Children.Add(header);
             var search=new Border {Background=Paint.Brush("#EDFFFFFF"),CornerRadius=new CornerRadius(24),Padding=new Thickness(17,3,17,3),Margin=new Thickness(0,16,0,0),Width=420,MaxWidth=420};
@@ -201,14 +203,14 @@ namespace OneTaskBar
             TextCompositionManager.AddPreviewTextInputStartHandler(Search,(s,e)=>composing=true);TextCompositionManager.AddPreviewTextInputUpdateHandler(Search,(s,e)=>composing=true);Search.PreviewTextInput+=(s,e)=> {composing=false;QueueSearch();};Search.PreviewMouseLeftButtonDown+=(s,e)=> {if(Search.Text.Length==0){shell.ToggleSearch(null);e.Handled=true;}};
             var bottom=new StackPanel {HorizontalAlignment=HorizontalAlignment.Center};bottom.Children.Add(search);count.HorizontalAlignment=HorizontalAlignment.Center;count.Margin=new Thickness(0,8,0,0);bottom.Children.Add(count);DockPanel.SetDock(bottom,Dock.Bottom);root.Children.Add(bottom);
             root.Children.Add(new SmoothScrollViewer {Content=items,VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
-            GrayPanel.Apply(root);
+
             Surface.Child=root;TransitionContent=root;PreviewTextInput+=(s,e)=> {if(!Search.IsKeyboardFocusWithin&&!String.IsNullOrEmpty(e.Text)&&(Keyboard.Modifiers&(ModifierKeys.Control|ModifierKeys.Alt))==0){Search.Text+=e.Text;QueueSearch();e.Handled=true;}};Deactivated+=(s,e)=> { if(!Program.Inspectable && IsVisible && !IsMouseOver) Hide(); };
         }
         void QueueSearch(){if(searchQueued||Search.Text.Length==0)return;searchQueued=true;Dispatcher.BeginInvoke(new Action(()=> {searchQueued=false;if(!composing&&IsVisible&&!String.IsNullOrWhiteSpace(Search.Text))shell.ToggleSearch(null,Search.Text);}),System.Windows.Threading.DispatcherPriority.Background);}
         internal void Configure(double width,double height)
         {
             searchBar.Width=Math.Max(200,Math.Min(420,width-112));
-            int columns=Math.Max(3,Math.Min(8,(int)Math.Floor((width-108)/108)));cellWidth=Math.Max(84,(width-112)/columns);cellHeight=Math.Min(126,Math.Max(104,height*.18));items.Width=cellWidth*columns;
+            int columns=Math.Max(1,Math.Min(6,(int)Math.Floor((width-64)/104)));cellWidth=Math.Max(64,(width-64)/columns);cellHeight=112;items.Width=cellWidth*columns;
         }
         internal void Reload()
         {
@@ -217,10 +219,10 @@ namespace OneTaskBar
             var query=Search.Text.Trim();
             foreach(var entry in shell.Apps.Where(a=>String.IsNullOrEmpty(query) || a.Name.IndexOf(query,StringComparison.CurrentCultureIgnoreCase)>=0)) {
                 var body=new StackPanel {Width=cellWidth-16,Height=cellHeight-12};
-                double iconSize=Math.Min(56,cellHeight-62);
+                double iconSize=Math.Min(48,cellHeight-58);
                 if(entry.Icon!=null){var icon=AppIcons.Visual(entry.Icon,iconSize);icon.Margin=new Thickness(0,7,0,7);body.Children.Add(icon);}
-                else body.Children.Add(new Glyph("window",iconSize) {Color=Paint.Ink,Margin=new Thickness(0,7,0,7),HorizontalAlignment=HorizontalAlignment.Center});
-                var label=Paint.TextBlock(entry.Name,12,Paint.Ink);label.TextAlignment=TextAlignment.Center;label.TextWrapping=TextWrapping.Wrap;label.TextTrimming=TextTrimming.CharacterEllipsis;label.MaxHeight=34;body.Children.Add(label);
+                else body.Children.Add(new Glyph("window",iconSize) {Color=Paint.Text,Margin=new Thickness(0,7,0,7),HorizontalAlignment=HorizontalAlignment.Center});
+                var label=Paint.TextBlock(entry.Name,12,Paint.Text);label.TextAlignment=TextAlignment.Center;label.TextWrapping=TextWrapping.Wrap;label.TextTrimming=TextTrimming.CharacterEllipsis;label.MaxHeight=34;body.Children.Add(label);
                 var app=entry; var cell=Paint.Button(body,()=> { app.Launch(); Hide(); },entry.Name); cell.Padding=new Thickness(7,4,7,4); cell.Margin=new Thickness(2); cell.Background=Brushes.Transparent; items.Children.Add(cell);
                 cell.Width=cellWidth-4;cell.Height=cellHeight-4;cell.ContextMenu=WindowPicker.Menu(app,shell);
             }
