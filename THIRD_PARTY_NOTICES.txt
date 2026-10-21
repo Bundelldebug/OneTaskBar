@@ -1,0 +1,31 @@
+Reference: Liquid Dock / https://github.com/sous1345/liquid-dock / commit 7bd326a14f8beaadc2d88f48f472b5ce57449f8b
+
+One TaskBar artwork (assets/ and tools/AssetBuilder.cs): original vector geometry
+and renders created for this project, covered by this repository's MIT license.
+No APK, extracted Samsung artwork, wallpapers, third-party fonts, or reference
+screenshots/recordings are distributed. Windows and installed application logos
+are obtained on the user's own PC at runtime and remain their owners' property.
+The project is independent of Microsoft and Samsung.
+
+Liquid Dock license:
+MIT License
+
+Copyright (c) 2026 Liquid Dock contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
