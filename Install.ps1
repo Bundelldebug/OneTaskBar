@@ -78,9 +78,9 @@ try{
 $uninstall=[Microsoft.Win32.Registry]::CurrentUser.CreateSubKey('Software\Microsoft\Windows\CurrentVersion\Uninstall\OneTaskBar')
 try{
     $command='powershell.exe -NoProfile -ExecutionPolicy Bypass -File "'+(Join-Path $installDir 'Uninstall.ps1')+'"'
-    foreach($entry in @{DisplayName='One TaskBar';DisplayVersion='0.4.0';Publisher='OneTaskBar contributors';InstallLocation=$installDir;DisplayIcon=$installedExe;UninstallString=$command;QuietUninstallString=$command}.GetEnumerator()){$uninstall.SetValue($entry.Key,$entry.Value)}
+    foreach($entry in @{DisplayName='One TaskBar';DisplayVersion='0.4.2';Publisher='OneTaskBar contributors';InstallLocation=$installDir;DisplayIcon=$installedExe;UninstallString=$command;QuietUninstallString=$command}.GetEnumerator()){$uninstall.SetValue($entry.Key,$entry.Value)}
     $uninstall.SetValue('NoModify',1,[Microsoft.Win32.RegistryValueKind]::DWord);$uninstall.SetValue('NoRepair',1,[Microsoft.Win32.RegistryValueKind]::DWord)
 }finally{$uninstall.Dispose()}
-[IO.File]::WriteAllText((Join-Path $stateDir 'installation.json'),(@{Version='0.4.0';Executable=$installedExe;Installed=(Get-Date).ToString('o');StartupEnabled=$startupEnabled;AdministratorRequired=$false}|ConvertTo-Json),[Text.Encoding]::UTF8)
+[IO.File]::WriteAllText((Join-Path $stateDir 'installation.json'),(@{Version='0.4.2';Executable=$installedExe;Installed=(Get-Date).ToString('o');StartupEnabled=$startupEnabled;AdministratorRequired=$false}|ConvertTo-Json),[Text.Encoding]::UTF8)
 if(-not $NoLaunch){Start-Process -FilePath $installedExe -ArgumentList '--desktop' -WindowStyle Hidden}
 Write-Output ('Installed: '+$installedExe)

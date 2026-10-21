@@ -1,3 +1,11 @@
+# Validation — 0.4.2
+
+Actual dock window widths grew from 308 to 400 physical pixels through intermediate frames, then shrank back to 308. Entry/exit fades, retained button references, stable launch order and interrupted growth/removal all passed. Native OSD opacity was already zero before the native SHOW event; normal-exit restoration passed. Power menu wiring was inspected without executing shutdown, sleep or lock.
+
+# Validation — 0.4.1
+
+Interior cards and controls now use translucent gray tint over the existing live backdrop. The top power menu contains shutdown, sleep and lock, with animated dismissal. Menu wiring is inspected without executing power actions.
+
 # Validation — 0.4.0
 
 Windows 11 x64, .NET Framework 4.8; these results do not establish support for every driver or shell customization.

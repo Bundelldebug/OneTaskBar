@@ -15,7 +15,7 @@ namespace OneTaskBar
         public string Name {get;set;} public string AppID {get;set;} public string Target {get;set;}
         public ImageSource Icon;
         public readonly List<IntPtr> Windows=new List<IntPtr>();
-        internal string Executable;
+        internal string Executable;internal long StartedUtcTicks;
         internal bool Pinned;
         internal TaskbarItem ExplorerItem;
         public string Key { get { return !String.IsNullOrEmpty(AppID) ? AppID : Target; } }
@@ -30,7 +30,7 @@ namespace OneTaskBar
         }
         internal AppEntry Copy()
         {
-            var result=new AppEntry {Name=Name,AppID=AppID,Target=Target,Icon=Icon,Executable=Executable,Pinned=Pinned,ExplorerItem=ExplorerItem};
+            var result=new AppEntry {Name=Name,AppID=AppID,Target=Target,Icon=Icon,Executable=Executable,Pinned=Pinned,ExplorerItem=ExplorerItem,StartedUtcTicks=StartedUtcTicks};
             result.Windows.AddRange(Windows.Where(Native.IsWindow)); return result;
         }
         public void LoadIcon()
@@ -73,6 +73,7 @@ namespace OneTaskBar
                     AppEntry entry;
                     if(!entries.TryGetValue(key,out entry)) { entry=new AppEntry { Name=title.ToString(),Target=String.IsNullOrEmpty(appId) ? path : null,AppID=appId,Executable=path };
                         entry.LoadIcon(); if(entry.Icon==null) entry.Icon=Native.WindowIcon(handle); entries.Add(key,entry); }
+                    try{long started=p.StartTime.ToUniversalTime().Ticks;if(entry.StartedUtcTicks==0||started<entry.StartedUtcTicks)entry.StartedUtcTicks=started;}catch{}
                     entry.Windows.Add(handle);
                 } } catch { }
                 return true;

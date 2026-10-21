@@ -48,6 +48,10 @@ namespace OneTaskBar
             if(args.Contains("--ui-probe"))return UiChecks.Run(args.Contains("--optimized")?"optimized":"baseline");
             if(args.Contains("--reference-probe"))return ReferenceChecks.Run();
             if(args.Contains("--osd-probe"))return OsdChecks.Run();
+            if(args.Contains("--power-menu-probe"))return SystemPower.Probe();
+            if(args.Contains("--dock-motion-probe"))return DockMotionChecks.Run();
+            if(args.Contains("--osd-mask-fixture")){var mask=new NativeOsdGate(()=>true,()=>false,()=>true);mask.Refresh();AppLog.Json("osd-mask-fixture.json",new {prepared=mask.Prepared,windows=mask.MaskedWindows.Select(h=>h.ToInt64()).ToArray()});return mask.Prepared>0?0:1;}
+            if(args.Contains("--osd-recovery-probe"))return OsdChecks.Recovery();
             if(args.Contains("--native-start-probe")){var watch=Stopwatch.StartNew();bool sent=SystemPanels.Start();Thread.Sleep(900);bool visible=LauncherChecks.StartVisible();AppLog.Json("native-start-probe.json",new {passed=sent&&visible,sent=sent,nativeStart=visible,foreground=ReferenceChecks.FocusName(),milliseconds=watch.ElapsedMilliseconds});if(visible)SystemPanels.Start();else SystemPanels.CloseSearchProbe();return sent&&visible?0:1;}
             if(args.Contains("--recovery-probe"))return RecoveryChecks.Run();
             if(args.Contains("--desktop-recovery-probe"))return RecoveryChecks.Desktop();
@@ -58,7 +62,7 @@ namespace OneTaskBar
             if(args.Contains("--diagnose")) return Diagnose();
             if(args.Contains("--desktop-probe")) return DesktopProbe();
             if(args.Contains("--tray-probe")) return DesktopProbe(true);
-            if(args.Contains("--recover")) {int index=Array.IndexOf(args,"--session");DesktopLease.Recover(index>=0&&index+1<args.Length?args[index+1]:null);return 0;}
+            if(args.Contains("--recover")) {int index=Array.IndexOf(args,"--session");DesktopLease.Recover(index>=0&&index+1<args.Length?args[index+1]:null);NativeOsdGate.Recover();return 0;}
             if(args.Contains("--guard-fixture")){Thread.Sleep(Timeout.Infinite);return 0;}
             if(args.Contains("--render")) return Render(args);
             bool created;
@@ -89,6 +93,7 @@ namespace OneTaskBar
         {
             var checks=new List<string>();
             try {
+                RuntimeDockOrder.Check();checks.Add("stable-launch-order");
                 foreach(double width in new double[] { 1,200,288,344,600 }) foreach(double value in new double[] { -20,0,1,33,99,100,120 }) {
                     double f=PillSlider.FillWidth(width,value);
                     if(f<0 || f>width || (value==100 && f!=width)) throw new Exception("Slider endpoint "+width+" "+value);

@@ -28,12 +28,21 @@ namespace OneTaskBar
         readonly Button powerAccess;readonly ColumnDefinition powerColumn;double powerWidth=58;
         readonly ShellController controller;
         readonly Dictionary<IntPtr,Border> indicators=new Dictionary<IntPtr,Border>();
+        sealed class DockCell {internal AppEntry Entry;internal Button Button;internal Border Dot;internal FrameworkElement Icon;internal TranslateTransform Offset=new TranslateTransform();internal double X=Double.NaN;internal bool Leaving;internal int Token;}
+        readonly Canvas appCanvas=new Canvas {Height=42,VerticalAlignment=VerticalAlignment.Center};
+        readonly Dictionary<string,DockCell> cells=new Dictionary<string,DockCell>(StringComparer.OrdinalIgnoreCase);
+        readonly System.Windows.Threading.DispatcherTimer resizeTimer=new System.Windows.Threading.DispatcherTimer(System.Windows.Threading.DispatcherPriority.Render){Interval=TimeSpan.FromMilliseconds(16)};
+        readonly Stopwatch resizeWatch=new Stopwatch();
+        double currentX,currentWidth,currentY,currentStartX,fromX,fromWidth,fromY,fromStartX,resizeDelay;DockLayout targetLayout;bool placed;
         bool visible=true;
         IntPtr pressedForeground;
         bool closed;
         internal DockHost(ShellController shell,Forms.Screen screen)
         {
             controller=shell; Screen=screen;
+            var search=Paint.Button(new Glyph("search",20){Color=Paint.Ink},()=>controller.ToggleSearch(this),"검색");search.Padding=new Thickness(0);search.Background=Brushes.Transparent;search.Width=42;search.Height=42;Canvas.SetLeft(search,10);appCanvas.Children.Add(search);Apps.Surface.Child=appCanvas;
+            resizeTimer.Tick+=(sender,args)=>ResizeFrame();
+
             foreach(var w in new GlassWindow[] {Start,Apps,Status}) {
                 w.SoftCorners=true;w.Dark=false; w.ShowActivated=false; w.Radius=22; w.Surface.CornerRadius=new CornerRadius(22); w.Surface.Background=LightPanel.DockGlass;w.Surface.BorderBrush=Brushes.Transparent;w.Surface.BorderThickness=new Thickness(0);
                 w.SourceInitialized+=(s,e)=> {
@@ -68,7 +77,7 @@ namespace OneTaskBar
             var time=Paint.Button(clock,()=>controller.ToggleNotifications(this),"알림 · 달력");time.Padding=new Thickness(0);time.Background=Brushes.Transparent;
             Grid.SetColumn(time,3); status.Children.Add(time); Status.Surface.Child=status;
             var menu=new ContextMenu(); var settings=new MenuItem {Header="One TaskBar 설정",Icon=new Glyph("settings",18){Color=Paint.Ink}};settings.Click+=(s,e)=>controller.ShowWelcome();menu.Items.Add(settings);
-            var resetOrder=new MenuItem {Header="앱 순서 초기화"};resetOrder.Click+=(s,e)=>LayoutOrder.Reset("dock.apps");menu.Items.Add(resetOrder);
+            var resetOrder=new MenuItem {Header="앱 순서 초기화"};resetOrder.Click+=(s,e)=>controller.ResetDockOrder();menu.Items.Add(resetOrder);
             var restore=new MenuItem {Header="Windows 작업표시줄로 돌아가기"};restore.Click+=(s,e)=>controller.SetDesktop(false);menu.Items.Add(restore);Start.ContextMenu=menu;
             Rebuild();
         }
@@ -83,40 +92,58 @@ namespace OneTaskBar
             new WindowInteropHelper(Apps).EnsureHandle();
             Native.SetWindowPos(new WindowInteropHelper(Apps).Handle,IntPtr.Zero,Screen.Bounds.Left+12,Screen.Bounds.Top+12,0,0,0x1|0x4|0x10);
             Scale=Math.Max(96,Native.GetDpiForWindow(new WindowInteropHelper(Apps).Handle))/96.0;
-            Rebuild();
+            placed=false;Rebuild();
         }
         internal void Rebuild()
         {
-            if(closed||DragReorder.Active) return;
-            if(Scale<=0) Scale=1;
+            if(closed||DragReorder.Active)return;if(Scale<=0)Scale=1;
             startGlyph.Kind=Preferences.Current.NativeStartButton?"windows-start":"apps";startGlyph.Color=Preferences.Current.NativeStartButton?Paint.Brush("#FF1975DD"):Paint.Ink;startGlyph.InvalidateVisual();startButton.ToolTip=Preferences.Current.NativeStartButton?"Windows 시작":"앱 목록";System.Windows.Automation.AutomationProperties.SetName(startButton,(string)startButton.ToolTip);
-            var entries=controller.DockApps();
+            var entries=controller.DockApps();powerWidth=PowerDisplay.Slot(controller.Power,Preferences.Current.DesktopPowerWatts);powerColumn.Width=new GridLength(powerWidth);powerAccess.Visibility=powerWidth>0?Visibility.Visible:Visibility.Collapsed;Battery.Width=powerWidth==78?70:52;
+            var layout=DockLayout.Compute(Screen.Bounds,Scale,Math.Max(1,entries.Count),powerWidth);var shown=entries.Skip(Math.Max(0,entries.Count-layout.Capacity)).Take(layout.Capacity).ToArray();var keys=new HashSet<string>(shown.Select(e=>e.Key),StringComparer.OrdinalIgnoreCase);bool animate=placed&&visible&&Apps.IsVisible&&Motion.Enabled;
+            foreach(var cell in cells.Values.Where(c=>!keys.Contains(c.Entry.Key)).ToArray()){
+                if(cell.Leaving)continue;cell.Leaving=true;cell.Button.IsHitTestVisible=false;int token=++cell.Token;
+                if(!animate){appCanvas.Children.Remove(cell.Button);cells.Remove(cell.Entry.Key);continue;}
+                var fade=Motion.Tween(cell.Button.Opacity,0,120);cell.Button.Opacity=0;fade.Completed+=(sender,args)=>{if(cell.Leaving&&cell.Token==token){appCanvas.Children.Remove(cell.Button);cells.Remove(cell.Entry.Key);}};cell.Button.BeginAnimation(UIElement.OpacityProperty,fade);cell.Offset.BeginAnimation(TranslateTransform.YProperty,Motion.Tween(cell.Offset.Y,7,120));
+            }
             indicators.Clear();
-            powerWidth=PowerDisplay.Slot(controller.Power,Preferences.Current.DesktopPowerWatts);powerColumn.Width=new GridLength(powerWidth);powerAccess.Visibility=powerWidth>0?Visibility.Visible:Visibility.Collapsed;Battery.Width=powerWidth==78?70:52;
-            var layout=DockLayout.Compute(Screen.Bounds,Scale,Math.Max(1,entries.Count),powerWidth);
-            var row=new StackPanel { Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center };
-            var search=Paint.Button(new Glyph("search",20) {Color=Paint.Ink},()=>controller.ToggleSearch(this),"검색"); search.Padding=new Thickness(0); search.Background=Brushes.Transparent; search.Width=42; search.Height=42; row.Children.Add(search);
-            foreach(var entry in entries.Take(layout.Capacity)) {
-                var content=new Grid {Width=44,Height=42};
-                FrameworkElement icon=entry.Icon!=null ? AppIcons.Visual(entry.Icon,30) : new Glyph("window",30) {Color=Paint.Ink};icon.VerticalAlignment=VerticalAlignment.Top;icon.Margin=new Thickness(0,4,0,0);
-                RenderOptions.SetBitmapScalingMode(icon,BitmapScalingMode.HighQuality);
-                content.Children.Add(icon);
-                if(entry.Windows.Count>0&&Preferences.Current.RunningDots) {var dot=new Border {Width=4,Height=4,CornerRadius=new CornerRadius(2),Background=Paint.Ink,VerticalAlignment=VerticalAlignment.Bottom,HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(0,0,0,3)};
-                    dot.Margin=new Thickness(0,0,0,2);content.Children.Add(dot);foreach(var h in entry.Windows)indicators[h]=dot;}
-                var app=entry;Button button=null;button=Paint.Button(content,()=>{var before=pressedForeground;pressedForeground=IntPtr.Zero;controller.ActivateApp(app,button,before);},app.Name);button.Width=46;button.Height=42;button.Padding=new Thickness(0);button.Background=Brushes.Transparent;
-                button.ContextMenu=WindowPicker.Menu(app,controller);
-                Motion.Dock(button,icon);
-                DragReorder.Attach(button,button,"dock.apps",app.Key,Orientation.Horizontal,()=>!closed,controller.MoveDock);
-                row.Children.Add(button);
+            for(int i=0;i<shown.Length;i++){
+                var entry=shown[i];DockCell cell;bool added=!cells.TryGetValue(entry.Key,out cell);if(added){cell=CreateCell(entry);cells.Add(entry.Key,cell);appCanvas.Children.Add(cell.Button);}else cell.Entry=entry;
+                bool returning=cell.Leaving;cell.Leaving=false;cell.Token++;cell.Button.IsHitTestVisible=true;
+                double x=52+i*46,oldX=Double.IsNaN(cell.X)?x+16:cell.X+cell.Offset.X;
+                if(added||returning||Math.Abs(cell.X-x)>.01){cell.X=x;Canvas.SetLeft(cell.Button,x);cell.Offset.BeginAnimation(TranslateTransform.XProperty,null);cell.Offset.X=0;cell.Offset.BeginAnimation(TranslateTransform.YProperty,null);cell.Offset.Y=0;
+                    if(animate){cell.Offset.BeginAnimation(TranslateTransform.XProperty,Motion.PanelTween(oldX-x,0,330));if(added||returning){cell.Offset.BeginAnimation(TranslateTransform.YProperty,Motion.PanelTween(6,0,330));var enter=new DoubleAnimationUsingKeyFrames {Duration=TimeSpan.FromMilliseconds(330),FillBehavior=FillBehavior.Stop};enter.KeyFrames.Add(new LinearDoubleKeyFrame(0,KeyTime.FromTimeSpan(TimeSpan.Zero)));enter.KeyFrames.Add(new LinearDoubleKeyFrame(0,KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(65))));enter.KeyFrames.Add(new SplineDoubleKeyFrame(1,KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(280)),new KeySpline(.2,.7,.2,1)));cell.Button.BeginAnimation(UIElement.OpacityProperty,null);cell.Button.Opacity=1;cell.Button.BeginAnimation(UIElement.OpacityProperty,enter);}}else{cell.Button.BeginAnimation(UIElement.OpacityProperty,null);cell.Button.Opacity=1;}}
+                cell.Dot.Visibility=entry.Windows.Count>0&&Preferences.Current.RunningDots?Visibility.Visible:Visibility.Collapsed;foreach(var window in entry.Windows)indicators[window]=cell.Dot;
             }
-            Apps.Surface.Child=row;
-            if(controller.Desktop) {
-                Start.ShowAt(Screen.Bounds,layout.StartX,layout.Y+2,40,40);
-                Apps.ShowAt(Screen.Bounds,layout.AppX,layout.Y,layout.AppWidth,44);
-                Status.ShowAt(Screen.Bounds,layout.StatusX,layout.Y,layout.StatusWidth,44);
-            }
-            UpdateActive(controller.LastApplication);
+            if(controller.Desktop)ResizeTo(layout,animate);UpdateActive(controller.LastApplication);
         }
+        DockCell CreateCell(AppEntry entry)
+        {
+            var cell=new DockCell {Entry=entry};var content=new Grid {Width=44,Height=42};cell.Icon=entry.Icon!=null?AppIcons.Visual(entry.Icon,30):new Glyph("window",30){Color=Paint.Ink};cell.Icon.VerticalAlignment=VerticalAlignment.Top;cell.Icon.Margin=new Thickness(0,4,0,0);RenderOptions.SetBitmapScalingMode(cell.Icon,BitmapScalingMode.HighQuality);content.Children.Add(cell.Icon);
+            cell.Dot=new Border {Width=4,Height=4,CornerRadius=new CornerRadius(2),Background=Paint.Ink,VerticalAlignment=VerticalAlignment.Bottom,HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(0,0,0,2)};content.Children.Add(cell.Dot);
+            cell.Button=Paint.Button(content,()=>{var before=pressedForeground;pressedForeground=IntPtr.Zero;controller.ActivateApp(cell.Entry,cell.Button,before);},entry.Name);cell.Button.Width=46;cell.Button.Height=42;cell.Button.Padding=new Thickness(0);cell.Button.Background=Brushes.Transparent;cell.Button.RenderTransform=cell.Offset;
+            cell.Button.ContextMenuOpening+=(sender,args)=>cell.Button.ContextMenu=WindowPicker.Menu(cell.Entry,controller);cell.Button.ContextMenu=WindowPicker.Menu(entry,controller);Motion.Dock(cell.Button,cell.Icon);DragReorder.Attach(cell.Button,cell.Button,"dock.apps",entry.Key,Orientation.Horizontal,()=>!closed,controller.MoveDock);return cell;
+        }
+        void ResizeTo(DockLayout layout,bool animate)
+        {
+            Status.ShowAt(Screen.Bounds,layout.StatusX,layout.Y,layout.StatusWidth,44);
+            if(!placed){placed=true;targetLayout=layout;currentX=layout.AppX;currentWidth=layout.AppWidth;currentY=layout.Y;currentStartX=layout.StartX;Start.ShowAt(Screen.Bounds,currentStartX,currentY+2,40,40);Apps.ShowAt(Screen.Bounds,currentX,currentY,currentWidth,44);return;}
+            if(resizeTimer.IsEnabled&&targetLayout!=null&&Math.Abs(targetLayout.AppX-layout.AppX)<.01&&Math.Abs(targetLayout.AppWidth-layout.AppWidth)<.01&&Math.Abs(targetLayout.Y-layout.Y)<.01)return;
+            targetLayout=layout;resizeTimer.Stop();
+            if(!animate){currentX=layout.AppX;currentWidth=layout.AppWidth;currentY=layout.Y;currentStartX=layout.StartX;PlaceFrame();return;}
+            if(Math.Abs(currentX-layout.AppX)<.01&&Math.Abs(currentWidth-layout.AppWidth)<.01&&Math.Abs(currentY-layout.Y)<.01)return;
+            fromX=currentX;fromWidth=currentWidth;fromY=currentY;fromStartX=currentStartX;resizeDelay=layout.AppWidth<currentWidth?85:0;resizeWatch.Restart();resizeTimer.Start();
+        }
+        void ResizeFrame()
+        {
+            if(closed||targetLayout==null){resizeTimer.Stop();return;}double progress=Math.Max(0,Math.Min(1,(resizeWatch.Elapsed.TotalMilliseconds-resizeDelay)/(330-resizeDelay))),ease=1-Math.Pow(1-progress,3);
+            currentX=fromX+(targetLayout.AppX-fromX)*ease;currentWidth=fromWidth+(targetLayout.AppWidth-fromWidth)*ease;currentY=fromY+(targetLayout.Y-fromY)*ease;currentStartX=fromStartX+(targetLayout.StartX-fromStartX)*ease;PlaceFrame();if(progress>=1)resizeTimer.Stop();
+        }
+        void PlaceFrame()
+        {
+            Apps.Width=currentWidth;Apps.Height=44;Start.Width=Start.Height=40;Native.Place(Apps,Screen.Bounds,currentX,currentY,currentWidth,44);Native.Place(Start,Screen.Bounds,currentStartX,currentY+2,40,40);Native.Round(Apps,22);
+        }
+        internal string[] ShownKeys {get{return cells.Values.Where(c=>!c.Leaving).OrderBy(c=>c.X).Select(c=>c.Entry.Key).ToArray();}}
+        internal Button AppButton(string key){DockCell cell;return cells.TryGetValue(key,out cell)?cell.Button:null;}
         internal void UpdateActive(IntPtr active) {Border selected;indicators.TryGetValue(active,out selected);foreach(var dot in indicators.Values.Distinct()){bool current=dot==selected;dot.Width=current?12:4;dot.Background=current?Brushes.Black:Paint.Brush("#AF262C2A");}}
         internal void SetVisible(bool value) {if(closed||visible==value)return;visible=value;foreach(var w in new[]{Start,Apps,Status}) {if(value)w.Show();else w.Hide();}}
         internal void Refresh(PowerState state)
@@ -143,7 +170,7 @@ namespace OneTaskBar
             return new TrayPlacement(trayAccess.PointToScreen(new Point(trayAccess.ActualWidth/2,0)),Screen.Bounds,Scale);
         }
         internal object Inspect() {return new {scale=Scale,apps=Native.RegionInfo(Apps),start=Native.RegionInfo(Start),status=Native.RegionInfo(Status),blur=Apps.HasBlur&&Status.HasBlur};}
-        internal void Close() { if(closed) return; closed=true; Start.Close(); Apps.Close(); Status.Close(); }
+        internal void Close() { if(closed) return; closed=true;resizeTimer.Stop();cells.Clear(); Start.Close(); Apps.Close(); Status.Close(); }
     }
     internal sealed class HudWindow : GlassWindow
     {

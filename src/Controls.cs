@@ -17,7 +17,7 @@ namespace OneTaskBar
     internal static class GrayPanel
     {
         // Neutral frosted glass retains live background color with readable dark content.
-        internal static readonly Brush Glass=LightPanel.Tint("#B8DDE1DE","#A0C5CEC7","#B2D8DED9"),Card=Paint.Brush("#32FFFFFF"),Muted=LightPanel.Muted;
+        internal static readonly Brush Glass=LightPanel.Tint("#8F858E87","#75747F77","#887F8981"),Card=Paint.Brush("#55ADB5AE"),Muted=LightPanel.Muted;
         internal static void Apply(DependencyObject root)
         {
             LightPanel.Apply(root);
@@ -109,6 +109,7 @@ namespace OneTaskBar
             else if(kind=="pause") {dc.DrawRoundedRectangle(brush,null,new Rect(5,3,5,18),1.5,1.5);dc.DrawRoundedRectangle(brush,null,new Rect(14,3,5,18),1.5,1.5);}
             else if(kind=="next"||kind=="previous") {if(kind=="previous")dc.PushTransform(new ScaleTransform(-1,1,12,12));dc.DrawGeometry(brush,null,Geometry.Parse("M4,4 L17,12 4,20 Z"));dc.DrawRoundedRectangle(brush,null,new Rect(18,4,3,16),1,1);if(kind=="previous")dc.Pop();}
             else if(kind=="moon") dc.DrawGeometry(brush,null,Geometry.Parse("M16,2 A10,10 0 1 0 22,17 A10,10 0 0 1 16,2 Z"));
+            else if(kind=="lock") {dc.DrawRoundedRectangle(null,pen,new Rect(5,10,14,12),2,2);dc.DrawGeometry(null,pen,Geometry.Parse("M8,10 L8,6 A4,4 0 0 1 16,6 L16,10"));dc.DrawEllipse(brush,null,new Point(12,15),1.2,1.2);line(12,15,12,18);}
             else if(kind=="power") dc.DrawGeometry(null,pen,Geometry.Parse("M12,1 L12,12 M7,4 A9,9 0 1 0 17,4"));
             else if(kind=="rotation") {dc.DrawGeometry(null,pen,Geometry.Parse("M3,11 A9,9 0 0 1 20,6 M17,3 L21,6 17,9 M21,13 A9,9 0 0 1 4,18 M7,15 L3,18 7,21"));}
             else if(kind=="devices") {dc.DrawRoundedRectangle(null,pen,new Rect(7,3,10,18),2,2);line(10,18,14,18);dc.DrawGeometry(null,pen,Geometry.Parse("M3,8 L1,12 3,16 M21,8 L23,12 21,16"));}

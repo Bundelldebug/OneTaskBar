@@ -4,5 +4,5 @@ using System.Reflection;
 [assembly: AssemblyDescription("Windows desktop dock, app launcher and control center")]
 [assembly: AssemblyCompany("OneTaskBar contributors")]
 [assembly: AssemblyCopyright("Copyright 2026 OneTaskBar contributors. MIT License.")]
-[assembly: AssemblyVersion("0.4.0.0")]
-[assembly: AssemblyFileVersion("0.4.0.0")]
+[assembly: AssemblyVersion("0.4.2.0")]
+[assembly: AssemblyFileVersion("0.4.2.0")]

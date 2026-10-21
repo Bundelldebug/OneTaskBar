@@ -76,3 +76,5 @@ Code and the original One TaskBar icon are under the [MIT license](LICENSE). [Th
 The dock button can independently open the app drawer or Windows Start. Connected PHY data drives Wi-Fi generation badges (4/5/6/7); unknown/offline connections have no generation badge. Clicking the foreground application minimizes it, with a visible icon bounce. Panels now use a light frosted material and original monochrome settings symbols. Brightness uses Windows power notifications, while the dedicated Explorer OSD is replaced only when the custom HUD is available.
 
 Known issue: native Start button invocation is not yet verified on the development PC; automated invocation opens SearchHost although physical Ctrl+Esc opens Start. The app drawer remains the default.
+
+0.4.2 adds retained dock cells with animated capsule growth/shrink, icon entry/exit and stable launch ordering (newest on the right), preserving manual moves. The gray control center has a more transparent neutral tint and a shutdown/sleep/lock menu. Native OSD opacity is prepared before presentation and restored on exit or watchdog recovery.
