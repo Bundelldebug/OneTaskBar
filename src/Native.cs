@@ -151,25 +151,25 @@ namespace OneTaskBar
         [DllImport("wlanapi.dll")] static extern uint WlanQueryInterface(IntPtr client,ref Guid id,uint opcode,IntPtr reserved,out uint size,out IntPtr data,out uint type);
         [DllImport("wlanapi.dll")] static extern void WlanFreeMemory(IntPtr memory);
         [DllImport("wlanapi.dll")] static extern uint WlanCloseHandle(IntPtr client,IntPtr reserved);
-        internal static string WifiName()
+        internal static string WifiName(){return ReadWifi().Name;}
+        internal static WifiLink ReadWifi()
         {
             IntPtr client=IntPtr.Zero,list=IntPtr.Zero;
             try {
-                uint agreed; if(WlanOpenHandle(2,IntPtr.Zero,out agreed,out client)!=0) return null;
-                if(WlanEnumInterfaces(client,IntPtr.Zero,out list)!=0) return null;
+                uint agreed; if(WlanOpenHandle(2,IntPtr.Zero,out agreed,out client)!=0) return new WifiLink();
+                if(WlanEnumInterfaces(client,IntPtr.Zero,out list)!=0) return new WifiLink();
                 int count=Marshal.ReadInt32(list);
                 for(int i=0;i<count;i++) {
                     var guid=(Guid)Marshal.PtrToStructure(IntPtr.Add(list,8+i*532),typeof(Guid)); uint size,type; IntPtr data;
                     if(WlanQueryInterface(client,ref guid,7,IntPtr.Zero,out size,out data,out type)!=0) continue;
                     try {
                         if(size<556 || Marshal.ReadInt32(data)!=1) continue;
-                        int length=Math.Min(32,Math.Max(0,Marshal.ReadInt32(data,520)));
-                        byte[] bytes=new byte[length]; Marshal.Copy(IntPtr.Add(data,524),bytes,0,length); return Encoding.UTF8.GetString(bytes);
+                        byte[] attributes=new byte[Math.Min(604,(int)size)];Marshal.Copy(data,attributes,0,attributes.Length);return WifiLink.Parse(attributes);
                     } finally { WlanFreeMemory(data); }
                 }
             } catch { }
             finally { if(list!=IntPtr.Zero) WlanFreeMemory(list); if(client!=IntPtr.Zero) WlanCloseHandle(client,IntPtr.Zero); }
-            return null;
+            return new WifiLink();
         }
     }
 

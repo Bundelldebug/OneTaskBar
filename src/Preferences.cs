@@ -10,6 +10,7 @@ namespace OneTaskBar
         public bool Blur=true,Animations=true,ChargeAnimation=true,Hover=true,RunningDots=true,Seconds=true,DesktopMode=true;
         public bool NativeNotifications=false,NativeQuickSettings=false;
         public bool NativeStartKey=true,NativeSearch=false;
+        public bool NativeStartButton=false;
         public int DesktopPowerWatts=0;
         public bool EmergencyExit=true;
     }

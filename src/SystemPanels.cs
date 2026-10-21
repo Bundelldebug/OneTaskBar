@@ -15,9 +15,15 @@ namespace OneTaskBar
         [DllImport("user32.dll")]static extern short GetAsyncKeyState(int key);
         internal const uint InputMarker=0x4f554948;
         static Input Key(ushort key,uint flags) {return new Input {Type=1,Data=new InputUnion {Keyboard=new KeyInput {Key=key,Flags=flags,Extra=new UIntPtr(InputMarker)}}};}
+        static Input Scan(ushort scan,uint flags){return new Input{Type=1,Data=new InputUnion{Keyboard=new KeyInput{Scan=scan,Flags=8|flags,Extra=new UIntPtr(InputMarker)}}};}
         static bool ModifiersHeld() {foreach(int key in new[]{0x10,0x11,0x12,0x5b,0x5c})if((GetAsyncKeyState(key)&0x8000)!=0)return true;return false;}
         internal static bool Toggle(bool notifications)
         {return Shortcut((ushort)(notifications?0x4e:0x41));}
+        internal static bool Start()
+        {
+            // Ctrl+Esc is Windows' native Start shortcut and bypasses solo-Win remapping.
+            for(int i=0;i<50&&ModifiersHeld();i++)Thread.Sleep(20);if(ModifiersHeld())return false;var input=new[]{Scan(0x1d,0),Scan(0x01,0),Scan(0x01,2),Scan(0x1d,2)};return SendInput(4,input,Marshal.SizeOf(typeof(Input)))==4;
+        }
         internal static bool Search(string query=null)
         {
             if(!Shortcut(0x53))return false;if(String.IsNullOrEmpty(query))return true;

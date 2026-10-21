@@ -27,7 +27,7 @@ namespace OneTaskBar
         CancellationTokenSource cancellation;int generation;Action first;bool closed;
         internal SearchWindow(ShellController controller)
         {
-            shell=controller;Title="One TaskBar · 검색";Width=1200;Height=760;Radius=32;Dark=false;StableSurface=true;Surface.CornerRadius=new CornerRadius(32);Surface.BorderThickness=new Thickness(0);Surface.Background=Paint.Brush("#6877847E");
+            shell=controller;Title="One TaskBar · 검색";Width=1200;Height=760;Radius=32;Dark=false;StableSurface=true;Surface.CornerRadius=new CornerRadius(32);Surface.BorderBrush=Paint.Brush("#58FFFFFF");Surface.BorderThickness=new Thickness(.7);Surface.Background=GrayPanel.Glass;
             var root=new DockPanel {Margin=new Thickness(36,26,36,20)};
             var header=new Grid {Height=36,Margin=new Thickness(4,0,4,12)};var title=Paint.TextBlock("검색",19,Paint.Text);title.FontWeight=FontWeights.SemiBold;header.Children.Add(title);
             var back=Paint.Action("앱 화면",()=>shell.ToggleDrawer(null));back.HorizontalAlignment=HorizontalAlignment.Right;back.Margin=new Thickness(0,0,62,0);header.Children.Add(back);var close=Paint.Button(new Glyph("close",19),()=>Hide(),"검색 닫기");close.HorizontalAlignment=HorizontalAlignment.Right;close.Width=40;close.Padding=new Thickness(8);header.Children.Add(close);DockPanel.SetDock(header,Dock.Top);root.Children.Add(header);
@@ -38,6 +38,7 @@ namespace OneTaskBar
             field=new Border {CornerRadius=new CornerRadius(29),Height=56,Width=620,Background=new LinearGradientBrush(Color.FromArgb(240,232,236,255),Color.FromArgb(240,218,251,247),0),Child=search,HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(0,15,0,0)};DockPanel.SetDock(field,Dock.Bottom);root.Children.Add(field);
             scroll=new SmoothScrollViewer {Content=cards,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};root.Children.Add(scroll);Surface.Child=root;TransitionContent=root;
             Query.TextChanged+=(s,e)=> {placeholder.Visibility=Query.Text.Length==0?Visibility.Visible:Visibility.Collapsed;Reload();};
+            GrayPanel.Apply(root);
             Query.PreviewKeyDown+=(s,e)=> {if(e.Key==Key.Enter&&first!=null){first();e.Handled=true;}else if(e.Key==Key.Down){scroll.Focus();scroll.LineDown();e.Handled=true;}};
             debounce.Tick+=async(s,e)=> {debounce.Stop();await FindFiles();};
             IsVisibleChanged+=(s,e)=> {if(!IsVisible){Cancel();cards.Children.Clear();files.Children.Clear();first=null;}};Closed+=(s,e)=> {closed=true;Cancel();};

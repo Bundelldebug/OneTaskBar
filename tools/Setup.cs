@@ -53,7 +53,7 @@ internal sealed class Setup : Form
         Icon=Icon.ExtractAssociatedIcon(Assembly.GetExecutingAssembly().Location);
         var image=new PictureBox {Image=Icon.ToBitmap(),SizeMode=PictureBoxSizeMode.Zoom,Bounds=new Rectangle(30,32,64,64)};Controls.Add(image);
         Controls.Add(new Label {Text="One TaskBar",Font=new Font(Font.FontFamily,22,FontStyle.Bold),AutoSize=true,Location=new Point(110,30)});
-        Controls.Add(new Label {Text="내 PC를 위한 가벼운 독과 런처 · 0.3.0",AutoSize=true,Location=new Point(113,76)});
+        Controls.Add(new Label {Text="내 PC를 위한 가벼운 독과 런처 · 0.4.0",AutoSize=true,Location=new Point(113,76)});
         Controls.Add(new Label {Text="현재 사용자에게 설치합니다. 관리자 권한은 필요하지 않습니다.",AutoSize=true,Location=new Point(30,122)});
         Controls.Add(new Label {Text=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"OneTaskBar","App"),MaximumSize=new Size(500,44),AutoSize=true,Location=new Point(30,152),ForeColor=Color.FromArgb(85,97,113)});
         bool auto=true;try{using(var key=Registry.CurrentUser.OpenSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Run")){string data=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"OneTaskBar","Data","installation.json");if(File.Exists(data))auto=key!=null&&key.GetValue("OneTaskBar")!=null;}}catch{}

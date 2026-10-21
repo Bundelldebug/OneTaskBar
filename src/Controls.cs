@@ -16,20 +16,17 @@ namespace OneTaskBar
 {
     internal static class GrayPanel
     {
-        // The original gray backdrop, with white content. The dock keeps its own lighter tint.
-        internal static readonly Brush Glass=Paint.Brush("#B32C3932"),Card=Paint.Brush("#24FFFFFF"),Muted=Paint.Muted;
+        // Neutral frosted glass retains live background color with readable dark content.
+        internal static readonly Brush Glass=LightPanel.Tint("#B8DDE1DE","#A0C5CEC7","#B2D8DED9"),Card=Paint.Brush("#32FFFFFF"),Muted=LightPanel.Muted;
         internal static void Apply(DependencyObject root)
         {
-            var text=root as TextBlock;if(text!=null){if(text.Foreground==Paint.Ink)text.Foreground=Paint.Text;else if(text.Foreground==LightPanel.Muted)text.Foreground=Paint.Muted;}
-            var control=root as Control;if(control!=null&&control.Foreground==Paint.Ink)control.Foreground=Paint.Text;
-            var glyph=root as Glyph;if(glyph!=null&&(glyph.Color==Paint.Ink||glyph.Color==LightPanel.Muted))glyph.Color=Paint.Text;
-            foreach(object child in LogicalTreeHelper.GetChildren(root)){var element=child as DependencyObject;if(element!=null)Apply(element);}
+            LightPanel.Apply(root);
         }
     }
     internal static class LightPanel
     {
         internal static readonly Brush Glass=Tint("#9BE5EBE7","#7BC5D0C9","#8FD8E2DB"),DockGlass=Tint("#AADFE7E2","#82C3D0C7","#96D5E1D9"),Muted=Paint.Brush("#FF4C5B52"),Card=Paint.Brush("#24FFFFFF");
-        static Brush Tint(string top,string middle,string bottom)
+        internal static Brush Tint(string top,string middle,string bottom)
         {
             var brush=new LinearGradientBrush();brush.StartPoint=new Point(0,0);brush.EndPoint=new Point(0,1);
             brush.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString(top),0));brush.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString(middle),.42));brush.GradientStops.Add(new GradientStop((Color)ColorConverter.ConvertFromString(bottom),1));brush.Freeze();return brush;
@@ -38,7 +35,7 @@ namespace OneTaskBar
         {
             var text=root as TextBlock;if(text!=null){if(text.Foreground==Paint.Text)text.Foreground=Paint.Ink;else if(text.Foreground==Paint.Muted)text.Foreground=Muted;}
             var control=root as Control;if(control!=null&&control.Foreground==Paint.Text)control.Foreground=Paint.Ink;
-            var glyph=root as Glyph;if(glyph!=null&&glyph.Color==Paint.Text)glyph.Color=Paint.Ink;
+            var glyph=root as Glyph;if(glyph!=null){if(glyph.Color==Paint.Text)glyph.Color=Paint.Ink;else if(glyph.Color==Paint.Muted)glyph.Color=Muted;}
             foreach(object child in LogicalTreeHelper.GetChildren(root)){var element=child as DependencyObject;if(element!=null)Apply(element);}
         }
         internal static Border IconFrame(UIElement child,double size)
@@ -49,6 +46,14 @@ namespace OneTaskBar
     internal static class Paint
     {
         static ControlTemplate buttonTemplate;
+        static readonly Geometry gear=Gear(),windowsGear=Gear(6,4.2);
+        static Geometry Gear(int teeth=8,double hole=3.5)
+        {
+            var shape=new StreamGeometry {FillRule=FillRule.EvenOdd};using(var path=shape.Open()){
+                for(int i=0;i<teeth*6;i++){double angle=i/(teeth*6.0)*2*Math.PI-Math.PI/2,radius=i%6==0||i%6==5?8.3:10.6;var point=new Point(12+radius*Math.Cos(angle),12+radius*Math.Sin(angle));if(i==0)path.BeginFigure(point,true,true);else path.LineTo(point,true,false);}
+                path.BeginFigure(new Point(12+hole,12),true,true);path.ArcTo(new Point(12-hole,12),new Size(hole,hole),0,false,SweepDirection.Clockwise,true,false);path.ArcTo(new Point(12+hole,12),new Size(hole,hole),0,false,SweepDirection.Clockwise,true,false);
+            }shape.Freeze();return shape;
+        }
         internal static SolidColorBrush Brush(string value) { var b=(SolidColorBrush)new BrushConverter().ConvertFromString(value); b.Freeze(); return b; }
         internal static readonly Brush Text=Brush("#FFFFFFFF"), Muted=Brush("#FFDBE3DF"), Ink=Brush("#FF19221E");
         internal static void Label(DrawingContext dc,string text,double size,Brush color,Point point,FontWeight weight)
@@ -63,7 +68,7 @@ namespace OneTaskBar
                 new Typeface(SystemFonts.MessageFontFamily,FontStyles.Normal,FontWeights.SemiBold,FontStretches.Normal),size,color,1.0);
             dc.DrawText(f,new Point(bounds.X+(bounds.Width-f.Width)/2,bounds.Y+(bounds.Height-f.Height)/2));
         }
-        internal static void Icon(DrawingContext dc,string kind,Brush brush,Point center,double size)
+        internal static void Icon(DrawingContext dc,string kind,Brush brush,Point center,double size,int generation=0)
         {
             var pen=new Pen(brush,1.8) { StartLineCap=PenLineCap.Round,EndLineCap=PenLineCap.Round,LineJoin=PenLineJoin.Round };
             dc.PushTransform(new TranslateTransform(center.X-size/2,center.Y-size/2)); dc.PushTransform(new ScaleTransform(size/24,size/24));
@@ -72,8 +77,10 @@ namespace OneTaskBar
                 dc.DrawEllipse(brush,null,new Point(12,12),4.2,4.2);
                 for(int i=0;i<8;i++) { double a=i*Math.PI/4; line(12+8*Math.Cos(a),12+8*Math.Sin(a),12+10.6*Math.Cos(a),12+10.6*Math.Sin(a)); }
             } else if(kind=="wifi"||kind=="wifi-off"||kind=="wifi-disconnected") {
-                var wifiPen=new Pen(brush,1.8){StartLineCap=PenLineCap.Round,EndLineCap=PenLineCap.Round,LineJoin=PenLineJoin.Round};
-                dc.DrawGeometry(null,wifiPen,Geometry.Parse("M3,8 Q12,0 21,8 M6.2,11.5 Q12,6.2 17.8,11.5 M9.4,15 Q12,12.6 14.6,15"));dc.DrawEllipse(brush,null,new Point(12,19),1.6,1.6);
+                bool badge=kind=="wifi"&&generation>=4&&generation<=7;if(badge)dc.PushTransform(new ScaleTransform(.82,.82,0,20));
+                var wifiPen=new Pen(brush,2.3){StartLineCap=PenLineCap.Round,EndLineCap=PenLineCap.Round,LineJoin=PenLineJoin.Round};
+                dc.DrawGeometry(null,wifiPen,Geometry.Parse("M2.8,8.4 Q12,-.4 21.2,8.4 M6.1,12 Q12,6.3 17.9,12 M9.4,15.5 Q12,13.1 14.6,15.5"));dc.DrawEllipse(brush,null,new Point(12,19.7),1.5,1.5);
+                if(badge){dc.Pop();Label(dc,generation.ToString(CultureInfo.InvariantCulture),9,brush,new Point(17.6,.2),FontWeights.Bold);}
                 if(kind=="wifi-off")line(3,3,21,21);else if(kind=="wifi-disconnected"){line(18,15,22,19);line(22,15,18,19);}
             } else if(kind=="bluetooth") {
                 dc.DrawGeometry(null,pen,Geometry.Parse("M6,6 L18,17 12,22 12,2 18,7 6,18"));
@@ -83,6 +90,7 @@ namespace OneTaskBar
                 else {dc.DrawGeometry(null,pen,Geometry.Parse("M15.5,8 Q19.5,12 15.5,16"));if(kind!="volume-low")dc.DrawGeometry(null,pen,Geometry.Parse("M18.5,4.5 Q25,12 18.5,19.5"));}
             } else if(kind=="bolt") dc.DrawGeometry(brush,null,Geometry.Parse("M14,1 L4,14 11,14 9,23 21,9 14,9 Z"));
             else if(kind=="apps") { for(int i=0;i<9;i++) dc.DrawEllipse(brush,null,new Point(5+(i%3)*7,5+(i/3)*7),1.5,1.5); }
+            else if(kind=="windows-start") {foreach(int x in new[]{2,13})foreach(int y in new[]{2,13})dc.DrawRoundedRectangle(brush,null,new Rect(x,y,9,9),.5,.5);}
             else if(kind=="grip") {for(int i=0;i<6;i++)dc.DrawEllipse(brush,null,new Point(8+(i%2)*8,5+(i/2)*7),1.6,1.6);}
             else if(kind=="edit") {dc.DrawGeometry(null,pen,Geometry.Parse("M4,16 L16,4 20,8 8,20 3,21 Z M14,6 L18,10"));}
             else if(kind=="search") { dc.DrawEllipse(null,pen,new Point(10,10),6.5,6.5); line(15,15,22,22); }
@@ -94,7 +102,8 @@ namespace OneTaskBar
             else if(kind=="airplane") dc.DrawGeometry(brush,null,Geometry.Parse("M11,2 Q12,0 13,2 L14,9 23,15 23,17 14,14 14,20 17,22 17,24 12,22 7,24 7,22 10,20 10,14 1,17 1,15 10,9 Z"));
             else if(kind=="battery") { dc.DrawRoundedRectangle(null,pen,new Rect(1,6,20,12),3,3); line(23,10,23,14); dc.DrawGeometry(brush,null,Geometry.Parse("M12,7 L7,13 11,13 10,17 17,10 13,10 Z")); }
             else if(kind=="person") { dc.DrawEllipse(brush,null,new Point(12,4),2.5,2.5); line(3,9,21,9); line(12,7,12,15); line(12,15,7,23); line(12,15,17,23); }
-            else if(kind=="settings") { dc.DrawEllipse(null,new Pen(brush,4),new Point(12,12),7,7); for(int i=0;i<8;i++) { double a=i*Math.PI/4; line(12+8*Math.Cos(a),12+8*Math.Sin(a),12+11*Math.Cos(a),12+11*Math.Sin(a)); } dc.DrawEllipse(brush,null,new Point(12,12),2,2); }
+            else if(kind=="settings") dc.DrawGeometry(brush,null,gear);
+            else if(kind=="windows-settings") dc.DrawGeometry(Paint.Ink,null,windowsGear);
             else if(kind=="window") { dc.DrawRoundedRectangle(null,pen,new Rect(2,3,20,18),2,2); line(2,8,22,8); }
             else if(kind=="play") dc.DrawGeometry(brush,null,Geometry.Parse("M6,3 L22,12 6,21 Z"));
             else if(kind=="pause") {dc.DrawRoundedRectangle(brush,null,new Rect(5,3,5,18),1.5,1.5);dc.DrawRoundedRectangle(brush,null,new Rect(14,3,5,18),1.5,1.5);}
@@ -122,18 +131,18 @@ namespace OneTaskBar
     }
     internal sealed class Glyph : FrameworkElement
     {
-        public string Kind; public Brush Color=Paint.Text;
+        public string Kind; public Brush Color=Paint.Text;public int Generation;
         public Glyph(string kind,double size) { Kind=kind; Width=Height=size; IsHitTestVisible=false; }
-        protected override void OnRender(DrawingContext dc) { Paint.Icon(dc,Kind,Color,new Point(ActualWidth/2,ActualHeight/2),Math.Min(ActualHeight,ActualWidth)-2); }
+        protected override void OnRender(DrawingContext dc) { Paint.Icon(dc,Kind,Color,new Point(ActualWidth/2,ActualHeight/2),Math.Min(ActualHeight,ActualWidth)-2,Generation); }
     }
     internal sealed class PillSlider : FrameworkElement
     {
         public string Kind; double value; bool dragging;
         static readonly DependencyProperty DisplayValueProperty=DependencyProperty.Register("DisplayValue",typeof(double),typeof(PillSlider),new FrameworkPropertyMetadata(0.0,FrameworkPropertyMetadataOptions.AffectsRender));
-        public bool Tablet=true;
+        public bool Tablet=true,AnimateValue=true;
         public bool Light;
         public event Action<double> Changed;
-        public double Value { get { return value; } set { double next=Clamp(value);if(this.value==next)return;this.value=next;double from=(double)GetValue(DisplayValueProperty);BeginAnimation(DisplayValueProperty,null);SetValue(DisplayValueProperty,next);if(!dragging&&Motion.Enabled&&IsVisible&&PresentationSource.FromVisual(this)!=null)BeginAnimation(DisplayValueProperty,Motion.Tween(from,next,160));InvalidateVisual(); } }
+        public double Value { get { return value; } set { double next=Clamp(value);if(this.value==next)return;this.value=next;double from=(double)GetValue(DisplayValueProperty);BeginAnimation(DisplayValueProperty,null);SetValue(DisplayValueProperty,next);if(AnimateValue&&!dragging&&Motion.Enabled&&IsVisible&&PresentationSource.FromVisual(this)!=null)BeginAnimation(DisplayValueProperty,Motion.Tween(from,next,160));InvalidateVisual(); } }
         public static double Clamp(double value) { return Double.IsNaN(value) || Double.IsInfinity(value) ? 0 : Math.Max(0,Math.Min(100,value)); }
         public static double FillWidth(double width,double value) { return Math.Max(0,width)*Clamp(value)/100; }
         public PillSlider(string kind) { Kind=kind; Height=44; MinWidth=90; Focusable=true; Cursor=Cursors.Hand; SnapsToDevicePixels=true;
@@ -148,7 +157,7 @@ namespace OneTaskBar
             if(shown>0) dc.DrawGeometry(Tablet?Paint.Brush("#FFF4F8F5"):Brushes.Black,null,fill);
             var c=new Point(h*.70,h/2); double icon=h*.44;
             Paint.Icon(dc,iconKind,Tablet&&!Light?Paint.Brush("#D8E8EDEA"):Paint.Brush("#FF303A36"),c,icon);
-            if(shown>0) {dc.PushClip(fill);Paint.Icon(dc,iconKind,Tablet?Paint.Brush(Kind=="brightness"?"#FFEC7D4E":"#FF35413B"):Paint.Brush("#FFF5F5F1"),c,icon);dc.Pop();}
+            if(shown>0) {dc.PushClip(fill);Paint.Icon(dc,iconKind,Tablet?Paint.Brush(!Light&&Kind=="brightness"?"#FFEC7D4E":"#FF35413B"):Paint.Brush("#FFF5F5F1"),c,icon);dc.Pop();}
             if(IsKeyboardFocused) dc.DrawRoundedRectangle(null,new Pen(Paint.Brush("#9ED4F0E5"),1.5),new Rect(1,1,w-2,h-2),h/2,h/2);
         }
         void Update(double x) { Value=Math.Round(Clamp(x/Math.Max(1,ActualWidth)*100)); if(Changed!=null) Changed(Value); }

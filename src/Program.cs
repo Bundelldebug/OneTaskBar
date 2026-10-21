@@ -46,6 +46,9 @@ namespace OneTaskBar
             if(args.Contains("--power-probe")) {var before=Native.ReadPerformanceMode();if(!before.Available)return 1;try {Native.SetPerformanceMode(before.Selected);var after=Native.ReadPerformanceMode();bool same=after.Available&&before.Selected==after.Selected;AppLog.Json("power-mode-probe.json",new {passed=same,before=before,after=after});return same?0:1;}catch(Exception e){AppLog.Json("power-mode-probe.json",new {passed=false,error=e.Message,before=before});return 1;}}
             if(args.Contains("--launcher-probe"))return LauncherChecks.Probe();
             if(args.Contains("--ui-probe"))return UiChecks.Run(args.Contains("--optimized")?"optimized":"baseline");
+            if(args.Contains("--reference-probe"))return ReferenceChecks.Run();
+            if(args.Contains("--osd-probe"))return OsdChecks.Run();
+            if(args.Contains("--native-start-probe")){var watch=Stopwatch.StartNew();bool sent=SystemPanels.Start();Thread.Sleep(900);bool visible=LauncherChecks.StartVisible();AppLog.Json("native-start-probe.json",new {passed=sent&&visible,sent=sent,nativeStart=visible,foreground=ReferenceChecks.FocusName(),milliseconds=watch.ElapsedMilliseconds});if(visible)SystemPanels.Start();else SystemPanels.CloseSearchProbe();return sent&&visible?0:1;}
             if(args.Contains("--recovery-probe"))return RecoveryChecks.Run();
             if(args.Contains("--desktop-recovery-probe"))return RecoveryChecks.Desktop();
             if(args.Contains("--typing-probe"))return RecoveryChecks.Typing();

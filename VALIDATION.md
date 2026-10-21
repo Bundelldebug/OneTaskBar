@@ -1,4 +1,19 @@
-# Validation — 0.3.0
+# Validation — 0.4.0
+
+Windows 11 x64, .NET Framework 4.8; these results do not establish support for every driver or shell customization.
+
+- Build and self-test passed, including PHY-to-Wi-Fi-generation fixtures, settings migration and OSD host filtering.
+- Actual connection reports 802.11be / Wi-Fi 7. Disconnected/disabled glyphs omit the generation number.
+- UI probe passed with 143 installed apps: stable backdrop across nine opening frames, 89 edge alpha levels, fractional scrolling totals 48 DIP, Task Manager context menu and repeated reopen/dismiss.
+- Direct typing and Korean IME composition probe passed; rounded search preserved.
+- Native Explorer volume command: custom HUD appeared in 119 ms and one native OSD was suppressed. Actual brightness event reached the HUD in 46 ms. Original audio and brightness were restored. These are single-run measurements, not hardware-wide latency guarantees.
+- App restore/group minimize and icon bounce containment passed in the foreground-fixture run; later real-mouse repetitions were sensitive to foreground changes during interactive testing.
+- The independent dock button preference and Windows glyph render correctly. Native Start invocation has NOT passed the automated check on this PC (SearchHost appears instead); physical Ctrl+Esc was confirmed by the user to open Start. This route remains under investigation and must not be described as verified.
+- Reference video was sampled locally to tune the feature area's expand/collapse easing; reference media is excluded from distribution.
+
+The measurements below describe the previous 0.3.0 release, not a new same-workload memory comparison.
+
+# Historical validation — 0.3.0
 
 Tests run on Windows 11 x64, .NET Framework 4.8, an unlocked desktop, and a catalog of 142 installed applications. They do not establish compatibility with every GPU, Windows build, device, or third-party program. Personal test JSON and screenshots are excluded from Git and release payloads.
 

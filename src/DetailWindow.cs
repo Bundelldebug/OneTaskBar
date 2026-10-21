@@ -17,7 +17,7 @@ namespace OneTaskBar
         bool closed,busy,changingMode;Guid? selectedMode;
         internal DetailWindow(ShellController controller,string kind)
         {
-            shell=controller;page=kind;Title="One TaskBar · "+PageName(kind);Width=380;Height=540;Radius=30;Dark=true;Surface.CornerRadius=new CornerRadius(30);Surface.Background=GrayPanel.Glass;Surface.BorderBrush=Brushes.Transparent;Surface.BorderThickness=new Thickness(0);
+            shell=controller;page=kind;Title="One TaskBar · "+PageName(kind);Width=380;Height=540;Radius=30;Dark=false;Surface.CornerRadius=new CornerRadius(30);Surface.Background=GrayPanel.Glass;Surface.BorderBrush=Paint.Brush("#48FFFFFF");Surface.BorderThickness=new Thickness(.7);
             var root=new DockPanel {Margin=new Thickness(20)};
             var header=new Grid {Height=44,Margin=new Thickness(0,0,0,12)};
             var back=Paint.Action("‹",()=> {Hide();shell.ToggleQuick(null);});back.Width=34;back.Background=Brushes.Transparent;back.Padding=new Thickness(0);back.HorizontalAlignment=HorizontalAlignment.Left;header.Children.Add(back);

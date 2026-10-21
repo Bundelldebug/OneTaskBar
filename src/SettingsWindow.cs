@@ -38,6 +38,7 @@ namespace OneTaskBar
             ChoiceRow(panels,"빠른 설정","Wi-Fi·소리·배터리 버튼에서 열 화면",Preferences.Current.NativeQuickSettings,v=>Preferences.Set(p=>p.NativeQuickSettings=v));
             Group(groups,"패널 선택",panels);
             var launcher=new StackPanel();
+            ChoiceRow(launcher,"독의 시작 버튼","버튼 모양과 눌렀을 때 열 화면",Preferences.Current.NativeStartButton,v=>Preferences.Set(p=>p.NativeStartButton=v),"앱 목록","Windows 시작");
             ChoiceRow(launcher,"키보드 시작 키","Windows 키만 눌렀을 때 열 화면",Preferences.Current.NativeStartKey,v=>Preferences.Set(p=>p.NativeStartKey=v),"앱 화면","Windows 시작");
             ChoiceRow(launcher,"검색 버튼","독과 앱 화면의 검색 버튼에서 열 화면",Preferences.Current.NativeSearch,v=>Preferences.Set(p=>p.NativeSearch=v),"런처 검색","Windows 검색");
             Group(groups,"시작과 검색",launcher);

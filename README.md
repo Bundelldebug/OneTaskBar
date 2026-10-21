@@ -40,7 +40,7 @@ The emergency shortcut is enabled by default and can be disabled in settings. It
 
 The standard EXE installer defaults to the **Windows notification center**, which works without package registration or notification-reading permission. The custom calendar remains available by selecting the custom center.
 
-Reading/dismissing Windows notifications in the custom center needs a Windows package identity plus explicit user consent. The unsigned developer identity is **not** installed by Setup. Source users can opt into the development-only procedure in [docs/NOTIFICATIONS.md](docs/NOTIFICATIONS.md); Windows may require elevation for that registration. A broadly distributable signed notification package is not supplied in v0.3.0. Do not expect an unregistered EXE to read notifications.
+Reading/dismissing Windows notifications in the custom center needs a Windows package identity plus explicit user consent. The unsigned developer identity is **not** installed by Setup. Source users can opt into the development-only procedure in [docs/NOTIFICATIONS.md](docs/NOTIFICATIONS.md); Windows may require elevation for that registration. A broadly distributable signed notification package is not supplied in v0.4.0. Do not expect an unregistered EXE to read notifications.
 
 Samsung Settings / device-connection buttons use applications and logos already installed on the PC; those applications are not bundled. An optional, pre-existing Windhawk charging companion is paused while the dock owns the desktop and resumed on exit. Windhawk is not required for the dock or installed by Setup.
 
@@ -70,3 +70,9 @@ Interactive probes require an unlocked desktop and focus their own test windows.
 No telemetry, account, or background web service is required. Search runs locally. Preferences, recent queries, shell pin caches, and diagnostic logs stay in the data directory. The custom notification center accesses notification data only after Windows permission. An app or document you choose to open may use its own network services.
 
 Code and the original One TaskBar icon are under the [MIT license](LICENSE). [Third-party notices](THIRD_PARTY_NOTICES.txt) include the Liquid Dock reference. This repository contains no Samsung APK, extracted launcher artwork, wallpapers, fonts, or user screenshots/recordings. Installed third-party logos are read at runtime and remain their owners' property. This is an independent project and is not affiliated with Microsoft or Samsung. Open-source licensing does not guarantee that no third party will ever make a copyright or trademark complaint.
+
+## 0.4.0
+
+The dock button can independently open the app drawer or Windows Start. Connected PHY data drives Wi-Fi generation badges (4/5/6/7); unknown/offline connections have no generation badge. Clicking the foreground application minimizes it, with a visible icon bounce. Panels now use a light frosted material and original monochrome settings symbols. Brightness uses Windows power notifications, while the dedicated Explorer OSD is replaced only when the custom HUD is available.
+
+Known issue: native Start button invocation is not yet verified on the development PC; automated invocation opens SearchHost although physical Ctrl+Esc opens Start. The app drawer remains the default.

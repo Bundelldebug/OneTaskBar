@@ -17,6 +17,9 @@ namespace OneTaskBar
         internal static void Validate(List<string> checks)
         {
             var serial=new JavaScriptSerializer();var old=serial.Deserialize<PreferenceData>("{}");if(!old.NativeStartKey||old.NativeSearch||old.DesktopPowerWatts!=0)throw new Exception("Launcher preference defaults changed");
+            if(old.NativeStartButton)throw new Exception("Existing users must retain the app-list button");var buttonChoice=serial.Deserialize<PreferenceData>(serial.Serialize(new PreferenceData {NativeStartButton=true,NativeStartKey=false}));if(!buttonChoice.NativeStartButton||buttonChoice.NativeStartKey)throw new Exception("Button and keyboard Start options were coupled");
+            foreach(int phy in new[]{0,1,6,7,8,9,10,11,100}){var bytes=new byte[604];Buffer.BlockCopy(BitConverter.GetBytes(1),0,bytes,0,4);var name=System.Text.Encoding.UTF8.GetBytes("Test 5G");Buffer.BlockCopy(BitConverter.GetBytes(name.Length),0,bytes,520,4);Buffer.BlockCopy(name,0,bytes,524,name.Length);Buffer.BlockCopy(BitConverter.GetBytes(phy),0,bytes,568,4);var link=WifiLink.Parse(bytes);int expected=phy==7?4:phy==8?5:phy==10?6:phy==11?7:0;if(link.Name!="Test 5G"||link.Generation!=expected)throw new Exception("Actual PHY generation parsing failed");bytes[0]=4;if(WifiLink.Parse(bytes).Generation!=0||WifiLink.Parse(bytes).Name!=null)throw new Exception("Disconnected Wi-Fi retained badge");}
+            if(WifiLink.Parse(new byte[555]).Generation!=0)throw new Exception("Truncated WLAN structure accepted");checks.Add("Independent dock Start option migrates/persists; Wi-Fi PHY 4/5/6/7 and unknown/disconnected parsing pass without SSID/band guessing");
             var restored=serial.Deserialize<PreferenceData>(serial.Serialize(new PreferenceData {NativeStartKey=false,NativeSearch=true,NativeNotifications=true,NativeQuickSettings=false,DesktopPowerWatts=9999}));if(restored.NativeStartKey||!restored.NativeSearch||!restored.NativeNotifications||restored.NativeQuickSettings||restored.DesktopPowerWatts!=9999)throw new Exception("Independent launcher preferences lost");
             foreach(int key in new[]{0x5b,0x5c}){var gesture=new StartKeyGesture();if(gesture.Observe(key,true,true,false)||gesture.Observe(key,true,true,false)||!gesture.Observe(key,false,true,false)||gesture.Observe(key,false,true,false))throw new Exception("Solo Windows key/repeat");
                 gesture.Observe(key,true,true,false);gesture.Observe(0x45,true,true,false);gesture.Observe(0x45,false,true,false);if(gesture.Observe(key,false,true,false))throw new Exception("Win+E chord intercepted");
@@ -36,8 +39,9 @@ namespace OneTaskBar
             var scroll=root as ScrollViewer;if(scroll!=null)yield return scroll;
             for(int i=0;i<VisualTreeHelper.GetChildrenCount(root);i++)foreach(var item in Scrolls(VisualTreeHelper.GetChild(root,i)))yield return item;
         }
-        static bool StartVisible()
+        internal static bool StartVisible()
         {
+            uint foreground;Native.GetWindowThreadProcessId(Native.GetForegroundWindow(),out foreground);try{using(var process=System.Diagnostics.Process.GetProcessById((int)foreground))if(process.ProcessName=="StartMenuExperienceHost")return true;}catch{}
             bool visible=false;Native.EnumWindows((h,state)=> {if(!Native.IsWindowVisible(h))return true;int cloaked;if(Native.DwmGetWindowAttribute(h,14,out cloaked,4)==0&&cloaked!=0)return true;uint pid;Native.GetWindowThreadProcessId(h,out pid);try{using(var process=System.Diagnostics.Process.GetProcessById((int)pid))if(process.ProcessName=="StartMenuExperienceHost"){visible=true;return false;}}catch{}return true;},IntPtr.Zero);return visible;
         }
         internal static int InputProbe()
