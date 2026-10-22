@@ -1,3 +1,13 @@
+# Validation — 8.5.1
+
+- Build and self-test passed. The existing live WPF Now bar fixture measured a 132-DIP short-title capsule and a 282-DIP long-title cap, matching the right status capsule. Both thumbnail/title alignment checks passed, including a one-character title with unused space.
+- The collapsed capsule contains only the thumbnail and title; its playback-state icon has been removed. Long-title scrolling, transport/seek callbacks, interrupted expansion/collapse, original-slot dismissal, synchronized blur/content geometry and transparent click-through passed. Corners retained 46 edge-alpha levels; the maximum sampled collapse frame gap was 19.33 ms. Fixture controls did not change the user's real media player.
+- This patch changes Now bar layout, media presentation and interactions. The 8.5.0 resource measurements below do not constitute a new battery-runtime measurement.
+- The popup fixture passed with a 140-DIP active quick-settings player, controls inside the card, working transport/seek/output callbacks and the 62-DIP idle state. Quick settings and expanded player renders show thumbnail backgrounds. One hundred repeated media updates reused the same frozen background brush. Popup blur cleanup and outside-click dismissal also passed.
+- Late-cover fixtures passed: missing images become available on retry, same-title events replace existing artwork, identical bytes decode only once, the retry schedule ends after two attempts and failures cannot carry a previous track's image forward. Wheel events leave slider values untouched and bubble when the new option is off; the quick toggle enables adjustment.
+- Dock checks passed stable launch order, capsule growth/shrink, live reordering preview, cancellation, click-through drag ghost, cross-divider pin/unpin, empty-group drops and persisted preferences. With desktop input access, two actual mouse drags committed pinning and unpinning. The restricted test process could inspect geometry but could not inject mouse input, so that run was not treated as an interaction pass.
+- Final installed 8.5.1 was sampled for 30.06 seconds after a 45-second startup wait, on AC with an active Windows media session and desktop mode enabled. Across 16 logical processors, main CPU averaged 0.0877%, recovery helper 0.0000%; combined working set ranged from 193.4 to 206.1 MiB. Windows notification access remained allowed. This is a short resource regression check, not a battery-discharge or 4K-video playback benchmark.
+
 # Validation — 8.5.0
 
 Windows 11 x64, .NET Framework 4.8, Intel Core Ultra X7 358H with 16 logical processors. These are development-PC checks, not a full battery-runtime benchmark.

@@ -22,8 +22,8 @@ Download **OneTaskBar-Setup.exe** from [Releases](https://github.com/Bundelldebu
 - Independent choices for Windows/custom quick settings, notifications, keyboard Start, and search. Windows shortcuts continue to work with the solo Start-key option.
 - Touch panning and fractional touchpad scrolling; discrete wheel scrolling uses a short transition.
 - System volume, brightness where supported, radio/device controls, media transport and centered artwork, battery/power mode, and theme toggle.
-- Nine quick toggles read back actual state: mute, dark mode, Do Not Disturb, power efficiency, keep screen awake, Wi-Fi, Bluetooth, dock animations and startup. Unsupported hardware controls are disabled or hidden. Power efficiency selects the Windows performance overlay; it is not a separate Energy Saver implementation. Keep-awake lasts only while the app is running and still allows manual sleep.
-- A bottom-left Now bar follows active Windows media sessions. Its 44-DIP capsule fits the title up to 320 DIP, scrolls longer titles, and expands into playback/seek controls when the media app supports them. Artwork supplies the background color, adjusted for readable white text. Crowded displays place it above the dock without moving existing app slots.
+- Ten quick toggles read back actual state: mute, dark mode, Do Not Disturb, power efficiency, keep screen awake, Wi-Fi, Bluetooth, dock animations, startup and slider scrolling. Unsupported hardware controls are disabled or hidden. Power efficiency selects the Windows performance overlay; it is not a separate Energy Saver implementation. Keep-awake lasts only while the app is running and still allows manual sleep.
+- A bottom-left Now bar follows active Windows media sessions. Its 44-DIP capsule fits the title up to the right status capsule's width (282 DIP maximum), keeps artwork and text left aligned, scrolls longer titles, and expands into playback/seek controls when the media app supports them. Artwork supplies the background color, adjusted for readable white text. Crowded displays place it above the dock without moving existing app slots.
 - Missing radios, Samsung applications, unsupported brightness devices, and absent batteries are handled without placeholder applications. Desktop users can hide the battery slot or manually show 1–9999 W; this value is **not a measurement**.
 - Charging status updates immediately on AC connection; the battery capsule expands once per cable connection. Startup does not simulate a plug event.
 - App context menus include Task Manager. Toggle animations, blur, hover, startup, indicators, and recovery in settings.
@@ -74,6 +74,17 @@ Interactive probes require an unlocked desktop and focus their own test windows.
 No telemetry, account, or background web service is required. Search runs locally. Preferences, recent queries, shell pin caches, and diagnostic logs stay in the data directory. The custom notification center accesses notification data only after Windows permission. An app or document you choose to open may use its own network services.
 
 Code and the original One TaskBar icon are under the [MIT license](LICENSE). [Third-party notices](THIRD_PARTY_NOTICES.txt) include the Liquid Dock reference. This repository contains no Samsung APK, extracted launcher artwork, wallpapers, fonts, or user screenshots/recordings. Installed third-party logos are read at runtime and remain their owners' property. This is an independent project and is not affiliated with Microsoft or Samsung. Open-source licensing does not guarantee that no third party will ever make a copyright or trademark complaint.
+
+## 8.5.1
+
+- Caps the collapsed Now bar at the right status capsule's width and keeps the thumbnail and title left aligned, including short titles.
+- Removes the playback-state icon from the collapsed capsule, leaving artwork and title.
+- Reduces the active quick-settings player from 188 to 140 DIP. Quick settings and expanded Now bar show artwork behind a dark translucent overlay for readable text.
+- Artwork surfaces are frozen, shared and bounded to 640 pixels, with weak caching so past covers can be collected. No live artwork blur or per-refresh decoding is added.
+- Same-title artwork events replace stale thumbnails. Two bounded retries after a track change handle late covers; identical image bytes reuse their decoded bitmap, and transient failures retain only the current track's cover.
+- Wheel/trackpad slider adjustments in quick settings default off. Enable them with the slider-scrolling quick toggle or app setting; otherwise scrolling continues through the panel.
+- A thin black dock divider separates pinned apps on the left from running-only apps on the right. Dragging across it saves pin/unpin changes. The dragged icon follows the pointer while neighboring icons slide into place; cancellation restores the layout.
+- Routine updates increment the patch number only; major and minor versions change at the owner's request.
 
 ## 8.5.0
 

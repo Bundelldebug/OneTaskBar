@@ -14,7 +14,7 @@ namespace OneTaskBar
             // Existing dock slots, including inactive pins, never move when an app starts.
             if(!initialized)foreach(var item in items.Where(a=>a.Pinned))order.Add(item.Key);
             foreach(var item in items.Where(a=>!order.Contains(a.Key,StringComparer.OrdinalIgnoreCase)).OrderBy(a=>a.Windows.Count>0&&a.StartedUtcTicks>0?a.StartedUtcTicks:Int64.MaxValue))order.Add(item.Key);
-            initialized=true;var ranks=order.Select((key,index)=>new {key,index}).ToDictionary(a=>a.key,a=>a.index,StringComparer.OrdinalIgnoreCase);return items.OrderBy(a=>ranks[a.Key]).ToList();
+            initialized=true;var ranks=order.Select((key,index)=>new {key,index}).ToDictionary(a=>a.key,a=>a.index,StringComparer.OrdinalIgnoreCase);return items.OrderBy(a=>a.Pinned?0:1).ThenBy(a=>ranks[a.Key]).ToList();
         }
         internal bool Move(string source,string target,bool after)
         {
@@ -28,6 +28,7 @@ namespace OneTaskBar
             pin.Windows.Add(new IntPtr(2));pin.StartedUtcTicks=9;if(keys(new[]{c,b,pin,a})!="pin,a,b,c")throw new Exception("Launching an existing pin moved its slot");pin.Windows.Clear();if(keys(new[]{c,pin,b,a})!="pin,a,b,c")throw new Exception("Closing a pinned app moved its slot");
             if(keys(new[]{pin,a,c})!="pin,a,c"||keys(new[]{b,c,pin,a})!="pin,a,c,b")throw new Exception("A newly returned unpinned app must append");state.Move("c","a",false);if(keys(new[]{d,b,c,pin,a})!="pin,c,a,b,d")throw new Exception("Manual order or new-app append failed");
             var activePin=live("active-pin",8);activePin.Pinned=true;var initial=new RuntimeDockOrder();if(String.Join(",",initial.Arrange(new[]{activePin,pin,b,a}).Select(x=>x.Key))!="active-pin,pin,a,b")throw new Exception("Startup reordered pinned applications");
+            c.Pinned=true;if(keys(new[]{pin,a,b,c,d})!="pin,c,a,b,d")throw new Exception("Pinned apps must precede running-only apps");c.Pinned=false;if(keys(new[]{pin,a,b,c,d})!="pin,c,a,b,d")throw new Exception("Unpinning changed other app order");
         }
     }
 }

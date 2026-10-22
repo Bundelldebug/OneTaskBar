@@ -85,6 +85,8 @@ namespace OneTaskBar
             if(kind=="brightness") {
                 dc.DrawEllipse(brush,null,new Point(12,12),4.2,4.2);
                 for(int i=0;i<8;i++) { double a=i*Math.PI/4; line(12+8*Math.Cos(a),12+8*Math.Sin(a),12+10.6*Math.Cos(a),12+10.6*Math.Sin(a)); }
+            } else if(kind=="scroll") {
+                dc.DrawRoundedRectangle(null,pen,new Rect(6,2,12,20),6,6);line(12,6,12,10);
             } else if(kind=="wifi"||kind=="wifi-off"||kind=="wifi-disconnected") {
                 bool badge=kind=="wifi"&&generation>=4&&generation<=7;int bars=kind=="wifi"?WifiLink.Bars(signal):0;
                 var wifiPen=new Pen(brush,2.0){StartLineCap=PenLineCap.Round,EndLineCap=PenLineCap.Round,LineJoin=PenLineJoin.Round};
@@ -160,7 +162,7 @@ namespace OneTaskBar
         static readonly DependencyProperty DisplayValueProperty=DependencyProperty.Register("DisplayValue",typeof(double),typeof(PillSlider),new FrameworkPropertyMetadata(0.0,FrameworkPropertyMetadataOptions.AffectsRender));
         public bool Tablet=true,AnimateValue=true;
         public bool Light,DarkTrack;
-        public bool ShowIcon=true,Slim;
+        public bool ShowIcon=true,Slim,WheelAdjust=true;
         public event Action<double> Changed;
         public double Value { get { return value; } set { double next=Clamp(value);if(this.value==next)return;this.value=next;double from=(double)GetValue(DisplayValueProperty);BeginAnimation(DisplayValueProperty,null);SetValue(DisplayValueProperty,next);if(AnimateValue&&!dragging&&Motion.Enabled&&IsVisible&&PresentationSource.FromVisual(this)!=null)BeginAnimation(DisplayValueProperty,Motion.Tween(from,next,160));InvalidateVisual(); } }
         public static double Clamp(double value) { return Double.IsNaN(value) || Double.IsInfinity(value) ? 0 : Math.Max(0,Math.Min(100,value)); }
@@ -188,7 +190,7 @@ namespace OneTaskBar
         protected override void OnMouseMove(MouseEventArgs e) { if(dragging && e.LeftButton==MouseButtonState.Pressed) Update(e.GetPosition(this).X); }
         protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e) { dragging=false; ReleaseMouseCapture(); e.Handled=true; }
         protected override void OnLostMouseCapture(MouseEventArgs e) { dragging=false; }
-        protected override void OnMouseWheel(MouseWheelEventArgs e) { Value+=Math.Sign(e.Delta)*2; if(Changed!=null) Changed(Value); e.Handled=true; }
+        protected override void OnMouseWheel(MouseWheelEventArgs e) {if(!WheelAdjust){base.OnMouseWheel(e);return;}Value+=Math.Sign(e.Delta)*2; if(Changed!=null) Changed(Value); e.Handled=true; }
         protected override void OnKeyDown(KeyEventArgs e) {
             double n=Value;
             if(e.Key==Key.Home) n=0; else if(e.Key==Key.End) n=100; else if(e.Key==Key.Left || e.Key==Key.Down) n-=2;

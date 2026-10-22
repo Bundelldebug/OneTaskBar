@@ -4,5 +4,6 @@ using System.Reflection;
 [assembly: AssemblyDescription("Windows desktop dock, app launcher and control center")]
 [assembly: AssemblyCompany("OneTaskBar contributors")]
 [assembly: AssemblyCopyright("Copyright 2026 OneTaskBar contributors. MIT License.")]
-[assembly: AssemblyVersion("8.5.0.0")]
-[assembly: AssemblyFileVersion("8.5.0.0")]
+// Increment only the patch number unless the owner requests a major/minor change.
+[assembly: AssemblyVersion("8.5.1.0")]
+[assembly: AssemblyFileVersion("8.5.1.0")]

@@ -12,6 +12,7 @@ namespace OneTaskBar
         public bool NotificationIntegration=true;
         public bool NativeStartKey=true,NativeSearch=false;
         public bool NativeStartButton=false;
+        public bool QuickSliderScroll=false;
         public int DesktopPowerWatts=0;
         public bool EmergencyExit=true;
     }

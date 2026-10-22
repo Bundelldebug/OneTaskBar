@@ -23,13 +23,14 @@ namespace OneTaskBar
     {
         internal double StartX,AppX,AppWidth,StatusX,StatusWidth,Y;
         internal int Capacity;
+        internal static double StatusSize(double screenWidth,double powerWidth=58){return Math.Min(282,Math.Max(226,screenWidth*.25))+powerWidth-58;}
         internal static DockLayout Compute(System.Drawing.Rectangle screen,double scale,int count,double powerWidth=58)
         {
             double width=screen.Width/scale;
-            double status=Math.Min(282,Math.Max(226,width*.25))+powerWidth-58,statusX=width-status-12;
-            double available=Math.Max(62,statusX-78);
-            int capacity=Math.Max(0,(int)Math.Floor((available-62)/46));
-            double apps=Math.Min(count,capacity)*46+62;
+            double status=StatusSize(width,powerWidth),statusX=width-status-12;
+            double available=Math.Max(74,statusX-78);
+            int capacity=Math.Max(0,(int)Math.Floor((available-74)/46));
+            double apps=Math.Min(count,capacity)*46+74;
             double x=Math.Max(66,Math.Min((width-apps)/2,statusX-apps-12));
             return new DockLayout { StartX=x-52,AppX=x,AppWidth=apps,StatusX=statusX,StatusWidth=status,Y=screen.Height/scale-56,Capacity=capacity };
         }
@@ -76,6 +77,7 @@ namespace OneTaskBar
         DateTime hudUntil,queryAt,appsAt,commitBrightnessUntil,sourceUntil;
         bool brightnessBusy,runningBusy,disposed,servicesBusy,pinsBusy; bool? exactSource;
         bool guardStarted;
+        int pinRevision;
         bool osdBrightnessBusy;string hudScreen;double hudScale=1;
         DateTime hudChangedAt;
         DateTime wifiAt,osdScanAt;bool wifiBusy;
@@ -215,7 +217,18 @@ namespace OneTaskBar
             return dockOrder.Arrange(LayoutOrder.Arrange("dock.apps",Catalog.Merge(Pins,Running),a=>a.Key));
         }
         internal void ResetDockOrder(){dockOrder.Reset();LayoutOrder.Reset("dock.apps");foreach(var dock in docks)dock.Rebuild();}
-        internal bool MoveDock(string source,string target,bool after) {var before=DockApps().Select(a=>a.Key).ToArray();if(!dockOrder.Move(source,target,after))return false;LayoutOrder.Move("dock.apps",before,source,target,after);return true;}
+        internal bool MoveDock(string source,string target,bool after)
+        {
+            var entries=DockApps();var moving=entries.FirstOrDefault(a=>String.Equals(a.Key,source,StringComparison.OrdinalIgnoreCase));var anchor=entries.FirstOrDefault(a=>String.Equals(a.Key,target,StringComparison.OrdinalIgnoreCase));
+            if(moving==null||anchor==null||String.Equals(source,target,StringComparison.OrdinalIgnoreCase))return false;
+            if(moving.Pinned!=anchor.Pinned)SetPin(moving,anchor.Pinned);if(!dockOrder.Move(source,target,after))return false;LayoutOrder.Move("dock.apps",entries.Select(a=>a.Key),source,target,after);foreach(var dock in docks)dock.Rebuild();return true;
+        }
+        internal bool MoveDockGroup(string source,bool pinned)
+        {
+            var entries=DockApps();var moving=entries.FirstOrDefault(a=>String.Equals(a.Key,source,StringComparison.OrdinalIgnoreCase));if(moving==null)return false;
+            var anchor=entries.LastOrDefault(a=>a.Pinned==pinned&&!String.Equals(a.Key,source,StringComparison.OrdinalIgnoreCase));bool changed=moving.Pinned!=pinned;if(changed)SetPin(moving,pinned);
+            if(anchor!=null){changed|=dockOrder.Move(source,anchor.Key,true);LayoutOrder.Move("dock.apps",entries.Select(a=>a.Key),source,anchor.Key,true);}foreach(var dock in docks)dock.Rebuild();return changed;
+        }
         void LayoutChanged(string scope) {if(scope=="dock.apps"&&!DragReorder.Active)foreach(var dock in docks)dock.Rebuild();}
         void DragFinished() {if(!disposed)Application.Current.Dispatcher.BeginInvoke(new Action(()=> {if(!disposed)foreach(var dock in docks)dock.Rebuild();}));}
         void OptionsChanged()
@@ -227,7 +240,12 @@ namespace OneTaskBar
             if(!Preferences.Current.Animations||!Preferences.Current.ChargeAnimation){foreach(var charge in charges)charge.Close();charges.Clear();}
             foreach(var dock in docks)dock.Rebuild();
         }
-        internal void Pin(AppEntry entry,bool pin) { Catalog.SetPinned(entry,pin); pinsAt=appsAt=DateTime.MinValue; }
+        void SetPin(AppEntry entry,bool pin)
+        {
+            Catalog.SetPinned(entry,pin);pinRevision++;Pins.RemoveAll(a=>Catalog.Same(a,entry));entry.Pinned=pin;
+            if(pin){var saved=entry.Copy();saved.Pinned=true;Pins.Add(saved);}foreach(var item in Running.Concat(Apps))if(Catalog.Same(item,entry))item.Pinned=pin;pinsAt=appsAt=DateTime.MinValue;
+        }
+        internal void Pin(AppEntry entry,bool pin) {SetPin(entry,pin);foreach(var dock in docks)dock.Rebuild();}
         internal void ActivateApp(AppEntry entry,FrameworkElement anchor,IntPtr beforeClick=default(IntPtr))
         {
             var windows=entry.Windows.Where(Native.IsWindow).ToList();
@@ -460,9 +478,10 @@ namespace OneTaskBar
                 })));
                 Native.HideTaskbars(); DesktopLease.SuppressCharging();
             }
-            if(Desktop&&now>=pinsAt&&!pinsBusy){pinsAt=now.AddSeconds(30);pinsBusy=true;var installed=Apps;var running=Running;var previousMirror=explorerItems;
+            if(Desktop&&now>=pinsAt&&!pinsBusy){pinsAt=now.AddSeconds(30);pinsBusy=true;var installed=Apps;var running=Running;var previousMirror=explorerItems;int revision=pinRevision;
                 BackgroundWork.Run(()=> {var mirror=ExplorerBridge.ReadApps();if(mirror.Count==0)mirror=previousMirror;return new {Mirror=mirror,Pins=Catalog.ReadPins(installed,mirror,running)};}).ContinueWith(t=>Application.Current.Dispatcher.BeginInvoke(new Action(()=> {
                     pinsBusy=false;if(disposed||t.Status!=TaskStatus.RanToCompletion)return;
+                    if(revision!=pinRevision){pinsAt=DateTime.MinValue;return;}
                     var old=String.Join("|",Pins.Select(a=>a.Key));Pins=t.Result.Pins;explorerItems=t.Result.Mirror;ExplorerBridge.Save(explorerItems);
                     if(old!=String.Join("|",Pins.Select(a=>a.Key)))foreach(var dock in docks)dock.Rebuild();
                 })));}

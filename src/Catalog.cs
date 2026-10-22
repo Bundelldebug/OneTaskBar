@@ -93,7 +93,7 @@ namespace OneTaskBar
             foreach(var item in pinned) if(!result.Any(a=>Same(a,item))) {var copy=item.Copy(); copy.Pinned=true; result.Add(copy);}
             foreach(var item in running) {
                 var match=result.FirstOrDefault(a=>Same(a,item));
-                if(match==null) result.Add(item.Copy());
+                if(match==null) {var copy=item.Copy();copy.Pinned=false;result.Add(copy);}
                 else { foreach(var w in item.Windows) if(!match.Windows.Contains(w)) match.Windows.Add(w); if(match.Icon==null) match.Icon=item.Icon; }
             }
             return result;

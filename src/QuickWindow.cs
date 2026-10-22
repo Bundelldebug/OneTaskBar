@@ -90,6 +90,7 @@ namespace OneTaskBar
             actionOrder.Add("bluetooth",RoundAction("bluetooth","블루투스","bluetooth"));
             actionOrder.Add("animations",RoundAction("play","독 애니메이션","animations"));
             actionOrder.Add("startup",RoundAction("startup","자동 실행","startup"));
+            actionOrder.Add("slider-scroll",RoundAction("scroll","스크롤 조절","slider-scroll"));
             actionArea.Children.Add(actions);
             var handle=Paint.Button(new Border {Width=28,Height=3,CornerRadius=new CornerRadius(2),Background=Paint.Brush("#70F4F8F5")},()=>ExpandActions(),"빠른 설정 더 보기 · 접기");handle.Background=Brushes.Transparent;handle.Height=11;handle.Padding=new Thickness(20,4,20,4);handle.VerticalAlignment=VerticalAlignment.Bottom;actionArea.Children.Add(handle);
             AddSection("actions",Card(actionArea,34,new Thickness(0,0,0,10)));
@@ -97,8 +98,8 @@ namespace OneTaskBar
             themeCircle=new Border {Width=44,Height=44,CornerRadius=new CornerRadius(22),Background=Paint.Brush(QuickPanel.Inactive),Child=themeToggle};AddSection("brightness",SliderRow(brightness,themeCircle));
             mute=IconButton("volume",()=>shell.Mute(),"음소거 전환",44);soundGlyphs.Add((Glyph)mute.Content);muteCircle=new Border {Width=44,Height=44,CornerRadius=new CornerRadius(22),Background=Paint.Brush(QuickPanel.Inactive),Child=mute};
             AddSection("volume",SliderRow(volume,muteCircle));
-            mediaPlayer=new MediaPlayerView(shell.Media,shell.SeekMedia,()=>shell.ShowDetail("sound"));
-            var mediaCard=Card(mediaPlayer,28,new Thickness(0,0,0,10));mediaPlayer.PaletteChanged=palette=>{mediaCard.Background=mediaPlayer.IsCompact?QuickPanel.Card:palette.Glass;mediaCard.CornerRadius=new CornerRadius(mediaPlayer.IsCompact?34:28);};AddSection("media",mediaCard);
+            mediaPlayer=new MediaPlayerView(shell.Media,shell.SeekMedia,()=>shell.ShowDetail("sound"),condensed:true);
+            var mediaCard=Card(mediaPlayer,28,new Thickness(0,0,0,10));mediaPlayer.PaletteChanged=palette=>{mediaCard.Background=mediaPlayer.IsCompact?QuickPanel.Card:mediaPlayer.MediaBackground;mediaCard.CornerRadius=new CornerRadius(mediaPlayer.IsCompact?34:28);};AddSection("media",mediaCard);
             shortcuts=new UniformGrid {Columns=2};var bottomOrder=new ReorderGroup("quick.shortcuts",shortcuts,Orientation.Horizontal,()=>editing,PlacePair);groups.Add(bottomOrder);
             devicesTile=WideTile("devices","주변 기기 연결","samsung-devices",new Thickness(0));windowsTile=WideTile("windows-settings","Windows 설정","windows-settings",new Thickness(0));bottomOrder.Add("devices",devicesTile);bottomOrder.Add("focus",windowsTile);AddSection("shortcuts",shortcuts);
             var utilities=new Grid {Margin=new Thickness(0,10,0,10)};utilities.ColumnDefinitions.Add(new ColumnDefinition());utilities.ColumnDefinitions.Add(new ColumnDefinition());var capture=WideTile("screenshot","화면 캡처","screen-capture",new Thickness(0,0,5,0));var manager=WideTile("task-manager","작업 관리자","task-manager",new Thickness(5,0,0,0));Grid.SetColumn(manager,1);utilities.Children.Add(capture);utilities.Children.Add(manager);AddSection("utilities",utilities);
@@ -161,6 +162,7 @@ namespace OneTaskBar
                 else if(key=="awake")shell.Toggles.SetAwake(!shell.Toggles.Awake);
                 else if(key=="animations")Preferences.Set(p=>p.Animations=!p.Animations);
                 else if(key=="startup")shell.Toggles.ToggleStartup();
+                else if(key=="slider-scroll")Preferences.Set(p=>p.QuickSliderScroll=!p.QuickSliderScroll);
                 else if(key=="wifi"||key=="bluetooth"){if(!await shell.Services.ToggleRadio(key))throw new InvalidOperationException("Windows가 이 무선 장치의 제어를 허용하지 않았습니다.");await shell.Services.Refresh();}
                 notice.Visibility=Visibility.Collapsed;
             }catch(Exception error){Feedback(error.Message);}
@@ -215,6 +217,7 @@ namespace OneTaskBar
         }
         internal void Refresh(PowerState state,int bright,double sound,bool muted,bool audioAvailable,bool brightAvailable)
         {
+            brightness.WheelAdjust=volume.WheelAdjust=Preferences.Current.QuickSliderScroll;
             var samsung=shell.SamsungSettings();if(samsung!=null&&samsung.Icon!=null&&samsungIcon==null){samsungIcon=samsung.Icon;samsungSettings.Content=AppIcons.Visual(samsungIcon,24);}
             samsungSettings.Visibility=samsung!=null?Visibility.Visible:Visibility.Collapsed;
             bool devices=shell.SamsungDevices()!=null;devicesTile.Visibility=devices?Visibility.Visible:Visibility.Collapsed;shortcuts.Columns=devices?2:1;if(!devices)windowsTile.Margin=new Thickness(0);
@@ -237,7 +240,7 @@ namespace OneTaskBar
             wifiGlyph.Color=wifi?Paint.Ink:Paint.ControlWhite;bluetoothGlyph.Color=bluetooth?Paint.Ink:Paint.ControlWhite;wifiGlyph.InvalidateVisual();bluetoothGlyph.InvalidateVisual();
             wifiGlyph.Opacity=wifi?1:.5;bluetoothGlyph.Opacity=bluetooth?1:.5;wifiName.Text=shell.Wifi??(wifi?"연결 안 됨":"꺼짐");bluetoothState.Text=shell.Services.BluetoothOn.HasValue?(bluetooth?"켜짐":"꺼짐"):"연결 설정";
             var efficiency=shell.Toggles.Power();var disturb=shell.Toggles.Disturb.State;
-            foreach(var pair in toggleButtons){string key=pair.Key;bool value=key=="mute"?muted:key=="theme"?theme.Dark:key=="dnd"?disturb.Enabled:key=="efficiency"?efficiency.Selected==QuickActions.EfficientMode:key=="awake"?shell.Toggles.Awake:key=="wifi"?wifi:key=="bluetooth"?bluetooth:key=="animations"?Preferences.Current.Animations:shell.Toggles.Startup;
+            foreach(var pair in toggleButtons){string key=pair.Key;bool value=key=="mute"?muted:key=="theme"?theme.Dark:key=="dnd"?disturb.Enabled:key=="efficiency"?efficiency.Selected==QuickActions.EfficientMode:key=="awake"?shell.Toggles.Awake:key=="wifi"?wifi:key=="bluetooth"?bluetooth:key=="animations"?Preferences.Current.Animations:key=="slider-scroll"?Preferences.Current.QuickSliderScroll:shell.Toggles.Startup;
                 bool available=!pendingToggles.Contains(key)&&(key=="mute"?audioAvailable:key=="theme"?theme.Available&&!themeBusy:key=="dnd"?disturb.Available:key=="efficiency"?efficiency.Available:key=="wifi"?shell.Services.WifiPresent!=false:key=="bluetooth"?shell.Services.BluetoothPresent!=false:true);pair.Value.RefreshState(value,available);}
             mediaPlayer.Update(shell.Services.Media,shell.Services.OutputName);
         }

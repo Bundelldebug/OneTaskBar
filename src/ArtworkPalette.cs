@@ -7,6 +7,7 @@ namespace OneTaskBar
     internal sealed class ArtworkPalette
     {
         static readonly ConditionalWeakTable<BitmapSource,ArtworkPalette> cache=new ConditionalWeakTable<BitmapSource,ArtworkPalette>();
+        static readonly ConditionalWeakTable<BitmapSource,Brush> playerSurfaces=new ConditionalWeakTable<BitmapSource,Brush>();
         internal readonly Color Dominant,Background;internal readonly Brush Glass,Solid,Ink;internal readonly double MinimumContrast;
         static readonly Color text=Color.FromRgb(244,248,245);const byte alpha=220;
         ArtworkPalette(Color dominant)
@@ -16,6 +17,21 @@ namespace OneTaskBar
         }
         internal static readonly ArtworkPalette Neutral=new ArtworkPalette(Color.FromRgb(104,115,110));
         internal static ArtworkPalette Read(BitmapSource source){if(source==null)return Neutral;return cache.GetValue(source,Extract);}
+        internal Brush PlayerSurface(BitmapSource source)
+        {
+            return source==null?Glass:playerSurfaces.GetValue(source,CreatePlayerSurface);
+        }
+        Brush CreatePlayerSurface(BitmapSource source)
+        {
+            // One frozen, bounded-size artwork surface per track; no live blur or per-tick bitmap work.
+            double scale=Math.Min(1,640.0/Math.Max(source.PixelWidth,source.PixelHeight));BitmapSource image=source;
+            if(scale<1){image=new TransformedBitmap(source,new ScaleTransform(scale,scale));image.Freeze();}
+            var picture=new ImageBrush(image) {Stretch=Stretch.UniformToFill};picture.Freeze();
+            var tint=new LinearGradientBrush {StartPoint=new System.Windows.Point(0,0),EndPoint=new System.Windows.Point(0,1)};
+            var tone=Shade(Background,.2);tint.GradientStops.Add(new GradientStop(Color.FromArgb(176,tone.R,tone.G,tone.B),0));tint.GradientStops.Add(new GradientStop(Color.FromArgb(196,tone.R,tone.G,tone.B),1));tint.Freeze();
+            var drawing=new DrawingGroup();var bounds=new System.Windows.Rect(0,0,400,188);using(var context=drawing.Open()){context.DrawRectangle(picture,null,bounds);context.DrawRectangle(tint,null,bounds);}drawing.Freeze();
+            var brush=new DrawingBrush(drawing) {Stretch=Stretch.UniformToFill,Opacity=.94};brush.Freeze();return brush;
+        }
         static ArtworkPalette Extract(BitmapSource image)
         {
             try {

@@ -37,6 +37,7 @@ namespace OneTaskBar
             ChoiceRow(panels,"알림센터","시계와 알림 버튼에서 열 화면",Preferences.Current.NativeNotifications,v=>Preferences.Set(p=>p.NativeNotifications=v));
             var notificationLink=Paint.Action("Windows 알림 연결 · 권한 관리",()=>shell.ShowNotificationConnection());notificationLink.HorizontalContentAlignment=HorizontalAlignment.Left;notificationLink.Margin=new Thickness(12,5,12,12);panels.Children.Add(notificationLink);
             ChoiceRow(panels,"빠른 설정","Wi-Fi·소리·배터리 버튼에서 열 화면",Preferences.Current.NativeQuickSettings,v=>Preferences.Set(p=>p.NativeQuickSettings=v));
+            Row(panels,"슬라이더 스크롤 조절","밝기·음량·재생 위치 위에서 휠이나 트랙패드 스크롤로 값을 바꿉니다. 기본은 꺼짐입니다",Preferences.Current.QuickSliderScroll,v=>Preferences.Set(p=>p.QuickSliderScroll=v));
             Group(groups,"패널 선택",panels);
             var launcher=new StackPanel();
             ChoiceRow(launcher,"독의 시작 버튼","버튼 모양과 눌렀을 때 열 화면",Preferences.Current.NativeStartButton,v=>Preferences.Set(p=>p.NativeStartButton=v),"앱 목록","Windows 시작");

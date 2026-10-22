@@ -18,8 +18,7 @@ namespace OneTaskBar
     {
         readonly ShellController shell;readonly Forms.Screen screen;readonly Action<string> command;readonly Func<double,Task<bool>> seekCommand;
         readonly Button compact;readonly MediaPlayerView expandedContent;readonly MarqueeTitle title=new MarqueeTitle();
-        readonly Border compactArt=new Border {Width=28,Height=28,CornerRadius=new CornerRadius(8)},glow=new Border {CornerRadius=new CornerRadius(22)};
-        readonly Glyph smallState=new Glyph("pause",14);
+        readonly Border compactArt=new Border {Width=28,Height=28,CornerRadius=new CornerRadius(8),HorizontalAlignment=HorizontalAlignment.Left},glow=new Border {CornerRadius=new CornerRadius(22),Opacity=.2};
         readonly Stopwatch watch=new Stopwatch();bool animating;TimeSpan lastRender=TimeSpan.MinValue;
         IDisposable outsideClick;
         Rect current,from,target,hostBox;NowBarLayout layout;double dockStart,dockTop,monitorScale=1;
@@ -33,8 +32,8 @@ namespace OneTaskBar
         {
             shell=controller;screen=monitor;command=dispatch??controller.Media;seekCommand=seekDispatch??controller.SeekMedia;Title="One TaskBar · Now bar";Width=132;Height=44;Radius=22;Dark=true;ShowActivated=false;Surface.CornerRadius=new CornerRadius(22);Surface.Background=QuickPanel.Glass;Palette=ArtworkPalette.Neutral;Surface.BorderThickness=new Thickness(0);Surface.BorderBrush=Brushes.Transparent;
             var root=new Grid();root.Children.Add(glow);
-            var small=new Grid {Height=44,Margin=new Thickness(10,0,10,0)};small.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(36)});small.ColumnDefinitions.Add(new ColumnDefinition());small.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(24)});small.Children.Add(compactArt);Grid.SetColumn(title,1);small.Children.Add(title);Grid.SetColumn(smallState,2);small.Children.Add(smallState);
-            compact=Paint.Button(small,()=>SetExpanded(true),"Now bar · 재생 컨트롤 열기");compact.Background=Brushes.Transparent;compact.Padding=new Thickness(0);compact.Height=44;compact.VerticalAlignment=VerticalAlignment.Bottom;root.Children.Add(compact);
+            var small=new Grid {Height=44,Margin=new Thickness(10,0,10,0)};small.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(36)});small.ColumnDefinitions.Add(new ColumnDefinition());small.Children.Add(compactArt);Grid.SetColumn(title,1);small.Children.Add(title);
+            compact=Paint.Button(small,()=>SetExpanded(true),"Now bar · 재생 컨트롤 열기");compact.Background=Brushes.Transparent;compact.Padding=new Thickness(0);compact.Height=44;compact.HorizontalContentAlignment=HorizontalAlignment.Stretch;compact.VerticalAlignment=VerticalAlignment.Bottom;root.Children.Add(compact);
             expandedContent=new MediaPlayerView(command,seekCommand,()=>{SetExpanded(false);shell.ShowDetail("sound");},()=>SetExpanded(false)) {VerticalAlignment=VerticalAlignment.Bottom,Visibility=Visibility.Collapsed,Opacity=0};
             root.Children.Add(expandedContent);Surface.Child=root;var decorator=(AdornerDecorator)Content;decorator.Child=null;hostCanvas.Children.Add(Surface);decorator.Child=hostCanvas;Surface.Clip=capsuleClip;compact.HorizontalAlignment=HorizontalAlignment.Left;expandedContent.HorizontalAlignment=HorizontalAlignment.Left;
             SourceInitialized+=(s,e)=>{var h=new WindowInteropHelper(this).Handle;Native.SetWindowLong(h,-20,(Native.GetWindowLong(h,-20)|0x80|0x08000000)&~0x40000);var source=HwndSource.FromHwnd(h);source.CompositionTarget.RenderMode=RenderMode.SoftwareOnly;source.AddHook((IntPtr hwnd,int msg,IntPtr wp,IntPtr lp,ref bool handled)=>{if(msg==0x21&&!expanded){handled=true;return new IntPtr(3);}return IntPtr.Zero;});};
@@ -48,8 +47,7 @@ namespace OneTaskBar
             if(closed)return;monitorScale=scale;dockStart=startX;dockTop=dockY;var now=DateTime.UtcNow;bool active=state!=null&&state.Available&&state.Active;if(active){lastActive=now;media=state;}bool present=media!=null&&(active||(now-lastActive).TotalMilliseconds<900);
             if(!allowed||!present){if(wanted||IsVisible){wanted=false;StopOutsideClick();StopMotion();expanded=false;title.Running=false;SetActivation(false);if(!allowed)HideImmediately();else Hide();}return;}
             if(title.Text!=media.Title){title.Text=media.Title;compact.ToolTip=media.Title+" · 재생 컨트롤 열기";System.Windows.Automation.AutomationProperties.SetName(compact,(string)compact.ToolTip);}
-            string stateKind=media.Playing?"pause":"play";if(smallState.Kind!=stateKind){smallState.Kind=stateKind;smallState.InvalidateVisual();}
-            if(artwork!=media.Artwork){artwork=media.Artwork;ApplyPalette(media.Artwork);if(artwork!=null){var brush=new ImageBrush(artwork){Stretch=Stretch.UniformToFill,AlignmentX=AlignmentX.Center,AlignmentY=AlignmentY.Center};brush.Freeze();compactArt.Background=brush;var background=new ImageBrush(artwork){Stretch=Stretch.UniformToFill,Opacity=.045};background.Freeze();glow.Background=background;compactArt.Child=null;}else {compactArt.Background=QuickPanel.Card;compactArt.Child=new Glyph("volume",16);glow.Background=null;}}
+            if(artwork!=media.Artwork){artwork=media.Artwork;ApplyPalette(media.Artwork);if(artwork!=null){var brush=new ImageBrush(artwork){Stretch=Stretch.UniformToFill,AlignmentX=AlignmentX.Center,AlignmentY=AlignmentY.Center};brush.Freeze();compactArt.Background=brush;glow.Background=Palette.PlayerSurface(media.Artwork);compactArt.Child=null;}else {compactArt.Background=QuickPanel.Card;compactArt.Child=new Glyph("volume",16);glow.Background=null;}}
             if(artwork==null&&compactArt.Child==null){compactArt.Background=QuickPanel.Card;compactArt.Child=new Glyph("volume",16);}
             if(expanded)expandedContent.Update(media,shell.Services.OutputName);
             layout=NowBarLayout.Fit(screen.Bounds.Width/scale,screen.Bounds.Height/scale,startX,dockY,title.NaturalWidth,expanded);title.ConservePower=shell.Power.Known&&!shell.Power.Connected;title.Running=!expanded&&!animating&&Motion.Enabled;

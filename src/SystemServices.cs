@@ -47,9 +47,10 @@ namespace OneTaskBar
         internal bool? WifiOn,BluetoothOn;
         internal bool? WifiPresent,BluetoothPresent;internal bool NetworkConnected;DateTime radioProbeAt;
         internal MediaState Media=new MediaState();
-        string artworkKey;int propertiesDirty=1,playbackDirty=1;DateTime metadataAt,playbackAt;bool disposed;
+        readonly MediaArtwork artwork=new MediaArtwork();int propertiesDirty=1,playbackDirty=1;DateTime metadataAt,playbackAt;bool disposed;
         bool interactive;internal bool Interactive {get{return interactive;}set{if(interactive==value)return;interactive=value;if(value){outputAt=radioProbeAt=playbackAt=DateTime.MinValue;Interlocked.Exchange(ref playbackDirty,1);}}}internal Action Changed;
         internal int MetadataReads;
+        internal int ArtworkReads {get{return artwork.Reads;}}internal int ArtworkDecodes {get{return artwork.Decodes;}}
         void Notify(){Interlocked.Exchange(ref playbackDirty,1);var changed=Changed;if(!disposed&&changed!=null)changed();}
         void PropertiesChanged(GlobalSystemMediaTransportControlsSession sender,MediaPropertiesChangedEventArgs args){Interlocked.Exchange(ref propertiesDirty,1);Notify();}
         void PlaybackChanged(GlobalSystemMediaTransportControlsSession sender,PlaybackInfoChangedEventArgs args){Notify();}
@@ -59,7 +60,7 @@ namespace OneTaskBar
         {
             if(Object.ReferenceEquals(session,value))return;
             if(session!=null)try{session.MediaPropertiesChanged-=PropertiesChanged;session.PlaybackInfoChanged-=PlaybackChanged;session.TimelinePropertiesChanged-=TimelineChanged;}catch{}
-            session=value;Interlocked.Exchange(ref propertiesDirty,1);metadataAt=DateTime.MinValue;
+            session=value;artwork.Clear();Interlocked.Exchange(ref propertiesDirty,1);metadataAt=DateTime.MinValue;
             if(session!=null)try{session.MediaPropertiesChanged+=PropertiesChanged;session.PlaybackInfoChanged+=PlaybackChanged;session.TimelinePropertiesChanged+=TimelineChanged;}catch{}
         }
         public void Dispose(){disposed=true;SelectSession(null);if(manager!=null)try{manager.CurrentSessionChanged-=CurrentChanged;}catch{}manager=null;}
@@ -85,29 +86,33 @@ namespace OneTaskBar
             try{NetworkConnected=System.Net.NetworkInformation.NetworkInterface.GetIsNetworkAvailable();}catch{}
             try {
                 if(manager==null){manager=await Wait(GlobalSystemMediaTransportControlsSessionManager.RequestAsync());manager.CurrentSessionChanged+=CurrentChanged;}
-                if(Interlocked.Exchange(ref playbackDirty,0)==0&&Volatile.Read(ref propertiesDirty)==0&&DateTime.UtcNow<playbackAt&&DateTime.UtcNow<metadataAt)return;
+                if(Interlocked.Exchange(ref playbackDirty,0)==0&&Volatile.Read(ref propertiesDirty)==0&&DateTime.UtcNow<playbackAt&&DateTime.UtcNow<metadataAt&&!artwork.Due(DateTime.UtcNow))return;
                 playbackAt=DateTime.UtcNow.AddSeconds(Interactive?2:5);
-                if(disposed)return;SelectSession(manager.GetCurrentSession()); if(session==null) {if(Media.Available)Media=new MediaState();artworkKey=null;Interlocked.Exchange(ref propertiesDirty,0);metadataAt=DateTime.UtcNow.AddSeconds(60);return;}
+                if(disposed)return;SelectSession(manager.GetCurrentSession()); if(session==null) {if(Media.Available)Media=new MediaState();artwork.Clear();Interlocked.Exchange(ref propertiesDirty,0);metadataAt=DateTime.UtcNow.AddSeconds(60);return;}
                 var info=session.GetPlaybackInfo();var previous=Media;
                 var state=new MediaState {Available=true,Title=previous.Title,Artist=previous.Artist,AppId=session.SourceAppUserModelId,
                     Playing=info.PlaybackStatus==GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing,Active=info.PlaybackStatus==GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing||info.PlaybackStatus==GlobalSystemMediaTransportControlsSessionPlaybackStatus.Paused,
-                    CanPlay=info.Controls.IsPlayPauseToggleEnabled,CanNext=info.Controls.IsNextEnabled,CanPrevious=info.Controls.IsPreviousEnabled,Artwork=previous.Artwork};
+                    CanPlay=info.Controls.IsPlayPauseToggleEnabled,CanNext=info.Controls.IsNextEnabled,CanPrevious=info.Controls.IsPreviousEnabled,Artwork=artwork.Image};
                 try {var timeline=session.GetTimelineProperties();state.Duration=Math.Max(0,(timeline.EndTime-timeline.StartTime).TotalSeconds);state.Position=Math.Max(0,(timeline.Position-timeline.StartTime).TotalSeconds);state.SampledUtc=timeline.LastUpdatedTime.UtcDateTime;if(Math.Abs((DateTime.UtcNow-state.SampledUtc).TotalDays)>1)state.SampledUtc=DateTime.UtcNow;state.CanSeek=info.Controls.IsPlaybackPositionEnabled&&state.Duration>0;}catch{}
                 // Track changes arrive as events; retain a slow fallback for incomplete media providers.
-                if(Interlocked.Exchange(ref propertiesDirty,0)!=0||DateTime.UtcNow>=metadataAt) {
-                    var properties=await Wait(session.TryGetMediaPropertiesAsync());MetadataReads++;metadataAt=DateTime.UtcNow.AddSeconds(60);
-                    state.Title=String.IsNullOrWhiteSpace(properties.Title)?"미디어":properties.Title;state.Artist=properties.Artist;
-                    string key=state.AppId+"|"+properties.Title+"|"+properties.Artist;
-                    if(key!=artworkKey) {
-                        artworkKey=key;state.Artwork=null;
-                        if(properties.Thumbnail!=null)using(var stream=await Wait(properties.Thumbnail.OpenReadAsync()))using(var reader=new DataReader(stream)) {
-                            uint size=(uint)Math.Min(8388608UL,stream.Size);await Wait(reader.LoadAsync(size));var bytes=new byte[size];reader.ReadBytes(bytes);
-                            using(var managed=new MemoryStream(bytes)){var image=new BitmapImage();image.BeginInit();image.CacheOption=BitmapCacheOption.OnLoad;image.DecodePixelWidth=320;image.StreamSource=managed;image.EndInit();image.Freeze();state.Artwork=image;}
-                        }
-                    }
+                if(Interlocked.Exchange(ref propertiesDirty,0)!=0||DateTime.UtcNow>=metadataAt||artwork.Due(DateTime.UtcNow)) {
+                    try {
+                        var properties=await Wait(session.TryGetMediaPropertiesAsync());MetadataReads++;metadataAt=DateTime.UtcNow.AddSeconds(60);
+                        state.Title=String.IsNullOrWhiteSpace(properties.Title)?"미디어":properties.Title;state.Artist=properties.Artist;
+                        string key=state.AppId+"|"+properties.Title+"|"+properties.Artist;
+                        state.Artwork=await artwork.Read(key,()=>ReadThumbnail(properties.Thumbnail),DateTime.UtcNow);
+                    }catch(Exception error){artwork.RetryFailed(DateTime.UtcNow);metadataAt=DateTime.UtcNow.AddSeconds(10);AppLog.Once("media-properties",error.Message);}
                 }
                 Media=state;
-            } catch(Exception e) {AppLog.Once("media",e.Message); Media=new MediaState();artworkKey=null;Interlocked.Exchange(ref propertiesDirty,1);}
+            } catch(Exception e) {AppLog.Once("media",e.Message); Media=new MediaState();artwork.Clear();Interlocked.Exchange(ref propertiesDirty,1);}
+        }
+        static async Task<byte[]> ReadThumbnail(IRandomAccessStreamReference reference)
+        {
+            if(reference==null)return null;
+            using(var stream=await Wait(reference.OpenReadAsync()))using(var reader=new DataReader(stream)) {
+                if(stream.Size==0||stream.Size>8388608UL)return null;uint size=(uint)stream.Size;
+                if(await Wait(reader.LoadAsync(size))!=size)return null;var bytes=new byte[size];reader.ReadBytes(bytes);return bytes;
+            }
         }
         internal async Task<bool> ToggleRadio(string kind)
         {
