@@ -14,7 +14,7 @@ namespace OneTaskBar
 {
     internal static partial class Native
     {
-        sealed class RegionState {internal int Width,Height,Radius;internal bool Soft;internal LiveBackdrop Backdrop;}
+        sealed class RegionState {internal int Width,Height,Radius;internal bool Soft;internal RectI? InputClip;internal LiveBackdrop Backdrop;}
         static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Window,RegionState> regions=new System.Runtime.CompilerServices.ConditionalWeakTable<Window,RegionState>();
         internal delegate bool EnumProc(IntPtr window, IntPtr state);
         [StructLayout(LayoutKind.Sequential)] internal struct RectI { public int Left, Top, Right, Bottom; }
@@ -83,6 +83,9 @@ namespace OneTaskBar
             // A GDI region has binary pixel coverage and cuts off the layered window's antialiasing.
             // Capsules and panels already have per-pixel WPF alpha and a matching composition clip.
             var glass=window as GlassWindow;
+            if(glass!=null&&glass.BackdropClip.HasValue){var bounds=InputBounds(glass.BackdropClip.Value,scale);
+                if(!state.InputClip.HasValue||!state.InputClip.Value.Equals(bounds)){if(ClipWindow(handle,bounds))state.InputClip=bounds;}state.Soft=false;return;}
+            if(state.InputClip.HasValue){SetWindowRgn(handle,IntPtr.Zero,true);state.InputClip=null;state.Width=0;}
             if(glass!=null&&glass.SoftCorners){if(!state.Soft){SetWindowRgn(handle,IntPtr.Zero,true);state.Soft=true;}state.Width=width;state.Height=height;state.Radius=curve;return;}
             // SetWindowRgn emits position notifications itself. Do not feed those back into another SetWindowRgn.
             if(!state.Soft&&state.Width==width&&state.Height==height&&state.Radius==curve)return;
@@ -91,6 +94,8 @@ namespace OneTaskBar
             var region=CreateRoundRectRgn(0,0,width,height,curve,curve);
             if(SetWindowRgn(handle,region,true)==0){DeleteObject(region);state.Width=0;}
         }
+        internal static RectI InputBounds(Rect clip,double scale){return new RectI {Left=Math.Max(0,(int)Math.Floor(clip.Left*scale)-1),Top=Math.Max(0,(int)Math.Floor(clip.Top*scale)-1),Right=(int)Math.Ceiling(clip.Right*scale)+1,Bottom=(int)Math.Ceiling(clip.Bottom*scale)+1};}
+        internal static bool ClipWindow(IntPtr window,RectI bounds){var region=CreateRectRgn(bounds.Left,bounds.Top,bounds.Right,bounds.Bottom);if(SetWindowRgn(window,region,true)!=0)return true;DeleteObject(region);return false;}
         internal static void EnableBlur(Window window,bool enabled){RegionState state;if(regions.TryGetValue(window,out state)&&state.Backdrop!=null)state.Backdrop.Enable(enabled);}
         internal static void Place(Window window, System.Drawing.Rectangle screen, double x, double y, double w, double h)
         {
@@ -291,15 +296,26 @@ namespace OneTaskBar
         readonly Hook callback; IntPtr handle;
         public bool Enabled; public Func<int,bool> OnKey;internal Func<bool> InterceptStart;internal Action OnStart;
         readonly StartKeyGesture start=new StartKeyGesture();
+        int bufferedWin,nativeWins;
         [DllImport("user32.dll")]static extern short GetAsyncKeyState(int key);
         public VolumeKeys() { callback=Handle; handle=SetWindowsHookEx(13,callback,GetModuleHandle(null),0); }
         IntPtr Handle(int code,IntPtr message,IntPtr info)
         {
             int key=code>=0 ? Marshal.ReadInt32(info) : 0;
-            if(code>=0&&Marshal.ReadInt64(info,16)!=(long)SystemPanels.InputMarker) {
+            if(code>=0&&Marshal.ReadInt64(info,16)==(long)SystemPanels.InputMarker)return CallNextHookEx(handle,code,message,info);
+            if(code>=0) {
                 bool down=message==new IntPtr(0x100)||message==new IntPtr(0x104),up=message==new IntPtr(0x101)||message==new IntPtr(0x105);
                 if(down||up){bool modifiers=(GetAsyncKeyState(0x10)&0x8000)!=0||(GetAsyncKeyState(0x11)&0x8000)!=0||(GetAsyncKeyState(0x12)&0x8000)!=0;
-                    if(start.Observe(key,down,Enabled&&InterceptStart!=null&&InterceptStart(),modifiers)&&SystemPanels.FinishStartKey((ushort)key)){if(OnStart!=null)OnStart();return new IntPtr(1);}}
+                    bool intercept=Enabled&&InterceptStart!=null&&InterceptStart(),invoke=start.Observe(key,down,intercept,modifiers),win=key==0x5b||key==0x5c;
+                    int winBit=key==0x5b?1:key==0x5c?2:0;
+                    // Keep a solo Win press entirely out of Explorer. Cancelling its action
+                    // at key-up is too late: shell/customizer dimming has already started.
+                    if(win&&down&&bufferedWin==key)return new IntPtr(1);
+                    if(win&&down&&bufferedWin==0&&(nativeWins&winBit)==0&&intercept&&!modifiers){bufferedWin=key;return new IntPtr(1);}
+                    if(win&&up&&bufferedWin==key){bufferedWin=0;if(invoke&&OnStart!=null)OnStart();return new IntPtr(1);}
+                    if(down&&bufferedWin!=0){int held=bufferedWin;bufferedWin=0;if(SystemPanels.ForwardStartChord((ushort)held,(ushort)key,(ushort)Marshal.ReadInt32(info,4),(uint)Marshal.ReadInt32(info,8))){nativeWins|=held==0x5b?1:2;nativeWins|=winBit;return new IntPtr(1);}}
+                    if(win){if(down)nativeWins|=winBit;else nativeWins&=~winBit;}
+                }
             }
             if(code>=0 && Enabled && key>=0xAD && key<=0xAF && OnKey!=null) {
                 if(message==new IntPtr(0x100) || message==new IntPtr(0x104)) { if(OnKey(key)) return new IntPtr(1); }

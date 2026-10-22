@@ -36,6 +36,8 @@ namespace OneTaskBar
             if(args.Length==3&&args[0]=="--register-notifications")return NotificationIdentity.RegisterHelper(args[1],args[2]);
             if(args.Length>0&&args[0]=="--notification-restart")return NotificationIdentity.RestartHelper(args);
             if(args.Contains("--notification-probe")) { Signal("ProbeNotifications"); return 0; }
+            if(args.Contains("--notification-banner-probe")) { Signal("ProbeBanners"); return 0; }
+            if(args.Contains("--notification-action-probe")) { Signal("ProbeNotificationAction"); return 0; }
             if(args.Contains("--panel-probe")) { Signal("ProbePanels"); return 0; }
             if(args.Contains("--native-panels-probe")) {
                 TaskbarMask.Active=TaskbarMask.Protected(Native.FindWindow("Shell_TrayWnd",null));
@@ -49,6 +51,9 @@ namespace OneTaskBar
             }
             if(args.Contains("--power-probe")) {var before=Native.ReadPerformanceMode();if(!before.Available)return 1;try {Native.SetPerformanceMode(before.Selected);var after=Native.ReadPerformanceMode();bool same=after.Available&&before.Selected==after.Selected;AppLog.Json("power-mode-probe.json",new {passed=same,before=before,after=after});return same?0:1;}catch(Exception e){AppLog.Json("power-mode-probe.json",new {passed=false,error=e.Message,before=before});return 1;}}
             if(args.Contains("--launcher-probe"))return LauncherChecks.Probe();
+            if(args.Contains("--start-menu-probe"))return StartChecks.Run();
+            if(args.Contains("--start-key-probe"))return StartKeyChecks.Run();
+            if(args.Contains("--notification-ui-probe"))return BannerChecks.Run();
             if(args.Contains("--ui-probe"))return UiChecks.Run(args.Contains("--optimized")?"optimized":"baseline");
             if(args.Contains("--reference-probe"))return ReferenceChecks.Run();
             if(args.Contains("--osd-probe"))return OsdChecks.Run();
@@ -73,7 +78,7 @@ namespace OneTaskBar
             if(args.Contains("--diagnose")) return Diagnose();
             if(args.Contains("--desktop-probe")) return DesktopProbe();
             if(args.Contains("--tray-probe")) return DesktopProbe(true);
-            if(args.Contains("--recover")) {int index=Array.IndexOf(args,"--session");DesktopLease.Recover(index>=0&&index+1<args.Length?args[index+1]:null);NativeOsdGate.Recover();return 0;}
+            if(args.Contains("--recover")) {int index=Array.IndexOf(args,"--session");DesktopLease.Recover(index>=0&&index+1<args.Length?args[index+1]:null);NativeOsdGate.Recover();NativeToastGate.Recover();NativeNotificationRoute.Recover();return 0;}
             if(args.Contains("--guard-fixture")){Thread.Sleep(Timeout.Infinite);return 0;}
             if(args.Contains("--render")) return Render(args);
             if(NotificationIdentity.Bootstrap(args))return 0;
@@ -174,6 +179,7 @@ namespace OneTaskBar
                 var payload=NotificationPayload.Parse("<toast activationType='protocol' launch='https://example.invalid/post?id=12&amp;view=알림'><visual><binding template='ToastGeneric'><text>알림 제목</text><text>알림 내용</text></binding></visual></toast>",new[]{"알림 제목","알림 내용"});
                 if(payload==null||payload.Type!="protocol"||payload.Arguments!="https://example.invalid/post?id=12&view=알림")throw new Exception("Original notification launch arguments were changed");
                 if(NotificationPayload.Parse("<toast launch='other'><visual><binding template='ToastGeneric'><text>다른 알림</text></binding></visual></toast>",new[]{"알림 제목"})!=null)throw new Exception("Unrelated notification payload matched");
+                var rich=NotificationPayload.Parse("<toast launch='conversation=42'><visual><binding template='ToastGeneric'><text>메시지</text><group><subgroup><text>새로운 내용</text></subgroup></group></binding></visual></toast>",new[]{"메시지","새로운 내용"});if(rich==null||rich.Arguments!="conversation=42")throw new Exception("Adaptive notification launch payload was lost");
                 checks.Add("Notification activation retains original escaped/Unicode arguments and rejects unrelated content");
                 using(var audio=new AudioService()) { audio.Read(); checks.Add("Audio read: "+(audio.Available ? "available, value="+audio.Value+", muted="+audio.Muted : "no default device")); }
                 checks.Add("Brightness read: "+BrightnessService.Read());

@@ -19,6 +19,8 @@ Download **OneTaskBar-Setup.exe** from [Releases](https://github.com/Bundelldebu
 - Separate app and status capsules; original Windows/app icons, Windows system font, seconds on the clock, running indicators, and drag-to-reorder pins.
 - Rounded, antialiased surfaces using layered WPF alpha and a matching DirectComposition clip. Blur stays steady while app/search contents animate.
 - Compact app drawer and launcher search, capped at 720 × 680 DIP: apps, Windows settings, local files/images, Korean initial consonants, and removable recent searches. Type directly in the app drawer; active IME composition finishes before the transition.
+- A One UI Start menu precedes the app drawer: search, paged pinned apps, recent files, user/document folders, settings and lock/sleep/shutdown/restart. Start pins and their drag order are saved separately from dock pins; app context menus offer both choices. Dragged tiles follow the pointer while neighbors animate into place. “All apps” opens the existing drawer. The Start page is capped at 640 × 620 DIP and uses the same glass as quick settings.
+- In custom Start-key mode, a solo physical Windows press stays out of the native shell from key-down, avoiding the native dim/undim transition. Windows chords are replayed in modifier/key order; native Start-key mode remains available.
 - Independent choices for Windows/custom quick settings, notifications, keyboard Start, and search. Windows shortcuts continue to work with the solo Start-key option.
 - Touch panning and fractional touchpad scrolling; discrete wheel scrolling uses a short transition.
 - System volume, brightness where supported, radio/device controls, media transport and centered artwork, battery/power mode, and theme toggle.
@@ -43,6 +45,8 @@ The emergency shortcut is enabled by default and can be disabled in settings. It
 The standard EXE installer defaults to the **Windows notification center**, which works without package registration or notification-reading permission. The custom center contains notifications without a calendar.
 
 Open One TaskBar settings → Windows notification connection to register its optional local identity and request access inside the app. Windows may require a one-time administrator approval for registration and always controls notification consent. Existing registration is reused on normal launch and login. The identity is an **unsigned local-test package**, not a production-signed MSIX; it is optional and is not silently registered by Setup. See [notification setup and limits](docs/NOTIFICATIONS.md). Native Windows notifications remain available.
+
+With notification access allowed, **One UI notification popups** replaces supported Windows toast banners with up to three rounded glass cards. Popups do not take keyboard focus; closing a card keeps its notification in history. Actual Windows banner content is matched to fresh listener entries, so existing history and history-only updates are not replayed. Clicking uses the original Windows toast action, protocol or registered callback. Notifications without a direct route are matched against their native history card; an ambiguous/unavailable match opens the native center rather than launching the sender app with guessed arguments. The expiry timer stops when the stack is empty. This optional shell integration is Windows-build dependent; see the notification guide for fallback and recovery behavior.
 
 Samsung Settings / device-connection buttons use applications and logos already installed on the PC; those applications are not bundled. An optional, pre-existing Windhawk charging companion is paused while the dock owns the desktop and resumed on exit. Windhawk is not required for the dock or installed by Setup.
 
@@ -74,6 +78,15 @@ Interactive probes require an unlocked desktop and focus their own test windows.
 No telemetry, account, or background web service is required. Search runs locally. Preferences, recent queries, shell pin caches, and diagnostic logs stay in the data directory. The custom notification center accesses notification data only after Windows permission. An app or document you choose to open may use its own network services.
 
 Code and the original One TaskBar icon are under the [MIT license](LICENSE). [Third-party notices](THIRD_PARTY_NOTICES.txt) include the Liquid Dock reference. This repository contains no Samsung APK, extracted launcher artwork, wallpapers, fonts, or user screenshots/recordings. Installed third-party logos are read at runtime and remain their owners' property. This is an independent project and is not affiliated with Microsoft or Samsung. Open-source licensing does not guarantee that no third party will ever make a copyright or trademark complaint.
+
+## 8.5.2
+
+- Adds a compact One UI Start page with search, pinned apps, recent files, All apps and power controls. Start pins are independent of dock pins; drag to reorder them with animated movement and persistent positions.
+- Buffers solo Windows-key presses before the native shell sees them, avoiding its dim/undim flash while preserving Windows-key chords and the optional native Start mode.
+- Clips both Now bar native input regions to the visible capsule, restoring clicks above and beside it in collapsed and expanded states.
+- Adds optional One UI notification banners with no focus stealing. Actual native-toast matching preserves silent history updates, Do Not Disturb and per-app banner decisions.
+- Opens the original notification action through the native toast, protocol, registered callback or exact native history card. Missing or ambiguous matches reveal Windows notification history instead of merely launching the sender app.
+- Keeps cached input bounds, bounded background work and event-driven recovery. The final battery/media-active resource sample averaged 0.0517% main CPU and 0.0000% helper CPU; see validation for memory and measurement limits.
 
 ## 8.5.1
 

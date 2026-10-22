@@ -10,9 +10,21 @@ The normal EXE installation runs per user without elevation and defaults to the 
 4. One TaskBar relaunches under its own registered identity. Allow notification access in the Windows consent dialog. The app cannot grant this permission itself.
 5. Choose the custom notification center. Existing registration and access are reused on normal EXE/shortcut/login launches.
 
-The development PC was connected successfully, including receipt and removal of One TaskBar's own temporary test toast. Notification content is processed locally. Original protocol/callback payloads are retained when available; other entries open their source app.
+The development PC was connected successfully, including receipt and removal of One TaskBar's own temporary test toast. Notification content is processed locally. Native toast targets, original protocol arguments and registered callbacks are used when available. Other entries are matched to the original native history card; they do not silently fall back to a generic app launch.
 
 ## Limits and removal
+
+### One UI popup banners
+
+After connection, the **One UI notification popups** setting controls banners separately from the native/custom notification-center choice. The desktop dock must be active. Up to three cards appear without taking keyboard focus; hovering pauses expiry, and dismissing a card leaves the original notification in Windows history. Clicking uses the same original-notification activation path as the custom center.
+
+Clicking a live card first invokes its exact native toast view. After that view expires, current protocol/callback data is re-read on demand; adaptive nested toast text is supported. For UWP toast activations or unavailable payloads, One TaskBar asks Windows to invoke the corresponding history card, matching sender group, title and body. Collapsed groups can be expanded and virtualized entries realized. Duplicate matches are not guessed. The native center is temporarily masked during a matched activation and its original attributes are restored, with an owner-checked recovery lease for crashes. If the entry is unavailable or ambiguous, the native center is left visible so the user can choose the original notification. This avoids pretending that a generic app launch executed the notification action.
+
+The listener's first snapshot establishes a baseline. A fresh entry must also match the title and body of an actual Windows toast view before it is shown. This preserves history-only updates and Windows decisions about Do Not Disturb and per-app banners; the history API alone does not reliably preserve `SuppressPopup`. Lock/presentation/full-screen state is also checked. No notification policy or global banner registry setting is changed.
+
+The tested Windows 11 shell exposes the dedicated `ShellExperienceHost` toast window with the Korean “새 알림” title and a `NormalToastView` accessibility view. English “New notification” is also recognized. Only that dedicated host is temporarily made transparent and non-interactive; other shell windows are excluded. The original window attributes are restored when the feature is disabled, notification access fails, desktop mode exits, or the app closes. A persisted owner-checked lease lets the recovery helper restore them after a crash. An unreadable native toast view releases its mask. Other Windows builds, languages or notification implementations can retain their native banners; this does not replace security/lock-screen notices or every application's own custom popup window.
+
+No idle banner polling is added. Native events trigger bounded accessibility reads, notification differences are deduplicated in memory, and the card expiry timer runs only while cards exist. Failed payload lookups are retained between unchanged snapshots and retried when the user clicks; they are not repeated for every history item on every refresh. Recent-file enumeration for the Start menu is unrelated to notification access and runs only when that menu opens, with a 30-second cache.
 
 The optional identity is an **unsigned local-test package**, not a production-signed application package. Windows policies, editions and deployment settings may reject it; this is not a universal notification-installation guarantee. A signed production MSIX and signing certificate are not provided. Setup does not silently register it, add trusted certificates, enable Developer Mode or change machine security policies.
 

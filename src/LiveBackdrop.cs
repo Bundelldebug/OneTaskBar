@@ -37,6 +37,7 @@ namespace OneTaskBar
         readonly double radius;
         int width,height,corner,popupX=Int32.MinValue,popupY=Int32.MinValue;
         Native.RectI placedBounds;bool shown;Rect? lastClip;
+        Native.RectI? inputClip;
         internal LiveBackdrop(Window window,double radius)
         {
             this.window=window;this.radius=radius;
@@ -66,7 +67,7 @@ namespace OneTaskBar
             }
             // WPF owns its HWND's compositor target. Put the backdrop in a separate, non-input,
             // no-redirection HWND and make the transparent WPF window its owner-ordered overlay.
-            background=CreateWindowEx(0x00200000|0x08000000|0x80|0x20|(topmost?0x8:0),"static","One TaskBar · 블러",0x80000000,0,0,1,1,IntPtr.Zero,IntPtr.Zero,IntPtr.Zero,IntPtr.Zero);
+            background=CreateWindowEx(0x00200000|0x08000000|0x80|0x20|(topmost?0x8:0),"static","One TaskBar · 블러",0x88000000,0,0,1,1,IntPtr.Zero,IntPtr.Zero,IntPtr.Zero,IntPtr.Zero);
             if(background==IntPtr.Zero)throw new System.ComponentModel.Win32Exception();
             int host=1;DwmSetWindowAttribute(background,17,ref host,4);
             if(window!=null)new WindowInteropHelper(window).Owner=background;
@@ -96,6 +97,7 @@ namespace OneTaskBar
             popupX=bounds.Left;popupY=bounds.Top;lastClip=clip;
             if(w!=width||h!=height){var size=new Vector2(w,h);root.Size=size;blur.Size=size;}width=w;height=h;corner=c;
             double scale=Math.Max(96,Native.GetDpiForWindow(handle))/96.0;float cw=clip.HasValue?(float)(clip.Value.Width*scale):w,ch=clip.HasValue?(float)(clip.Value.Height*scale):h;
+            if(clip.HasValue){var boundsClip=Native.InputBounds(clip.Value,scale);if(!inputClip.HasValue||!inputClip.Value.Equals(boundsClip)){if(Native.ClipWindow(background,boundsClip))inputClip=boundsClip;}}
             shape.Offset=clip.HasValue?new Vector2((float)(clip.Value.X*scale),(float)(clip.Value.Y*scale)):Vector2.Zero;shape.Size=new Vector2(cw,ch);shape.CornerRadius=new Vector2(Math.Min(c,cw/2f),Math.Min(c,ch/2f));
             Sync();
         }

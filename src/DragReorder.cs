@@ -37,7 +37,7 @@ namespace OneTaskBar
                 if(!armed||Active||!enabled()||e.LeftButton!=MouseButtonState.Pressed)return;
                 Point now=e.GetPosition(handle);if(Math.Abs(now.X-origin.X)<SystemParameters.MinimumHorizontalDragDistance&&Math.Abs(now.Y-origin.Y)<SystemParameters.MinimumVerticalDragDistance)return;
                 armed=false;e.Handled=true;Mouse.Capture(null);active=new Session {Scope=scope,Key=key};double opacity=target.Opacity;DragGhost ghost=null;GiveFeedbackEventHandler feedback=null;
-                try {if(scope=="dock.apps"){ghost=new DragGhost(target);ghost.Show();ghost.Follow();feedback=(sender,args)=>{ghost.Follow();args.UseDefaultCursors=false;Mouse.SetCursor(Cursors.Arrow);args.Handled=true;};handle.GiveFeedback+=feedback;}target.Opacity=.28;StartedMoves++;if(DragDrop.DoDragDrop(handle,new DataObject(format,active.Id),DragDropEffects.Move)!=DragDropEffects.None)CompletedMoves++;}
+                try {if(scope=="dock.apps"||scope=="start.pins"){ghost=new DragGhost(target);ghost.Show();ghost.Follow();feedback=(sender,args)=>{ghost.Follow();args.UseDefaultCursors=false;Mouse.SetCursor(Cursors.Arrow);args.Handled=true;};handle.GiveFeedback+=feedback;}target.Opacity=.28;StartedMoves++;if(DragDrop.DoDragDrop(handle,new DataObject(format,active.Id),DragDropEffects.Move)!=DragDropEffects.None)CompletedMoves++;}
                 catch(Exception error){AppLog.Write("layout-drag",error.Message);}
                 finally {if(feedback!=null)handle.GiveFeedback-=feedback;if(ghost!=null)ghost.Close();Mouse.SetCursor(null);target.Opacity=opacity;ClearMark();active=null;var notify=Finished;if(notify!=null)notify();}
             };

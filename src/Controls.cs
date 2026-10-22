@@ -114,6 +114,9 @@ namespace OneTaskBar
             else if(kind=="headphones") {dc.DrawGeometry(null,pen,Geometry.Parse("M4,16 L4,10 A8,8 0 0 1 20,10 L20,16"));dc.DrawRoundedRectangle(brush,null,new Rect(2,12,5,9),2,2);dc.DrawRoundedRectangle(brush,null,new Rect(17,12,5,9),2,2);}
             else if(kind=="network"||kind=="network-off") {dc.DrawRoundedRectangle(null,pen,new Rect(3,3,18,12),2,2);line(12,15,12,21);line(7,21,17,21);if(kind=="network-off")line(3,22,22,2);}
             else if(kind=="chevron") { line(8,5,15,12); line(15,12,8,19); }
+            else if(kind=="back") {line(15,5,8,12);line(8,12,15,19);}
+            else if(kind=="user") {dc.DrawEllipse(null,pen,new Point(12,7),4,4);dc.DrawGeometry(null,pen,Geometry.Parse("M3,22 L3,20 A9,8 0 0 1 21,20 L21,22"));}
+            else if(kind=="folder") dc.DrawGeometry(null,pen,Geometry.Parse("M2,7 L2,4 Q2,2 4,2 L10,2 13,5 20,5 Q22,5 22,7 L22,20 Q22,22 20,22 L4,22 Q2,22 2,20 Z M2,9 L22,9"));
             else if(kind=="up") { line(5,15,12,8); line(12,8,19,15); }
             else if(kind=="close") {line(6,6,18,18);line(18,6,6,18);}
             else if(kind=="pin") {dc.DrawGeometry(null,pen,Geometry.Parse("M8,3 L16,3 15,10 19,14 5,14 9,10 Z M12,14 L12,22"));}

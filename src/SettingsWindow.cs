@@ -35,13 +35,14 @@ namespace OneTaskBar
             Group(groups,"데스크톱",desktopRows);
             var panels=new StackPanel();
             ChoiceRow(panels,"알림센터","시계와 알림 버튼에서 열 화면",Preferences.Current.NativeNotifications,v=>Preferences.Set(p=>p.NativeNotifications=v));
+            Row(panels,"One UI 알림 팝업","Windows 알림을 둥근 블러 카드로 표시합니다. 방해 금지와 앱별 배너 설정을 따릅니다",Preferences.Current.NotificationPopups,v=>Preferences.Set(p=>p.NotificationPopups=v));
             var notificationLink=Paint.Action("Windows 알림 연결 · 권한 관리",()=>shell.ShowNotificationConnection());notificationLink.HorizontalContentAlignment=HorizontalAlignment.Left;notificationLink.Margin=new Thickness(12,5,12,12);panels.Children.Add(notificationLink);
             ChoiceRow(panels,"빠른 설정","Wi-Fi·소리·배터리 버튼에서 열 화면",Preferences.Current.NativeQuickSettings,v=>Preferences.Set(p=>p.NativeQuickSettings=v));
             Row(panels,"슬라이더 스크롤 조절","밝기·음량·재생 위치 위에서 휠이나 트랙패드 스크롤로 값을 바꿉니다. 기본은 꺼짐입니다",Preferences.Current.QuickSliderScroll,v=>Preferences.Set(p=>p.QuickSliderScroll=v));
             Group(groups,"패널 선택",panels);
             var launcher=new StackPanel();
-            ChoiceRow(launcher,"독의 시작 버튼","버튼 모양과 눌렀을 때 열 화면",Preferences.Current.NativeStartButton,v=>Preferences.Set(p=>p.NativeStartButton=v),"앱 목록","Windows 시작");
-            ChoiceRow(launcher,"키보드 시작 키","Windows 키만 눌렀을 때 열 화면",Preferences.Current.NativeStartKey,v=>Preferences.Set(p=>p.NativeStartKey=v),"앱 화면","Windows 시작");
+            ChoiceRow(launcher,"독의 시작 버튼","버튼 모양과 눌렀을 때 열 화면",Preferences.Current.NativeStartButton,v=>Preferences.Set(p=>p.NativeStartButton=v),"One UI 시작","Windows 시작");
+            ChoiceRow(launcher,"키보드 시작 키","Windows 키만 눌렀을 때 열 화면",Preferences.Current.NativeStartKey,v=>Preferences.Set(p=>p.NativeStartKey=v),"One UI 시작","Windows 시작");
             ChoiceRow(launcher,"검색 버튼","독과 앱 화면의 검색 버튼에서 열 화면",Preferences.Current.NativeSearch,v=>Preferences.Set(p=>p.NativeSearch=v),"런처 검색","Windows 검색");
             Group(groups,"시작과 검색",launcher);
             var safety=new StackPanel();Row(safety,"긴급 종료 단축키","Ctrl + Shift + Tab + 1 · One TaskBar 종료 및 Windows 작업표시줄 복원",Preferences.Current.EmergencyExit,v=>Preferences.Set(p=>p.EmergencyExit=v));Group(groups,"복구",safety);

@@ -14,7 +14,7 @@ namespace OneTaskBar
 {
     internal sealed class NotificationEntry
     {
-        internal uint Id;internal string App,AppId,Title,Body;internal DateTimeOffset Created;internal ImageSource Icon;internal NotificationPayload Payload;internal Guid Activator;
+        internal uint Id;internal string App,AppId,Title,Body;internal DateTimeOffset Created;internal ImageSource Icon;internal NotificationPayload Payload;internal Guid Activator;internal IntPtr NativeWindow;internal string NativeSignature;
     }
     internal sealed class NotificationService : IDisposable
     {
@@ -28,7 +28,7 @@ namespace OneTaskBar
         readonly Dictionary<string,ImageSource> icons=new Dictionary<string,ImageSource>(StringComparer.OrdinalIgnoreCase);
         readonly Dictionary<string,Guid> activators=new Dictionary<string,Guid>(StringComparer.OrdinalIgnoreCase);
         bool reading,subscribed,disposed;int dirty=1;DateTime nextRead;
-        internal int SnapshotReads;internal bool Interactive;internal Action Updated;
+        internal int SnapshotReads;internal bool Interactive;internal Action Updated;internal Action<List<NotificationEntry>> SnapshotReady;
         void Changed(UserNotificationListener sender,UserNotificationChangedEventArgs args){Interlocked.Exchange(ref dirty,1);var updated=Updated;if(!disposed&&updated!=null)updated();}
         public void Dispose(){disposed=true;if(subscribed&&listener!=null)try{listener.NotificationChanged-=Changed;}catch{}subscribed=false;}
         internal void Invalidate(){Interlocked.Exchange(ref dirty,1);}
@@ -62,11 +62,12 @@ namespace OneTaskBar
                     if(!icons.TryGetValue(appId,out icon)){icon=await Logo(item.AppInfo);icons[appId]=icon;}
                     Guid activator;if(!activators.TryGetValue(appId,out activator)){activator=NotificationActivation.Callback(appId);activators[appId]=activator;}
                     var previous=Items.FirstOrDefault(n=>n.Id==item.Id&&n.AppId==appId&&n.Title==(text.FirstOrDefault()??"알림")&&n.Body==String.Join("\n",text.Skip(1)));
-                    result.Add(new NotificationEntry {Id=item.Id,App=item.AppInfo.DisplayInfo.DisplayName,AppId=item.AppInfo.AppUserModelId,Icon=icon,Created=item.CreationTime,Title=text.FirstOrDefault()??"알림",Body=String.Join("\n",text.Skip(1)),Payload=previous!=null&&previous.Payload!=null?previous.Payload:NotificationPayload.Read(appId,text),Activator=activator});
+                    result.Add(new NotificationEntry {Id=item.Id,App=item.AppInfo.DisplayInfo.DisplayName,AppId=item.AppInfo.AppUserModelId,Icon=icon,Created=item.CreationTime,Title=text.FirstOrDefault()??"알림",Body=String.Join("\n",text.Skip(1)),Payload=previous!=null?previous.Payload:NotificationPayload.Read(appId,text),Activator=activator,NativeWindow=previous!=null?previous.NativeWindow:IntPtr.Zero,NativeSignature=previous!=null?previous.NativeSignature:null});
                     }catch(Exception error){AppLog.Once("notification-item",error.Message);}
                 }
                 Items=result.OrderByDescending(n=>n.Created).ToList();
-            }catch(Exception e){AppLog.Once("notification-read",e.Message);Status="Windows 알림을 읽지 못했습니다";}finally{reading=false;}
+                var ready=SnapshotReady;if(!disposed&&ready!=null)ready(Items);
+            }catch(Exception e){Allowed=false;AppLog.Once("notification-read",e.Message);Status="Windows 알림을 읽지 못했습니다";}finally{reading=false;}
         }
         static async Task<ImageSource> Logo(Windows.ApplicationModel.AppInfo app)
         {

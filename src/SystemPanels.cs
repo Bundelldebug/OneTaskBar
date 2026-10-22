@@ -35,20 +35,25 @@ namespace OneTaskBar
         {var inputs=new System.Collections.Generic.List<Input>();foreach(char c in text){var down=Key(0,4);var data=down.Data;var keyboard=data.Keyboard;keyboard.Scan=c;data.Keyboard=keyboard;down.Data=data;var up=down;data=up.Data;keyboard=data.Keyboard;keyboard.Flags=6;data.Keyboard=keyboard;up.Data=data;inputs.Add(down);inputs.Add(up);}return SendInput((uint)inputs.Count,inputs.ToArray(),Marshal.SizeOf(typeof(Input)))==inputs.Count;}
         internal static void CloseSearchProbe()
         {uint pid;Native.GetWindowThreadProcessId(Native.GetForegroundWindow(),out pid);try{using(var process=System.Diagnostics.Process.GetProcessById((int)pid)){if(process.ProcessName!="SearchHost"&&process.ProcessName!="SearchApp"&&process.ProcessName!="SearchUI")return;var inputs=new[]{Key(0x1b,0),Key(0x1b,2)};SendInput(2,inputs,Marshal.SizeOf(typeof(Input)));}}catch{}}
-        internal static bool ProbeStartTap()
+        internal static bool ProbeStartTap(ushort win=0x5b)
         {
-            if(ModifiersHeld())return false;var inputs=new[]{Key(0x5b,1),Key(0x5b,3)};
+            if(ModifiersHeld())return false;var inputs=new[]{Key(win,1),Key(win,3)};
             for(int i=0;i<inputs.Length;i++){var data=inputs[i].Data;var keyboard=data.Keyboard;keyboard.Extra=new UIntPtr(InputMarker+1);data.Keyboard=keyboard;inputs[i].Data=data;}
             return SendInput(2,inputs,Marshal.SizeOf(typeof(Input)))==2;
         }
-        internal static bool FinishStartKey(ushort key)
+        static Input ProbeKey(ushort key,uint flags){var input=Key(key,flags);var data=input.Data;var keyboard=data.Keyboard;keyboard.Extra=new UIntPtr(InputMarker+1);data.Keyboard=keyboard;input.Data=data;return input;}
+        internal static bool ProbeStartChord(bool shift=false)
         {
-            // Explorer has seen Win-down. A neutral F24 chord cancels its solo-key Start action,
-            // then the same physical Win release is replayed. Win+letter chords never enter here.
-            var inputs=new[]{Key(0x87,0),Key(0x87,2),Key(key,3)};
-            uint sent=SendInput(3,inputs,Marshal.SizeOf(typeof(Input)));
-            if(sent<3)SendInput(1,new[]{Key(key,3)},Marshal.SizeOf(typeof(Input)));
-            return sent==3;
+            if(ModifiersHeld())return false;bool sent=SendInput(1,new[]{ProbeKey(0x5b,1)},Marshal.SizeOf(typeof(Input)))==1;Thread.Sleep(65);
+            if(shift){sent&=SendInput(1,new[]{ProbeKey(0x10,0)},Marshal.SizeOf(typeof(Input)))==1;Thread.Sleep(40);}sent&=SendInput(1,new[]{ProbeKey(0x87,0)},Marshal.SizeOf(typeof(Input)))==1;Thread.Sleep(60);
+            var release=shift?new[]{ProbeKey(0x87,2),ProbeKey(0x10,2),ProbeKey(0x5b,3)}:new[]{ProbeKey(0x87,2),ProbeKey(0x5b,3)};sent&=SendInput((uint)release.Length,release,Marshal.SizeOf(typeof(Input)))==release.Length;return sent;
+        }
+        internal static bool ForwardStartChord(ushort win,ushort key,ushort scan,uint hookFlags)
+        {
+            // Replay the buffered modifier and the first chord key as one ordered batch.
+            // Letting the physical chord key pass first could type it before Windows sees Win.
+            uint flags=(hookFlags&1)!=0?1u:0u;var next=scan!=0?Scan(scan,flags):Key(key,flags);var inputs=new[]{Key(win,1),next};uint sent=SendInput(2,inputs,Marshal.SizeOf(typeof(Input)));
+            if(sent>0&&sent<2)SendInput(1,new[]{Key(win,3)},Marshal.SizeOf(typeof(Input)));return sent==2;
         }
         static bool Shortcut(ushort letter)
         {
