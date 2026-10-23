@@ -16,7 +16,7 @@ namespace OneTaskBar
         readonly ShellController shell;
         bool releasing;
         internal void ReleaseIdle(){releasing=true;Close();}
-        readonly ToggleSwitch desktop,startup;
+        readonly ToggleSwitch desktop,startup,autoHide;
         readonly TextBlock status=Paint.TextBlock("변경한 설정은 바로 적용되고 다음 실행에도 유지됩니다",11,Paint.Muted);
         internal readonly BatteryPill PreviewBattery=new BatteryPill {Width=56,Height=24,ExpandedWidth=90};
         internal WelcomeWindow(ShellController controller)
@@ -33,6 +33,7 @@ namespace OneTaskBar
             var quick=Paint.Action("빠른 설정",()=>shell.ToggleQuick(null));quick.HorizontalAlignment=HorizontalAlignment.Left;actions.Children.Add(quick);footer.Children.Add(actions);DockPanel.SetDock(footer,Dock.Bottom);root.Children.Add(footer);
             var groups=new StackPanel();
             var desktopRows=new StackPanel();desktop=Row(desktopRows,"Windows 작업표시줄 대체","기본 작업표시줄과 전환합니다",shell.Desktop,v=> {shell.SetDesktop(v);Show();Activate();});
+            autoHide=Row(desktopRows,"작업표시줄 자동 숨기기","Windows 설정과 함께 적용됩니다. 화면 아래쪽에 커서를 대면 다시 표시합니다",shell.Demo?shell.DockAutoHide:Native.TaskbarAutoHide(),v=>shell.SetAutoHide(v));
             startup=Row(desktopRows,"로그인 시 자동 시작","Windows 로그인 후 One TaskBar을 실행합니다",StartupPreference.Enabled,v=> {try{StartupPreference.Set(v);status.Text=v?"로그인 자동 시작을 켰습니다":"로그인 자동 시작을 껐습니다";}catch(Exception e){status.Text="자동 시작 설정을 저장하지 못했습니다: "+e.Message;}});
             Group(groups,"데스크톱",desktopRows);
             var panels=new StackPanel();
@@ -95,6 +96,7 @@ namespace OneTaskBar
             var labels=new StackPanel {VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,14,0)};labels.Children.Add(Paint.TextBlock(title,14,Paint.Text));var detail=Paint.TextBlock(description,11,Paint.Muted);detail.Margin=new Thickness(0,3,0,0);detail.TextWrapping=TextWrapping.Wrap;labels.Children.Add(detail);grid.Children.Add(labels);
             var toggle=new ToggleSwitch(title,value,changed) {HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Center};Grid.SetColumn(toggle,1);grid.Children.Add(toggle);parent.Children.Add(grid);return toggle;
         }
-        internal void UpdateMode(){desktop.Refresh(shell.Desktop);startup.Refresh(StartupPreference.Enabled);}
+        internal void UpdateAutoHide(bool value){autoHide.Refresh(value);}
+        internal void UpdateMode(){desktop.Refresh(shell.Desktop);startup.Refresh(StartupPreference.Enabled);UpdateAutoHide(shell.Demo?shell.DockAutoHide:Native.TaskbarAutoHide());}
     }
 }

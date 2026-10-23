@@ -97,12 +97,31 @@ namespace OneTaskBar
         internal static RectI InputBounds(Rect clip,double scale){return new RectI {Left=Math.Max(0,(int)Math.Floor(clip.Left*scale)-1),Top=Math.Max(0,(int)Math.Floor(clip.Top*scale)-1),Right=(int)Math.Ceiling(clip.Right*scale)+1,Bottom=(int)Math.Ceiling(clip.Bottom*scale)+1};}
         internal static bool ClipWindow(IntPtr window,RectI bounds){var region=CreateRectRgn(bounds.Left,bounds.Top,bounds.Right,bounds.Bottom);if(SetWindowRgn(window,region,true)!=0)return true;DeleteObject(region);return false;}
         internal static void EnableBlur(Window window,bool enabled){RegionState state;if(regions.TryGetValue(window,out state)&&state.Backdrop!=null)state.Backdrop.Enable(enabled);}
+        internal static double PrepareMonitor(Window window,System.Drawing.Rectangle screen)
+        {
+            var handle=new WindowInteropHelper(window).EnsureHandle();var monitor=MonitorFromPoint(new PointI {X=screen.Left+screen.Width/2,Y=screen.Top+screen.Height/2},2);
+            if(MonitorFromWindow(handle,2)!=monitor)return SeedMonitor(window,screen);
+            return Math.Max(96,GetDpiForWindow(handle))/96.0;
+        }
+        internal static double SeedMonitor(Window window,System.Drawing.Rectangle screen)
+        {
+            var handle=new WindowInteropHelper(window).EnsureHandle();double width=window.Width,height=window.Height;
+            try{
+                // Read destination DPI with the HWND wholly inside that monitor.
+                // A wide HWND can otherwise retain the old/third monitor's scale.
+                SetWindowPos(handle,IntPtr.Zero,screen.Left+screen.Width/2,screen.Top+screen.Height/2,1,1,0x4|0x8|0x10);
+                return Math.Max(96,GetDpiForWindow(handle))/96.0;
+            }finally{if(!window.Width.Equals(width))window.Width=width;if(!window.Height.Equals(height))window.Height=height;}
+        }
+        internal static RectI PlacementBounds(System.Drawing.Rectangle screen,double scale,double x,double y,double width,double height)
+        {
+            int left=screen.Left+(int)Math.Round(x*scale),top=screen.Top+(int)Math.Round(y*scale);return new RectI {Left=left,Top=top,Right=left+(int)Math.Round(width*scale),Bottom=top+(int)Math.Round(height*scale)};
+        }
         internal static void Place(Window window, System.Drawing.Rectangle screen, double x, double y, double w, double h)
         {
             var handle = new WindowInteropHelper(window).EnsureHandle();
-            double scale = Math.Max(96, GetDpiForWindow(handle)) / 96.0;
-            SetWindowPos(handle, new IntPtr(-1), screen.Left+(int)Math.Round(x*scale),
-                screen.Top+(int)Math.Round(y*scale), (int)Math.Round(w*scale), (int)Math.Round(h*scale), 0x10);
+            double scale=PrepareMonitor(window,screen);var bounds=PlacementBounds(screen,scale,x,y,w,h);
+            SetWindowPos(handle,new IntPtr(-1),bounds.Left,bounds.Top,bounds.Right-bounds.Left,bounds.Bottom-bounds.Top,0x10);
         }
         internal static object RegionInfo(Window window)
         {

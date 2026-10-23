@@ -38,18 +38,23 @@ namespace OneTaskBar
         readonly System.Windows.Threading.DispatcherTimer resizeTimer=new System.Windows.Threading.DispatcherTimer(System.Windows.Threading.DispatcherPriority.Render){Interval=TimeSpan.FromMilliseconds(16)};
         readonly Stopwatch resizeWatch=new Stopwatch();
         double currentX,currentWidth,currentY,currentStartX,fromX,fromWidth,fromY,fromStartX,resizeDelay;DockLayout targetLayout;bool placed;
-        bool visible=true;
+        bool visible=true,ready;
+        bool autoHide,fullScreen;DockRevealEdge revealEdge;
+        readonly System.Windows.Threading.DispatcherTimer hideDelay=new System.Windows.Threading.DispatcherTimer {Interval=TimeSpan.FromMilliseconds(600)};
+        internal bool DockVisible {get{return visible;}}internal bool EdgeVisible {get{return revealEdge!=null&&revealEdge.Visible;}}
         IntPtr pressedForeground;
         bool closed;internal NowBar MediaBar {get;private set;}
         internal DockHost(ShellController shell,Forms.Screen screen)
         {
             controller=shell; Screen=screen;
+            hideDelay.Tick+=(s,e)=>CompleteAutoHide(InUse());
             pinDivider.RenderTransform=dividerOffset;Canvas.SetTop(pinDivider,9);Panel.SetZIndex(pinDivider,2);appCanvas.Children.Add(pinDivider);DragReorder.DropArea(appCanvas,"dock.apps",()=>!closed,(key,point)=>controller.MoveDockGroup(key,point.X<dividerX),(key,point)=>PreviewGroup(key,point.X<dividerX));DragReorder.Finished+=EndDragPreview;
             var search=Paint.Button(new Glyph("search",20){Color=Paint.Ink},()=>controller.ToggleSearch(this),"검색");search.Padding=new Thickness(0);search.Background=Brushes.Transparent;search.Width=42;search.Height=42;Canvas.SetLeft(search,10);appCanvas.Children.Add(search);Apps.Surface.Child=appCanvas;
             var desktops=Paint.Button(new Glyph("desktops",19){Color=Paint.Ink},()=>controller.OpenTaskView(),"데스크톱 전환 · 작업 보기");TaskViewButton=desktops;desktops.Padding=new Thickness(0);desktops.Background=Brushes.Transparent;desktops.Width=desktops.Height=42;Canvas.SetLeft(desktops,52);appCanvas.Children.Add(desktops);
             resizeTimer.Tick+=(sender,args)=>ResizeFrame();
 
             foreach(var w in new GlassWindow[] {Start,Apps,Status}) {
+                w.MouseEnter+=(s,e)=>hideDelay.Stop();w.MouseLeave+=(s,e)=>QueueHide();
                 w.SoftCorners=true;w.Dark=false; w.ShowActivated=false; w.Radius=22; w.Surface.CornerRadius=new CornerRadius(22); w.Surface.Background=LightPanel.DockGlass;w.Surface.BorderBrush=Brushes.Transparent;w.Surface.BorderThickness=new Thickness(0);
                 w.SourceInitialized+=(s,e)=> {
                     var h=new WindowInteropHelper((Window)s).Handle;
@@ -95,10 +100,8 @@ namespace OneTaskBar
         }
         internal void Show()
         {
-            new WindowInteropHelper(Apps).EnsureHandle();
-            Native.SetWindowPos(new WindowInteropHelper(Apps).Handle,IntPtr.Zero,Screen.Bounds.Left+12,Screen.Bounds.Top+12,0,0,0x1|0x4|0x10);
-            Scale=Math.Max(96,Native.GetDpiForWindow(new WindowInteropHelper(Apps).Handle))/96.0;
-            placed=false;Rebuild();
+            Scale=Native.PrepareMonitor(Apps,Screen.Bounds);Native.PrepareMonitor(Start,Screen.Bounds);Native.PrepareMonitor(Status,Screen.Bounds);
+            ready=true;placed=false;Rebuild();
         }
         internal void Rebuild()
         {
@@ -121,7 +124,7 @@ namespace OneTaskBar
                     if(animate){cell.Offset.BeginAnimation(TranslateTransform.XProperty,Motion.PanelTween(oldX-x,0,330));if(added||returning){cell.Offset.BeginAnimation(TranslateTransform.YProperty,Motion.PanelTween(6,0,330));var enter=new DoubleAnimationUsingKeyFrames {Duration=TimeSpan.FromMilliseconds(330),FillBehavior=FillBehavior.Stop};enter.KeyFrames.Add(new LinearDoubleKeyFrame(0,KeyTime.FromTimeSpan(TimeSpan.Zero)));enter.KeyFrames.Add(new LinearDoubleKeyFrame(0,KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(65))));enter.KeyFrames.Add(new SplineDoubleKeyFrame(1,KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(280)),new KeySpline(.2,.7,.2,1)));cell.Button.BeginAnimation(UIElement.OpacityProperty,null);cell.Button.Opacity=1;cell.Button.BeginAnimation(UIElement.OpacityProperty,enter);}}else{cell.Button.BeginAnimation(UIElement.OpacityProperty,null);cell.Button.Opacity=1;}}
                 cell.Dot.Visibility=entry.Windows.Count>0&&Preferences.Current.RunningDots?Visibility.Visible:Visibility.Collapsed;foreach(var window in entry.Windows)indicators[window]=cell.Dot;
             }
-            if(controller.Desktop)ResizeTo(layout,animate);UpdateActive(controller.LastApplication);
+            if(controller.Desktop&&ready)ResizeTo(layout,animate);UpdateActive(controller.LastApplication);
         }
         DockCell CreateCell(AppEntry entry)
         {
@@ -148,7 +151,7 @@ namespace OneTaskBar
         internal void EndDragPreview(){if(closed||dragPreview==null)return;dragPreview=null;resetPreview=true;Rebuild();resetPreview=false;}
         void ResizeTo(DockLayout layout,bool animate)
         {
-            Status.ShowAt(Screen.Bounds,layout.StatusX,layout.Y,layout.StatusWidth,44);
+            if(visible)Status.ShowAt(Screen.Bounds,layout.StatusX,layout.Y,layout.StatusWidth,44);else{Status.Width=layout.StatusWidth;Status.Height=44;Native.Place(Status,Screen.Bounds,layout.StatusX,layout.Y,layout.StatusWidth,44);}
             if(!placed){placed=true;targetLayout=layout;currentX=layout.AppX;currentWidth=layout.AppWidth;currentY=layout.Y;currentStartX=layout.StartX;Start.ShowAt(Screen.Bounds,currentStartX,currentY+2,40,40);Apps.ShowAt(Screen.Bounds,currentX,currentY,currentWidth,44);return;}
             if(resizeTimer.IsEnabled&&targetLayout!=null&&Math.Abs(targetLayout.AppX-layout.AppX)<.01&&Math.Abs(targetLayout.AppWidth-layout.AppWidth)<.01&&Math.Abs(targetLayout.Y-layout.Y)<.01)return;
             targetLayout=layout;resizeTimer.Stop();
@@ -169,7 +172,29 @@ namespace OneTaskBar
         internal Button AppButton(string key){DockCell cell;return cells.TryGetValue(key,out cell)?cell.Button:null;}
         internal double PinBoundary {get{return dividerX;}}
         internal void UpdateActive(IntPtr active) {Border selected;indicators.TryGetValue(active,out selected);foreach(var dot in indicators.Values.Distinct()){bool current=dot==selected;dot.Width=current?12:4;dot.Background=current?Brushes.Black:Paint.Brush("#AF262C2A");}}
-        internal void SetVisible(bool value) {if(closed||visible==value)return;visible=value;foreach(var w in new[]{Start,Apps,Status}) {if(value)w.Show();else w.Hide();}}
+        internal void SetVisible(bool value)
+        {
+            if(closed||visible==value)return;visible=value;
+            // Fullscreen/capture can reverse before a popup fade finishes.
+            foreach(var w in new[]{Start,Apps,Status}){if(value)w.Show();else w.HideImmediately();}
+        }
+        bool InUse(){return DragReorder.Active||Start.IsMouseOver||Apps.IsMouseOver||Status.IsMouseOver||(Start.ContextMenu!=null&&Start.ContextMenu.IsOpen)||cells.Values.Any(c=>c.Button.ContextMenu!=null&&c.Button.ContextMenu.IsOpen)||controller.DockInUse(this);}
+        internal void CompleteAutoHide(bool interacting){hideDelay.Stop();if(autoHide&&!fullScreen&&!interacting){SetVisible(false);if(revealEdge!=null)revealEdge.Show(true);}}
+        internal IntPtr RevealHandle {get{return revealEdge!=null?revealEdge.Handle:IntPtr.Zero;}}
+        void QueueHide(){if(autoHide&&!fullScreen&&visible&&!hideDelay.IsEnabled&&!InUse())hideDelay.Start();}
+        internal void Reveal()
+        {
+            if(closed||!autoHide||fullScreen||!controller.DisplayAwake)return;if(revealEdge!=null)revealEdge.Show(false);SetVisible(true);Refresh(controller.Power);QueueHide();
+        }
+        internal void UpdateVisibility(bool obscured,bool automatic)
+        {
+            if(closed)return;fullScreen=obscured;autoHide=automatic;
+            if(!autoHide&&revealEdge!=null){revealEdge.Dispose();revealEdge=null;}
+            if(fullScreen){hideDelay.Stop();SetVisible(false);if(revealEdge!=null)revealEdge.Show(false);return;}
+            if(!autoHide){hideDelay.Stop();SetVisible(true);return;}
+            if(revealEdge==null)revealEdge=new DockRevealEdge(Screen.Bounds,Reveal);
+            revealEdge.Show(!visible);QueueHide();
+        }
         internal void Refresh(PowerState state)
         {
             if(closed) return;
@@ -196,8 +221,8 @@ namespace OneTaskBar
             // PointToScreen already returns physical pixels under per-monitor DPI awareness.
             return new TrayPlacement(trayAccess.PointToScreen(new Point(trayAccess.ActualWidth/2,0)),Screen.Bounds,Scale);
         }
-        internal object Inspect() {return new {scale=Scale,apps=Native.RegionInfo(Apps),start=Native.RegionInfo(Start),status=Native.RegionInfo(Status),blur=Apps.HasBlur&&Status.HasBlur,nowBar=MediaBar!=null?Native.RegionInfo(MediaBar):null};}
-        internal void Close() { if(closed) return; closed=true;DragReorder.Finished-=EndDragPreview;resizeTimer.Stop();if(MediaBar!=null)MediaBar.Close();cells.Clear(); Start.Close(); Apps.Close(); Status.Close(); }
+        internal object Inspect() {return new {scale=Scale,visible=visible,autoHide=autoHide,revealEdge=EdgeVisible,apps=Native.RegionInfo(Apps),start=Native.RegionInfo(Start),status=Native.RegionInfo(Status),blur=Apps.HasBlur&&Status.HasBlur,nowBar=MediaBar!=null?Native.RegionInfo(MediaBar):null};}
+        internal void Close() { if(closed) return; closed=true;DragReorder.Finished-=EndDragPreview;resizeTimer.Stop();hideDelay.Stop();if(revealEdge!=null){revealEdge.Dispose();revealEdge=null;}if(MediaBar!=null)MediaBar.Close();cells.Clear(); Start.Close(); Apps.Close(); Status.Close(); }
     }
     internal sealed class HudWindow : GlassWindow
     {

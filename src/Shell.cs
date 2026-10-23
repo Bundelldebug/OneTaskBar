@@ -92,6 +92,7 @@ namespace OneTaskBar
         double lastAppRefreshMs;
         DateTime servicesAt;
         DateTime releaseAt;internal int RetiredPanels;
+        DateTime autoHideAt;internal bool DockAutoHide;
         IntPtr lastForeground;
         internal IntPtr LastApplication;
         internal DateTime FocusUntil;
@@ -219,7 +220,8 @@ namespace OneTaskBar
             foreach(var animation in charges)animation.Close();charges.Clear();
             foreach(var reservation in reservations) reservation.Dispose(); reservations.Clear();
             foreach(var dock in docks) dock.Close(); docks.Clear();
-            foreach(var screen in Forms.Screen.AllScreens) { var dock=new DockHost(this,screen); docks.Add(dock); dock.Show(); reservations.Add(new AppBarReservation(screen,dock.Scale)); }
+            SyncAutoHide(true);
+            foreach(var screen in Forms.Screen.AllScreens) { var dock=new DockHost(this,screen);docks.Add(dock);dock.Show();reservations.Add(new AppBarReservation(screen,dock.Scale,DockAutoHide,TaskbarOptionsChanged));dock.UpdateVisibility(Native.IsFullScreen(screen),DockAutoHide);}
             trayDock=trayMonitor==null?null:docks.FirstOrDefault(d=>d.Screen.DeviceName==trayMonitor)??docks.FirstOrDefault();
             if(StartMenu!=null)StartMenu.HideImmediately();if(Quick!=null) Quick.Hide(); if(Drawer!=null) Drawer.Hide();if(Finder!=null)Finder.HideImmediately();if(Center!=null)Center.Hide();if(Detail!=null)Detail.Hide();
         }
@@ -245,6 +247,7 @@ namespace OneTaskBar
         void OptionsChanged()
         {
             if(disposed)return;
+            SyncAutoHide(true);
             Notifications.Check();Banners.Refresh();
             Services.ArtworkModeChanged();
             if(!Preferences.Current.ChargeSoundEnabled)ConnectionSound.Dispose();
@@ -474,7 +477,7 @@ namespace OneTaskBar
             if(Desktop)ExplorerBridge.KeepTrayPosition(trayDock!=null?trayDock.TrayAnchor():null);
             var foreground=Native.GetForegroundWindow(); uint foregroundPid; Native.GetWindowThreadProcessId(foreground,out foregroundPid);
             if(foregroundPid!=ownPid) LastApplication=foreground;
-            if(Desktop) foreach(var dock in docks) {dock.SetVisible(!Native.IsFullScreen(dock.Screen)); if(foreground!=lastForeground) dock.UpdateActive(LastApplication);}
+            if(Desktop){SyncAutoHide(false);foreach(var dock in docks){dock.UpdateVisibility(Native.IsFullScreen(dock.Screen),DockAutoHide);if(foreground!=lastForeground)dock.UpdateActive(LastApplication);}}
             lastForeground=foreground;
             bool battery=Power.Known&&!Power.Connected;double cadence=RuntimeCadence.Pulse(Desktop,battery,interactive,docks.Count>0&&docks.All(d=>!d.Apps.IsVisible),true);if(timer.Interval.TotalMilliseconds!=cadence)timer.Interval=TimeSpan.FromMilliseconds(cadence);
             if(Welcome!=null&&Welcome.IsVisible)Welcome.PreviewBattery.Update(Power);
@@ -532,8 +535,23 @@ namespace OneTaskBar
         }
         internal static double MonitorScale(Forms.Screen screen,Window window)
         {
-            var h=new WindowInteropHelper(window).EnsureHandle(); Native.SetWindowPos(h,IntPtr.Zero,screen.Bounds.Left+12,screen.Bounds.Top+12,0,0,0x1|0x4|0x10);
-            return Math.Max(96,Native.GetDpiForWindow(h))/96.0;
+            return Native.PrepareMonitor(window,screen.Bounds);
+        }
+        void TaskbarOptionsChanged(){autoHideAt=DateTime.MinValue;Wake();}
+        void SyncAutoHide(bool force)
+        {
+            if(Demo||disposed||!force&&DateTime.UtcNow<autoHideAt)return;autoHideAt=DateTime.UtcNow.AddSeconds(2);bool next=Native.TaskbarAutoHide();if(!force&&next==DockAutoHide)return;DockAutoHide=next;foreach(var item in reservations)item.SetAutoHide(next);if(Welcome!=null)Welcome.UpdateAutoHide(next);
+        }
+        internal void SetAutoHide(bool value)
+        {
+            if(Demo)DockAutoHide=value;else{Native.SetTaskbarAutoHide(value);SyncAutoHide(true);}foreach(var dock in docks)dock.UpdateVisibility(Native.IsFullScreen(dock.Screen),DockAutoHide);
+        }
+        internal bool DockInUse(DockHost dock)
+        {
+            if((trayBusy||nativePanelBusy)&&trayDock==dock||dock.MediaBar!=null&&dock.MediaBar.Expanded)return true;
+            foreach(var panel in new Window[]{Quick,Center,Detail,Drawer,Finder,StartMenu,Welcome,NotificationLink,Previews.Popup}){
+                if(panel==null||!panel.IsVisible)continue;Native.RectI rect;if(Native.GetWindowRect(new WindowInteropHelper(panel).Handle,out rect)&&dock.Screen.Bounds.Contains((rect.Left+rect.Right)/2,(rect.Top+rect.Bottom)/2))return true;
+            }return false;
         }
         internal void ShowHud(string kind,double value,bool muted)
         {

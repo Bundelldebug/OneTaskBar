@@ -7,6 +7,8 @@ namespace OneTaskBar
     internal static class TaskbarMask
     {
         internal static volatile bool Active;
+        internal static volatile bool TransientState;
+        internal static bool SavedAutoHide;
         internal static readonly object Gate=new object();
         const string State="OneTaskBar.TaskbarMask.v1",Color="OneTaskBar.TaskbarMaskColor.v1";
         const int Marker=1<<16,WasLayered=1<<17,WasTransparent=1<<18,Layered=0x80000,Transparent=0x20;

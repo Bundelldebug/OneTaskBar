@@ -31,6 +31,7 @@ namespace OneTaskBar
         [DllImport("ole32.dll")] static extern int PropVariantClear(ref Variant value);
         [DllImport("shell32.dll")] internal static extern UIntPtr SHAppBarMessage(uint message,ref AppBarData data);
         [DllImport("user32.dll")] static extern IntPtr MonitorFromPoint(PointI point,uint flags);
+        [DllImport("user32.dll")] static extern IntPtr MonitorFromWindow(IntPtr window,uint flags);
         [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern bool GetMonitorInfo(IntPtr monitor,ref MonitorData data);
         [StructLayout(LayoutKind.Sequential)] struct MonitorData {public int Size;public RectI Monitor,Work;public uint Flags;}
         [StructLayout(LayoutKind.Sequential)] internal struct AppBarData { public uint Size; public IntPtr Window; public uint Callback,Edge; public RectI Rect; public IntPtr Param; }
@@ -102,11 +103,15 @@ namespace OneTaskBar
         internal static bool IsFullScreen(Forms.Screen screen)
         {
             var h=GetForegroundWindow(); uint pid; GetWindowThreadProcessId(h,out pid);
-            if(pid==Process.GetCurrentProcess().Id || IsIconic(h)) return false;
+            if(pid==Process.GetCurrentProcess().Id||!IsWindowVisible(h)||IsIconic(h))return false;
             var name=new StringBuilder(100); GetClassName(h,name,100); if(name.ToString()=="Progman" || name.ToString()=="WorkerW" || name.ToString().StartsWith("Shell_")) return false;
-            RectI r; if(!GetWindowRect(h,out r)) return false; var b=screen.Bounds;
-            return r.Left<=b.Left && r.Top<=b.Top && r.Right>=b.Right && r.Bottom>=b.Bottom;
+            RectI r; if(!GetWindowRect(h,out r)) return false;
+            return CoversMonitor(r,screen.Bounds,IsZoomed(h),(GetWindowLong(h,-16)&0xC40000)!=0);
         }
+        [DllImport("user32.dll")]static extern bool IsZoomed(IntPtr window);
+        internal static bool CoversMonitor(RectI rect,System.Drawing.Rectangle screen,bool maximized,bool framed){return !(maximized&&framed)&&rect.Left<=screen.Left&&rect.Top<=screen.Top&&rect.Right>=screen.Right&&rect.Bottom>=screen.Bottom;}
+        internal static bool TaskbarAutoHide(){if(TaskbarMask.TransientState)return TaskbarMask.SavedAutoHide;var data=new AppBarData {Size=(uint)Marshal.SizeOf(typeof(AppBarData))};return (SHAppBarMessage(4,ref data).ToUInt64()&1)!=0;}
+        internal static void SetTaskbarAutoHide(bool value){var data=new AppBarData {Size=(uint)Marshal.SizeOf(typeof(AppBarData))};uint state=(uint)SHAppBarMessage(4,ref data).ToUInt64(),next=value?state|1:state&~1U;if(TaskbarMask.TransientState){TaskbarMask.SavedAutoHide=value;DesktopLease.RecordTemporaryState(next);}data.Param=new IntPtr(next);SHAppBarMessage(10,ref data);}
         internal static RectI WorkArea(Forms.Screen screen) {var data=new MonitorData {Size=Marshal.SizeOf(typeof(MonitorData))};GetMonitorInfo(MonitorFromPoint(new PointI {X=screen.Bounds.Left+1,Y=screen.Bounds.Top+1},2),ref data);return data.Work;}
         internal static void Activate(IntPtr h)
         {
@@ -218,13 +223,14 @@ namespace OneTaskBar
             if(invoked){for(int i=0;i<20;i++){if(wasOpen||TrayVisible())return TrayOpened(handle,wasOpen,placement);System.Threading.Thread.Sleep(15);}}
             var data=new Native.AppBarData {Size=(uint)Marshal.SizeOf(typeof(Native.AppBarData)),Window=handle};
             uint state=(uint)Native.SHAppBarMessage(4,ref data).ToUInt64();
+            DesktopLease.RecordTemporaryState(state);
             try {
-                lock(TaskbarMask.Gate){if(!TaskbarMask.Active)return false;data.Param=new IntPtr(state&~1U);Native.SHAppBarMessage(10,ref data);}
+                lock(TaskbarMask.Gate){if(!TaskbarMask.Active)return false;TaskbarMask.SavedAutoHide=(state&1)!=0;TaskbarMask.TransientState=true;data.Param=new IntPtr(state&~1U);Native.SHAppBarMessage(10,ref data);}
                 chevron=null;
                 for(int i=0;i<40&&chevron==null;i++){CacheTray();if(chevron==null)System.Threading.Thread.Sleep(25);}
                 if(chevron==null)AppLog.Json("tray-elements.json",SystemButtons());
                 invoked=InvokeChevron();
-            }finally {lock(TaskbarMask.Gate){if(TaskbarMask.Active){data.Param=new IntPtr(state);Native.SHAppBarMessage(10,ref data);TaskbarMask.Hide(handle);}}}
+            }finally {lock(TaskbarMask.Gate){if(TaskbarMask.TransientState){data.Param=new IntPtr((state&~1U)|(TaskbarMask.SavedAutoHide?1U:0));Native.SHAppBarMessage(10,ref data);}if(TaskbarMask.Active)TaskbarMask.Hide(handle);TaskbarMask.TransientState=false;}DesktopLease.RecordTemporaryState(null);}
             if(!invoked){AppLog.Write("tray-open","cached="+cached+"; found="+(chevron!=null)+"; invoke failed");return false;}
             for(int i=0;i<40;i++){if(wasOpen||TrayVisible())return TrayOpened(handle,wasOpen,placement);System.Threading.Thread.Sleep(15);}AppLog.Write("tray-open","invoked but overflow host not visible");return false;
         }
@@ -261,6 +267,8 @@ namespace OneTaskBar
     internal sealed class DesktopLease
     {
         public bool Active {get;set;} public uint TaskbarState {get;set;} public bool ResumeCharging {get;set;}
+        public bool? RestoreTaskbarState {get;set;}
+        public uint? TemporaryTaskbarState {get;set;}
         public string ChargingExe {get;set;} public string Session {get;set;}
         public int OwnerPid {get;set;}public long OwnerStarted {get;set;}
         internal static string FileName {get {return Path.Combine(AppLog.Data,"desktop-lease.json");}}
@@ -275,10 +283,14 @@ namespace OneTaskBar
             // The completed Windhawk project has its own logon task; do not delete or disable it.
             bool scheduled=false;
             try {scheduled=File.Exists(helper)&&File.Exists(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),"Codex","OneUIBookAssets","power-state.json"));} catch { }
-            var lease=new DesktopLease {Active=true,TaskbarState=(uint)Native.SHAppBarMessage(4,ref data).ToUInt64(),ResumeCharging=wasRunning||scheduled,ChargingExe=helper,Session=Guid.NewGuid().ToString("N")};
-            lease.Save(); data.Param=new IntPtr(lease.TaskbarState|1); Native.SHAppBarMessage(10,ref data); SuppressCharging(); return lease;
+            var lease=new DesktopLease {Active=true,TaskbarState=(uint)Native.SHAppBarMessage(4,ref data).ToUInt64(),RestoreTaskbarState=false,ResumeCharging=wasRunning||scheduled,ChargingExe=helper,Session=Guid.NewGuid().ToString("N")};
+            lease.Save();SuppressCharging();return lease;
         }
         internal void Save() {lock(Gate){Directory.CreateDirectory(AppLog.Data);string temporary=FileName+".tmp";File.WriteAllText(temporary,new JavaScriptSerializer().Serialize(this));if(File.Exists(FileName))File.Replace(temporary,FileName,FileName+".previous");else File.Move(temporary,FileName);}}
+        internal static void RecordTemporaryState(uint? state)
+        {
+            lock(Gate){try{if(!File.Exists(FileName))return;var lease=new JavaScriptSerializer().Deserialize<DesktopLease>(File.ReadAllText(FileName));if(lease==null||!lease.Active)return;lease.TemporaryTaskbarState=state;lease.Save();}catch(Exception error){AppLog.Once("tray-state-recovery",error.Message);}}
+        }
         internal static void SuppressCharging() { try {using(var stop=EventWaitHandleCompat.OpenCharging()) if(stop!=null) stop.Set();} catch { } }
         internal static void Recover(string expectedSession=null)
         {
@@ -286,8 +298,8 @@ namespace OneTaskBar
                 DesktopLease lease=null;
                 try { if(File.Exists(FileName)) lease=new JavaScriptSerializer().Deserialize<DesktopLease>(File.ReadAllText(FileName)); } catch(Exception e) { AppLog.Write("lease-read",e.Message); }
                 if(lease==null || !lease.Active || expectedSession!=null && lease.Session!=expectedSession) return;
-                var data=new Native.AppBarData {Size=(uint)Marshal.SizeOf(typeof(Native.AppBarData)),Window=Native.FindWindow("Shell_TrayWnd",null),Param=new IntPtr(lease.TaskbarState)};
-                Native.SHAppBarMessage(10,ref data); Native.RestoreTaskbars();
+                var data=new Native.AppBarData {Size=(uint)Marshal.SizeOf(typeof(Native.AppBarData)),Window=Native.FindWindow("Shell_TrayWnd",null),Param=new IntPtr(lease.TemporaryTaskbarState??lease.TaskbarState)};
+                if(lease.TemporaryTaskbarState.HasValue||lease.RestoreTaskbarState!=false)Native.SHAppBarMessage(10,ref data);Native.RestoreTaskbars();
                 lease.Active=false; lease.Save();
                 if(lease.ResumeCharging && File.Exists(lease.ChargingExe)) try {
                     bool resumed=false;
@@ -304,21 +316,23 @@ namespace OneTaskBar
     }
     internal sealed class AppBarReservation : IDisposable
     {
-        readonly HwndSource source; readonly Forms.Screen screen; readonly double scale; bool busy,disposed;
-        internal AppBarReservation(Forms.Screen monitor,double dpiScale)
+        readonly HwndSource source; readonly Forms.Screen screen; readonly double scale;readonly Action stateChanged;bool busy,disposed,autoHide,positioned;Native.RectI lastPosition;
+        internal AppBarReservation(Forms.Screen monitor,double dpiScale,bool hidden=false,Action changed=null)
         {
-            screen=monitor; scale=dpiScale;
+            screen=monitor;scale=dpiScale;autoHide=hidden;stateChanged=changed;
             var p=new HwndSourceParameters("OneTaskBar.WorkArea") {WindowStyle=unchecked((int)0x80000000),ExtendedWindowStyle=0x80|0x08000000,PositionX=screen.Bounds.Left,PositionY=screen.Bounds.Bottom-1,Width=1,Height=1};
             source=new HwndSource(p); source.AddHook(Message);
             var data=Data(); data.Callback=0x8053; Native.SHAppBarMessage(0,ref data); Update();
         }
         Native.AppBarData Data() {return new Native.AppBarData {Size=(uint)Marshal.SizeOf(typeof(Native.AppBarData)),Window=source.Handle,Edge=3};}
-        IntPtr Message(IntPtr h,int msg,IntPtr w,IntPtr l,ref bool handled) {if(msg==0x8053 && w.ToInt32()==1) Update(); return IntPtr.Zero;}
+        IntPtr Message(IntPtr h,int msg,IntPtr w,IntPtr l,ref bool handled) {if(msg==0x8053){if(w.ToInt32()==1)Update();else if(w.ToInt32()==0&&stateChanged!=null)stateChanged();}return IntPtr.Zero;}
+        internal void SetAutoHide(bool value){if(autoHide==value)return;autoHide=value;Update();}
+        internal static int ReservationTop(System.Drawing.Rectangle screen,double scale,int availableBottom,bool hidden){return hidden?availableBottom:Math.Min(availableBottom,screen.Bottom-(int)Math.Round(60*scale));}
         void Update()
         {
             if(busy||disposed) return; busy=true;
             try { var b=screen.Bounds; var data=Data(); data.Rect=new Native.RectI {Left=b.Left,Top=b.Top,Right=b.Right,Bottom=b.Bottom};
-                Native.SHAppBarMessage(2,ref data); data.Rect.Top=data.Rect.Bottom-(int)Math.Round(60*scale); Native.SHAppBarMessage(3,ref data);
+                Native.SHAppBarMessage(2,ref data);data.Rect.Top=ReservationTop(b,scale,data.Rect.Bottom,autoHide);if(positioned&&data.Rect.Equals(lastPosition))return;Native.SHAppBarMessage(3,ref data);lastPosition=data.Rect;positioned=true;
             } finally {busy=false;}
         }
         public void Dispose() {if(disposed)return; disposed=true; var data=Data(); Native.SHAppBarMessage(1,ref data); source.Dispose();}

@@ -1,0 +1,51 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Threading.Tasks;
+using System.Web.Script.Serialization;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Interop;
+using System.Windows.Media;
+using System.Windows.Threading;
+using Forms=System.Windows.Forms;
+namespace OneTaskBar
+{
+    internal static class DesktopBehaviorChecks
+    {
+        [DllImport("user32.dll")]static extern IntPtr SendMessage(IntPtr window,uint message,IntPtr wp,IntPtr lp);
+        [DllImport("user32.dll")]static extern IntPtr WindowFromPoint(Native.PointI point);
+        internal static void Validate(List<string> checks)
+        {
+            int count=0;foreach(var screen in new[]{new System.Drawing.Rectangle(0,0,3840,2160),new System.Drawing.Rectangle(-1440,-700,1440,2560),new System.Drawing.Rectangle(3840,900,1920,1080)})foreach(double scale in new[]{1.0,1.25,1.5,1.75,2.0,2.5}){
+                var layout=DockLayout.Compute(screen,scale,8);var menu=Native.PlacementBounds(screen,scale,layout.StartX,layout.Y+2,40,40);var apps=Native.PlacementBounds(screen,scale,layout.AppX,layout.Y,layout.AppWidth,44);if(menu.Left<screen.Left||menu.Top<screen.Top||menu.Right>apps.Left||menu.Bottom>screen.Bottom||apps.Right>screen.Right)throw new Exception("Mixed-DPI/negative-origin dock placement");
+                int native=screen.Bottom-(int)Math.Round(48*scale),top=AppBarReservation.ReservationTop(screen,scale,native,false);if(top!=screen.Bottom-(int)Math.Round(60*scale)||AppBarReservation.ReservationTop(screen,scale,native,true)!=native||AppBarReservation.ReservationTop(screen,scale,screen.Bottom-(int)(100*scale),false)!=screen.Bottom-(int)(100*scale))throw new Exception("Autohide or existing taskbar reservation doubled");count++;
+            }
+            var full=new Native.RectI {Left=0,Top=0,Right=1920,Bottom=1080};var area=new System.Drawing.Rectangle(0,0,1920,1080);if(!Native.CoversMonitor(full,area,false,false)||Native.CoversMonitor(full,area,true,true)||!Native.CoversMonitor(full,area,true,false))throw new Exception("Maximized window misclassified as fullscreen");
+            var json=new JavaScriptSerializer();if(json.Deserialize<DesktopLease>("{\"Active\":true,\"TaskbarState\":1}").RestoreTaskbarState==false||json.Deserialize<DesktopLease>(json.Serialize(new DesktopLease {RestoreTaskbarState=false})).RestoreTaskbarState!=false)throw new Exception("Legacy recovery compatibility / native setting preservation");
+            var temporary=json.Deserialize<DesktopLease>(json.Serialize(new DesktopLease {RestoreTaskbarState=false,TemporaryTaskbarState=1}));if(temporary.TemporaryTaskbarState!=1)throw new Exception("Temporary tray state lost its crash recovery snapshot");
+            checks.Add("Three-monitor landscape/portrait/negative-origin placement at six DPI scales; autohide work-area return, no double reservation, maximized-window classification and legacy recovery compatibility pass ("+count+" layouts)");
+        }
+        static bool Bounds(Window window,Native.RectI expected){Native.RectI actual;return Native.GetWindowRect(new WindowInteropHelper(window).Handle,out actual)&&Math.Abs(actual.Left-expected.Left)<=1&&Math.Abs(actual.Top-expected.Top)<=1&&Math.Abs(actual.Right-expected.Right)<=1&&Math.Abs(actual.Bottom-expected.Bottom)<=1;}
+        static bool Contents(DockHost dock){return new[]{dock.Start,dock.Apps,dock.Status}.All(w=>w.IsVisible&&w.Surface.Opacity==1&&((FrameworkElement)w.Surface.Child).Opacity==1&&((FrameworkElement)w.Surface.Child).RenderTransform.Value.IsIdentity&&w.Surface.IsHitTestVisible);}
+        internal static int Run()
+        {
+            var app=new Application {ShutdownMode=ShutdownMode.OnExplicitShutdown};int result=1;ShellController shell=null;DockHost dock=null;GlassWindow legacy=null,menu=null;var monitors=new List<object>();
+            app.Dispatcher.BeginInvoke(new Action(async()=> {
+                try{
+                    Program.Inspectable=true;Directory.CreateDirectory(AppLog.Data);Validate(new List<string>());shell=new ShellController(true);shell.Desktop=true;shell.Pins=Enumerable.Range(1,4).Select(i=>new AppEntry {Name="검사 앱 "+i,Target="fixture:"+i,Icon=ArtworkPalette.Sample(Colors.CornflowerBlue)}).ToList();var screen=Forms.Screen.PrimaryScreen;
+                    legacy=new GlassWindow {ShowActivated=false,Width=200,Height=80};legacy.Surface.Child=Paint.TextBlock("이전 애니메이션 경로",14,Paint.Text);legacy.ShowAt(screen.Bounds,40,40,200,80);legacy.Hide();await Task.Delay(20);legacy.Show();await Task.Delay(260);bool oldFade=((FrameworkElement)legacy.Surface.Child).Opacity<.01;legacy.Close();legacy=null;
+                    bool placement=true;foreach(var monitor in Forms.Screen.AllScreens){dock=new DockHost(shell,monitor);dock.Show();await Task.Delay(80);var fit=DockLayout.Compute(monitor.Bounds,dock.Scale,4);bool aligned=Bounds(dock.Start,Native.PlacementBounds(monitor.Bounds,dock.Scale,fit.StartX,fit.Y+2,40,40))&&Bounds(dock.Apps,Native.PlacementBounds(monitor.Bounds,dock.Scale,fit.AppX,fit.Y,fit.AppWidth,44))&&Bounds(dock.Status,Native.PlacementBounds(monitor.Bounds,dock.Scale,fit.StatusX,fit.Y,fit.StatusWidth,44));placement&=aligned;monitors.Add(new {bounds=monitor.Bounds,scale=dock.Scale,aligned=aligned});dock.Close();dock=null;}
+                    dock=new DockHost(shell,screen);dock.Show();await Task.Delay(100);bool returned=true;for(int i=0;i<8;i++){dock.SetVisible(false);await Task.Delay(i%3*10);dock.SetVisible(true);}await Task.Delay(250);returned=Contents(dock)&&dock.ShownKeys.Length==4;dock.SetVisible(false);dock.Rebuild();await Task.Delay(220);bool staysHidden=!dock.Start.IsVisible&&!dock.Apps.IsVisible&&!dock.Status.IsVisible;dock.SetVisible(true);
+                    dock.UpdateVisibility(false,true);dock.CompleteAutoHide(true);bool held=dock.DockVisible&&!dock.EdgeVisible;dock.CompleteAutoHide(false);await Task.Delay(100);bool hidden=!dock.DockVisible&&dock.EdgeVisible&&!dock.Apps.IsVisible&&!dock.Status.IsVisible;Native.RectI edge;Native.GetWindowRect(dock.RevealHandle,out edge);bool thin=edge.Bottom-edge.Top==2&&edge.Left==screen.Bounds.Left&&edge.Right==screen.Bounds.Right;bool hit=Native.GetAncestor(WindowFromPoint(new Native.PointI {X=screen.Bounds.Left+20,Y=screen.Bounds.Bottom-1}),2)==dock.RevealHandle;
+                    SendMessage(dock.RevealHandle,0x200,IntPtr.Zero,new IntPtr(0x10014));await Task.Delay(70);bool revealed=Contents(dock)&&dock.DockVisible&&!dock.EdgeVisible;dock.UpdateVisibility(true,true);bool fullscreen=!dock.DockVisible&&!dock.EdgeVisible;dock.UpdateVisibility(false,true);dock.Reveal();dock.UpdateVisibility(false,false);bool disabled=Contents(dock)&&dock.RevealHandle==IntPtr.Zero;
+                    var before=Native.WorkArea(screen);bool flags=Native.TaskbarAutoHide();using(var reserve=new AppBarReservation(screen,dock.Scale,true)){await Task.Delay(100);var during=Native.WorkArea(screen);bool noSpace=during.Equals(before);if(!noSpace)throw new Exception("Hidden appbar took additional workspace");}bool unchanged=flags==Native.TaskbarAutoHide();
+                    menu=new GlassWindow {ShowActivated=false,Width=620,Height=300};Native.SeedMonitor(menu,screen.Bounds);bool logicalSize=menu.Width==620&&menu.Height==300;bool menuPlacement=true;foreach(var monitor in Forms.Screen.AllScreens.Reverse()){double scale=ShellController.MonitorScale(monitor,menu);double width=Math.Min(720,monitor.Bounds.Width/scale-24);menu.ShowAt(monitor.Bounds,12,12,width,300);await Task.Delay(40);menuPlacement&=Bounds(menu,Native.PlacementBounds(monitor.Bounds,scale,12,12,width,300));}menuPlacement&=logicalSize;
+                    bool passed=placement&&menuPlacement&&returned&&staysHidden&&held&&hidden&&thin&&hit&&revealed&&fullscreen&&disabled&&unchanged;AppLog.Json("desktop-behavior-probe.json",new {passed=passed,legacyFadeRaceReproduced=oldFade,rapidCaptureReturnRestoresIcons=returned,rebuildDoesNotReshowHiddenWindows=staysHidden,actualMonitorPlacement=placement,menuRelocation=menuPlacement,actualMonitorCount=Forms.Screen.AllScreens.Length,monitors=monitors,syntheticThreeMonitorLayouts=18,autoHideHoldsDuringInteraction=held,autoHideHidesAllWindows=hidden,edgeTwoPixels=thin,edgeHitTest=hit,edgeMouseMessageReveals=revealed,fullscreenDisablesEdge=fullscreen,disablingAutoHideRestoresDock=disabled,hiddenAppbarAddsNoWorkspace=true,nativeAutoHideSettingUnchanged=unchanged,globalKeyboardShortcutSent=false,externalAppsLaunched=false});result=passed?0:1;
+                }catch(Exception error){AppLog.Json("desktop-behavior-probe.json",new {passed=false,error=error.ToString()});}finally{if(legacy!=null)legacy.Close();if(menu!=null)menu.Close();if(dock!=null)dock.Close();if(shell!=null)shell.Dispose();app.Shutdown(result);}
+            }),DispatcherPriority.ApplicationIdle);return app.Run();
+        }
+    }
+}

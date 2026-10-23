@@ -84,6 +84,13 @@ YouTube high-resolution covers are optional and off by default. When enabled, on
 
 Code and the original One TaskBar icon are under the [MIT license](LICENSE). [Third-party notices](THIRD_PARTY_NOTICES.txt) include the Liquid Dock reference. This repository contains no Samsung APK, extracted launcher artwork, wallpapers, fonts, or user screenshots/recordings. Installed third-party logos are read at runtime and remain their owners' property. This is an independent project and is not affiliated with Microsoft or Samsung. Open-source licensing does not guarantee that no third party will ever make a copyright or trademark complaint.
 
+## 8.5.4
+
+- Fixes menu/dock placement across monitor origins and DPI scales. Each HWND reaches the destination monitor before DPI is read; initial dock placement waits until all three windows are ready.
+- Fixes icons disappearing after rapid fullscreen/capture transitions. Dock visibility changes cancel the pending content fade, and rebuilding a hidden dock no longer shows its status capsule.
+- Follows the real Windows taskbar auto-hide setting instead of forcing that setting during startup. The same option is available in One TaskBar settings. A two-physical-pixel bottom edge reveals the hidden dock through mouse events, with no permanent fast polling timer. Open menus, previews and media controls keep it visible.
+- Releases the dock's work-area reservation while auto-hidden, avoids doubling the native taskbar reservation when shown, and preserves user setting changes on exit/crash. See VALIDATION.md for actual/synthetic monitor coverage and resource results.
+
 ## 8.5.3
 
 - Adds `tools/Test-ReleaseDefender.ps1` for pre-publication scans of the app, recovery helper, Setup and portable archive. It requires active protection, unchanged file hashes and no new matching detections. It does not change security exclusions or protection settings. Scan results are specific to those files and installed definitions. Trusted code signing requires a separate publisher certificate; Defender results and SmartScreen reputation are distinct. See [Microsoft's developer FAQ](https://learn.microsoft.com/en-us/defender-xdr/developer-faq) and [file submission portal](https://www.microsoft.com/en-us/wdsi/filesubmission/).
