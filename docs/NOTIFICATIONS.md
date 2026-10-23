@@ -14,9 +14,15 @@ The development PC was connected successfully, including receipt and removal of 
 
 ## Limits and removal
 
-### One UI popup banners
+### Icons and pictures
 
-After connection, the **One UI notification popups** setting controls banners separately from the native/custom notification-center choice. The desktop dock must be active. Up to three cards appear without taking keyboard focus; hovering pauses expiry, and dismissing a card leaves the original notification in Windows history. Clicking uses the same original-notification activation path as the custom center.
+After listener permission is granted, the app resolves the sender's Windows logo with an installed-app fallback. App-logo overrides and hero/inline images are read from the original matching toast. A bounded, read-only Windows notification-store fallback matches the authorized item's sender, notification ID and text when the public listener projection omits image references. It never writes that store or enumerates unrelated notifications. This optional Windows implementation detail can change; missing payloads or assets leave text-only cards.
+
+Images are decoded once per changed notification from local package/data files or existing Windows URL cache entries, capped in file/decoded size. The app does not fetch remote notification images. Missing pictures and icons omit their space rather than displaying generic placeholder artwork. Original activation matching and notification permission still apply.
+
+### One Taskbar popup banners
+
+After connection, the **One Taskbar notification popups** setting controls banners separately from the native/custom notification-center choice. The desktop dock must be active. Up to three cards appear without taking keyboard focus; hovering pauses expiry, and dismissing a card leaves the original notification in Windows history. Clicking uses the same original-notification activation path as the custom center.
 
 Clicking a live card first invokes its exact native toast view. After that view expires, current protocol/callback data is re-read on demand; adaptive nested toast text is supported. For UWP toast activations or unavailable payloads, One TaskBar asks Windows to invoke the corresponding history card, matching sender group, title and body. Collapsed groups can be expanded and virtualized entries realized. Duplicate matches are not guessed. The native center is temporarily masked during a matched activation and its original attributes are restored, with an owner-checked recovery lease for crashes. If the entry is unavailable or ambiguous, the native center is left visible so the user can choose the original notification. This avoids pretending that a generic app launch executed the notification action.
 

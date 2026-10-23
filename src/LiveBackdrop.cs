@@ -20,6 +20,7 @@ namespace OneTaskBar
         static object dispatcherQueue;
         static Compositor compositor;
         static readonly System.Collections.Generic.HashSet<LiveBackdrop> instances=new System.Collections.Generic.HashSet<LiveBackdrop>();
+        internal static int InstanceCount {get{return instances.Count;}}
         internal static int OrphanCount {get{int count=0;foreach(var item in instances)if(item.background!=IntPtr.Zero&&Native.IsWindowVisible(item.background)&&!item.Visible)count++;return count;}}
         internal static int VisibleCount {get{int count=0;foreach(var item in instances)if(item.background!=IntPtr.Zero&&Native.IsWindowVisible(item.background))count++;return count;}}
         [DllImport("user32.dll",CharSet=CharSet.Unicode)]static extern IntPtr CreateWindowEx(int ex,string cls,string title,uint style,int x,int y,int width,int height,IntPtr parent,IntPtr menu,IntPtr instance,IntPtr data);

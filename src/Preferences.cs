@@ -14,6 +14,11 @@ namespace OneTaskBar
         public bool NativeStartKey=true,NativeSearch=false;
         public bool NativeStartButton=false;
         public bool QuickSliderScroll=false;
+        public bool ChargeSoundEnabled=false;
+        public string ChargeSoundFile;
+        public bool NowBarLargeCover=false;
+        public bool YouTubeHighResArtwork=false;
+        public string YouTubeArtworkTrack;
         public int DesktopPowerWatts=0;
         public bool EmergencyExit=true;
     }

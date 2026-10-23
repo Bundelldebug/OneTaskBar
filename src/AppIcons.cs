@@ -1,5 +1,5 @@
 using System;
-using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using System.Threading;
@@ -12,10 +12,14 @@ namespace OneTaskBar
 {
     internal static class AppIcons
     {
-        static readonly ConcurrentDictionary<string,Lazy<ImageSource>> cache=new ConcurrentDictionary<string,Lazy<ImageSource>>(StringComparer.OrdinalIgnoreCase);
+        sealed class CachedIcon {internal Lazy<ImageSource> Image;internal LinkedListNode<string> Position;}
+        static readonly object cacheLock=new object();
+        static readonly Dictionary<string,CachedIcon> cache=new Dictionary<string,CachedIcon>(StringComparer.OrdinalIgnoreCase);
+        static readonly LinkedList<string> recent=new LinkedList<string>();
+        internal const int CacheLimit=48;
         sealed class Plate {internal bool Needed;}
         static readonly SemaphoreSlim loaders=new SemaphoreSlim(3);
-        internal static int CachedCount {get{return cache.Count;}}
+        internal static int CachedCount {get{lock(cacheLock)return cache.Count;}}
         internal static FrameworkElement Visual(AppEntry app,double size){return app.Icon!=null?Visual(app.Icon,size):new DeferredIcon(app,size);}
         // Decode only icons that have entered a visible viewport, with bounded parallel work.
         sealed class DeferredIcon : Decorator
@@ -29,7 +33,7 @@ namespace OneTaskBar
             {
                 if(requested||!IsVisible)return;
                 if(scroll!=null){try{var bounds=TransformToAncestor(scroll).TransformBounds(new Rect(0,0,ActualWidth,ActualHeight));if(!bounds.IntersectsWith(new Rect(0,0,scroll.ActualWidth,scroll.ActualHeight)))return;}catch(InvalidOperationException){return;}}
-                requested=true;Stop();try{await loaders.WaitAsync();ImageSource icon;try{icon=await BackgroundWork.Run(()=>Get(entry));}finally{loaders.Release();}entry.Icon=icon;if(icon!=null)Child=Visual(icon,size);}catch(Exception error){AppLog.Once("icon-load",error.Message);}
+                requested=true;Stop();try{await loaders.WaitAsync();ImageSource icon;try{icon=await BackgroundWork.Run(()=>Get(entry));}finally{loaders.Release();}if(icon!=null)Child=Visual(icon,size);}catch(Exception error){AppLog.Once("icon-load",error.Message);}
             }
         }
         static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ImageSource,Plate> plates=new System.Runtime.CompilerServices.ConditionalWeakTable<ImageSource,Plate>();
@@ -50,7 +54,7 @@ namespace OneTaskBar
         internal static ImageSource Get(AppEntry app)
         {
             string key=(app.AppID??"")+"|"+(app.Target??app.Executable??"");
-            return cache.GetOrAdd(key,k=>new Lazy<ImageSource>(()=>Load(app))).Value;
+            Lazy<ImageSource> image;lock(cacheLock){CachedIcon item;if(cache.TryGetValue(key,out item)){recent.Remove(item.Position);recent.AddFirst(item.Position);image=item.Image;}else {image=new Lazy<ImageSource>(()=>Load(app));cache[key]=new CachedIcon {Image=image,Position=recent.AddFirst(key)};while(cache.Count>CacheLimit){string oldest=recent.Last.Value;recent.RemoveLast();cache.Remove(oldest);}}}return image.Value;
         }
         static ImageSource Load(AppEntry app)
         {
@@ -70,7 +74,7 @@ namespace OneTaskBar
         {
             if(original==null)return null;
             try {
-                if(original.PixelWidth>192||original.PixelHeight>192){double scale=192.0/Math.Max(original.PixelWidth,original.PixelHeight);var reduced=new TransformedBitmap(original,new ScaleTransform(scale,scale));reduced.Freeze();original=reduced;}
+                if(original.PixelWidth>160||original.PixelHeight>160){double scale=160.0/Math.Max(original.PixelWidth,original.PixelHeight);var reduced=new TransformedBitmap(original,new ScaleTransform(scale,scale));reduced.Freeze();original=reduced;}
                 var image=new FormatConvertedBitmap(original,PixelFormats.Bgra32,null,0);int w=image.PixelWidth,h=image.PixelHeight,stride=w*4;
                 if(w<2||h<2||w>2048||h>2048)return original;
                 var pixels=new byte[stride*h];image.CopyPixels(pixels,stride,0);int left=w,top=h,right=-1,bottom=-1;

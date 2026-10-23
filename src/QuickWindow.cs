@@ -37,8 +37,12 @@ namespace OneTaskBar
         readonly List<TextBlock> actionNames=new List<TextBlock>();
         readonly TextBlock notice=Paint.TextBlock("",11,Paint.Muted);
         bool themeBusy;bool? darkMode;
-        System.Windows.Media.ImageSource samsungIcon;
+        System.Windows.Media.ImageSource samsungIcon;string samsungIconKey;
         internal bool SamsungIconLoaded {get{return samsungIcon!=null;}}
+        async void LoadSamsungIcon(AppEntry app)
+        {
+            try{var icon=app.Icon??await BackgroundWork.Run(()=>AppIcons.Get(app));if(icon!=null&&samsungIconKey==app.Key){samsungIcon=icon;samsungSettings.Content=AppIcons.Visual(icon,24);}}catch(Exception error){AppLog.Once("samsung-settings-icon",error.Message);}
+        }
         readonly Border muteCircle;
         readonly StackPanel body=new StackPanel();
         readonly List<ReorderGroup> groups=new List<ReorderGroup>();
@@ -218,7 +222,7 @@ namespace OneTaskBar
         internal void Refresh(PowerState state,int bright,double sound,bool muted,bool audioAvailable,bool brightAvailable)
         {
             brightness.WheelAdjust=volume.WheelAdjust=Preferences.Current.QuickSliderScroll;
-            var samsung=shell.SamsungSettings();if(samsung!=null&&samsung.Icon!=null&&samsungIcon==null){samsungIcon=samsung.Icon;samsungSettings.Content=AppIcons.Visual(samsungIcon,24);}
+            var samsung=shell.SamsungSettings();if(samsung!=null&&samsungIconKey!=samsung.Key){samsungIconKey=samsung.Key;samsungSettings.Content=AppIcons.Visual(samsung,24);LoadSamsungIcon(samsung);}
             samsungSettings.Visibility=samsung!=null?Visibility.Visible:Visibility.Collapsed;
             bool devices=shell.SamsungDevices()!=null;devicesTile.Visibility=devices?Visibility.Visible:Visibility.Collapsed;shortcuts.Columns=devices?2:1;if(!devices)windowsTile.Margin=new Thickness(0);
             wifiTile.Visibility=shell.Services.WifiPresent==false?Visibility.Collapsed:Visibility.Visible;bluetoothTile.Visibility=shell.Services.BluetoothPresent==false?Visibility.Collapsed:Visibility.Visible;

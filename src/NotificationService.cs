@@ -14,7 +14,7 @@ namespace OneTaskBar
 {
     internal sealed class NotificationEntry
     {
-        internal uint Id;internal string App,AppId,Title,Body;internal DateTimeOffset Created;internal ImageSource Icon;internal NotificationPayload Payload;internal Guid Activator;internal IntPtr NativeWindow;internal string NativeSignature;
+        internal uint Id;internal string App,AppId,Title,Body;internal DateTimeOffset Created;internal ImageSource Icon,Artwork;internal NotificationPayload Payload;internal Guid Activator;internal IntPtr NativeWindow;internal string NativeSignature;
     }
     internal sealed class NotificationService : IDisposable
     {
@@ -29,6 +29,7 @@ namespace OneTaskBar
         readonly Dictionary<string,Guid> activators=new Dictionary<string,Guid>(StringComparer.OrdinalIgnoreCase);
         bool reading,subscribed,disposed;int dirty=1;DateTime nextRead;
         internal int SnapshotReads;internal bool Interactive;internal Action Updated;internal Action<List<NotificationEntry>> SnapshotReady;
+        internal Func<List<AppEntry>> AppCatalog;List<AppEntry> iconCatalog;
         void Changed(UserNotificationListener sender,UserNotificationChangedEventArgs args){Interlocked.Exchange(ref dirty,1);var updated=Updated;if(!disposed&&updated!=null)updated();}
         public void Dispose(){disposed=true;if(subscribed&&listener!=null)try{listener.NotificationChanged-=Changed;}catch{}subscribed=false;}
         internal void Invalidate(){Interlocked.Exchange(ref dirty,1);}
@@ -53,16 +54,18 @@ namespace OneTaskBar
             try {
                 var entries=await SystemServices.Wait(listener.GetNotificationsAsync(NotificationKinds.Toast));SnapshotReads++;
                 if(!Preferences.Current.NotificationIntegration||listener.GetAccessStatus()!=UserNotificationListenerAccessStatus.Allowed){Allowed=false;Items=new List<NotificationEntry>();return;}
-                var result=new List<NotificationEntry>();
+                var result=new List<NotificationEntry>();var catalog=AppCatalog!=null?AppCatalog():new List<AppEntry>();if(iconCatalog!=catalog){foreach(var key in icons.Where(p=>p.Value==null).Select(p=>p.Key).ToArray())icons.Remove(key);iconCatalog=catalog;}
                 foreach(var item in entries) {
                     try {
                     var binding=item.Notification.Visual.GetBinding(KnownNotificationBindings.ToastGeneric);if(binding==null)continue;
                     var text=binding.GetTextElements().Select(t=>t.Text).ToArray();
-                    string appId=item.AppInfo.AppUserModelId??item.AppInfo.DisplayInfo.DisplayName;ImageSource icon;
-                    if(!icons.TryGetValue(appId,out icon)){icon=await Logo(item.AppInfo);icons[appId]=icon;}
+                    uint notificationId=item.Id;string appId=item.AppInfo.AppUserModelId??item.AppInfo.DisplayInfo.DisplayName;ImageSource icon;
+                    if(!icons.TryGetValue(appId,out icon)){icon=await Logo(item.AppInfo);if(icon==null){var known=catalog.FirstOrDefault(a=>String.Equals(a.AppID,appId,StringComparison.OrdinalIgnoreCase))??catalog.FirstOrDefault(a=>String.Equals(a.Name,item.AppInfo.DisplayInfo.DisplayName,StringComparison.OrdinalIgnoreCase));if(known!=null)icon=known.Icon??await BackgroundWork.Run(()=>AppIcons.Get(known));}icons[appId]=icon;}
                     Guid activator;if(!activators.TryGetValue(appId,out activator)){activator=NotificationActivation.Callback(appId);activators[appId]=activator;}
                     var previous=Items.FirstOrDefault(n=>n.Id==item.Id&&n.AppId==appId&&n.Title==(text.FirstOrDefault()??"알림")&&n.Body==String.Join("\n",text.Skip(1)));
-                    result.Add(new NotificationEntry {Id=item.Id,App=item.AppInfo.DisplayInfo.DisplayName,AppId=item.AppInfo.AppUserModelId,Icon=icon,Created=item.CreationTime,Title=text.FirstOrDefault()??"알림",Body=String.Join("\n",text.Skip(1)),Payload=previous!=null?previous.Payload:NotificationPayload.Read(appId,text),Activator=activator,NativeWindow=previous!=null?previous.NativeWindow:IntPtr.Zero,NativeSignature=previous!=null?previous.NativeSignature:null});
+                    var payload=previous!=null?previous.Payload:NotificationPayload.Read(appId,text);ImageSource artwork=previous!=null?previous.Artwork:null,overrideIcon=previous!=null?previous.Icon:null;
+                    if(previous==null){var native=await BackgroundWork.Run(()=>NativeToastAssets.Read(appId,notificationId,text));if(payload==null)payload=native;var assets=native??payload;if(assets!=null){overrideIcon=await BackgroundWork.Run(()=>NativeToastAssets.Image(appId,assets.LogoSource,true));artwork=await BackgroundWork.Run(()=>NativeToastAssets.Image(appId,assets.ImageSource,false));}}
+                    result.Add(new NotificationEntry {Id=item.Id,App=item.AppInfo.DisplayInfo.DisplayName,AppId=appId,Icon=overrideIcon??icon,Artwork=artwork,Created=item.CreationTime,Title=text.FirstOrDefault()??"알림",Body=String.Join("\n",text.Skip(1)),Payload=payload,Activator=activator,NativeWindow=previous!=null?previous.NativeWindow:IntPtr.Zero,NativeSignature=previous!=null?previous.NativeSignature:null});
                     }catch(Exception error){AppLog.Once("notification-item",error.Message);}
                 }
                 Items=result.OrderByDescending(n=>n.Created).ToList();

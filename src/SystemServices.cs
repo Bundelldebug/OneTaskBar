@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -26,9 +26,9 @@ namespace OneTaskBar
         {
             try {
                 var app=Windows.ApplicationModel.AppInfo.GetFromAppUserModelId(appId);if(app==null)return null;
-                using(var stream=await Wait(app.DisplayInfo.GetLogo(new Windows.Foundation.Size(192,192)).OpenReadAsync()))using(var reader=new DataReader(stream)) {
+                using(var stream=await Wait(app.DisplayInfo.GetLogo(new Windows.Foundation.Size(160,160)).OpenReadAsync()))using(var reader=new DataReader(stream)) {
                     uint size=(uint)Math.Min(8388608UL,stream.Size);await Wait(reader.LoadAsync(size));var bytes=new byte[size];reader.ReadBytes(bytes);
-                    using(var data=new MemoryStream(bytes)){var image=new BitmapImage();image.BeginInit();image.CacheOption=BitmapCacheOption.OnLoad;image.DecodePixelWidth=192;image.StreamSource=data;image.EndInit();image.Freeze();return image;}
+                    using(var data=new MemoryStream(bytes)){var image=new BitmapImage();image.BeginInit();image.CacheOption=BitmapCacheOption.OnLoad;image.DecodePixelWidth=160;image.StreamSource=data;image.EndInit();image.Freeze();return image;}
                 }
             }catch{return null;}
         }
@@ -48,6 +48,8 @@ namespace OneTaskBar
         internal bool? WifiPresent,BluetoothPresent;internal bool NetworkConnected;DateTime radioProbeAt;
         internal MediaState Media=new MediaState();
         readonly MediaArtwork artwork=new MediaArtwork();int propertiesDirty=1,playbackDirty=1;DateTime metadataAt,playbackAt;bool disposed;
+        readonly MediaArtwork highArtwork=new MediaArtwork();string highAttempt;bool largeCover=Preferences.Current.NowBarLargeCover,highResolution=YouTubeArtwork.Enabled;
+        internal void ArtworkModeChanged(){if(largeCover==Preferences.Current.NowBarLargeCover&&highResolution==YouTubeArtwork.Enabled)return;largeCover=Preferences.Current.NowBarLargeCover;highResolution=YouTubeArtwork.Enabled;highAttempt=null;if(!largeCover||!highResolution){highArtwork.Clear();}Interlocked.Exchange(ref propertiesDirty,1);Notify();}
         bool interactive;internal bool Interactive {get{return interactive;}set{if(interactive==value)return;interactive=value;if(value){outputAt=radioProbeAt=playbackAt=DateTime.MinValue;Interlocked.Exchange(ref playbackDirty,1);}}}internal Action Changed;
         internal int MetadataReads;
         internal int ArtworkReads {get{return artwork.Reads;}}internal int ArtworkDecodes {get{return artwork.Decodes;}}
@@ -60,7 +62,7 @@ namespace OneTaskBar
         {
             if(Object.ReferenceEquals(session,value))return;
             if(session!=null)try{session.MediaPropertiesChanged-=PropertiesChanged;session.PlaybackInfoChanged-=PlaybackChanged;session.TimelinePropertiesChanged-=TimelineChanged;}catch{}
-            session=value;artwork.Clear();Interlocked.Exchange(ref propertiesDirty,1);metadataAt=DateTime.MinValue;
+            session=value;artwork.Clear();highArtwork.Clear();highAttempt=null;Interlocked.Exchange(ref propertiesDirty,1);metadataAt=DateTime.MinValue;
             if(session!=null)try{session.MediaPropertiesChanged+=PropertiesChanged;session.PlaybackInfoChanged+=PlaybackChanged;session.TimelinePropertiesChanged+=TimelineChanged;}catch{}
         }
         public void Dispose(){disposed=true;SelectSession(null);if(manager!=null)try{manager.CurrentSessionChanged-=CurrentChanged;}catch{}manager=null;}
@@ -92,7 +94,7 @@ namespace OneTaskBar
                 var info=session.GetPlaybackInfo();var previous=Media;
                 var state=new MediaState {Available=true,Title=previous.Title,Artist=previous.Artist,AppId=session.SourceAppUserModelId,
                     Playing=info.PlaybackStatus==GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing,Active=info.PlaybackStatus==GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing||info.PlaybackStatus==GlobalSystemMediaTransportControlsSessionPlaybackStatus.Paused,
-                    CanPlay=info.Controls.IsPlayPauseToggleEnabled,CanNext=info.Controls.IsNextEnabled,CanPrevious=info.Controls.IsPreviousEnabled,Artwork=artwork.Image};
+                    CanPlay=info.Controls.IsPlayPauseToggleEnabled,CanNext=info.Controls.IsNextEnabled,CanPrevious=info.Controls.IsPreviousEnabled,Artwork=highArtwork.Image??artwork.Image};
                 try {var timeline=session.GetTimelineProperties();state.Duration=Math.Max(0,(timeline.EndTime-timeline.StartTime).TotalSeconds);state.Position=Math.Max(0,(timeline.Position-timeline.StartTime).TotalSeconds);state.SampledUtc=timeline.LastUpdatedTime.UtcDateTime;if(Math.Abs((DateTime.UtcNow-state.SampledUtc).TotalDays)>1)state.SampledUtc=DateTime.UtcNow;state.CanSeek=info.Controls.IsPlaybackPositionEnabled&&state.Duration>0;}catch{}
                 // Track changes arrive as events; retain a slow fallback for incomplete media providers.
                 if(Interlocked.Exchange(ref propertiesDirty,0)!=0||DateTime.UtcNow>=metadataAt||artwork.Due(DateTime.UtcNow)) {
@@ -101,6 +103,9 @@ namespace OneTaskBar
                         state.Title=String.IsNullOrWhiteSpace(properties.Title)?"미디어":properties.Title;state.Artist=properties.Artist;
                         string key=state.AppId+"|"+properties.Title+"|"+properties.Artist;
                         state.Artwork=await artwork.Read(key,()=>ReadThumbnail(properties.Thumbnail),DateTime.UtcNow);
+                        bool permitted=largeCover&&highResolution&&YouTubeArtwork.Allowed(state.AppId,state.Title);if(!permitted||highAttempt!=key){highArtwork.Clear();}
+                        if(permitted&&state.Artwork!=null&&Math.Min(state.Artwork.PixelWidth,state.Artwork.PixelHeight)<500&&highAttempt!=key){highAttempt=key;string source=state.AppId,title=state.Title;var bytes=await BackgroundWork.Run(()=>YouTubeArtwork.Read(source,title));if(disposed)return;if(bytes!=null){var sharp=await highArtwork.Read(key,()=>Task.FromResult(bytes),DateTime.UtcNow);if(sharp!=null)state.Artwork=sharp;}}
+                        else if(permitted&&highArtwork.Image!=null)state.Artwork=highArtwork.Image;
                     }catch(Exception error){artwork.RetryFailed(DateTime.UtcNow);metadataAt=DateTime.UtcNow.AddSeconds(10);AppLog.Once("media-properties",error.Message);}
                 }
                 Media=state;

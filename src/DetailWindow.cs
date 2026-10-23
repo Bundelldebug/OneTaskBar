@@ -14,7 +14,9 @@ namespace OneTaskBar
         readonly ShellController shell;readonly string page;
         readonly StackPanel body=new StackPanel();readonly TextBlock status=Paint.TextBlock("",12,Paint.Muted);
         readonly DispatcherTimer ticker=new DispatcherTimer {Interval=TimeSpan.FromSeconds(1)};
-        bool closed,busy,changingMode;Guid? selectedMode;
+        bool closed,busy,changingMode,changingSamsung;Guid? selectedMode;int samsungMode=-1;
+        internal override bool CanRelease {get{return !busy&&!changingMode&&!changingSamsung;}}
+        internal bool TimerActive {get{return ticker.IsEnabled;}}
         internal DetailWindow(ShellController controller,string kind)
         {
             shell=controller;page=kind;Title="One TaskBar · "+PageName(kind);Width=380;Height=540;Radius=30;Dark=true;Surface.CornerRadius=new CornerRadius(30);Surface.Background=QuickPanel.Glass;Surface.BorderBrush=Paint.Brush("#48FFFFFF");Surface.BorderThickness=new Thickness(.7);
@@ -26,7 +28,8 @@ namespace OneTaskBar
             status.TextWrapping=TextWrapping.Wrap;status.Margin=new Thickness(5,10,5,0);DockPanel.SetDock(status,Dock.Bottom);root.Children.Add(status);
             root.Children.Add(new SmoothScrollViewer {Content=body,VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});Surface.Child=root;
             Closed+=(s,e)=> {closed=true;ticker.Stop();};Deactivated+=(s,e)=> {if(!Program.Inspectable&&IsVisible&&!IsMouseOver)Hide();};Reload();
-            ticker.Tick+=(s,e)=> {if(page=="focus")FocusStatus();else if(page=="power"&&!busy&&!changingMode){var mode=Native.ReadPerformanceMode();if(mode.Available&&selectedMode!=mode.Selected)Reload();}};ticker.Start();
+            ticker.Tick+=(s,e)=> {if(page=="focus")FocusStatus();else if(page=="power"&&!busy&&!changingMode&&!changingSamsung){var mode=Native.ReadPerformanceMode();if(mode.Available&&selectedMode!=mode.Selected||shell.SamsungSettings()!=null&&samsungMode!=SamsungPerformance.Current())Reload();}};
+            IsVisibleChanged+=(s,e)=> {if(IsVisible&&(page=="focus"||page=="power"))ticker.Start();else ticker.Stop();};
         }
         static string PageName(string kind) {return kind=="wifi"?"Wi-Fi":kind=="bluetooth"?"블루투스":kind=="sound"?"소리 및 출력":kind=="power"?"배터리 및 전원":kind=="focus"?"집중 타이머":"디스플레이";}
         static Border Card(UIElement child) {return new Border {CornerRadius=new CornerRadius(22),Background=QuickPanel.Card,Padding=new Thickness(13),Margin=new Thickness(0,5,0,5),Child=child};}
@@ -56,6 +59,8 @@ namespace OneTaskBar
                     if(PowerDisplay.Slot(shell.Power,Preferences.Current.DesktopPowerWatts)>0)body.Children.Add(Card(new BatteryPill {Width=140,Height=40,State=shell.Power}));
                     Text(shell.Power.Known?(shell.Power.Connected?"전원에 연결되어 있습니다":"배터리를 사용하고 있습니다"):"배터리가 없는 PC · Windows 전원 관리를 사용합니다");
                     if(!shell.Power.Known&&Preferences.Current.DesktopPowerWatts>0)Text("표시된 W 값은 사용자가 직접 입력한 값이며 실시간 소비전력 측정값이 아닙니다.");
+                    var samsung=shell.SamsungSettings();var vendor=SamsungPerformance.Read(samsung!=null);samsungMode=vendor.Selected;
+                    if(vendor.Available){Text("삼성 성능 모드");foreach(var option in vendor.Modes){var choice=option;var button=Paint.Action((choice.Id==vendor.Selected?"✓  ":"")+choice.Name,()=>ChangeSamsungMode(choice.Id));button.IsEnabled=!changingSamsung;button.HorizontalContentAlignment=HorizontalAlignment.Left;button.HorizontalAlignment=HorizontalAlignment.Stretch;button.Padding=new Thickness(13,11,13,11);button.Margin=new Thickness(0,3,0,3);button.Background=choice.Id==vendor.Selected?Paint.ControlWhite:QuickPanel.Card;((TextBlock)button.Content).Foreground=choice.Id==vendor.Selected?Paint.Ink:Paint.Text;body.Children.Add(button);}Action("삼성 설정에서 성능 모드 열기  ›",()=>SamsungPerformance.Open());}
                     var mode=Native.ReadPerformanceMode();selectedMode=mode.Available?(Guid?)mode.Selected:null;Text("Windows 성능 모드");
                     if(mode.Available){foreach(var option in Native.PerformanceModes()){var choice=option;var button=Paint.Action((choice.Id==mode.Selected?"✓  ":"")+choice.Name,()=>ChangeMode(choice.Id));button.HorizontalContentAlignment=HorizontalAlignment.Left;button.HorizontalAlignment=HorizontalAlignment.Stretch;button.Padding=new Thickness(13,11,13,11);button.Margin=new Thickness(0,3,0,3);button.BorderBrush=Brushes.Transparent;button.BorderThickness=new Thickness(0);button.Background=choice.Id==mode.Selected?Paint.ControlWhite:QuickPanel.Card;((TextBlock)button.Content).Foreground=choice.Id==mode.Selected?Paint.Ink:Paint.Text;body.Children.Add(button);}}
                     else Text("이 Windows 환경은 성능 모드 변경을 지원하지 않습니다.");
@@ -77,6 +82,12 @@ namespace OneTaskBar
             catch(Exception error){if(!closed)status.Text=error.Message;}
         }
         void FocusStatus() {status.Text=shell.FocusUntil>DateTime.UtcNow?"남은 시간  "+(shell.FocusUntil-DateTime.UtcNow).ToString(@"mm\:ss"):"진행 중인 타이머가 없습니다";}
+        async void ChangeSamsungMode(int value)
+        {
+            if(changingSamsung||closed)return;changingSamsung=true;status.Text="삼성 설정에서 성능 모드를 적용하는 중…";
+            try{var state=await BackgroundWork.Run(()=>SamsungPerformance.Set(shell.SamsungSettings(),value));if(!closed){samsungMode=state.Selected;Reload();}}
+            catch(Exception error){if(!closed)status.Text=error.Message;}finally{changingSamsung=false;}
+        }
         async void ChangeMode(Guid mode)
         {
             if(changingMode||closed)return;changingMode=true;status.Text="성능 모드를 적용하는 중…";

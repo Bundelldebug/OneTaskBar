@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -14,6 +14,8 @@ namespace OneTaskBar
     internal sealed class WelcomeWindow : GlassWindow
     {
         readonly ShellController shell;
+        bool releasing;
+        internal void ReleaseIdle(){releasing=true;Close();}
         readonly ToggleSwitch desktop,startup;
         readonly TextBlock status=Paint.TextBlock("변경한 설정은 바로 적용되고 다음 실행에도 유지됩니다",11,Paint.Muted);
         internal readonly BatteryPill PreviewBattery=new BatteryPill {Width=56,Height=24,ExpandedWidth=90};
@@ -35,16 +37,17 @@ namespace OneTaskBar
             Group(groups,"데스크톱",desktopRows);
             var panels=new StackPanel();
             ChoiceRow(panels,"알림센터","시계와 알림 버튼에서 열 화면",Preferences.Current.NativeNotifications,v=>Preferences.Set(p=>p.NativeNotifications=v));
-            Row(panels,"One UI 알림 팝업","Windows 알림을 둥근 블러 카드로 표시합니다. 방해 금지와 앱별 배너 설정을 따릅니다",Preferences.Current.NotificationPopups,v=>Preferences.Set(p=>p.NotificationPopups=v));
+            Row(panels,"One Taskbar 알림 팝업","Windows 알림을 둥근 블러 카드로 표시합니다. 방해 금지와 앱별 배너 설정을 따릅니다",Preferences.Current.NotificationPopups,v=>Preferences.Set(p=>p.NotificationPopups=v));
             var notificationLink=Paint.Action("Windows 알림 연결 · 권한 관리",()=>shell.ShowNotificationConnection());notificationLink.HorizontalContentAlignment=HorizontalAlignment.Left;notificationLink.Margin=new Thickness(12,5,12,12);panels.Children.Add(notificationLink);
             ChoiceRow(panels,"빠른 설정","Wi-Fi·소리·배터리 버튼에서 열 화면",Preferences.Current.NativeQuickSettings,v=>Preferences.Set(p=>p.NativeQuickSettings=v));
             Row(panels,"슬라이더 스크롤 조절","밝기·음량·재생 위치 위에서 휠이나 트랙패드 스크롤로 값을 바꿉니다. 기본은 꺼짐입니다",Preferences.Current.QuickSliderScroll,v=>Preferences.Set(p=>p.QuickSliderScroll=v));
             Group(groups,"패널 선택",panels);
             var launcher=new StackPanel();
-            ChoiceRow(launcher,"독의 시작 버튼","버튼 모양과 눌렀을 때 열 화면",Preferences.Current.NativeStartButton,v=>Preferences.Set(p=>p.NativeStartButton=v),"One UI 시작","Windows 시작");
-            ChoiceRow(launcher,"키보드 시작 키","Windows 키만 눌렀을 때 열 화면",Preferences.Current.NativeStartKey,v=>Preferences.Set(p=>p.NativeStartKey=v),"One UI 시작","Windows 시작");
+            ChoiceRow(launcher,"독의 시작 버튼","버튼 모양과 눌렀을 때 열 화면",Preferences.Current.NativeStartButton,v=>Preferences.Set(p=>p.NativeStartButton=v),"One Taskbar","Windows 시작");
+            ChoiceRow(launcher,"키보드 시작 키","Windows 키만 눌렀을 때 열 화면",Preferences.Current.NativeStartKey,v=>Preferences.Set(p=>p.NativeStartKey=v),"One Taskbar","Windows 시작");
             ChoiceRow(launcher,"검색 버튼","독과 앱 화면의 검색 버튼에서 열 화면",Preferences.Current.NativeSearch,v=>Preferences.Set(p=>p.NativeSearch=v),"런처 검색","Windows 검색");
             Group(groups,"시작과 검색",launcher);
+            var nowBar=new StackPanel();ChoiceRow(nowBar,"미디어 플레이어 펼침 스타일","큰 커버는 앨범 이미지를 위로 펼쳐 표시합니다",Preferences.Current.NowBarLargeCover,v=>Preferences.Set(p=>p.NowBarLargeCover=v),"기본","큰 커버");Row(nowBar,"YouTube 고화질 커버",(Preferences.Current.YouTubeArtworkTrack!=null?"현재 영상만 허용됨 · ":"")+"삼성 브라우저의 재생 제목과 일치하는 기록에서 영상 ID만 읽어 YouTube 이미지 서버에서 커버를 가져옵니다",YouTubeArtwork.Enabled,v=>Preferences.Set(p=>{p.YouTubeHighResArtwork=v;p.YouTubeArtworkTrack=null;}));Group(groups,"미디어 플레이어",nowBar);
             var safety=new StackPanel();Row(safety,"긴급 종료 단축키","Ctrl + Shift + Tab + 1 · One TaskBar 종료 및 Windows 작업표시줄 복원",Preferences.Current.EmergencyExit,v=>Preferences.Set(p=>p.EmergencyExit=v));Group(groups,"복구",safety);
             var hardware=new StackPanel();
             var powerRow=new Grid {Margin=new Thickness(15,11,15,11)};powerRow.ColumnDefinitions.Add(new ColumnDefinition());powerRow.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(105)});
@@ -61,8 +64,14 @@ namespace OneTaskBar
             Row(motion,"충전 애니메이션","연결할 때 배터리 아이콘이 커졌다가 돌아옵니다",Preferences.Current.ChargeAnimation,v=>Preferences.Set(p=>p.ChargeAnimation=v));
             var preview=new Grid {Margin=new Thickness(15,5,15,12),Height=44};PreviewBattery.State=controller.Power;PreviewBattery.VerticalAlignment=VerticalAlignment.Center;PreviewBattery.HorizontalAlignment=HorizontalAlignment.Left;PreviewBattery.Margin=new Thickness(34,0,0,0);preview.Children.Add(PreviewBattery);
             var tryCharge=Paint.Action("충전 효과 미리 보기",()=>shell.PreviewCharge());tryCharge.HorizontalAlignment=HorizontalAlignment.Right;preview.Children.Add(tryCharge);motion.Children.Add(preview);Group(groups,"움직임",motion);
+            var sounds=new StackPanel();var soundToggle=Row(sounds,"충전 연결음","충전기를 새로 연결하면 선택한 소리 파일을 재생합니다",Preferences.Current.ChargeSoundEnabled,v=>Preferences.Set(p=>p.ChargeSoundEnabled=v));
+            var soundName=Paint.TextBlock(String.IsNullOrEmpty(Preferences.Current.ChargeSoundFile)?"선택한 파일 없음":Path.GetFileName(Preferences.Current.ChargeSoundFile),12,Paint.Muted);soundName.Margin=new Thickness(15,3,15,7);soundName.TextTrimming=TextTrimming.CharacterEllipsis;sounds.Children.Add(soundName);
+            var soundActions=new StackPanel {Orientation=Orientation.Horizontal,Margin=new Thickness(12,0,12,12)};
+            soundActions.Children.Add(Paint.Action("소리 파일 선택",()=> {var picker=new Microsoft.Win32.OpenFileDialog {Title="충전 연결음 선택",Filter="소리 파일|*.wav;*.mp3;*.wma;*.m4a;*.aac",CheckFileExists=true,Multiselect=false};if(picker.ShowDialog(this)!=true)return;Preferences.Set(p=> {p.ChargeSoundFile=picker.FileName;p.ChargeSoundEnabled=true;});soundName.Text=Path.GetFileName(picker.FileName);soundToggle.Refresh(true);status.Text="충전 연결음을 저장했습니다";}));
+            soundActions.Children.Add(Paint.Action("미리 듣기",()=>shell.ConnectionSound.Play(Preferences.Current.ChargeSoundFile,message=>status.Text=message)));
+            soundActions.Children.Add(Paint.Action("파일 지우기",()=> {Preferences.Set(p=> {p.ChargeSoundFile=null;p.ChargeSoundEnabled=false;});soundName.Text="선택한 파일 없음";soundToggle.Refresh(false);}));sounds.Children.Add(soundActions);Group(groups,"충전 소리",sounds);
             var scroller=new SmoothScrollViewer {Content=groups,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};scroller.Resources[SystemParameters.VerticalScrollBarWidthKey]=5.0;root.Children.Add(scroller);Surface.Child=root;LightPanel.Apply(root);
-            MouseLeftButtonDown+=(s,e)=> {if(e.OriginalSource==header||e.OriginalSource==name)DragMove();};Closing+=(s,e)=> {if(!shell.IsDisposing&&!Application.Current.Dispatcher.HasShutdownStarted){e.Cancel=true;Hide();}};
+            MouseLeftButtonDown+=(s,e)=> {if(e.OriginalSource==header||e.OriginalSource==name)DragMove();};Closing+=(s,e)=> {if(!releasing&&!shell.IsDisposing&&!Application.Current.Dispatcher.HasShutdownStarted){e.Cancel=true;Hide();}};
         }
         static void Group(StackPanel target,string label,UIElement content)
         {

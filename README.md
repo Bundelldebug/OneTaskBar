@@ -19,15 +19,18 @@ Download **OneTaskBar-Setup.exe** from [Releases](https://github.com/Bundelldebu
 - Separate app and status capsules; original Windows/app icons, Windows system font, seconds on the clock, running indicators, and drag-to-reorder pins.
 - Rounded, antialiased surfaces using layered WPF alpha and a matching DirectComposition clip. Blur stays steady while app/search contents animate.
 - Compact app drawer and launcher search, capped at 720 × 680 DIP: apps, Windows settings, local files/images, Korean initial consonants, and removable recent searches. Type directly in the app drawer; active IME composition finishes before the transition.
-- A One UI Start menu precedes the app drawer: search, paged pinned apps, recent files, user/document folders, settings and lock/sleep/shutdown/restart. Start pins and their drag order are saved separately from dock pins; app context menus offer both choices. Dragged tiles follow the pointer while neighbors animate into place. “All apps” opens the existing drawer. The Start page is capped at 640 × 620 DIP and uses the same glass as quick settings.
+- A One Taskbar Start menu precedes the app drawer: search, paged pinned apps, recent files, user/document folders, settings and lock/sleep/shutdown/restart. Start pins and their drag order are saved separately from dock pins; app context menus offer both choices. Dragged tiles follow the pointer while neighbors animate into place. “All apps” opens the existing drawer. The Start page is capped at 940 × 620 DIP and uses the same glass as quick settings.
+- Start and All apps each support app folders, folder renaming and child drag order; use tile centers to group and edges to reorder. Folder extraction preserves apps. Start, drawer and dock layouts are saved separately. The Phone Link pane uses the installed native Start companion card and collapses on narrow displays.
 - In custom Start-key mode, a solo physical Windows press stays out of the native shell from key-down, avoiding the native dim/undim transition. Windows chords are replayed in modifier/key order; native Start-key mode remains available.
 - Independent choices for Windows/custom quick settings, notifications, keyboard Start, and search. Windows shortcuts continue to work with the solo Start-key option.
 - Touch panning and fractional touchpad scrolling; discrete wheel scrolling uses a short transition.
 - System volume, brightness where supported, radio/device controls, media transport and centered artwork, battery/power mode, and theme toggle.
 - Ten quick toggles read back actual state: mute, dark mode, Do Not Disturb, power efficiency, keep screen awake, Wi-Fi, Bluetooth, dock animations, startup and slider scrolling. Unsupported hardware controls are disabled or hidden. Power efficiency selects the Windows performance overlay; it is not a separate Energy Saver implementation. Keep-awake lasts only while the app is running and still allows manual sleep.
-- A bottom-left Now bar follows active Windows media sessions. Its 44-DIP capsule fits the title up to the right status capsule's width (282 DIP maximum), keeps artwork and text left aligned, scrolls longer titles, and expands into playback/seek controls when the media app supports them. Artwork supplies the background color, adjusted for readable white text. Crowded displays place it above the dock without moving existing app slots.
+- A bottom-left Media player follows active Windows media sessions. Its 44-DIP capsule fits the title up to the right status capsule's width (282 DIP maximum), keeps artwork and text left aligned, scrolls longer titles, and expands into playback/seek controls when the media app supports them. Artwork supplies the background color, adjusted for readable white text. Crowded displays place it above the dock without moving existing app slots.
 - Missing radios, Samsung applications, unsupported brightness devices, and absent batteries are handled without placeholder applications. Desktop users can hide the battery slot or manually show 1–9999 W; this value is **not a measurement**.
 - Charging status updates immediately on AC connection; the battery capsule expands once per cable connection. Startup does not simulate a plug event.
+- Settings → Media player offers default or large-cover expansion; settings → Charging sound selects and previews your own local audio file. Both new options default off.
+- The button immediately right of Search opens Windows Task view for switching desktops. In launcher Search, use arrows to select results and Enter to open them. App menus in Start, All apps and Search offer Run as administrator for desktop executables/shortcuts; Windows controls the elevation prompt.
 - App context menus include Task Manager. Toggle animations, blur, hover, startup, indicators, and recovery in settings.
 
 ## Recovery and shortcuts
@@ -46,9 +49,9 @@ The standard EXE installer defaults to the **Windows notification center**, whic
 
 Open One TaskBar settings → Windows notification connection to register its optional local identity and request access inside the app. Windows may require a one-time administrator approval for registration and always controls notification consent. Existing registration is reused on normal launch and login. The identity is an **unsigned local-test package**, not a production-signed MSIX; it is optional and is not silently registered by Setup. See [notification setup and limits](docs/NOTIFICATIONS.md). Native Windows notifications remain available.
 
-With notification access allowed, **One UI notification popups** replaces supported Windows toast banners with up to three rounded glass cards. Popups do not take keyboard focus; closing a card keeps its notification in history. Actual Windows banner content is matched to fresh listener entries, so existing history and history-only updates are not replayed. Clicking uses the original Windows toast action, protocol or registered callback. Notifications without a direct route are matched against their native history card; an ambiguous/unavailable match opens the native center rather than launching the sender app with guessed arguments. The expiry timer stops when the stack is empty. This optional shell integration is Windows-build dependent; see the notification guide for fallback and recovery behavior.
+With notification access allowed, **One Taskbar notification popups** replaces supported Windows toast banners with up to three rounded glass cards. Popups do not take keyboard focus; closing a card keeps its notification in history. Actual Windows banner content is matched to fresh listener entries, so existing history and history-only updates are not replayed. Clicking uses the original Windows toast action, protocol or registered callback. Notifications without a direct route are matched against their native history card; an ambiguous/unavailable match opens the native center rather than launching the sender app with guessed arguments. The expiry timer stops when the stack is empty. This optional shell integration is Windows-build dependent; see the notification guide for fallback and recovery behavior.
 
-Samsung Settings / device-connection buttons use applications and logos already installed on the PC; those applications are not bundled. An optional, pre-existing Windhawk charging companion is paused while the dock owns the desktop and resumed on exit. Windhawk is not required for the dock or installed by Setup.
+Samsung Settings / device-connection buttons use applications and logos already installed on the PC; those applications are not bundled. Compatible devices show Samsung performance choices in Battery and power. On OEM versions without accessible selection controls, the original performance page opens for manual selection. No firmware or registry performance value is directly modified. An optional, pre-existing Windhawk charging companion is paused while the dock owns the desktop and resumed on exit. Windhawk is not required for the dock or installed by Setup.
 
 ## Build and verify
 
@@ -77,22 +80,37 @@ Interactive probes require an unlocked desktop and focus their own test windows.
 
 No telemetry, account, or background web service is required. Search runs locally. Preferences, recent queries, shell pin caches, and diagnostic logs stay in the data directory. The custom notification center accesses notification data only after Windows permission. An app or document you choose to open may use its own network services.
 
+YouTube high-resolution covers are optional and off by default. When enabled, only the exact playing Samsung Browser title is matched in that browser's current local History profile. A unique video ID is used to request a public cover from `i.ytimg.com`; no title, cookies or history rows are sent. Ambiguous matches are rejected. Each track is resolved once, with bounded database time, download size and two CDN image-size attempts. Single-video consent can be limited to that track instead of enabling the general option. Native artwork keeps its source detail up to 1280 pixels; background images remain bounded separately. A source that supplies only a tiny image may still look soft when no matching high-resolution cover is available.
+
 Code and the original One TaskBar icon are under the [MIT license](LICENSE). [Third-party notices](THIRD_PARTY_NOTICES.txt) include the Liquid Dock reference. This repository contains no Samsung APK, extracted launcher artwork, wallpapers, fonts, or user screenshots/recordings. Installed third-party logos are read at runtime and remain their owners' property. This is an independent project and is not affiliated with Microsoft or Samsung. Open-source licensing does not guarantee that no third party will ever make a copyright or trademark complaint.
+
+## 8.5.3
+
+- Adds `tools/Test-ReleaseDefender.ps1` for pre-publication scans of the app, recovery helper, Setup and portable archive. It requires active protection, unchanged file hashes and no new matching detections. It does not change security exclusions or protection settings. Scan results are specific to those files and installed definitions. Trusted code signing requires a separate publisher certificate; Defender results and SmartScreen reputation are distinct. See [Microsoft's developer FAQ](https://learn.microsoft.com/en-us/defender-xdr/developer-faq) and [file submission portal](https://www.microsoft.com/en-us/wdsi/filesubmission/).
+- Adds Task view beside dock Search, spatial keyboard navigation and Enter in launcher Search, and administrator launch in Start/All apps/Search app menus. IME composition and the query's normal caret controls are preserved; the dock menu does not show elevation.
+- Start and All apps support folders, naming, child order, extraction and animated reordering. Each layout is independent of dock pins; new installs append without reshuffling existing folders.
+- Start gains a responsive Phone Link pane from the installed native companion card, with connection/battery details and generic message/call/photo/file shortcuts. It refreshes on opening, with no hidden polling; unavailable metadata shows a connect state.
+- Battery and power shows supported Samsung performance profiles only on compatible devices with Samsung Settings installed. Selection uses the signed OEM app's controls, with the original performance page as fallback when automation is unavailable. Firmware services and mirrored registry values are not written directly.
+- Notification icons fall back to installed app logos. Available native app-logo overrides and large images appear in both the center and banners. Missing images leave no placeholder or empty image column; picture reads reuse local assets/cache without downloading remote images.
+- Adds a custom charging sound file picker and preview. It defaults off, plays once on a new AC connection and does not play merely because the app starts plugged in.
+- Media player offers an optional large-cover expansion with controls below the artwork, preserving the default compact player. Missing covers omit the large area. Real Windows lock-screen replacement is outside the supported desktop app APIs.
+- Renames the capsule feature to Media player. Covers preserve native resolution up to 1280 pixels, with a separate opt-in Samsung Browser/YouTube high-resolution source for tiny native thumbnails.
+- Renames custom Start and popup settings to One Taskbar. Hidden panels release after 20 seconds, detail-page timers stop while hidden, and the icon cache is bounded to 48 entries with 160-pixel assets. No forced GC or working-set trim is used; see validation for measured memory and CPU.
 
 ## 8.5.2
 
-- Adds a compact One UI Start page with search, pinned apps, recent files, All apps and power controls. Start pins are independent of dock pins; drag to reorder them with animated movement and persistent positions.
+- Adds a compact One Taskbar Start page with search, pinned apps, recent files, All apps and power controls. Start pins are independent of dock pins; drag to reorder them with animated movement and persistent positions.
 - Buffers solo Windows-key presses before the native shell sees them, avoiding its dim/undim flash while preserving Windows-key chords and the optional native Start mode.
-- Clips both Now bar native input regions to the visible capsule, restoring clicks above and beside it in collapsed and expanded states.
-- Adds optional One UI notification banners with no focus stealing. Actual native-toast matching preserves silent history updates, Do Not Disturb and per-app banner decisions.
+- Clips both Media player native input regions to the visible capsule, restoring clicks above and beside it in collapsed and expanded states.
+- Adds optional One Taskbar notification banners with no focus stealing. Actual native-toast matching preserves silent history updates, Do Not Disturb and per-app banner decisions.
 - Opens the original notification action through the native toast, protocol, registered callback or exact native history card. Missing or ambiguous matches reveal Windows notification history instead of merely launching the sender app.
 - Keeps cached input bounds, bounded background work and event-driven recovery. The final battery/media-active resource sample averaged 0.0517% main CPU and 0.0000% helper CPU; see validation for memory and measurement limits.
 
 ## 8.5.1
 
-- Caps the collapsed Now bar at the right status capsule's width and keeps the thumbnail and title left aligned, including short titles.
+- Caps the collapsed Media player at the right status capsule's width and keeps the thumbnail and title left aligned, including short titles.
 - Removes the playback-state icon from the collapsed capsule, leaving artwork and title.
-- Reduces the active quick-settings player from 188 to 140 DIP. Quick settings and expanded Now bar show artwork behind a dark translucent overlay for readable text.
+- Reduces the active quick-settings player from 188 to 140 DIP. Quick settings and expanded Media player show artwork behind a dark translucent overlay for readable text.
 - Artwork surfaces are frozen, shared and bounded to 640 pixels, with weak caching so past covers can be collected. No live artwork blur or per-refresh decoding is added.
 - Same-title artwork events replace stale thumbnails. Two bounded retries after a track change handle late covers; identical image bytes reuse their decoded bitmap, and transient failures retain only the current track's cover.
 - Wheel/trackpad slider adjustments in quick settings default off. Enable them with the slider-scrolling quick toggle or app setting; otherwise scrolling continues through the panel.
@@ -109,9 +127,9 @@ Code and the original One TaskBar icon are under the [MIT license](LICENSE). [Th
 ## 0.5.5
 
 - Live DWM window previews with enlarged image content, monitor-aware pagination and released thumbnail handles.
-- One shared media player in quick settings and Now bar, including default output-device name and an icon button for switching outputs. Idle media becomes a slim capsule.
+- One shared media player in quick settings and Media player, including default output-device name and an icon button for switching outputs. Idle media becomes a slim capsule.
 - In-app Windows notification connection, Do Not Disturb toggle, calendar-free notification panel and mutually exclusive quick/notification panels.
-- Softer low-volume/brightness shapes, matched blur during transitions, signal-aware Wi-Fi arcs, click-away context menus and Now bar collapse, and white battery numbers.
+- Softer low-volume/brightness shapes, matched blur during transitions, signal-aware Wi-Fi arcs, click-away context menus and Media player collapse, and white battery numbers.
 - Background work uses two reusable EcoQoS workers; Windows selects efficient cores on supported hybrid CPUs. No hard CPU affinity is imposed. Icons decode on entering the viewport, media metadata follows change events, and fallback polling is reduced. UI/animation work and urgent keyboard feedback retain their normal execution paths.
 - Battery operation lowers the general UI pulse from 10 to 5 Hz, independently of animation frames and input callbacks. This reduces periodic work; battery-runtime gains have not been measured.
 - Fixes the recovery helper's undispatched STA messages that could saturate a core and leave helpers behind after restart. The helper now uses a sleeping native owner wait with 20-ms emergency-key checks, avoids window-message and file-watcher traffic, and rejects duplicates.
@@ -119,7 +137,7 @@ Code and the original One TaskBar icon are under the [MIT license](LICENSE). [Th
 
 ## 0.5.2
 
-Adds the artwork-colored Now bar with real media-session controls, adaptive title width and marquee overflow. Expansion and collapse animate the capsule inside a fixed native host, keeping text layout cached and avoiding repeated native window resizing and backdrop placement. Transparent space outside the capsule passes clicks through; the bar stays out of Alt+Tab.
+Adds the artwork-colored Media player with real media-session controls, adaptive title width and marquee overflow. Expansion and collapse animate the capsule inside a fixed native host, keeping text layout cached and avoiding repeated native window resizing and backdrop placement. Transparent space outside the capsule passes clicks through; the bar stays out of Alt+Tab.
 
 Quick settings, connection details, notifications, app drawer and search share the gray live-glass palette. App/search panels use compact bounds and continuous content transitions. Quick settings contains actual stateful toggles, a plain settings glyph and a power menu with restart, shutdown, sleep and lock.
 

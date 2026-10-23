@@ -116,6 +116,11 @@ namespace OneTaskBar
             else if(kind=="chevron") { line(8,5,15,12); line(15,12,8,19); }
             else if(kind=="back") {line(15,5,8,12);line(8,12,15,19);}
             else if(kind=="user") {dc.DrawEllipse(null,pen,new Point(12,7),4,4);dc.DrawGeometry(null,pen,Geometry.Parse("M3,22 L3,20 A9,8 0 0 1 21,20 L21,22"));}
+            else if(kind=="phone") {dc.DrawRoundedRectangle(null,pen,new Rect(6,1,12,22),2.5,2.5);line(10,4,14,4);line(10,20,14,20);}
+            else if(kind=="message") dc.DrawGeometry(null,pen,Geometry.Parse("M5,3 L19,3 Q22,3 22,6 L22,15 Q22,18 19,18 L10,18 5,22 5,18 Q2,18 2,15 L2,6 Q2,3 5,3 Z M6,8 L18,8 M6,12 L14,12"));
+            else if(kind=="photo") {dc.DrawRoundedRectangle(null,pen,new Rect(2,2,20,20),3,3);dc.DrawEllipse(null,pen,new Point(8,8),2,2);dc.DrawGeometry(null,pen,Geometry.Parse("M3,19 L10,12 14,16 17,12 22,17"));}
+            else if(kind=="send") dc.DrawGeometry(null,pen,Geometry.Parse("M2,3 L23,12 2,21 6,12 Z M6,12 L23,12"));
+            else if(kind=="call") dc.DrawGeometry(null,pen,Geometry.Parse("M5,2 L9,6 7,10 Q9,15 14,17 L18,15 22,19 20,22 Q9,23 2,10 L2,5 Z"));
             else if(kind=="folder") dc.DrawGeometry(null,pen,Geometry.Parse("M2,7 L2,4 Q2,2 4,2 L10,2 13,5 20,5 Q22,5 22,7 L22,20 Q22,22 20,22 L4,22 Q2,22 2,20 Z M2,9 L22,9"));
             else if(kind=="up") { line(5,15,12,8); line(12,8,19,15); }
             else if(kind=="close") {line(6,6,18,18);line(18,6,6,18);}
@@ -126,6 +131,8 @@ namespace OneTaskBar
             else if(kind=="settings") dc.DrawGeometry(brush,null,gear);
             else if(kind=="windows-settings") dc.DrawGeometry(brush,null,windowsGear);
             else if(kind=="window") { dc.DrawRoundedRectangle(null,pen,new Rect(2,3,20,18),2,2); line(2,8,22,8); }
+            else if(kind=="desktops") {dc.DrawGeometry(null,pen,Geometry.Parse("M8,5 L8,3 Q8,2 10,2 L21,2 Q23,2 23,4 L23,15 Q23,17 21,17 L19,17"));dc.DrawRoundedRectangle(null,pen,new Rect(1,7,17,15),2,2);}
+            else if(kind=="shield") dc.DrawGeometry(null,pen,Geometry.Parse("M12,2 Q17,5 21,5 L21,12 Q20,19 12,23 Q4,19 3,12 L3,5 Q7,5 12,2 Z M12,3 L12,21 M4,11 L20,11"));
             else if(kind=="play") dc.DrawGeometry(brush,null,Geometry.Parse("M6,3 L22,12 6,21 Z"));
             else if(kind=="pause") {dc.DrawRoundedRectangle(brush,null,new Rect(5,3,5,18),1.5,1.5);dc.DrawRoundedRectangle(brush,null,new Rect(14,3,5,18),1.5,1.5);}
             else if(kind=="next"||kind=="previous") {if(kind=="previous")dc.PushTransform(new ScaleTransform(-1,1,12,12));dc.DrawGeometry(brush,null,Geometry.Parse("M4,4 L17,12 4,20 Z"));dc.DrawRoundedRectangle(brush,null,new Rect(18,4,3,16),1,1);if(kind=="previous")dc.Pop();}
@@ -220,6 +227,9 @@ namespace OneTaskBar
         internal bool StableSurface=true;internal FrameworkElement TransitionContent;
         internal Rect? BackdropClip;
         internal bool IsDismissing {get{return hiding;}}
+        internal DateTime HiddenSince=DateTime.UtcNow;
+        internal virtual bool CanRelease {get{return true;}}
+        internal bool IdleForRelease(DateTime now){return !closed&&!IsVisible&&!hiding&&CanRelease&&(now-HiddenSince).TotalSeconds>=20;}
         public GlassWindow()
         {
             MenuTheme.Install();
@@ -244,6 +254,7 @@ namespace OneTaskBar
             };
             SizeChanged+=(s,e)=> { if(new WindowInteropHelper(this).Handle!=IntPtr.Zero) Native.Round(this,Radius); };
             Preferences.Changed+=ApplyMaterial;
+            IsVisibleChanged+=(s,e)=> {if(!IsVisible)HiddenSince=DateTime.UtcNow;};
             Closed+=(s,e)=> {closed=true;++motion;CompleteDismissal(false);Preferences.Changed-=ApplyMaterial;};
             PreviewKeyDown+=(s,e)=> { if(e.Key==Key.Escape&&!DragReorder.Active) { Hide(); e.Handled=true; } };
         }

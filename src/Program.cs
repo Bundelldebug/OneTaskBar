@@ -38,6 +38,7 @@ namespace OneTaskBar
             if(args.Contains("--notification-probe")) { Signal("ProbeNotifications"); return 0; }
             if(args.Contains("--notification-banner-probe")) { Signal("ProbeBanners"); return 0; }
             if(args.Contains("--notification-action-probe")) { Signal("ProbeNotificationAction"); return 0; }
+            if(args.Contains("--phone-companion-probe")){var phone=PhoneCompanion.Read();int reads=PhoneCompanion.Reads,decodes=PhoneCompanion.Decodes;var again=PhoneCompanion.Read();bool cached=Object.ReferenceEquals(phone,again)&&reads==PhoneCompanion.Reads&&decodes==PhoneCompanion.Decodes;bool passed=phone.Available&&cached&&phone.Actions.ContainsKey("open");AppLog.Json("phone-companion-probe.json",new {passed=passed,available=phone.Available,connectionPresent=!String.IsNullOrEmpty(phone.Status),batteryPresent=!String.IsNullOrEmpty(phone.Battery),phoneImage=phone.Image!=null,genericActions=phone.Actions.Count,unchangedMetadataAndArtworkReused=cached,backgroundPolling=false,phoneCommandsExecuted=false});return passed?0:1;}
             if(args.Contains("--panel-probe")) { Signal("ProbePanels"); return 0; }
             if(args.Contains("--native-panels-probe")) {
                 TaskbarMask.Active=TaskbarMask.Protected(Native.FindWindow("Shell_TrayWnd",null));
@@ -51,6 +52,12 @@ namespace OneTaskBar
             }
             if(args.Contains("--power-probe")) {var before=Native.ReadPerformanceMode();if(!before.Available)return 1;try {Native.SetPerformanceMode(before.Selected);var after=Native.ReadPerformanceMode();bool same=after.Available&&before.Selected==after.Selected;AppLog.Json("power-mode-probe.json",new {passed=same,before=before,after=after});return same?0:1;}catch(Exception e){AppLog.Json("power-mode-probe.json",new {passed=false,error=e.Message,before=before});return 1;}}
             if(args.Contains("--launcher-probe"))return LauncherChecks.Probe();
+            if(args.Contains("--launcher-keyboard-probe"))return LauncherInputChecks.Run();
+            if(args.Contains("--app-screen-probe"))return AppScreenChecks.Run();
+            if(args.Contains("--notification-assets-probe"))return NotificationAssetChecks.Run();
+            if(args.Contains("--memory-lifecycle-probe"))return MemoryChecks.Run();
+            if(args.Contains("--media-source-probe"))return MediaArtwork.Probe();
+            if(args.Contains("--artwork-resolver-probe"))return YouTubeArtworkChecks.Run();
             if(args.Contains("--start-menu-probe"))return StartChecks.Run();
             if(args.Contains("--start-key-probe"))return StartKeyChecks.Run();
             if(args.Contains("--notification-ui-probe"))return BannerChecks.Run();
@@ -111,7 +118,7 @@ namespace OneTaskBar
         {
             var checks=new List<string>();
             try {
-                EfficiencyChecks.Validate(checks);RuntimeCadence.Check(checks);RuntimeDockOrder.Check();checks.Add("stable-launch-order");LauncherLayout.Check();checks.Add("compact-launcher-layout");NowBarLayout.Check();checks.Add("nowbar-monitor-layout");ArtworkPalette.Check();checks.Add("artwork-color-contrast");MediaArtwork.Check(checks);
+                EfficiencyChecks.Validate(checks);RuntimeCadence.Check(checks);RuntimeDockOrder.Check();checks.Add("stable-launch-order");LauncherLayout.Check();checks.Add("compact-launcher-layout");NowBarLayout.Check();checks.Add("nowbar-monitor-layout");ArtworkPalette.Check();checks.Add("artwork-color-contrast");MediaArtwork.Check(checks);StartDataChecks.Validate(checks);NotificationAssetChecks.Validate(checks);LauncherInputChecks.Validate(checks);
                 foreach(double width in new double[] { 1,200,288,344,600 }) foreach(double value in new double[] { -20,0,1,33,99,100,120 }) {
                     double f=PillSlider.FillWidth(width,value);
                     if(f<0 || f>width || (value==100 && f!=width)) throw new Exception("Slider endpoint "+width+" "+value);

@@ -19,15 +19,23 @@ namespace OneTaskBar
         readonly UniformGrid pins=new UniformGrid {Columns=6},recent=new UniformGrid {Columns=2};
         readonly TextBlock page=Paint.TextBlock("",11,Paint.Muted);
         readonly Button previous,next;
+        readonly ColumnDefinition phoneColumn;internal readonly PhonePane Phone;
+        PhoneSnapshot phoneSnapshot;DateTime phoneUntil;bool phoneBusy;
         internal readonly TextBox Search=new TextBox {FontSize=14,Foreground=Paint.Ink,Background=Brushes.Transparent,BorderThickness=new Thickness(0),Padding=new Thickness(6,9,6,9),MaxLength=120};
-        List<AppEntry> pinned=new List<AppEntry>();List<StartRecent> cachedRecent;
-        readonly Dictionary<string,Button> pinButtons=new Dictionary<string,Button>(StringComparer.OrdinalIgnoreCase);string dragPreview;
+        List<StartTile> pinned=new List<StartTile>();List<StartRecent> cachedRecent;
+        readonly Grid pinHeading,folderHeading;readonly TextBox folderName;readonly Grid recentHeading;
+        readonly Dictionary<string,Button> pinButtons=new Dictionary<string,Button>(StringComparer.OrdinalIgnoreCase);string dragPreview,groupTarget,openFolder;bool renaming;
         DateTime recentUntil;bool recentBusy,composing,queued,closed;int pinPage,load;
         internal int PinnedCount {get{return pinButtons.Count;}}
         internal int RecentCount {get{return recent.Children.Count;}}
+        internal int FolderCount {get{return shell.StartPins.FolderCount;}}
+        internal string OpenFolderKey {get{return openFolder;}}
+        internal TextBox FolderNameEditor {get{return folderName;}}
+        internal string LastPinDrop;
         internal StartWindow(ShellController owner)
         {
-            shell=owner;Title="One TaskBar · 시작";Width=640;Height=620;Radius=32;Dark=true;StableSurface=true;
+            shell=owner;Title="One TaskBar · 시작";Width=940;Height=620;Radius=32;Dark=true;StableSurface=true;
+            Resources[SystemParameters.VerticalScrollBarWidthKey]=4.0;
             Surface.CornerRadius=new CornerRadius(Radius);Surface.Background=QuickPanel.Glass;Surface.BorderBrush=Paint.Brush("#58FFFFFF");Surface.BorderThickness=new Thickness(.7);
             var root=new DockPanel {Margin=new Thickness(24,23,24,16)};
             var searchBox=new Border {Background=Paint.ControlWhite,CornerRadius=new CornerRadius(23),Padding=new Thickness(16,2,16,2),Margin=new Thickness(0,0,0,22)};
@@ -44,22 +52,30 @@ namespace OneTaskBar
             var user=Paint.Button(userRow,()=>OpenFolder(Environment.SpecialFolder.UserProfile),"사용자 폴더 열기");user.HorizontalAlignment=HorizontalAlignment.Left;user.MaxWidth=240;user.Background=Brushes.Transparent;footer.Children.Add(user);
             var tools=new StackPanel {Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right};
             tools.Children.Add(Tool("folder","문서",()=>OpenFolder(Environment.SpecialFolder.MyDocuments)));
+            tools.Children.Add(Tool("phone","휴대폰과 연결",()=>OpenPhone("ms-settings:mobile-devices-addphone-direct")));
             tools.Children.Add(Tool("settings","Windows 설정",async()=> {if(await DismissAsync())shell.OpenWindowsSettings();}));
             Button power=null;power=Tool("power","전원",()=> {power.ContextMenu=PowerMenu(power);power.ContextMenu.IsOpen=true;});tools.Children.Add(power);footer.Children.Add(tools);DockPanel.SetDock(footer,Dock.Bottom);root.Children.Add(footer);
 
             var body=new StackPanel();
-            var heading=Heading("고정됨");var all=Paint.Action("모든 앱  ›",()=>shell.ToggleDrawer(null));all.HorizontalAlignment=HorizontalAlignment.Right;all.FontSize=11;all.Height=31;heading.Children.Add(all);body.Children.Add(heading);
+            pinHeading=Heading("고정됨");var all=Paint.Action("모든 앱  ›",()=>shell.ToggleDrawer(null));all.HorizontalAlignment=HorizontalAlignment.Right;all.FontSize=11;all.Height=31;pinHeading.Children.Add(all);body.Children.Add(pinHeading);
+            folderHeading=new Grid {Height=40,Visibility=Visibility.Collapsed,Margin=new Thickness(0,0,0,7)};folderHeading.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(40)});folderHeading.ColumnDefinitions.Add(new ColumnDefinition());
+            var back=Tool("back","고정 앱으로 돌아가기 · 앱을 놓으면 폴더 밖으로 이동",()=> {CommitFolderName();openFolder=null;pinPage=0;RenderPins();});folderHeading.Children.Add(back);
+            folderName=new TextBox {FontSize=18,FontWeight=FontWeights.SemiBold,Foreground=Paint.Text,Background=Brushes.Transparent,BorderThickness=new Thickness(0),MaxLength=48,Padding=new Thickness(6,7,6,7),ToolTip="폴더 이름 변경"};Grid.SetColumn(folderName,1);folderHeading.Children.Add(folderName);body.Children.Add(folderHeading);
+            folderName.LostKeyboardFocus+=(s,e)=>CommitFolderName();folderName.PreviewKeyDown+=(s,e)=> {if(e.Key==Key.Enter){CommitFolderName();Keyboard.ClearFocus();e.Handled=true;}else if(e.Key==Key.Escape){openFolder=null;RenderPins();e.Handled=true;}};
+            DragReorder.DropArea(folderHeading,"start.pins",()=>openFolder!=null,(key,point)=> {bool moved=shell.StartPins.Extract(key);if(moved)openFolder=null;return moved;},(key,point)=>dragPreview="extract");
             pins.Margin=new Thickness(0,7,0,0);body.Children.Add(pins);
+            DragReorder.DropArea(pins,"start.pins",()=>!closed&&IsVisible,DropPin,PreviewPinDrop,true);
             var pagination=new StackPanel {Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Center,Height=28};
             previous=Tool("back","이전 고정 앱",()=> {pinPage--;RenderPins();});previous.Width=28;previous.Height=26;
             next=Tool("chevron","다음 고정 앱",()=> {pinPage++;RenderPins();});next.Width=28;next.Height=26;pagination.Children.Add(previous);page.Margin=new Thickness(7,0,7,0);pagination.Children.Add(page);pagination.Children.Add(next);body.Children.Add(pagination);
-            var recentHeading=Heading("최근 항목");recentHeading.Margin=new Thickness(8,14,8,9);var documents=Paint.Action("폴더 열기  ›",()=>OpenFolder(Environment.SpecialFolder.Recent));documents.HorizontalAlignment=HorizontalAlignment.Right;documents.FontSize=11;documents.Height=31;recentHeading.Children.Add(documents);body.Children.Add(recentHeading);
+            recentHeading=Heading("최근 항목");recentHeading.Margin=new Thickness(8,14,8,9);var documents=Paint.Action("폴더 열기  ›",()=>OpenFolder(Environment.SpecialFolder.Recent));documents.HorizontalAlignment=HorizontalAlignment.Right;documents.FontSize=11;documents.Height=31;recentHeading.Children.Add(documents);body.Children.Add(recentHeading);
             recent.Margin=new Thickness(0,0,0,3);body.Children.Add(recent);
             root.Children.Add(new SmoothScrollViewer {Content=body,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
-            Surface.Child=root;TransitionContent=root;
+            var layout=new Grid();layout.ColumnDefinitions.Add(new ColumnDefinition());phoneColumn=new ColumnDefinition {Width=new GridLength(278)};layout.ColumnDefinitions.Add(phoneColumn);layout.Children.Add(root);Phone=new PhonePane(OpenPhone,()=>LoadPhone(true)){Margin=new Thickness(0,18,18,18)};Grid.SetColumn(Phone,1);layout.Children.Add(Phone);
+            Surface.Child=layout;TransitionContent=layout;
             SizeChanged+=(s,e)=>UpdatePinColumns();
-            PreviewTextInput+=(s,e)=> {if(!Search.IsKeyboardFocusWithin&&!String.IsNullOrEmpty(e.Text)&&(Keyboard.Modifiers&(ModifierKeys.Control|ModifierKeys.Alt))==0){Search.Text+=e.Text;QueueSearch();e.Handled=true;}};
-            Deactivated+=(s,e)=> {if(!Program.Inspectable&&!DragReorder.Active&&IsVisible&&!IsMouseOver&&!(power.ContextMenu!=null&&power.ContextMenu.IsOpen))Hide();};
+            PreviewTextInput+=(s,e)=> {if(!Search.IsKeyboardFocusWithin&&!folderName.IsKeyboardFocusWithin&&!String.IsNullOrEmpty(e.Text)&&(Keyboard.Modifiers&(ModifierKeys.Control|ModifierKeys.Alt))==0){Search.Text+=e.Text;QueueSearch();e.Handled=true;}};
+            Deactivated+=(s,e)=> {if(!Program.Inspectable&&!DragReorder.Active&&IsVisible&&!IsMouseOver&&!(power.ContextMenu!=null&&power.ContextMenu.IsOpen)&&!pinButtons.Values.Any(b=>b.ContextMenu!=null&&b.ContextMenu.IsOpen))Hide();};
             DragReorder.Finished+=FinishPinDrag;Closed+=(s,e)=> {closed=true;++load;DragReorder.Finished-=FinishPinDrag;};
         }
         static Button Tool(string glyph,string label,Action action){var button=Paint.Button(new Glyph(glyph,20),action,label);button.Background=Brushes.Transparent;button.Padding=new Thickness(9);button.Width=button.Height=40;return button;}
@@ -67,30 +83,74 @@ namespace OneTaskBar
         void QueueSearch(){if(queued||Search.Text.Length==0)return;queued=true;Dispatcher.BeginInvoke(new Action(()=> {queued=false;if(!composing&&IsVisible&&!String.IsNullOrWhiteSpace(Search.Text))shell.ToggleSearch(null,Search.Text);}),System.Windows.Threading.DispatcherPriority.Background);}
         internal void Reload()
         {
-            Search.Text="";pinPage=0;RefreshPins();
-            RenderRecent(cachedRecent??new List<StartRecent>());LoadRecent();
+            Search.Text="";openFolder=null;pinPage=0;RefreshPins();
+            RenderRecent(cachedRecent??new List<StartRecent>());LoadRecent();if(Phone.Visibility==Visibility.Visible)LoadPhone();
         }
-        internal void RefreshPins(){pinned=shell.StartPins.Resolve(shell.Apps);RenderPins();}
-        void UpdatePinColumns(){pins.Columns=pinned.Count==0?1:Math.Max(2,Math.Min(6,(int)Math.Floor((Width-48)/86)));}
+        internal void Configure(double width,double height){Width=width;Height=height;bool wide=width>=830;phoneColumn.Width=new GridLength(wide?278:0);Phone.Visibility=wide?Visibility.Visible:Visibility.Collapsed;UpdatePinColumns();}
+        async void LoadPhone(bool force=false)
+        {
+            if(closed||phoneBusy)return;if(!force&&phoneSnapshot!=null&&DateTime.UtcNow<phoneUntil){Phone.Update(phoneSnapshot);return;}phoneBusy=true;
+            try{var state=await BackgroundWork.Run(()=>PhoneCompanion.Read(force));if(closed)return;phoneSnapshot=state;phoneUntil=DateTime.UtcNow.AddSeconds(30);if(IsVisible)Phone.Update(state);}catch(Exception error){AppLog.Once("start-phone",error.GetType().Name);}finally{phoneBusy=false;}
+        }
+        async void OpenPhone(string uri){if(await DismissAsync())Native.Open(uri);}
+        internal void FixturePhone(PhoneSnapshot snapshot){phoneSnapshot=snapshot;phoneUntil=DateTime.UtcNow.AddHours(1);Phone.Update(snapshot);}
+        internal void RefreshPins(){pinned=shell.StartPins.Tiles(shell.Apps);if(openFolder!=null&&!pinned.Any(p=>p.Folder&&p.Key==openFolder))openFolder=null;RenderPins();}
+        List<StartTile> CurrentTiles(){var folder=pinned.FirstOrDefault(p=>p.Folder&&p.Key==openFolder);return folder==null?pinned:folder.Children;}
+        void UpdatePinColumns(){pins.Columns=pinned.Count==0?1:Math.Max(2,Math.Min(6,(int)Math.Floor((Width-48-(phoneColumn==null?0:phoneColumn.Width.Value))/86)));}
         void RenderPins()
         {
-            int pages=Math.Max(1,(pinned.Count+17)/18);pinPage=Math.Max(0,Math.Min(pages-1,pinPage));pins.Children.Clear();pinButtons.Clear();UpdatePinColumns();
-            foreach(var item in pinned.Skip(pinPage*18).Take(18)){
-                var app=item;var content=new StackPanel();var icon=AppIcons.Visual(app,40);icon.HorizontalAlignment=HorizontalAlignment.Center;icon.Margin=new Thickness(0,2,0,7);content.Children.Add(icon);
-                var name=Paint.TextBlock(app.Name,11,Paint.Text);name.TextAlignment=TextAlignment.Center;name.TextWrapping=TextWrapping.Wrap;name.TextTrimming=TextTrimming.CharacterEllipsis;name.MaxHeight=30;content.Children.Add(name);
-                var button=Paint.Button(content,()=>Launch(app),app.Name);button.Height=89;button.Margin=new Thickness(1);button.Padding=new Thickness(4,5,4,5);button.Background=Brushes.Transparent;button.ContextMenu=WindowPicker.Menu(app,shell);button.RenderTransform=new TranslateTransform();pins.Children.Add(button);pinButtons[app.Key]=button;
-                DragReorder.Attach(button,button,"start.pins",app.Key,Orientation.Horizontal,()=>!closed&&IsVisible,MovePin,PreviewPin);
+            var current=CurrentTiles();int pages=Math.Max(1,(current.Count+17)/18);pinPage=Math.Max(0,Math.Min(pages-1,pinPage));pins.Children.Clear();pinButtons.Clear();UpdatePinColumns();
+            pinHeading.Visibility=openFolder==null?Visibility.Visible:Visibility.Collapsed;folderHeading.Visibility=openFolder==null?Visibility.Collapsed:Visibility.Visible;recentHeading.Visibility=recent.Visibility=openFolder==null?Visibility.Visible:Visibility.Collapsed;
+            if(openFolder!=null){var folder=pinned.First(t=>t.Key==openFolder);folderName.Text=folder.Name;}
+            foreach(var item in current.Skip(pinPage*18).Take(18)){
+                var tile=item;var content=new StackPanel();var icon=tile.Folder?FolderIcon(tile):AppIcons.Visual(tile.App,40);icon.HorizontalAlignment=HorizontalAlignment.Center;icon.Margin=new Thickness(0,2,0,7);content.Children.Add(icon);
+                var name=Paint.TextBlock(tile.Name,11,Paint.Text);name.TextAlignment=TextAlignment.Center;name.TextWrapping=TextWrapping.Wrap;name.TextTrimming=TextTrimming.CharacterEllipsis;name.MaxHeight=30;content.Children.Add(name);
+                var button=Paint.Button(content,()=> {if(tile.Folder)OpenPinFolder(tile.Key);else Launch(tile.App);},tile.Folder?tile.Name+" · 앱 "+tile.Children.Count+"개":tile.Name);button.Height=89;button.Margin=new Thickness(1);button.Padding=new Thickness(4,5,4,5);button.Background=Brushes.Transparent;button.ContextMenu=PinMenu(tile);button.RenderTransform=new TranslateTransform();pins.Children.Add(button);pinButtons[tile.Key]=button;
+                DragReorder.Attach(button,button,"start.pins",tile.Key,Orientation.Horizontal,()=>!closed&&IsVisible,MovePin,PreviewPin);
             }
-            if(pinned.Count==0){var empty=Paint.TextBlock("앱을 우클릭해 시작 화면에 고정해 보세요.",12,Paint.Muted);empty.TextWrapping=TextWrapping.Wrap;pins.Children.Add(empty);}
+            if(current.Count==0){var empty=Paint.TextBlock("앱을 우클릭해 시작 화면에 고정해 보세요.",12,Paint.Muted);empty.TextWrapping=TextWrapping.Wrap;pins.Children.Add(empty);}
             page.Text=pages>1?(pinPage+1)+" / "+pages:"";previous.Visibility=next.Visibility=pages>1?Visibility.Visible:Visibility.Collapsed;previous.IsEnabled=pinPage>0;next.IsEnabled=pinPage<pages-1;
         }
         internal Button PinButton(string key){Button button;return pinButtons.TryGetValue(key,out button)?button:null;}
-        internal string[] PinnedKeys {get{return pinned.Select(p=>p.Key).ToArray();}}
-        internal bool MovePin(string source,string target,bool after){return shell.StartPins.Move(source,target,after);}
+        internal string[] PinnedKeys {get{return CurrentTiles().Select(p=>p.Key).ToArray();}}
+        internal bool MovePin(string source,string target,bool after){return openFolder==null?shell.StartPins.Move(source,target,after):shell.StartPins.MoveWithin(openFolder,source,target,after);}
+        internal void OpenPinFolder(string key){if(!pinned.Any(p=>p.Folder&&p.Key==key))return;openFolder=key;pinPage=0;RenderPins();if(Motion.Enabled)Motion.Fade(pins,.55,1,160);}
+        internal void ClosePinFolder(){CommitFolderName();openFolder=null;pinPage=0;RenderPins();}
+        void CommitFolderName(){if(renaming||openFolder==null)return;renaming=true;try{if(shell.StartPins.Rename(openFolder,folderName.Text))pinned=shell.StartPins.Tiles(shell.Apps);var tile=pinned.FirstOrDefault(p=>p.Key==openFolder);if(tile!=null)folderName.Text=tile.Name;}finally{renaming=false;}}
+        internal static FrameworkElement FolderIcon(StartTile tile)
+        {
+            var icons=new UniformGrid {Columns=2,Rows=2,Width=32,Height=32,UseLayoutRounding=true};foreach(var app in tile.Children.Take(4)){var icon=AppIcons.Visual(app.App,13);icon.Margin=new Thickness(1);icon.HorizontalAlignment=HorizontalAlignment.Center;icon.VerticalAlignment=VerticalAlignment.Center;icons.Children.Add(icon);}return new Border {Width=40,Height=40,Padding=new Thickness(4),CornerRadius=new CornerRadius(11),Background=Paint.Brush("#32FFFFFF"),UseLayoutRounding=true,Child=icons};
+        }
+        ContextMenu PinMenu(StartTile tile)
+        {
+            var menu=tile.Folder?new ContextMenu():WindowPicker.Menu(tile.App,shell,allowAdmin:true);
+            if(tile.Folder){var rename=new MenuItem {Header="폴더 이름 변경"};rename.Click+=(s,e)=> {OpenPinFolder(tile.Key);folderName.Focus();folderName.SelectAll();};menu.Items.Add(rename);var dissolve=new MenuItem {Header="폴더 풀기 · 앱 유지"};dissolve.Click+=(s,e)=> {if(shell.StartPins.Dissolve(tile.Key))RefreshPins();};menu.Items.Add(dissolve);}
+            else if(openFolder!=null){menu.Items.Add(new Separator());var extract=new MenuItem {Header="폴더 밖으로 꺼내기"};extract.Click+=(s,e)=> {if(shell.StartPins.Extract(tile.Key)){openFolder=null;RefreshPins();}};menu.Items.Add(extract);}
+            else {var group=new MenuItem {Header="폴더로 묶기"};group.SubmenuOpened+=(s,e)=> {group.Items.Clear();foreach(var value in pinned.Where(p=>p.Key!=tile.Key)){var target=value;var option=new MenuItem {Header=target.Folder?target.Name+"에 추가":target.Name+"와 새 폴더"};option.Click+=(sender,args)=> {if(shell.StartPins.Combine(tile.Key,target.Key))RefreshPins();};group.Items.Add(option);}group.IsEnabled=group.Items.Count>0;};menu.Items.Add(new Separator());menu.Items.Add(group);}return menu;
+        }
+        internal bool CanGroup(string source,string target,Point point)
+        {
+            Button button;return openFolder==null&&source!=target&&pinned.Any(p=>p.Key==source&&!p.Folder)&&pinButtons.TryGetValue(target,out button)&&point.X>button.ActualWidth*.27&&point.X<button.ActualWidth*.73&&point.Y>8&&point.Y<button.ActualHeight*.68;
+        }
+        string DropTarget(Point point,out Point local)
+        {
+            foreach(var pair in pinButtons){var slot=LayoutInformation.GetLayoutSlot(pair.Value);if(slot.Contains(point)){local=new Point(point.X-slot.Left-pair.Value.Margin.Left,point.Y-slot.Top-pair.Value.Margin.Top);return pair.Key;}}local=new Point();return null;
+        }
+        bool DropPin(string source,Point point){Point local;string target=DropTarget(point,out local);LastPinDrop=CurrentTiles().FindIndex(t=>t.Key==source)+":"+CurrentTiles().FindIndex(t=>t.Key==target)+":"+Math.Round(point.X)+","+Math.Round(point.Y);if(target==null||target==source)return false;return CanGroup(source,target,local)?shell.StartPins.Combine(source,target):MovePin(source,target,local.X>=pinButtons[target].ActualWidth/2);}
+        void PreviewPinDrop(string source,Point point)
+        {
+            Point local;string target=DropTarget(point,out local);if(target==null||target==source){PreviewGroup(source,target,false);foreach(var button in pinButtons.Values)AnimatePin(button,0,0);dragPreview="reset";return;}
+            bool combine=CanGroup(source,target,local);PreviewGroup(source,target,combine);if(!combine)PreviewPin(source,target,local.X>=pinButtons[target].ActualWidth/2);
+        }
+        void PreviewGroup(string source,string target,bool combine)
+        {
+            if(groupTarget!=null&&pinButtons.ContainsKey(groupTarget))pinButtons[groupTarget].Background=Brushes.Transparent;groupTarget=null;if(!combine)return;
+            groupTarget=target;dragPreview="folder|"+source+"|"+target;foreach(var button in pinButtons.Values)AnimatePin(button,0,0);pinButtons[target].Background=Paint.Brush("#38FFFFFF");
+        }
         internal void PreviewPin(string source,string target,bool after)
         {
             string signature=source+"|"+target+"|"+after;if(dragPreview==signature||!pinButtons.ContainsKey(source)||!pinButtons.ContainsKey(target))return;dragPreview=signature;
-            var keys=pinned.Skip(pinPage*18).Take(18).Select(p=>p.Key).ToList();var slots=keys.ToDictionary(k=>k,k=>LayoutInformation.GetLayoutSlot(pinButtons[k]).TopLeft,StringComparer.OrdinalIgnoreCase);var original=keys.ToArray();keys.Remove(source);keys.Insert(keys.IndexOf(target)+(after?1:0),source);
+            var keys=CurrentTiles().Skip(pinPage*18).Take(18).Select(p=>p.Key).ToList();var slots=keys.ToDictionary(k=>k,k=>LayoutInformation.GetLayoutSlot(pinButtons[k]).TopLeft,StringComparer.OrdinalIgnoreCase);var original=keys.ToArray();keys.Remove(source);keys.Insert(keys.IndexOf(target)+(after?1:0),source);
             for(int i=0;i<keys.Count;i++){var key=keys[i];var from=slots[key];var to=slots[original[i]];AnimatePin(pinButtons[key],to.X-from.X,to.Y-from.Y);}
         }
         static void AnimatePin(Button button,double x,double y)
@@ -100,7 +160,7 @@ namespace OneTaskBar
         }
         internal void FinishPinDrag()
         {
-            if(closed||dragPreview==null)return;dragPreview=null;var positions=pinButtons.ToDictionary(p=>p.Key,p=>p.Value.TranslatePoint(new Point(),pins),StringComparer.OrdinalIgnoreCase);RefreshPins();pins.UpdateLayout();
+            if(closed||dragPreview==null)return;dragPreview=null;groupTarget=null;var positions=pinButtons.ToDictionary(p=>p.Key,p=>p.Value.TranslatePoint(new Point(),pins),StringComparer.OrdinalIgnoreCase);RefreshPins();pins.UpdateLayout();
             foreach(var pair in pinButtons){Point old;if(!positions.TryGetValue(pair.Key,out old))continue;var position=pair.Value.TranslatePoint(new Point(),pins);var shift=(TranslateTransform)pair.Value.RenderTransform;shift.X=old.X-position.X;shift.Y=old.Y-position.Y;AnimatePin(pair.Value,0,0);}
         }
         async void LoadRecent()

@@ -25,6 +25,7 @@ namespace OneTaskBar
         readonly Glyph wifiStatus=new Glyph("wifi",22){Color=Paint.Ink},volumeStatus=new Glyph("volume",19){Color=Paint.Ink};
         readonly Button quickAccess,trayAccess;
         readonly Button startButton;readonly Glyph startGlyph=new Glyph("apps",23){Color=Paint.Ink};
+        internal readonly Button TaskViewButton;
         readonly Button powerAccess;readonly ColumnDefinition powerColumn;double powerWidth=58;
         readonly ShellController controller;
         readonly Dictionary<IntPtr,Border> indicators=new Dictionary<IntPtr,Border>();
@@ -45,6 +46,7 @@ namespace OneTaskBar
             controller=shell; Screen=screen;
             pinDivider.RenderTransform=dividerOffset;Canvas.SetTop(pinDivider,9);Panel.SetZIndex(pinDivider,2);appCanvas.Children.Add(pinDivider);DragReorder.DropArea(appCanvas,"dock.apps",()=>!closed,(key,point)=>controller.MoveDockGroup(key,point.X<dividerX),(key,point)=>PreviewGroup(key,point.X<dividerX));DragReorder.Finished+=EndDragPreview;
             var search=Paint.Button(new Glyph("search",20){Color=Paint.Ink},()=>controller.ToggleSearch(this),"검색");search.Padding=new Thickness(0);search.Background=Brushes.Transparent;search.Width=42;search.Height=42;Canvas.SetLeft(search,10);appCanvas.Children.Add(search);Apps.Surface.Child=appCanvas;
+            var desktops=Paint.Button(new Glyph("desktops",19){Color=Paint.Ink},()=>controller.OpenTaskView(),"데스크톱 전환 · 작업 보기");TaskViewButton=desktops;desktops.Padding=new Thickness(0);desktops.Background=Brushes.Transparent;desktops.Width=desktops.Height=42;Canvas.SetLeft(desktops,52);appCanvas.Children.Add(desktops);
             resizeTimer.Tick+=(sender,args)=>ResizeFrame();
 
             foreach(var w in new GlassWindow[] {Start,Apps,Status}) {
@@ -104,7 +106,7 @@ namespace OneTaskBar
             startGlyph.Kind=Preferences.Current.NativeStartButton?"windows-start":"apps";startGlyph.Color=Preferences.Current.NativeStartButton?Paint.Brush("#FF1975DD"):Paint.Ink;startGlyph.InvalidateVisual();startButton.ToolTip=Preferences.Current.NativeStartButton?"Windows 시작":"앱 목록";System.Windows.Automation.AutomationProperties.SetName(startButton,(string)startButton.ToolTip);
             var entries=controller.DockApps();powerWidth=PowerDisplay.Slot(controller.Power,Preferences.Current.DesktopPowerWatts);powerColumn.Width=new GridLength(powerWidth);powerAccess.Visibility=powerWidth>0?Visibility.Visible:Visibility.Collapsed;Battery.Width=powerWidth==78?70:52;
             var layout=DockLayout.Compute(Screen.Bounds,Scale,Math.Max(1,entries.Count),powerWidth);var shown=entries.Skip(Math.Max(0,entries.Count-layout.Capacity)).Take(layout.Capacity).ToArray();var keys=new HashSet<string>(shown.Select(e=>e.Key),StringComparer.OrdinalIgnoreCase);bool animate=placed&&visible&&Apps.IsVisible&&Motion.Enabled;
-            int pinned=shown.Count(a=>a.Pinned);double nextDivider=52+pinned*46+6,oldDivider=Double.IsNaN(dividerX)?nextDivider:dividerX+dividerOffset.X;dividerX=nextDivider;Canvas.SetLeft(pinDivider,dividerX);dividerOffset.BeginAnimation(TranslateTransform.XProperty,null);dividerOffset.X=0;if(animate&&Math.Abs(oldDivider-nextDivider)>.01)dividerOffset.BeginAnimation(TranslateTransform.XProperty,Motion.PanelTween(oldDivider-nextDivider,0,330));
+            int pinned=shown.Count(a=>a.Pinned);double nextDivider=DockLayout.AppOffset+pinned*46+6,oldDivider=Double.IsNaN(dividerX)?nextDivider:dividerX+dividerOffset.X;dividerX=nextDivider;Canvas.SetLeft(pinDivider,dividerX);dividerOffset.BeginAnimation(TranslateTransform.XProperty,null);dividerOffset.X=0;if(animate&&Math.Abs(oldDivider-nextDivider)>.01)dividerOffset.BeginAnimation(TranslateTransform.XProperty,Motion.PanelTween(oldDivider-nextDivider,0,330));
             foreach(var cell in cells.Values.Where(c=>!keys.Contains(c.Entry.Key)).ToArray()){
                 if(cell.Leaving)continue;cell.Leaving=true;cell.Button.IsHitTestVisible=false;int token=++cell.Token;
                 if(!animate){appCanvas.Children.Remove(cell.Button);cells.Remove(cell.Entry.Key);continue;}
@@ -114,7 +116,7 @@ namespace OneTaskBar
             for(int i=0;i<shown.Length;i++){
                 var entry=shown[i];DockCell cell;bool added=!cells.TryGetValue(entry.Key,out cell);if(added){cell=CreateCell(entry);cells.Add(entry.Key,cell);appCanvas.Children.Add(cell.Button);}else cell.Entry=entry;
                 bool returning=cell.Leaving;cell.Leaving=false;cell.Token++;cell.Button.IsHitTestVisible=true;
-                double x=52+i*46+(i>=pinned?12:0),oldX=Double.IsNaN(cell.X)?x+16:cell.X+cell.Offset.X;
+                double x=DockLayout.AppOffset+i*46+(i>=pinned?12:0),oldX=Double.IsNaN(cell.X)?x+16:cell.X+cell.Offset.X;
                 if(added||returning||resetPreview||Math.Abs(cell.X-x)>.01){cell.X=x;Canvas.SetLeft(cell.Button,x);cell.Offset.BeginAnimation(TranslateTransform.XProperty,null);cell.Offset.X=0;cell.Offset.BeginAnimation(TranslateTransform.YProperty,null);cell.Offset.Y=0;
                     if(animate){cell.Offset.BeginAnimation(TranslateTransform.XProperty,Motion.PanelTween(oldX-x,0,330));if(added||returning){cell.Offset.BeginAnimation(TranslateTransform.YProperty,Motion.PanelTween(6,0,330));var enter=new DoubleAnimationUsingKeyFrames {Duration=TimeSpan.FromMilliseconds(330),FillBehavior=FillBehavior.Stop};enter.KeyFrames.Add(new LinearDoubleKeyFrame(0,KeyTime.FromTimeSpan(TimeSpan.Zero)));enter.KeyFrames.Add(new LinearDoubleKeyFrame(0,KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(65))));enter.KeyFrames.Add(new SplineDoubleKeyFrame(1,KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(280)),new KeySpline(.2,.7,.2,1)));cell.Button.BeginAnimation(UIElement.OpacityProperty,null);cell.Button.Opacity=1;cell.Button.BeginAnimation(UIElement.OpacityProperty,enter);}}else{cell.Button.BeginAnimation(UIElement.OpacityProperty,null);cell.Button.Opacity=1;}}
                 cell.Dot.Visibility=entry.Windows.Count>0&&Preferences.Current.RunningDots?Visibility.Visible:Visibility.Collapsed;foreach(var window in entry.Windows)indicators[window]=cell.Dot;
@@ -140,8 +142,8 @@ namespace OneTaskBar
         void PreviewOrder(List<DockCell> order,DockCell moving,bool pinned,string signature)
         {
             if(dragPreview==signature)return;dragPreview=signature;order=order.OrderBy(c=>(c==moving?pinned:c.Entry.Pinned)?0:1).ToList();int count=order.Count(c=>c==moving?pinned:c.Entry.Pinned);
-            for(int i=0;i<order.Count;i++){var cell=order[i];double next=52+i*46+(i>=count?12:0)-cell.X,from=cell.Offset.X;cell.Offset.BeginAnimation(TranslateTransform.XProperty,null);cell.Offset.X=next;if(Motion.Enabled)cell.Offset.BeginAnimation(TranslateTransform.XProperty,Motion.Tween(from,next,160));}
-            double end=52+count*46+6-dividerX,start=dividerOffset.X;dividerOffset.BeginAnimation(TranslateTransform.XProperty,null);dividerOffset.X=end;if(Motion.Enabled)dividerOffset.BeginAnimation(TranslateTransform.XProperty,Motion.Tween(start,end,160));
+            for(int i=0;i<order.Count;i++){var cell=order[i];double next=DockLayout.AppOffset+i*46+(i>=count?12:0)-cell.X,from=cell.Offset.X;cell.Offset.BeginAnimation(TranslateTransform.XProperty,null);cell.Offset.X=next;if(Motion.Enabled)cell.Offset.BeginAnimation(TranslateTransform.XProperty,Motion.Tween(from,next,160));}
+            double end=DockLayout.AppOffset+count*46+6-dividerX,start=dividerOffset.X;dividerOffset.BeginAnimation(TranslateTransform.XProperty,null);dividerOffset.X=end;if(Motion.Enabled)dividerOffset.BeginAnimation(TranslateTransform.XProperty,Motion.Tween(start,end,160));
         }
         internal void EndDragPreview(){if(closed||dragPreview==null)return;dragPreview=null;resetPreview=true;Rebuild();resetPreview=false;}
         void ResizeTo(DockLayout layout,bool animate)
@@ -207,10 +209,13 @@ namespace OneTaskBar
     }
     internal sealed class DrawerWindow : GlassWindow
     {
-        readonly ShellController shell; readonly WrapPanel items=new WrapPanel {HorizontalAlignment=HorizontalAlignment.Center};
+        readonly ShellController shell; readonly System.Windows.Controls.Primitives.UniformGrid items=new System.Windows.Controls.Primitives.UniformGrid {Columns=6,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Top};
         double cellWidth=118,cellHeight=116;
         readonly Border searchBar;
-        List<AppEntry> loadedApps;string loadedQuery;double loadedWidth,loadedHeight;bool composing,searchQueued;
+        List<AppEntry> loadedApps;double loadedWidth;bool composing,searchQueued,closed,renaming;
+        List<StartTile> tiles=new List<StartTile>();string folder,preview,group;
+        readonly Dictionary<string,Button> buttons=new Dictionary<string,Button>(StringComparer.OrdinalIgnoreCase);
+        readonly Grid folderHeading;readonly TextBox folderName;
         readonly TextBlock count=Paint.TextBlock("",12,Paint.Muted);
         internal readonly TextBox Search=new TextBox {FontSize=15,Foreground=Paint.Ink,Background=Brushes.Transparent,BorderThickness=new Thickness(0),Padding=new Thickness(6,8,6,8)};
         internal DrawerWindow(ShellController controller)
@@ -219,6 +224,11 @@ namespace OneTaskBar
             var root=new DockPanel {Margin=new Thickness(24,20,24,16)};
             var header=new Grid {Height=42,Margin=new Thickness(12,0,12,20)};var title=Paint.TextBlock("앱",22,Paint.Text);title.FontWeight=FontWeights.SemiBold;header.Children.Add(title);
             var close=Paint.Action("닫기",()=>Hide()); close.HorizontalAlignment=HorizontalAlignment.Right; close.Height=32; header.Children.Add(close); DockPanel.SetDock(header,Dock.Top); root.Children.Add(header);
+            folderHeading=new Grid {Height=42,Margin=new Thickness(6,0,6,8),Visibility=Visibility.Collapsed};folderHeading.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(40)});folderHeading.ColumnDefinitions.Add(new ColumnDefinition());
+            var back=Paint.Button(new Glyph("back",20),()=>CloseFolder(),"모든 앱으로 돌아가기 · 앱을 놓으면 폴더 밖으로 이동");back.Width=36;back.Background=Brushes.Transparent;folderHeading.Children.Add(back);
+            folderName=new TextBox {FontSize=18,FontWeight=FontWeights.SemiBold,Foreground=Paint.Text,Background=Brushes.Transparent,BorderThickness=new Thickness(0),Padding=new Thickness(5,7,5,7),MaxLength=48,ToolTip="폴더 이름 변경"};Grid.SetColumn(folderName,1);folderHeading.Children.Add(folderName);DockPanel.SetDock(folderHeading,Dock.Top);root.Children.Add(folderHeading);
+            folderName.LostKeyboardFocus+=(s,e)=>CommitName();folderName.PreviewKeyDown+=(s,e)=> {if(e.Key==Key.Enter){CommitName();Keyboard.ClearFocus();e.Handled=true;}};
+            DragReorder.DropArea(folderHeading,"drawer.apps",()=>folder!=null,(key,point)=> {bool moved=shell.AppScreen.Extract(key);if(moved)folder=null;return moved;},(key,point)=>preview="extract");
             var search=new Border {Background=Paint.Brush("#EDFFFFFF"),CornerRadius=new CornerRadius(24),Padding=new Thickness(17,3,17,3),Margin=new Thickness(0,16,0,0),Width=420,MaxWidth=420};
             searchBar=search;
             var field=new Grid();field.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(27)});field.ColumnDefinitions.Add(new ColumnDefinition());field.Children.Add(new Glyph("search",20){Color=LightPanel.Muted,VerticalAlignment=VerticalAlignment.Center});Search.MaxLength=120;Grid.SetColumn(Search,1);field.Children.Add(Search);var hint=Paint.TextBlock("검색",15,LightPanel.Muted);hint.IsHitTestVisible=false;hint.Margin=new Thickness(6,0,0,0);Grid.SetColumn(hint,1);field.Children.Add(hint);search.Child=field;
@@ -226,30 +236,76 @@ namespace OneTaskBar
             TextCompositionManager.AddPreviewTextInputStartHandler(Search,(s,e)=>composing=true);TextCompositionManager.AddPreviewTextInputUpdateHandler(Search,(s,e)=>composing=true);Search.PreviewTextInput+=(s,e)=> {composing=false;QueueSearch();};Search.PreviewMouseLeftButtonDown+=(s,e)=> {if(Search.Text.Length==0){shell.ToggleSearch(null);e.Handled=true;}};
             var bottom=new StackPanel {HorizontalAlignment=HorizontalAlignment.Center};bottom.Children.Add(search);count.HorizontalAlignment=HorizontalAlignment.Center;count.Margin=new Thickness(0,8,0,0);bottom.Children.Add(count);DockPanel.SetDock(bottom,Dock.Bottom);root.Children.Add(bottom);
             root.Children.Add(new SmoothScrollViewer {Content=items,VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
+            DragReorder.DropArea(items,"drawer.apps",()=>!closed&&IsVisible,DropApp,PreviewAppDrop,true);
 
-            Surface.Child=root;TransitionContent=root;PreviewTextInput+=(s,e)=> {if(!Search.IsKeyboardFocusWithin&&!String.IsNullOrEmpty(e.Text)&&(Keyboard.Modifiers&(ModifierKeys.Control|ModifierKeys.Alt))==0){Search.Text+=e.Text;QueueSearch();e.Handled=true;}};Deactivated+=(s,e)=> { if(!Program.Inspectable && IsVisible && !IsMouseOver) Hide(); };
+            Surface.Child=root;TransitionContent=root;PreviewTextInput+=(s,e)=> {if(!Search.IsKeyboardFocusWithin&&!folderName.IsKeyboardFocusWithin&&!String.IsNullOrEmpty(e.Text)&&(Keyboard.Modifiers&(ModifierKeys.Control|ModifierKeys.Alt))==0){Search.Text+=e.Text;QueueSearch();e.Handled=true;}};Deactivated+=(s,e)=> { if(!Program.Inspectable&&!DragReorder.Active&&IsVisible&&!IsMouseOver&&!buttons.Values.Any(b=>b.ContextMenu!=null&&b.ContextMenu.IsOpen))Hide(); };
+            DragReorder.Finished+=FinishDrag;Closed+=(s,e)=> {closed=true;DragReorder.Finished-=FinishDrag;};
         }
         void QueueSearch(){if(searchQueued||Search.Text.Length==0)return;searchQueued=true;Dispatcher.BeginInvoke(new Action(()=> {searchQueued=false;if(!composing&&IsVisible&&!String.IsNullOrWhiteSpace(Search.Text))shell.ToggleSearch(null,Search.Text);}),System.Windows.Threading.DispatcherPriority.Background);}
         internal void Configure(double width,double height)
         {
             searchBar.Width=Math.Max(200,Math.Min(420,width-112));
-            int columns=Math.Max(1,Math.Min(6,(int)Math.Floor((width-64)/104)));cellWidth=Math.Max(64,(width-64)/columns);cellHeight=112;items.Width=cellWidth*columns;
+            int columns=Math.Max(1,Math.Min(6,(int)Math.Floor((width-64)/104)));items.Columns=columns;cellWidth=Math.Max(64,(width-64)/columns);cellHeight=112;items.Width=cellWidth*columns;
         }
         internal void Reload()
         {
-            var currentQuery=Search.Text.Trim();if(loadedApps==shell.Apps&&loadedQuery==currentQuery&&loadedWidth==cellWidth&&loadedHeight==cellHeight)return;loadedApps=shell.Apps;loadedQuery=currentQuery;loadedWidth=cellWidth;loadedHeight=cellHeight;
-            items.Children.Clear();
-            var query=Search.Text.Trim();
-            foreach(var entry in shell.Apps.Where(a=>String.IsNullOrEmpty(query) || a.Name.IndexOf(query,StringComparison.CurrentCultureIgnoreCase)>=0)) {
+            if(loadedApps==shell.Apps&&loadedWidth==cellWidth&&folder==null)return;loadedApps=shell.Apps;loadedWidth=cellWidth;folder=null;shell.AppScreen.Reconcile(shell.Apps);RefreshApps();
+        }
+        internal void RefreshApps(){tiles=shell.AppScreen.Tiles(shell.Apps);if(folder!=null&&!tiles.Any(t=>t.Key==folder&&t.Folder))folder=null;RenderApps();}
+        List<StartTile> Current(){var node=tiles.FirstOrDefault(t=>t.Key==folder&&t.Folder);return node==null?tiles:node.Children;}
+        void RenderApps()
+        {
+            items.Children.Clear();buttons.Clear();folderHeading.Visibility=folder==null?Visibility.Collapsed:Visibility.Visible;if(folder!=null)folderName.Text=tiles.First(t=>t.Key==folder).Name;
+            foreach(var value in Current()) {
+                var tile=value;
                 var body=new StackPanel {Width=cellWidth-16,Height=cellHeight-12};
                 double iconSize=Math.Min(48,cellHeight-58);
-                var icon=AppIcons.Visual(entry,iconSize);icon.Margin=new Thickness(0,7,0,7);icon.HorizontalAlignment=HorizontalAlignment.Center;body.Children.Add(icon);
-                var label=Paint.TextBlock(entry.Name,12,Paint.Text);label.TextAlignment=TextAlignment.Center;label.TextWrapping=TextWrapping.Wrap;label.TextTrimming=TextTrimming.CharacterEllipsis;label.MaxHeight=34;body.Children.Add(label);
-                var app=entry; var cell=Paint.Button(body,()=> { app.Launch(); Hide(); },entry.Name); cell.Padding=new Thickness(7,4,7,4); cell.Margin=new Thickness(2); cell.Background=Brushes.Transparent; items.Children.Add(cell);
-                cell.Width=cellWidth-4;cell.Height=cellHeight-4;cell.ContextMenu=WindowPicker.Menu(app,shell);
+                var icon=tile.Folder?StartWindow.FolderIcon(tile):AppIcons.Visual(tile.App,iconSize);icon.Margin=new Thickness(0,7,0,7);icon.HorizontalAlignment=HorizontalAlignment.Center;body.Children.Add(icon);
+                var label=Paint.TextBlock(tile.Name,12,Paint.Text);label.TextAlignment=TextAlignment.Center;label.TextWrapping=TextWrapping.Wrap;label.TextTrimming=TextTrimming.CharacterEllipsis;label.MaxHeight=34;body.Children.Add(label);
+                var cell=Paint.Button(body,()=> {if(tile.Folder)OpenFolder(tile.Key);else Launch(tile.App);},tile.Folder?tile.Name+" · 앱 "+tile.Children.Count+"개":tile.Name);cell.Padding=new Thickness(7,4,7,4);cell.Margin=new Thickness(2);cell.Background=Brushes.Transparent;items.Children.Add(cell);
+                cell.Width=cellWidth-4;cell.Height=cellHeight-4;cell.ContextMenu=AppMenu(tile);cell.RenderTransform=new TranslateTransform();buttons[tile.Key]=cell;
+                DragReorder.Attach(cell,cell,"drawer.apps",tile.Key,Orientation.Horizontal,()=>!closed&&IsVisible,MoveApp,PreviewMove);
             }
             if(shell.Apps.Count==0) items.Children.Add(Paint.TextBlock("설치된 앱을 불러오는 중…",14,Paint.Text));
-            count.Text=items.Children.Count+"개 앱";
+            count.Text=(folder==null?shell.Apps.Count:Current().Count)+"개 앱";
+        }
+        async void Launch(AppEntry app){if(await DismissAsync())app.Launch();}
+        internal void OpenFolder(string key){if(!tiles.Any(t=>t.Key==key&&t.Folder))return;folder=key;RenderApps();if(Motion.Enabled)Motion.Fade(items,.55,1,160);}
+        internal void CloseFolder(){CommitName();folder=null;RenderApps();}
+        void CommitName(){if(renaming||folder==null)return;renaming=true;try{if(shell.AppScreen.Rename(folder,folderName.Text))tiles=shell.AppScreen.Tiles(shell.Apps);var node=tiles.FirstOrDefault(t=>t.Key==folder);if(node!=null)folderName.Text=node.Name;}finally{renaming=false;}}
+        internal string[] AppKeys {get{return Current().Select(t=>t.Key).ToArray();}}
+        internal Button AppButton(string key){Button button;return buttons.TryGetValue(key,out button)?button:null;}
+        internal TextBox FolderNameEditor {get{return folderName;}}
+        internal string OpenFolderKey {get{return folder;}}
+        internal bool MoveApp(string source,string target,bool after){return folder==null?shell.AppScreen.Move(source,target,after):shell.AppScreen.MoveWithin(folder,source,target,after);}
+        ContextMenu AppMenu(StartTile tile)
+        {
+            var menu=tile.Folder?new ContextMenu():WindowPicker.Menu(tile.App,shell,allowAdmin:true);
+            if(tile.Folder){var rename=new MenuItem {Header="폴더 이름 변경"};rename.Click+=(s,e)=> {OpenFolder(tile.Key);folderName.Focus();folderName.SelectAll();};menu.Items.Add(rename);var dissolve=new MenuItem {Header="폴더 풀기 · 앱 유지"};dissolve.Click+=(s,e)=> {if(shell.AppScreen.Dissolve(tile.Key))RefreshApps();};menu.Items.Add(dissolve);}
+            else if(folder!=null){menu.Items.Add(new Separator());var extract=new MenuItem {Header="폴더 밖으로 꺼내기"};extract.Click+=(s,e)=> {if(shell.AppScreen.Extract(tile.Key)){folder=null;RefreshApps();}};menu.Items.Add(extract);}
+            else {var groupMenu=new MenuItem {Header="폴더로 묶기"};groupMenu.SubmenuOpened+=(s,e)=> {groupMenu.Items.Clear();foreach(var other in tiles.Where(t=>t.Key!=tile.Key)){var target=other;var item=new MenuItem {Header=target.Folder?target.Name+"에 추가":target.Name+"와 새 폴더"};item.Click+=(sender,args)=> {if(shell.AppScreen.Combine(tile.Key,target.Key))RefreshApps();};groupMenu.Items.Add(item);}};menu.Items.Add(new Separator());menu.Items.Add(groupMenu);}return menu;
+        }
+        string Target(Point point,out Point local)
+        {
+            foreach(var pair in buttons){var slot=System.Windows.Controls.Primitives.LayoutInformation.GetLayoutSlot(pair.Value);if(slot.Contains(point)){local=new Point(point.X-slot.Left-pair.Value.Margin.Left,point.Y-slot.Top-pair.Value.Margin.Top);return pair.Key;}}local=new Point();return null;
+        }
+        bool Groupable(string source,string target,Point point){return folder==null&&source!=target&&tiles.Any(t=>t.Key==source&&!t.Folder)&&buttons.ContainsKey(target)&&point.X>buttons[target].ActualWidth*.27&&point.X<buttons[target].ActualWidth*.73&&point.Y>8&&point.Y<buttons[target].ActualHeight*.68;}
+        internal bool DropApp(string source,Point point){Point local;var target=Target(point,out local);if(target==null||target==source)return false;return Groupable(source,target,local)?shell.AppScreen.Combine(source,target):MoveApp(source,target,local.X>=buttons[target].ActualWidth/2);}
+        void PreviewAppDrop(string source,Point point)
+        {
+            Point local;string target=Target(point,out local);if(group!=null&&buttons.ContainsKey(group))buttons[group].Background=Brushes.Transparent;group=null;
+            if(target==null||target==source){foreach(var button in buttons.Values)Animate(button,0,0);preview="reset";return;}
+            if(Groupable(source,target,local)){group=target;preview="folder|"+target;foreach(var button in buttons.Values)Animate(button,0,0);buttons[target].Background=Paint.Brush("#38FFFFFF");}else PreviewMove(source,target,local.X>=buttons[target].ActualWidth/2);
+        }
+        internal void PreviewMove(string source,string target,bool after)
+        {
+            string signature=source+"|"+target+"|"+after;if(preview==signature||!buttons.ContainsKey(source)||!buttons.ContainsKey(target))return;preview=signature;var keys=AppKeys.ToList();var original=keys.ToArray();var slots=keys.ToDictionary(k=>k,k=>System.Windows.Controls.Primitives.LayoutInformation.GetLayoutSlot(buttons[k]).TopLeft,StringComparer.OrdinalIgnoreCase);keys.Remove(source);keys.Insert(keys.IndexOf(target)+(after?1:0),source);
+            for(int i=0;i<keys.Count;i++){var from=slots[keys[i]];var to=slots[original[i]];Animate(buttons[keys[i]],to.X-from.X,to.Y-from.Y);}
+        }
+        static void Animate(Button button,double x,double y){var transform=(TranslateTransform)button.RenderTransform;double fromX=transform.X,fromY=transform.Y;transform.BeginAnimation(TranslateTransform.XProperty,null);transform.BeginAnimation(TranslateTransform.YProperty,null);transform.X=x;transform.Y=y;if(Motion.Enabled){transform.BeginAnimation(TranslateTransform.XProperty,Motion.Tween(fromX,x,170));transform.BeginAnimation(TranslateTransform.YProperty,Motion.Tween(fromY,y,170));}}
+        internal void FinishDrag()
+        {
+            if(closed||preview==null)return;preview=null;group=null;var positions=buttons.ToDictionary(p=>p.Key,p=>p.Value.TranslatePoint(new Point(),items),StringComparer.OrdinalIgnoreCase);RefreshApps();items.UpdateLayout();foreach(var pair in buttons){Point old;if(!positions.TryGetValue(pair.Key,out old))continue;var at=pair.Value.TranslatePoint(new Point(),items);var shift=(TranslateTransform)pair.Value.RenderTransform;shift.X=old.X-at.X;shift.Y=old.Y-at.Y;Animate(pair.Value,0,0);}
         }
     }
 }

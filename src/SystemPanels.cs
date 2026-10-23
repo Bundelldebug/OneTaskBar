@@ -19,6 +19,7 @@ namespace OneTaskBar
         static bool ModifiersHeld() {foreach(int key in new[]{0x10,0x11,0x12,0x5b,0x5c})if((GetAsyncKeyState(key)&0x8000)!=0)return true;return false;}
         internal static bool Toggle(bool notifications)
         {return Shortcut((ushort)(notifications?0x4e:0x41));}
+        internal static bool TaskView(){return Shortcut(0x09);}
         internal static bool Start()
         {
             // Ctrl+Esc is Windows' native Start shortcut and bypasses solo-Win remapping.

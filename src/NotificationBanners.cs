@@ -121,17 +121,21 @@ namespace OneTaskBar
     {
         readonly TextBlock sender=Paint.TextBlock("",11,Paint.Muted),title=Paint.TextBlock("",14,Paint.Text),body=Paint.TextBlock("",12,Paint.Muted);
         readonly Border icon=new Border {Width=35,Height=35,VerticalAlignment=VerticalAlignment.Top,Margin=new Thickness(0,4,10,0)};
+        readonly Image artwork=new Image {Height=118,Stretch=Stretch.Uniform,Margin=new Thickness(0,9,0,0),Visibility=Visibility.Collapsed};
+        readonly ColumnDefinition iconColumn=new ColumnDefinition();
+        internal bool HasIcon {get{return icon.Visibility==Visibility.Visible;}}
+        internal bool HasArtwork {get{return artwork.Visibility==Visibility.Visible;}}
         internal NotificationEntry Entry;internal DateTime Expires;internal bool Opening,ClosedFlag;
-        internal double DesiredHeight {get{return String.IsNullOrWhiteSpace(Entry.Body)?98:126;}}
+        internal double DesiredHeight {get{return (String.IsNullOrWhiteSpace(Entry.Body)?98:126)+(Entry.Artwork!=null?127:0);}}
         internal NotificationBanner(NotificationEntry entry,Action<NotificationBanner> open,Action<NotificationBanner,bool> close)
         {
             Title="One TaskBar · 알림 팝업";ShowActivated=false;Focusable=false;Radius=27;StableSurface=true;Dark=true;Surface.CornerRadius=new CornerRadius(Radius);Surface.Background=QuickPanel.Glass;Surface.BorderBrush=Paint.Brush("#36FFFFFF");Surface.BorderThickness=new Thickness(.7);
-            var content=new Grid();content.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(45)});content.ColumnDefinitions.Add(new ColumnDefinition());content.Children.Add(icon);
+            var content=new Grid();content.ColumnDefinitions.Add(iconColumn);content.ColumnDefinitions.Add(new ColumnDefinition());content.Children.Add(icon);
             var text=new StackPanel();sender.TextTrimming=TextTrimming.CharacterEllipsis;text.Children.Add(sender);title.FontWeight=FontWeights.SemiBold;title.TextWrapping=TextWrapping.Wrap;title.TextTrimming=TextTrimming.CharacterEllipsis;title.MaxHeight=39;title.Margin=new Thickness(0,5,12,3);text.Children.Add(title);body.TextWrapping=TextWrapping.Wrap;body.TextTrimming=TextTrimming.CharacterEllipsis;body.MaxHeight=34;body.Margin=new Thickness(0,0,4,0);text.Children.Add(body);Grid.SetColumn(text,1);content.Children.Add(text);
-            var row=new Grid();var hit=Paint.Button(content,()=>open(this),"알림 열기");hit.Background=Brushes.Transparent;hit.Padding=new Thickness(17,14,33,13);hit.HorizontalContentAlignment=HorizontalAlignment.Stretch;row.Children.Add(hit);var dismiss=Paint.Button(new Glyph("close",13),()=>close(this,true),"팝업 닫기 · 알림 기록 유지");dismiss.Background=Brushes.Transparent;dismiss.Width=dismiss.Height=28;dismiss.Padding=new Thickness(6);dismiss.HorizontalAlignment=HorizontalAlignment.Right;dismiss.VerticalAlignment=VerticalAlignment.Top;dismiss.Margin=new Thickness(0,7,7,0);row.Children.Add(dismiss);Surface.Child=row;TransitionContent=row;
+            text.Children.Add(artwork);var row=new Grid();var hit=Paint.Button(content,()=>open(this),"알림 열기");hit.Background=Brushes.Transparent;hit.Padding=new Thickness(17,14,33,13);hit.HorizontalContentAlignment=HorizontalAlignment.Stretch;row.Children.Add(hit);var dismiss=Paint.Button(new Glyph("close",13),()=>close(this,true),"팝업 닫기 · 알림 기록 유지");dismiss.Background=Brushes.Transparent;dismiss.Width=dismiss.Height=28;dismiss.Padding=new Thickness(6);dismiss.HorizontalAlignment=HorizontalAlignment.Right;dismiss.VerticalAlignment=VerticalAlignment.Top;dismiss.Margin=new Thickness(0,7,7,0);row.Children.Add(dismiss);Surface.Child=row;TransitionContent=row;
             SourceInitialized+=(s,e)=> {var h=new WindowInteropHelper(this).Handle;Native.SetWindowLong(h,-20,Native.GetWindowLong(h,-20)|0x08000000);};
             Closed+=(s,e)=>ClosedFlag=true;Update(entry);
         }
-        internal void Update(NotificationEntry entry){Entry=entry;sender.Text=entry.App;title.Text=entry.Title;body.Text=entry.Body;body.Visibility=String.IsNullOrWhiteSpace(entry.Body)?Visibility.Collapsed:Visibility.Visible;icon.Child=entry.Icon!=null?AppIcons.Visual(entry.Icon,32):(UIElement)new Glyph("window",29);Expires=DateTime.UtcNow.AddSeconds(7);}
+        internal void Update(NotificationEntry entry){Entry=entry;sender.Text=entry.App;title.Text=entry.Title;body.Text=entry.Body;body.Visibility=String.IsNullOrWhiteSpace(entry.Body)?Visibility.Collapsed:Visibility.Visible;icon.Child=entry.Icon!=null?AppIcons.Visual(entry.Icon,32):null;icon.Visibility=entry.Icon!=null?Visibility.Visible:Visibility.Collapsed;iconColumn.Width=new GridLength(entry.Icon!=null?45:0);artwork.Source=entry.Artwork;artwork.Visibility=entry.Artwork!=null?Visibility.Visible:Visibility.Collapsed;Expires=DateTime.UtcNow.AddSeconds(7);}
     }
 }

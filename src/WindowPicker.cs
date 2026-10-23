@@ -9,7 +9,7 @@ namespace OneTaskBar
 {
     internal static class WindowPicker
     {
-        internal static ContextMenu Menu(AppEntry entry,ShellController shell,bool windowsOnly=false)
+        internal static ContextMenu Menu(AppEntry entry,ShellController shell,bool windowsOnly=false,bool allowAdmin=false)
         {
             var menu=new ContextMenu {MinWidth=220,MaxWidth=380};
             foreach(var h in entry.Windows.Where(Native.IsWindow)) {
@@ -20,6 +20,7 @@ namespace OneTaskBar
             if(!windowsOnly) {
                 if(menu.Items.Count>0)menu.Items.Add(new Separator());
                 var launch=new MenuItem {Header="새로 열기",Icon=new Glyph("window",18){Color=Paint.Ink}};launch.Click+=(s,e)=> {var copy=entry.Copy();copy.Windows.Clear();copy.Launch();};menu.Items.Add(launch);
+                if(allowAdmin&&AdminLaunch.Prepare(entry)!=null){var admin=new MenuItem {Header="관리자 권한으로 실행",Icon=new Glyph("shield",18){Color=Paint.Ink}};admin.Click+=(s,e)=>AdminLaunch.Start(entry,shell);menu.Items.Add(admin);}
                 var startPin=new MenuItem {Header=shell.StartPins.Contains(entry)?"시작 화면에서 고정 해제":"시작 화면에 고정",Icon=new Glyph("pin",18){Color=Paint.Ink}};startPin.Click+=(s,e)=>shell.PinStart(entry,!shell.StartPins.Contains(entry));menu.Items.Add(startPin);
                 var pin=new MenuItem {Header=shell.Pins.Any(a=>Catalog.Same(a,entry))?"독에서 고정 해제":"독에 고정",Icon=new Glyph("pin",18){Color=Paint.Ink}};pin.Click+=(s,e)=>shell.Pin(entry,!shell.Pins.Any(a=>Catalog.Same(a,entry)));menu.Items.Add(pin);
                 menu.Opened+=(s,e)=> {startPin.Header=shell.StartPins.Contains(entry)?"시작 화면에서 고정 해제":"시작 화면에 고정";pin.Header=shell.Pins.Any(a=>Catalog.Same(a,entry))?"독에서 고정 해제":"독에 고정";};

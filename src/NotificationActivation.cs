@@ -14,14 +14,18 @@ namespace OneTaskBar
     internal sealed class NotificationPayload
     {
         internal string Arguments="",Type="foreground",TargetPackage="";internal bool SuppressPopup;
+        internal string LogoSource,ImageSource;
         internal static string TextKey(IEnumerable<string> values) {return Regex.Replace(String.Concat(values),@"\s+","");}
         internal static NotificationPayload Parse(string xml,IEnumerable<string> text)
         {
-            var document=new XmlDocument {XmlResolver=null};document.LoadXml(xml);var toast=document.DocumentElement;if(toast==null||toast.LocalName!="toast")return null;
+            if(String.IsNullOrEmpty(xml)||xml.Length>524288)return null;var document=new XmlDocument {XmlResolver=null};using(var reader=XmlReader.Create(new StringReader(xml),new XmlReaderSettings {XmlResolver=null,DtdProcessing=DtdProcessing.Prohibit,MaxCharactersInDocument=524288}))document.Load(reader);var toast=document.DocumentElement;if(toast==null||toast.LocalName!="toast")return null;
             var expected=text.ToArray();var binding=toast.SelectSingleNode("visual/binding[@template='ToastGeneric']");if(binding==null)return null;
             var actual=binding.SelectNodes(".//text").Cast<XmlNode>().Take(expected.Length).Select(n=>n.InnerText);
             if(TextKey(actual)!=TextKey(expected))return null;
-            return new NotificationPayload {Arguments=toast.GetAttribute("launch"),Type=String.IsNullOrEmpty(toast.GetAttribute("activationType"))?"foreground":toast.GetAttribute("activationType"),TargetPackage=toast.GetAttribute("protocolActivationTargetApplicationPfn")};
+            var payload=new NotificationPayload {Arguments=toast.GetAttribute("launch"),Type=String.IsNullOrEmpty(toast.GetAttribute("activationType"))?"foreground":toast.GetAttribute("activationType"),TargetPackage=toast.GetAttribute("protocolActivationTargetApplicationPfn")};
+            string baseUri=((XmlElement)binding).GetAttribute("baseUri");if(String.IsNullOrEmpty(baseUri))baseUri=((XmlElement)binding.ParentNode).GetAttribute("baseUri");
+            foreach(XmlElement image in binding.SelectNodes(".//image")){string source=image.GetAttribute("src");if(String.IsNullOrWhiteSpace(source)||source.Length>4096)continue;Uri root,absolute;if(Uri.TryCreate(baseUri,UriKind.Absolute,out root)&&Uri.TryCreate(root,source,out absolute))source=absolute.AbsoluteUri;if(image.GetAttribute("placement")=="appLogoOverride")payload.LogoSource=source;else if(payload.ImageSource==null||image.GetAttribute("placement")=="hero")payload.ImageSource=source;}
+            return payload;
         }
         internal static NotificationPayload Read(string appId,string[] text)
         {

@@ -21,11 +21,12 @@ namespace OneTaskBar
         internal static bool Active {get{return active!=null;}}
         internal static int StartedMoves,CompletedMoves;
         internal static event Action Finished;
-        internal static void DropArea(FrameworkElement target,string scope,Func<bool> enabled,Func<string,Point,bool> drop,Action<string,Point> preview=null)
+        internal static void DropArea(FrameworkElement target,string scope,Func<bool> enabled,Func<string,Point,bool> drop,Action<string,Point> preview=null,bool capture=false)
         {
             target.AllowDrop=true;
-            DragEventHandler over=(s,e)=>{if(e.Handled||!Matches(e.Data,scope)||!enabled())return;e.Handled=true;e.Effects=DragDropEffects.Move;ClearMark();Point point=e.GetPosition(target);active.PendingDrop=key=>drop(key,point);if(preview!=null)preview(active.Key,point);};target.DragEnter+=over;target.DragOver+=over;
-            target.Drop+=(s,e)=>{if(e.Handled||!Matches(e.Data,scope)||!enabled())return;e.Handled=true;ClearMark();e.Effects=drop(active.Key,e.GetPosition(target))?DragDropEffects.Move:DragDropEffects.None;};
+            DragEventHandler over=(s,e)=>{if(e.Handled||!Matches(e.Data,scope)||!enabled())return;e.Handled=true;e.Effects=DragDropEffects.Move;ScrollAtEdge(target,e);ClearMark();Point point=e.GetPosition(target);active.PendingDrop=key=>drop(key,point);if(preview!=null)preview(active.Key,point);};
+            DragEventHandler finish=(s,e)=>{if(e.Handled||!Matches(e.Data,scope)||!enabled())return;e.Handled=true;ClearMark();e.Effects=drop(active.Key,e.GetPosition(target))?DragDropEffects.Move:DragDropEffects.None;};
+            if(capture){target.PreviewDragEnter+=over;target.PreviewDragOver+=over;target.PreviewDrop+=finish;}else{target.DragEnter+=over;target.DragOver+=over;target.Drop+=finish;}
         }
         internal static void Attach(FrameworkElement target,FrameworkElement handle,string scope,string key,Orientation direction,Func<bool> enabled,Func<string,string,bool,bool> move,Action<string,string,bool> preview=null)
         {
@@ -37,18 +38,18 @@ namespace OneTaskBar
                 if(!armed||Active||!enabled()||e.LeftButton!=MouseButtonState.Pressed)return;
                 Point now=e.GetPosition(handle);if(Math.Abs(now.X-origin.X)<SystemParameters.MinimumHorizontalDragDistance&&Math.Abs(now.Y-origin.Y)<SystemParameters.MinimumVerticalDragDistance)return;
                 armed=false;e.Handled=true;Mouse.Capture(null);active=new Session {Scope=scope,Key=key};double opacity=target.Opacity;DragGhost ghost=null;GiveFeedbackEventHandler feedback=null;
-                try {if(scope=="dock.apps"||scope=="start.pins"){ghost=new DragGhost(target);ghost.Show();ghost.Follow();feedback=(sender,args)=>{ghost.Follow();args.UseDefaultCursors=false;Mouse.SetCursor(Cursors.Arrow);args.Handled=true;};handle.GiveFeedback+=feedback;}target.Opacity=.28;StartedMoves++;if(DragDrop.DoDragDrop(handle,new DataObject(format,active.Id),DragDropEffects.Move)!=DragDropEffects.None)CompletedMoves++;}
+                try {if(scope=="dock.apps"||scope=="start.pins"||scope=="drawer.apps"){ghost=new DragGhost(target);ghost.Show();ghost.Follow();feedback=(sender,args)=>{ghost.Follow();args.UseDefaultCursors=false;Mouse.SetCursor(Cursors.Arrow);args.Handled=true;};handle.GiveFeedback+=feedback;}target.Opacity=.28;StartedMoves++;if(DragDrop.DoDragDrop(handle,new DataObject(format,active.Id),DragDropEffects.Move)!=DragDropEffects.None)CompletedMoves++;}
                 catch(Exception error){AppLog.Write("layout-drag",error.Message);}
                 finally {if(feedback!=null)handle.GiveFeedback-=feedback;if(ghost!=null)ghost.Close();Mouse.SetCursor(null);target.Opacity=opacity;ClearMark();active=null;var notify=Finished;if(notify!=null)notify();}
             };
             DragEventHandler over=(s,e)=> {
-                if(!Matches(e.Data,scope)||!enabled())return;e.Handled=true;e.Effects=DragDropEffects.Move;
+                if(e.Handled||!Matches(e.Data,scope)||!enabled())return;e.Handled=true;e.Effects=DragDropEffects.Move;
                 ScrollAtEdge(target,e);if(active.Key==key){ClearMark();return;}bool after=After(e.GetPosition(target),target,direction);if(preview!=null){active.PendingDrop=source=>move(source,key,after);ClearMark();preview(active.Key,key,after);}else ShowMark(target,direction,after);
             };
             target.DragEnter+=over;target.DragOver+=over;
             target.DragLeave+=(s,e)=> {if(mark!=null&&mark.AdornedElement==target)ClearMark();};
             target.Drop+=(s,e)=> {
-                if(!Matches(e.Data,scope)||!enabled())return;e.Handled=true;ClearMark();
+                if(e.Handled||!Matches(e.Data,scope)||!enabled())return;e.Handled=true;ClearMark();
                 bool moved=key==active.Key&&active.PendingDrop!=null?active.PendingDrop(active.Key):move(active.Key,key,After(e.GetPosition(target),target,direction));e.Effects=moved?DragDropEffects.Move:DragDropEffects.None;
             };
         }

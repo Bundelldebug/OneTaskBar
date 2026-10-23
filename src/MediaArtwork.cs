@@ -1,6 +1,7 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
 using System.Windows.Media;
@@ -22,11 +23,30 @@ namespace OneTaskBar
                 Reads++;byte[] bytes=await read();if(bytes==null||bytes.Length==0||bytes.Length>8388608)return Image;
                 string hash;using(var sha=SHA256.Create())hash=Convert.ToBase64String(sha.ComputeHash(bytes));
                 if(Image!=null&&hash==digest)return Image;
-                using(var stream=new MemoryStream(bytes)){var image=new BitmapImage();image.BeginInit();image.CacheOption=BitmapCacheOption.OnLoad;image.DecodePixelWidth=320;image.StreamSource=stream;image.EndInit();image.Freeze();Image=image;digest=hash;Decodes++;}
+                using(var stream=new MemoryStream(bytes)){var image=BitmapDecode.Frozen(stream,1280);if(image!=null){Image=image;digest=hash;Decodes++;}}
             }catch(Exception error){AppLog.Once("media-artwork",error.Message);}
             return Image;
         }
         static byte[] Cover(Color color){var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(ArtworkPalette.Sample(color)));using(var stream=new MemoryStream()){encoder.Save(stream);return stream.ToArray();}}
+        static byte[] SizedCover(int width,int height){var pixels=new byte[width*height*4];for(int i=3;i<pixels.Length;i+=4)pixels[i]=255;var image=BitmapSource.Create(width,height,96,96,PixelFormats.Bgra32,null,pixels,width*4);var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(image));using(var stream=new MemoryStream()){encoder.Save(stream);return stream.ToArray();}}
+        internal static int Probe()
+        {
+            try{return Task.Run(async()=> {
+                var manager=await SystemServices.Wait(Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager.RequestAsync());
+                var session=manager.GetSessions().FirstOrDefault(s=>String.Equals(s.SourceAppUserModelId,"Internet",StringComparison.OrdinalIgnoreCase));
+                if(session==null){AppLog.Json("media-source-probe.json",new {browserSessionAvailable=false});return 1;}
+                var properties=await SystemServices.Wait(session.TryGetMediaPropertiesAsync());if(properties.Thumbnail==null)return 1;
+                using(var stream=await SystemServices.Wait(properties.Thumbnail.OpenReadAsync()))using(var reader=new Windows.Storage.Streams.DataReader(stream)){
+                    if(stream.Size>8388608)return 1;await SystemServices.Wait(reader.LoadAsync((uint)stream.Size));var bytes=new byte[(int)stream.Size];reader.ReadBytes(bytes);
+                    using(var data=new MemoryStream(bytes)){
+                        var image=BitmapDecode.Frozen(data,1280);var video=YouTubeArtwork.Find(YouTubeArtwork.Profile("Internet"),properties.Title);byte[] high=video!=null?YouTubeArtwork.Download(video):null;BitmapSource sharp=null;if(high!=null)using(var highStream=new MemoryStream(high))sharp=BitmapDecode.Frozen(highStream,1280);
+                        var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(sharp??image));Directory.CreateDirectory(AppLog.Data);using(var file=File.Create(Path.Combine(AppLog.Data,"received-media-cover.png")))encoder.Save(file);
+                        AppLog.Json("media-source-probe.json",new {source="Internet",receivedBytes=bytes.Length,decodedWidth=image.PixelWidth,decodedHeight=image.PixelHeight,consentKey=video!=null?YouTubeArtwork.TrackKey("Internet",properties.Title):null,lookup=YouTubeArtwork.LookupStatus,exactPlayingVideoMatched=video!=null,highWidth=sharp!=null?sharp.PixelWidth:0,highHeight=sharp!=null?sharp.PixelHeight:0});return sharp!=null?0:1;
+                    }
+                }
+            }).GetAwaiter().GetResult();}
+            catch(Exception error){AppLog.Json("media-source-probe.json",new {error=error.ToString()});return 1;}
+        }
         internal static void Check(List<string> checks)
         {
             var cache=new MediaArtwork();var now=new DateTime(2026,1,1,0,0,0,DateTimeKind.Utc);byte[] green=Cover(Colors.Green),red=Cover(Colors.Red);
@@ -40,6 +60,7 @@ namespace OneTaskBar
             var retained=cache.Read("track",()=>Task.FromResult(new byte[]{1,2,3}),now.AddSeconds(8)).GetAwaiter().GetResult();
             if(!Object.ReferenceEquals(retained,changed))throw new Exception("Transient image failure cleared current cover");
             if(cache.Read("next",()=>Task.FromResult<byte[]>(null),now.AddSeconds(9)).GetAwaiter().GetResult()!=null)throw new Exception("Previous track artwork leaked");
+            var sharp=cache.Read("sharp",()=>Task.FromResult(SizedCover(960,540)),now).GetAwaiter().GetResult();if(sharp==null||sharp.PixelWidth!=960||sharp.PixelHeight!=540)throw new Exception("High resolution cover was reduced or upscaled");var bounded=cache.Read("wide",()=>Task.FromResult(SizedCover(1600,900)),now).GetAwaiter().GetResult();if(bounded==null||bounded.PixelWidth!=1280||bounded.PixelHeight!=720)throw new Exception("Large cover dimensions not bounded");var portrait=cache.Read("portrait",()=>Task.FromResult(SizedCover(100,1600)),now).GetAwaiter().GetResult();if(portrait==null||portrait.PixelHeight!=1280||portrait.PixelWidth!=80)throw new Exception("Portrait cover exceeded decoded memory bound");checks.Add("Media artwork preserves native detail up to 1280 pixels, never upscales small sources and bounds wide/portrait dimensions");
             checks.Add("Late/same-title artwork updates retry twice, identical bytes reuse decoded images, and image failures retain the current track only");
         }
     }

@@ -19,5 +19,6 @@ notification-registration.json
 settings.json
 search-history.json
 start-pins.json
+apps-layout.json
 native-toast-lease.json
 native-notification-action-lease.json

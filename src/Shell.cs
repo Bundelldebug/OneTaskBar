@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -21,6 +21,7 @@ namespace OneTaskBar
 {
     internal sealed class DockLayout
     {
+        internal const double AppOffset=94,FixedWidth=116;
         internal double StartX,AppX,AppWidth,StatusX,StatusWidth,Y;
         internal int Capacity;
         internal static double StatusSize(double screenWidth,double powerWidth=58){return Math.Min(282,Math.Max(226,screenWidth*.25))+powerWidth-58;}
@@ -28,9 +29,9 @@ namespace OneTaskBar
         {
             double width=screen.Width/scale;
             double status=StatusSize(width,powerWidth),statusX=width-status-12;
-            double available=Math.Max(74,statusX-78);
-            int capacity=Math.Max(0,(int)Math.Floor((available-74)/46));
-            double apps=Math.Min(count,capacity)*46+74;
+            double available=Math.Max(FixedWidth,statusX-78);
+            int capacity=Math.Max(0,(int)Math.Floor((available-FixedWidth)/46));
+            double apps=Math.Min(count,capacity)*46+FixedWidth;
             double x=Math.Max(66,Math.Min((width-apps)/2,statusX-apps-12));
             return new DockLayout { StartX=x-52,AppX=x,AppWidth=apps,StatusX=statusX,StatusWidth=status,Y=screen.Height/scale-56,Capacity=capacity };
         }
@@ -48,6 +49,7 @@ namespace OneTaskBar
         internal List<AppEntry> Apps=new List<AppEntry>(),Running=new List<AppEntry>();
         internal List<AppEntry> Pins=new List<AppEntry>();
         internal readonly StartPinStore StartPins=new StartPinStore(Path.Combine(AppLog.Data,"start-pins.json"));
+        internal readonly StartPinStore AppScreen=new StartPinStore(Path.Combine(AppLog.Data,"apps-layout.json"),4096);
         readonly RuntimeDockOrder dockOrder=new RuntimeDockOrder();
         List<TaskbarItem> explorerItems=ExplorerBridge.ReadSaved();
         internal readonly SystemServices Services=new SystemServices();
@@ -61,6 +63,7 @@ namespace OneTaskBar
         readonly List<AppBarReservation> reservations=new List<AppBarReservation>();
         DesktopLease lease;
         readonly ChargeState chargeState=new ChargeState();
+        internal readonly ChargeSound ConnectionSound=new ChargeSound();
         readonly DispatcherTimer timer=new DispatcherTimer { Interval=TimeSpan.FromMilliseconds(100) };
         readonly ShellEvents shellEvents;
         readonly VolumeKeys keys;
@@ -88,6 +91,7 @@ namespace OneTaskBar
         DateTime pinsAt;
         double lastAppRefreshMs;
         DateTime servicesAt;
+        DateTime releaseAt;internal int RetiredPanels;
         IntPtr lastForeground;
         internal IntPtr LastApplication;
         internal DateTime FocusUntil;
@@ -117,7 +121,7 @@ namespace OneTaskBar
             var brightSource=new Guid("8ffee2c6-2d01-46be-adb9-398addc5b4ff");brightnessNotify=Native.RegisterPowerSettingNotification(messages.Handle,ref brightSource,0);
             var displaySource=new Guid("2b84c20e-ad23-4ddf-93db-05ffbd7efca5");displayNotify=Native.RegisterPowerSettingNotification(messages.Handle,ref displaySource,0);
             Audio.Changed=Wake;brightnessEvents=new BrightnessEvents(QueueBrightness);
-            Services.Changed=ServiceChanged;Notifications.Updated=ServiceChanged;
+            Services.Changed=ServiceChanged;Notifications.Updated=ServiceChanged;Notifications.AppCatalog=()=>Apps;
             osdGate=new NativeOsdGate(()=>Desktop&&!disposed,ReplaceNativeOsd,()=>Desktop&&!disposed&&Brightness>=0&&Audio.Available);
             Native.RegisterHotKey(messages.Handle,1,0x4000|2|1,0x51); // Ctrl+Alt+Q, no Win-key hook.
             Native.RegisterHotKey(messages.Handle,2,0x4000|2|1,0x48); // Ctrl+Alt+H.
@@ -242,6 +246,8 @@ namespace OneTaskBar
         {
             if(disposed)return;
             Notifications.Check();Banners.Refresh();
+            Services.ArtworkModeChanged();
+            if(!Preferences.Current.ChargeSoundEnabled)ConnectionSound.Dispose();
             if(Preferences.Current.NativeSearch&&Finder!=null)Finder.Hide();
             if(Preferences.Current.NativeQuickSettings){if(Quick!=null)Quick.Hide();if(Detail!=null)Detail.Hide();}
             if(Preferences.Current.NativeNotifications&&Center!=null)Center.Hide();
@@ -312,6 +318,12 @@ namespace OneTaskBar
             Detail.ShowAt(screen.Bounds,screen.Bounds.Width/scale-w-12,screen.Bounds.Height/scale-h-76,w,h);Detail.Pop();Detail.Activate();
         }
         internal void ShowWelcome() { if(StartMenu!=null)StartMenu.HideImmediately();if(Welcome==null) Welcome=new WelcomeWindow(this); Welcome.UpdateMode(); Welcome.Show();Welcome.Pop(); Welcome.Activate(); }
+        internal int TaskViewRequests;
+        internal async void OpenTaskView()
+        {
+            TaskViewRequests++;Previews.Close();foreach(var panel in new GlassWindow[]{Quick,Center,Detail,Drawer,Finder,StartMenu})if(panel!=null)panel.HideImmediately();foreach(var dock in docks)if(dock.MediaBar!=null)dock.MediaBar.SetExpanded(false);if(Demo)return;
+            if(!await Task.Run(()=>SystemPanels.TaskView())){ShowWelcome();Welcome.Feedback("작업 보기를 열지 못했습니다. 키보드 조합키를 놓고 다시 눌러 주세요.");}
+        }
         internal void ShowNotificationConnection(bool resume=false)
         {
             Previews.Close();if(StartMenu!=null)StartMenu.HideImmediately();
@@ -377,8 +389,8 @@ namespace OneTaskBar
             foreach(var panel in new GlassWindow[]{Quick,Center,Detail,Drawer,Finder,StartMenu})if(panel!=null)panel.HideImmediately();
             foreach(var host in docks)if(host.MediaBar!=null)host.MediaBar.SetExpanded(false);
             var screen=dock!=null?dock.Screen:Forms.Screen.FromPoint(Forms.Cursor.Position);double scale=dock!=null?dock.Scale:MonitorScale(screen,StartMenu);
-            double width=Math.Min(640,screen.Bounds.Width/scale-32),height=Math.Min(620,screen.Bounds.Height/scale-100);
-            StartMenu.Reload();StartMenu.ShowAt(screen.Bounds,(screen.Bounds.Width/scale-width)/2,Math.Max(12,screen.Bounds.Height/scale-height-76),width,height);StartMenu.Pop();StartMenu.Activate();StartMenu.Search.Focus();
+            double width=Math.Min(940,screen.Bounds.Width/scale-32),height=Math.Min(620,screen.Bounds.Height/scale-100);
+            StartMenu.Configure(width,height);StartMenu.Reload();StartMenu.ShowAt(screen.Bounds,(screen.Bounds.Width/scale-width)/2,Math.Max(12,screen.Bounds.Height/scale-height-76),width,height);StartMenu.Pop();StartMenu.Activate();StartMenu.Search.Focus();
         }
         void EnsureGuard()
         {
@@ -454,6 +466,8 @@ namespace OneTaskBar
             var now=DateTime.UtcNow;
             if(Interlocked.Exchange(ref servicesDirty,0)!=0)servicesAt=DateTime.MinValue;
             if(FocusUntil!=DateTime.MinValue&&now>=FocusUntil){FocusUntil=DateTime.MinValue;System.Media.SystemSounds.Asterisk.Play();if(tray!=null)tray.ShowBalloonTip(5000,Program.AppName,"집중 타이머가 끝났습니다",Forms.ToolTipIcon.Info);}
+            var power=PowerState.Read();if(exactSource.HasValue&&now<sourceUntil)power.Connected=exactSource.Value;Power=power;ConnectionSound.Observe(Power.Known,Power.Connected);
+            if(now>=releaseAt){releaseAt=now.AddSeconds(5);ReleaseDormantPanels(now);}
             if(!DisplayAwake){double sleep=RuntimeCadence.Pulse(Desktop,true,false,false,false);if(FocusUntil!=DateTime.MinValue)sleep=Math.Min(sleep,Math.Max(100,(FocusUntil-now).TotalMilliseconds));timer.Interval=TimeSpan.FromMilliseconds(sleep);return;}
             bool interactive=(StartMenu!=null&&StartMenu.IsVisible)||(Quick!=null&&Quick.IsVisible)||(Center!=null&&Center.IsVisible)||(Detail!=null&&Detail.IsVisible)||(Drawer!=null&&Drawer.IsVisible)||(Finder!=null&&Finder.IsVisible)||(Welcome!=null&&Welcome.IsVisible)||docks.Any(d=>d.MediaBar!=null&&d.MediaBar.Expanded);
             if(now>=osdScanAt){osdScanAt=now.AddSeconds(10);if(osdGate!=null)osdGate.Refresh();}
@@ -462,9 +476,7 @@ namespace OneTaskBar
             if(foregroundPid!=ownPid) LastApplication=foreground;
             if(Desktop) foreach(var dock in docks) {dock.SetVisible(!Native.IsFullScreen(dock.Screen)); if(foreground!=lastForeground) dock.UpdateActive(LastApplication);}
             lastForeground=foreground;
-            var power=PowerState.Read();
-            if(exactSource.HasValue && now<sourceUntil) power.Connected=exactSource.Value;
-            Power=power;bool battery=Power.Known&&!Power.Connected;double cadence=RuntimeCadence.Pulse(Desktop,battery,interactive,docks.Count>0&&docks.All(d=>!d.Apps.IsVisible),true);if(timer.Interval.TotalMilliseconds!=cadence)timer.Interval=TimeSpan.FromMilliseconds(cadence);
+            bool battery=Power.Known&&!Power.Connected;double cadence=RuntimeCadence.Pulse(Desktop,battery,interactive,docks.Count>0&&docks.All(d=>!d.Apps.IsVisible),true);if(timer.Interval.TotalMilliseconds!=cadence)timer.Interval=TimeSpan.FromMilliseconds(cadence);
             if(Welcome!=null&&Welcome.IsVisible)Welcome.PreviewBattery.Update(Power);
             bool celebrate=chargeState.Observe(Power.Connected);
             if(celebrate && Power.Known&&Desktop&&Preferences.Current.ChargeAnimation&&Preferences.Current.Animations) PreviewCharge(false);
@@ -506,7 +518,17 @@ namespace OneTaskBar
                     var old=String.Join("|",Pins.Select(a=>a.Key));Pins=t.Result.Pins;explorerItems=t.Result.Mirror;ExplorerBridge.Save(explorerItems);
                     if(old!=String.Join("|",Pins.Select(a=>a.Key)))foreach(var dock in docks)dock.Rebuild();
                 })));}
-            ++iteration;if(now>=liveStateAt){liveStateAt=now.AddSeconds(30);AppLog.Json("live-state.json",new {time=DateTimeOffset.Now.ToString("o"),sequence=iteration,pulseMilliseconds=cadence,desktop=Desktop,battery=Power.Level,connected=Power.Connected,volume=Audio.Value,muted=Audio.Muted,brightness=Brightness,displays=docks.Count,apps=Apps.Count,pinned=Pins.Count,running=Running.Count,appRefreshMs=Math.Round(lastAppRefreshMs,1),wifi=Services.WifiOn,bluetooth=Services.BluetoothOn,media=Services.Media.Title,output=Services.OutputName,wifiSignal=WifiSignal,packaged=Notifications.Packaged,notificationsAllowed=Notifications.Allowed,cachedIcons=AppIcons.CachedCount,ecoWorkers=BackgroundWork.EcoWorkers,backgroundJobs=BackgroundWork.Completed,mediaMetadataReads=Services.MetadataReads,notificationSnapshotReads=Notifications.SnapshotReads,notificationCount=Notifications.Items.Count,inspectable=Program.Inspectable,quick=Quick!=null?Native.RegionInfo(Quick):null,center=Center!=null?Native.RegionInfo(Center):null,docks=docks.Select(d=>d.Inspect()).ToArray()});}
+            ++iteration;if(now>=liveStateAt){liveStateAt=now.AddSeconds(30);AppLog.Json("live-state.json",new {time=DateTimeOffset.Now.ToString("o"),sequence=iteration,pulseMilliseconds=cadence,desktop=Desktop,battery=Power.Level,connected=Power.Connected,volume=Audio.Value,muted=Audio.Muted,brightness=Brightness,displays=docks.Count,apps=Apps.Count,pinned=Pins.Count,running=Running.Count,appRefreshMs=Math.Round(lastAppRefreshMs,1),wifi=Services.WifiOn,bluetooth=Services.BluetoothOn,media=Services.Media.Title,mediaActive=Services.Media.Active,retiredPanels=RetiredPanels,output=Services.OutputName,wifiSignal=WifiSignal,packaged=Notifications.Packaged,notificationsAllowed=Notifications.Allowed,cachedIcons=AppIcons.CachedCount,ecoWorkers=BackgroundWork.EcoWorkers,backgroundJobs=BackgroundWork.Completed,mediaMetadataReads=Services.MetadataReads,notificationSnapshotReads=Notifications.SnapshotReads,notificationCount=Notifications.Items.Count,inspectable=Program.Inspectable,quick=Quick!=null?Native.RegionInfo(Quick):null,center=Center!=null?Native.RegionInfo(Center):null,docks=docks.Select(d=>d.Inspect()).ToArray()});}
+        }
+        T ReleasePanel<T>(T panel,DateTime now) where T:GlassWindow
+        {
+            if(panel==null||!panel.IdleForRelease(now))return panel;panel.Close();RetiredPanels++;return null;
+        }
+        internal void ReleaseDormantPanels(DateTime now)
+        {
+            if(disposed||DragReorder.Active||externalLaunching||nativePanelBusy)return;
+            Quick=ReleasePanel(Quick,now);Center=ReleasePanel(Center,now);Detail=ReleasePanel(Detail,now);Drawer=ReleasePanel(Drawer,now);Finder=ReleasePanel(Finder,now);StartMenu=ReleasePanel(StartMenu,now);
+            if(Welcome!=null&&Welcome.IdleForRelease(now)){Welcome.ReleaseIdle();Welcome=null;RetiredPanels++;}
         }
         internal static double MonitorScale(Forms.Screen screen,Window window)
         {
@@ -587,7 +609,7 @@ namespace OneTaskBar
                     for(int i=0;i<10&&!Notifications.Items.Any(n=>n.Title==probeTitle);i++){await Task.Delay(150);await Notifications.Refresh();}
                 }
                 var item=Notifications.Items.FirstOrDefault();var route=item!=null?await Task.Run(()=>NotificationActivation.Open(item,true)):null;
-                AppLog.Json("notification-route-probe.json",new {time=DateTimeOffset.Now.ToString("o"),temporary=temporary,allowed=Notifications.Allowed,count=Notifications.Items.Count,icons=Notifications.Items.Count(n=>n.Icon!=null),route=route});
+                AppLog.Json("notification-route-probe.json",new {time=DateTimeOffset.Now.ToString("o"),temporary=temporary,allowed=Notifications.Allowed,count=Notifications.Items.Count,icons=Notifications.Items.Count(n=>n.Icon!=null),artwork=Notifications.Items.Count(n=>n.Artwork!=null),payloads=Notifications.Items.Count(n=>n.Payload!=null),route=route});
             }catch(Exception e){AppLog.Json("notification-route-probe.json",new {error=e.Message});}
             finally {if(temporary){try{Windows.UI.Notifications.ToastNotificationManager.History.Remove(tag,group);}catch{}}}
             if(temporary)await Notifications.Refresh();
@@ -615,6 +637,7 @@ namespace OneTaskBar
             Desktop=false;
             TaskbarMask.Active=false;
             timer.Stop(); SystemEvents.DisplaySettingsChanged-=DisplayChanged; SystemEvents.PowerModeChanged-=PowerChanged;
+            ConnectionSound.Dispose();
             Previews.Dispose();if(brightnessEvents!=null)brightnessEvents.Dispose();
             if(keys!=null) keys.Dispose();
             if(osdGate!=null)osdGate.Dispose();
