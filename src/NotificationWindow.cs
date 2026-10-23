@@ -15,8 +15,10 @@ namespace OneTaskBar
         readonly StackPanel cards=new StackPanel();
         readonly TextBlock clock=Paint.TextBlock("",28,Paint.Text),today=Paint.TextBlock("",12,Paint.Muted),count=Paint.TextBlock("알림",17,Paint.Text);
         readonly Button access,clear,disturb;readonly Glyph disturbGlyph=new Glyph("dnd",20);
-        readonly Dictionary<string,Border> retained=new Dictionary<string,Border>();string signature;bool opening,disturbBusy;
+        readonly Dictionary<string,NotificationStackView> retained=new Dictionary<string,NotificationStackView>(StringComparer.OrdinalIgnoreCase);string signature;bool opening,disturbBusy;
+        List<NotificationEntry> renderedItems;bool renderedAllowed;long clockSecond=-1;DateTime renderedDate;
         internal int CardCount {get{return retained.Count;}}
+        internal IEnumerable<NotificationStackView> Stacks {get{return retained.Values;}}
         internal NotificationWindow(ShellController controller)
         {
             shell=controller;Title="One TaskBar · 알림";Width=394;Height=584;Radius=30;Dark=true;Surface.CornerRadius=new CornerRadius(30);Surface.Background=QuickPanel.Glass;Surface.BorderBrush=Paint.Brush("#48FFFFFF");Surface.BorderThickness=new Thickness(.7);
@@ -45,31 +47,23 @@ namespace OneTaskBar
         }
         internal void Refresh()
         {
-            clock.Text=DateTime.Now.ToString("H:mm:ss");today.Text=DateTime.Now.ToString("M월 d일 dddd",System.Globalization.CultureInfo.GetCultureInfo("ko-KR"));
+            var now=DateTime.Now;long second=now.Ticks/TimeSpan.TicksPerSecond;if(second!=clockSecond){clockSecond=second;clock.Text=now.ToString("H:mm:ss");}if(now.Date!=renderedDate){renderedDate=now.Date;today.Text=now.ToString("M월 d일 dddd",System.Globalization.CultureInfo.GetCultureInfo("ko-KR"));}
             var dnd=shell.Toggles.Disturb.State;disturb.IsEnabled=dnd.Available&&!disturbBusy;disturb.Background=dnd.Enabled?Paint.ControlWhite:QuickPanel.Card;disturbGlyph.Color=dnd.Enabled?Paint.Ink:Paint.ControlWhite;disturbGlyph.InvalidateVisual();System.Windows.Automation.AutomationProperties.SetItemStatus(disturb,dnd.Enabled?"켜짐":"꺼짐");
             var service=shell.Notifications;access.Visibility=service.Allowed?Visibility.Collapsed:Visibility.Visible;count.Text=service.Allowed&&service.Items.Count>0?"알림  "+service.Items.Count:"알림";clear.IsEnabled=service.Allowed&&service.Items.Count>0;clear.Opacity=clear.IsEnabled?1:.4;
             var accessText=access.Content as TextBlock;if(accessText!=null)accessText.Text="Windows 알림 연결";
-            string current=service.Allowed+"|"+dnd.Enabled+"|"+String.Join("|",service.Items.Select(a=>a.Id+":"+a.Title+":"+a.Body+":"+(a.Icon!=null)+":"+(a.Artwork!=null)));if(current==signature)return;signature=current;
-            var items=service.Allowed?service.Items:new List<NotificationEntry>();var keys=new HashSet<string>(items.Select(Key));foreach(string key in retained.Keys.Where(k=>!keys.Contains(k)).ToArray()){var removed=retained[key];retained.Remove(key);RemoveCard(removed);}
+            if(!shell.Demo&&signature!=null&&Object.ReferenceEquals(renderedItems,service.Items)&&renderedAllowed==service.Allowed)return;renderedItems=service.Items;renderedAllowed=service.Allowed;
+            string current=service.Allowed+"|"+String.Join("|",service.Items.Select(a=>NotificationStack.ItemKey(a)+":"+a.App+":"+a.Title+":"+a.Body+":"+a.Created.UtcDateTime.Ticks+":"+(a.Icon!=null?a.Icon.GetHashCode():0)+":"+(a.Artwork!=null?a.Artwork.GetHashCode():0)));if(current==signature)return;signature=current;
+            var items=NotificationStack.Group(service.Allowed?service.Items:new List<NotificationEntry>());var keys=new HashSet<string>(items.Select(g=>g.Key),StringComparer.OrdinalIgnoreCase);foreach(string key in retained.Keys.Where(k=>!keys.Contains(k)).ToArray()){var removed=retained[key];retained.Remove(key);RemoveCard(removed);}
             foreach(var empty in cards.Children.OfType<Border>().Where(b=>b.Tag as string=="empty").ToArray())cards.Children.Remove(empty);
             if(!service.Allowed||service.Items.Count==0){var content=new StackPanel {Margin=new Thickness(20,32,20,34)};var empty=Paint.TextBlock(service.Allowed?"알림이 없습니다.":"Windows 알림 연결",15,Paint.Text);empty.FontWeight=FontWeights.SemiBold;empty.TextAlignment=TextAlignment.Center;content.Children.Add(empty);if(!service.Allowed){var status=Paint.TextBlock(service.Status,12,Paint.Muted);status.TextAlignment=TextAlignment.Center;status.TextWrapping=TextWrapping.Wrap;status.Margin=new Thickness(0,9,0,0);content.Children.Add(status);}cards.Children.Add(new Border {Tag="empty",Background=Brushes.Transparent,Margin=new Thickness(0,4,0,6),Child=content});return;}
 
-            int index=0;foreach(var item in service.Items){string key=Key(item),version=item.Title+"|"+item.Body+"|"+(item.Icon!=null)+"|"+(item.Artwork!=null);Border existing;if(retained.TryGetValue(key,out existing)){if((string)existing.Tag==version){int old=cards.Children.IndexOf(existing);if(old!=index){cards.Children.Remove(existing);cards.Children.Insert(Math.Min(index,cards.Children.Count),existing);}index++;continue;}retained.Remove(key);RemoveCard(existing);}
-                var row=new StackPanel {Margin=new Thickness(0)};
-                var appRow=new DockPanel();
-                var app=Paint.TextBlock(item.App+"  ·  "+item.Created.LocalDateTime.ToString("H:mm"),10,Paint.Muted);app.TextTrimming=TextTrimming.CharacterEllipsis;appRow.Children.Add(app);row.Children.Add(appRow);
-                var title=Paint.TextBlock(item.Title,14,Paint.Text);title.FontWeight=FontWeights.SemiBold;title.TextWrapping=TextWrapping.Wrap;title.MaxHeight=44;title.TextTrimming=TextTrimming.CharacterEllipsis;title.Margin=new Thickness(0,7,0,4);row.Children.Add(title);
-                if(!String.IsNullOrEmpty(item.Body)){var body=Paint.TextBlock(item.Body,12,Paint.Text);body.TextWrapping=TextWrapping.Wrap;body.MaxHeight=90;body.TextTrimming=TextTrimming.CharacterEllipsis;row.Children.Add(body);}
-                if(item.Artwork!=null)row.Children.Add(new Image {Source=item.Artwork,Height=130,Stretch=Stretch.Uniform,Margin=new Thickness(0,9,0,0)});
-                var content=new Grid();content.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(item.Icon!=null?40:0)});content.ColumnDefinitions.Add(new ColumnDefinition());
-                if(item.Icon!=null){var icon=AppIcons.Visual(item.Icon,32);icon.VerticalAlignment=VerticalAlignment.Top;icon.Margin=new Thickness(0,3,6,0);content.Children.Add(icon);}Grid.SetColumn(row,1);content.Children.Add(row);
-                var open=Paint.Button(content,()=>OpenNotification(item),item.App+" · 원래 알림 동작 열기");open.HorizontalContentAlignment=HorizontalAlignment.Stretch;open.Background=Brushes.Transparent;open.Padding=new Thickness(13,13,35,14);
-                var layout=new Grid();layout.Children.Add(open);var close=Paint.Button(new Glyph("close",12){Color=Paint.Muted},()=> {service.Dismiss(item.Id);RefreshNotifications();},"알림 지우기");close.Width=24;close.Height=24;close.Padding=new Thickness(5);close.Background=Brushes.Transparent;close.HorizontalAlignment=HorizontalAlignment.Right;close.VerticalAlignment=VerticalAlignment.Top;close.Margin=new Thickness(0,8,8,0);layout.Children.Add(close);
-                var card=new Border {Tag=version,Background=QuickPanel.Card,CornerRadius=new CornerRadius(27),Margin=new Thickness(0,4,0,7),Child=layout};retained[key]=card;cards.Children.Insert(Math.Min(index,cards.Children.Count),card);index++;if(IsVisible&&Motion.Enabled){Motion.Fade(card,0,1,180);var shift=new TranslateTransform(0,10);card.RenderTransform=shift;shift.BeginAnimation(TranslateTransform.YProperty,Motion.Tween(10,0,240));}
+            int index=0;foreach(var group in items){NotificationStackView card;bool added=!retained.TryGetValue(group.Key,out card);
+                if(added){card=new NotificationStackView(group,OpenNotification,item=>{service.Dismiss(item.Id);RefreshNotifications();},stack=>{foreach(var item in stack.Items)service.Dismiss(item.Id);RefreshNotifications();});retained[group.Key]=card;}else card.Update(group);
+                int old=cards.Children.IndexOf(card);if(old!=index){if(old>=0)cards.Children.Remove(card);cards.Children.Insert(Math.Min(index,cards.Children.Count),card);}index++;
+                if(added&&IsVisible&&Motion.Enabled){Motion.Fade(card,0,1,180);var shift=new TranslateTransform(0,10);card.RenderTransform=shift;shift.BeginAnimation(TranslateTransform.YProperty,Motion.Tween(10,0,240));}
             }
         }
-        static string Key(NotificationEntry item){return item.AppId+"|"+item.Id;}
-        void RemoveCard(Border card)
+        void RemoveCard(FrameworkElement card)
         {
             if(!IsVisible||!Motion.Enabled){cards.Children.Remove(card);return;}card.IsHitTestVisible=false;double height=card.ActualHeight;card.Height=0;card.ClipToBounds=true;card.BeginAnimation(HeightProperty,Motion.Tween(height,0,180));var fade=Motion.Tween(card.Opacity,0,150);card.Opacity=0;fade.Completed+=(s,e)=>cards.Children.Remove(card);card.BeginAnimation(OpacityProperty,fade);
         }

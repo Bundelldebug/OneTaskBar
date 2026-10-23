@@ -25,15 +25,18 @@ namespace OneTaskBar
         internal double StartX,AppX,AppWidth,StatusX,StatusWidth,Y;
         internal int Capacity;
         internal static double StatusSize(double screenWidth,double powerWidth=58){return Math.Min(282,Math.Max(226,screenWidth*.25))+powerWidth-58;}
-        internal static DockLayout Compute(System.Drawing.Rectangle screen,double scale,int count,double powerWidth=58)
+        internal static double BalancedY(double height,double reserved){return height-(Math.Max(68,reserved)+44)/2;}
+        internal static DockLayout Compute(System.Drawing.Rectangle screen,double scale,int count,double powerWidth=58,bool media=false,double reserved=68)
         {
             double width=screen.Width/scale;
             double status=StatusSize(width,powerWidth),statusX=width-status-12;
-            double available=Math.Max(FixedWidth,statusX-78);
+            double mediaMinimum=media?Math.Min(44,Math.Max(1,statusX-204)):0;
+            double minimumX=media?mediaMinimum+76:66;
+            double available=Math.Max(FixedWidth,statusX-minimumX-12);
             int capacity=Math.Max(0,(int)Math.Floor((available-FixedWidth)/46));
             double apps=Math.Min(count,capacity)*46+FixedWidth;
-            double x=Math.Max(66,Math.Min((width-apps)/2,statusX-apps-12));
-            return new DockLayout { StartX=x-52,AppX=x,AppWidth=apps,StatusX=statusX,StatusWidth=status,Y=screen.Height/scale-56,Capacity=capacity };
+            double x=Math.Max(minimumX,Math.Min((width-apps)/2,statusX-apps-12));
+            return new DockLayout { StartX=x-52,AppX=x,AppWidth=apps,StatusX=statusX,StatusWidth=status,Y=BalancedY(screen.Height/scale,reserved),Capacity=capacity };
         }
     }
     internal sealed class ShellController : IDisposable
@@ -92,7 +95,7 @@ namespace OneTaskBar
         double lastAppRefreshMs;
         DateTime servicesAt;
         DateTime releaseAt;internal int RetiredPanels;
-        DateTime autoHideAt;internal bool DockAutoHide;
+        DateTime autoHideAt;internal bool DockAutoHide;bool autoHideChanging;int autoHideRevision;
         IntPtr lastForeground;
         internal IntPtr LastApplication;
         internal DateTime FocusUntil;
@@ -282,6 +285,12 @@ namespace OneTaskBar
         }
         internal async void Media(string command) {await Services.ControlMedia(command); servicesAt=DateTime.MinValue;}
         internal async Task<bool> SeekMedia(double percent){bool changed=await Services.SeekPercent(percent);if(changed)servicesAt=DateTime.MinValue;return changed;}
+        internal async void OpenMediaApplication(string appId)
+        {
+            if(disposed||externalLaunching)return;var app=MediaApplication.Resolve(appId,Running.Concat(Apps));if(app==null){if(Quick!=null&&Quick.IsVisible)Quick.Feedback("현재 재생 앱의 창을 찾지 못했습니다.");AppLog.Once("media-app-open",appId??"unknown");return;}externalLaunching=true;
+            try{bool dismissed=Quick==null||!Quick.IsVisible||await Quick.DismissAsync();foreach(var dock in docks)if(dock.MediaBar!=null)dock.MediaBar.SetExpanded(false);if(Motion.Enabled)await Task.Delay(130);if(dismissed&&!disposed)app.Launch();}
+            catch(Exception error){AppLog.Write("media-app-open",error.Message);}finally{externalLaunching=false;}
+        }
         internal void NowBarOpening(NowBar selected){foreach(var dock in docks)if(dock.MediaBar!=null&&dock.MediaBar!=selected)dock.MediaBar.SetExpanded(false);foreach(var panel in new GlassWindow[]{Quick,Center,Detail,Drawer,Finder,StartMenu})if(panel!=null)panel.HideImmediately();}
         internal void ShowNative(string kind,DockHost dock=null)
         {
@@ -332,9 +341,11 @@ namespace OneTaskBar
             Previews.Close();if(StartMenu!=null)StartMenu.HideImmediately();
             if(NotificationLink==null)NotificationLink=new NotificationConnectWindow(this);if(Quick!=null)Quick.Hide();if(Center!=null)Center.Hide();if(Welcome!=null)Welcome.Hide();var screen=Forms.Screen.FromPoint(Forms.Cursor.Position);double scale=MonitorScale(screen,NotificationLink),w=Math.Min(490,screen.Bounds.Width/scale-32),h=Math.Min(414,screen.Bounds.Height/scale-100);NotificationLink.ShowAt(screen.Bounds,(screen.Bounds.Width/scale-w)/2,(screen.Bounds.Height/scale-h)/2,w,h);NotificationLink.Pop();NotificationLink.Activate();if(resume)Application.Current.Dispatcher.BeginInvoke(new Action(async()=>{await Task.Delay(350);if(!disposed&&NotificationLink.IsVisible)NotificationLink.Begin();}));
         }
+        AppEntry lastSamsungSettings;
         internal AppEntry SamsungSettings()
         {
-            return Apps.FirstOrDefault(a=>(a.AppID??"").IndexOf("SamsungSettings",StringComparison.OrdinalIgnoreCase)>=0)??Apps.FirstOrDefault(a=>a.Name=="삼성 설정"||a.Name=="Samsung Settings");
+            var app=Apps.FirstOrDefault(a=>(a.AppID??"").IndexOf("SamsungSettings",StringComparison.OrdinalIgnoreCase)>=0)??Apps.FirstOrDefault(a=>a.Name=="삼성 설정"||a.Name=="Samsung Settings");
+            if(app!=null)lastSamsungSettings=app;else if(Apps.Count>0)lastSamsungSettings=null;return app??lastSamsungSettings;
         }
         bool externalLaunching;
         internal AppEntry SamsungDevices() {return Apps.FirstOrDefault(a=>(a.AppID??"").IndexOf("SamsungMyDevices",StringComparison.OrdinalIgnoreCase)>=0)??Apps.FirstOrDefault(a=>a.Name=="주변 기기 연결");}
@@ -521,7 +532,7 @@ namespace OneTaskBar
                     var old=String.Join("|",Pins.Select(a=>a.Key));Pins=t.Result.Pins;explorerItems=t.Result.Mirror;ExplorerBridge.Save(explorerItems);
                     if(old!=String.Join("|",Pins.Select(a=>a.Key)))foreach(var dock in docks)dock.Rebuild();
                 })));}
-            ++iteration;if(now>=liveStateAt){liveStateAt=now.AddSeconds(30);AppLog.Json("live-state.json",new {time=DateTimeOffset.Now.ToString("o"),sequence=iteration,pulseMilliseconds=cadence,desktop=Desktop,battery=Power.Level,connected=Power.Connected,volume=Audio.Value,muted=Audio.Muted,brightness=Brightness,displays=docks.Count,apps=Apps.Count,pinned=Pins.Count,running=Running.Count,appRefreshMs=Math.Round(lastAppRefreshMs,1),wifi=Services.WifiOn,bluetooth=Services.BluetoothOn,media=Services.Media.Title,mediaActive=Services.Media.Active,retiredPanels=RetiredPanels,output=Services.OutputName,wifiSignal=WifiSignal,packaged=Notifications.Packaged,notificationsAllowed=Notifications.Allowed,cachedIcons=AppIcons.CachedCount,ecoWorkers=BackgroundWork.EcoWorkers,backgroundJobs=BackgroundWork.Completed,mediaMetadataReads=Services.MetadataReads,notificationSnapshotReads=Notifications.SnapshotReads,notificationCount=Notifications.Items.Count,inspectable=Program.Inspectable,quick=Quick!=null?Native.RegionInfo(Quick):null,center=Center!=null?Native.RegionInfo(Center):null,docks=docks.Select(d=>d.Inspect()).ToArray()});}
+            ++iteration;if(now>=liveStateAt){liveStateAt=now.AddSeconds(30);AppLog.Json("live-state.json",new {time=DateTimeOffset.Now.ToString("o"),sequence=iteration,pulseMilliseconds=cadence,desktop=Desktop,battery=Power.Level,connected=Power.Connected,volume=Audio.Value,muted=Audio.Muted,brightness=Brightness,displays=docks.Count,apps=Apps.Count,pinned=Pins.Count,running=Running.Count,appRefreshMs=Math.Round(lastAppRefreshMs,1),wifi=Services.WifiOn,bluetooth=Services.BluetoothOn,media=Services.Media.Title,mediaActive=Services.Media.Active,retiredPanels=RetiredPanels,managedBytes=GC.GetTotalMemory(false),backdropCount=LiveBackdrop.InstanceCount,windowCount=Application.Current.Windows.Count,output=Services.OutputName,wifiSignal=WifiSignal,packaged=Notifications.Packaged,notificationsAllowed=Notifications.Allowed,cachedIcons=AppIcons.CachedCount,ecoWorkers=BackgroundWork.EcoWorkers,backgroundJobs=BackgroundWork.Completed,mediaMetadataReads=Services.MetadataReads,notificationSnapshotReads=Notifications.SnapshotReads,notificationCount=Notifications.Items.Count,inspectable=Program.Inspectable,quick=Quick!=null?Native.RegionInfo(Quick):null,center=Center!=null?Native.RegionInfo(Center):null,docks=docks.Select(d=>d.Inspect()).ToArray()});}
         }
         T ReleasePanel<T>(T panel,DateTime now) where T:GlassWindow
         {
@@ -540,11 +551,15 @@ namespace OneTaskBar
         void TaskbarOptionsChanged(){autoHideAt=DateTime.MinValue;Wake();}
         void SyncAutoHide(bool force)
         {
-            if(Demo||disposed||!force&&DateTime.UtcNow<autoHideAt)return;autoHideAt=DateTime.UtcNow.AddSeconds(2);bool next=Native.TaskbarAutoHide();if(!force&&next==DockAutoHide)return;DockAutoHide=next;foreach(var item in reservations)item.SetAutoHide(next);if(Welcome!=null)Welcome.UpdateAutoHide(next);
+            if(Demo||disposed||autoHideChanging||!force&&DateTime.UtcNow<autoHideAt)return;autoHideAt=DateTime.UtcNow.AddSeconds(2);bool next=Native.TaskbarAutoHide();if(!force&&next==DockAutoHide)return;DockAutoHide=next;foreach(var item in reservations)item.SetAutoHide(next);if(Welcome!=null)Welcome.UpdateAutoHide(next);
         }
-        internal void SetAutoHide(bool value)
+        internal async void SetAutoHide(bool value)
         {
-            if(Demo)DockAutoHide=value;else{Native.SetTaskbarAutoHide(value);SyncAutoHide(true);}foreach(var dock in docks)dock.UpdateVisibility(Native.IsFullScreen(dock.Screen),DockAutoHide);
+            if(Demo){DockAutoHide=value;foreach(var dock in docks)dock.UpdateVisibility(false,value);return;}
+            int revision=++autoHideRevision;autoHideChanging=true;
+            try{Native.SetTaskbarAutoHide(value);for(int i=0;i<20&&Native.TaskbarAutoHide()!=value;i++)await Task.Delay(50);if(revision!=autoHideRevision||disposed)return;if(Native.TaskbarAutoHide()!=value&&Welcome!=null)Welcome.Feedback("Windows 자동 숨김 변경을 확인하지 못했습니다. 다시 시도해 주세요.");}
+            catch(Exception error){AppLog.Write("taskbar-autohide",error.Message);if(Welcome!=null)Welcome.Feedback(error.Message);}
+            finally{if(revision==autoHideRevision){autoHideChanging=false;if(!disposed){SyncAutoHide(true);foreach(var dock in docks)dock.UpdateVisibility(Native.IsFullScreen(dock.Screen),DockAutoHide);}}}
         }
         internal bool DockInUse(DockHost dock)
         {

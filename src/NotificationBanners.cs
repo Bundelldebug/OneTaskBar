@@ -54,7 +54,7 @@ namespace OneTaskBar
         {
             Refresh();if(!Enabled)return;
             var current=new HashSet<string>(items.Select(Key),StringComparer.Ordinal);var fresh=items.Where(n=>!known.Contains(Key(n))&&Fresh(n,DateTimeOffset.Now)).OrderByDescending(n=>n.Created).Take(3).Reverse().ToList();
-            foreach(var banner in visible.ToArray())if(!current.Contains(Key(banner.Entry)))Close(banner,false);
+            foreach(var banner in visible.ToArray())if(!banner.Retain(current))Close(banner,false);Layout();
             known.Clear();known.UnionWith(current);if(!baseline){baseline=true;if(gate!=null)gate.Refresh();return;}
             foreach(string key in pending.Keys.Where(k=>!current.Contains(k)||!Fresh(pending[k],DateTimeOffset.Now)).ToArray())pending.Remove(key);
             foreach(var item in fresh)pending[Key(item)]=item;while(pending.Count>12)pending.Remove(pending.OrderBy(p=>p.Value.Created).First().Key);Drain();
@@ -90,14 +90,14 @@ namespace OneTaskBar
         }
         internal void Show(NotificationEntry item)
         {
-            if(disposed)return;var existing=visible.FirstOrDefault(b=>Key(b.Entry)==Key(item));if(existing!=null){existing.Update(item);existing.Expires=DateTime.UtcNow.AddSeconds(7);return;}
+            if(disposed)return;var existing=visible.FirstOrDefault(b=>String.Equals(NotificationStack.AppKey(b.Entry),NotificationStack.AppKey(item),StringComparison.OrdinalIgnoreCase));if(existing!=null){existing.Update(item);Layout();return;}
             while(visible.Count>=3)Close(visible[0],false);
-            var banner=new NotificationBanner(item,Open,Close);visible.Add(banner);Shown++;Layout();banner.Pop();expiry.Start();
+            var banner=new NotificationBanner(item,Open,Close);visible.Add(banner);Shown++;Layout();banner.Appear();expiry.Start();
         }
         void Layout()
         {
             if(visible.Count==0)return;var screen=Forms.Screen.PrimaryScreen??Forms.Screen.FromPoint(Forms.Cursor.Position);double scale=visible[0].IsVisible?Math.Max(96,Native.GetDpiForWindow(new WindowInteropHelper(visible[0]).Handle))/96.0:ShellController.MonitorScale(screen,visible[0]),width=Math.Min(370,screen.WorkingArea.Width/scale-24),y=Math.Max(12,(screen.WorkingArea.Top-screen.Bounds.Top)/scale+12);
-            foreach(var banner in visible){double h=banner.DesiredHeight;if(y+h>screen.WorkingArea.Height/scale-24){Close(banner,false);break;}banner.ShowAt(screen.Bounds,(screen.WorkingArea.Right-screen.Bounds.Left)/scale-width-12,y,width,h);y+=h+9;}
+            foreach(var banner in visible){double h=banner.DesiredHeight;if(y+h>screen.WorkingArea.Height/scale-24){Close(banner,false);break;}banner.PlaceBanner(screen.Bounds,(screen.WorkingArea.Right-screen.Bounds.Left)/scale-width-12,y,width,h);y+=h+9;}
         }
         async void Open(NotificationBanner banner)
         {
@@ -112,7 +112,7 @@ namespace OneTaskBar
         internal async void Close(NotificationBanner banner,bool animate)
         {
             if(!visible.Remove(banner))return;if(visible.Count==0)expiry.Stop();
-            if(animate)await banner.DismissAsync();if(!banner.ClosedFlag)banner.Close();if(!disposed)Layout();
+            if(animate)await banner.Disappear();if(!banner.ClosedFlag)banner.Close();if(!disposed)Layout();
         }
         internal void Clear(){foreach(var banner in visible.ToArray())Close(banner,false);expiry.Stop();}
         public void Dispose(){if(disposed)return;disposed=true;++revision;shell.Notifications.SnapshotReady=null;Clear();if(gate!=null)gate.Dispose();}
@@ -123,6 +123,11 @@ namespace OneTaskBar
         readonly Border icon=new Border {Width=35,Height=35,VerticalAlignment=VerticalAlignment.Top,Margin=new Thickness(0,4,10,0)};
         readonly Image artwork=new Image {Height=118,Stretch=Stretch.Uniform,Margin=new Thickness(0,9,0,0),Visibility=Visibility.Collapsed};
         readonly ColumnDefinition iconColumn=new ColumnDefinition();
+        readonly List<NotificationEntry> entries=new List<NotificationEntry>();
+        readonly DispatcherTimer motion=new DispatcherTimer(DispatcherPriority.Normal){Interval=TimeSpan.FromMilliseconds(16)};readonly System.Diagnostics.Stopwatch motionWatch=new System.Diagnostics.Stopwatch();
+        System.Drawing.Rectangle monitor;Rect bounds;double progress=1,from,to;TaskCompletionSource<bool> completion;
+        internal bool Animating {get{return motion.IsEnabled;}}
+        internal int StackCount {get{return entries.Count;}}
         internal bool HasIcon {get{return icon.Visibility==Visibility.Visible;}}
         internal bool HasArtwork {get{return artwork.Visibility==Visibility.Visible;}}
         internal NotificationEntry Entry;internal DateTime Expires;internal bool Opening,ClosedFlag;
@@ -134,8 +139,29 @@ namespace OneTaskBar
             var text=new StackPanel();sender.TextTrimming=TextTrimming.CharacterEllipsis;text.Children.Add(sender);title.FontWeight=FontWeights.SemiBold;title.TextWrapping=TextWrapping.Wrap;title.TextTrimming=TextTrimming.CharacterEllipsis;title.MaxHeight=39;title.Margin=new Thickness(0,5,12,3);text.Children.Add(title);body.TextWrapping=TextWrapping.Wrap;body.TextTrimming=TextTrimming.CharacterEllipsis;body.MaxHeight=34;body.Margin=new Thickness(0,0,4,0);text.Children.Add(body);Grid.SetColumn(text,1);content.Children.Add(text);
             text.Children.Add(artwork);var row=new Grid();var hit=Paint.Button(content,()=>open(this),"알림 열기");hit.Background=Brushes.Transparent;hit.Padding=new Thickness(17,14,33,13);hit.HorizontalContentAlignment=HorizontalAlignment.Stretch;row.Children.Add(hit);var dismiss=Paint.Button(new Glyph("close",13),()=>close(this,true),"팝업 닫기 · 알림 기록 유지");dismiss.Background=Brushes.Transparent;dismiss.Width=dismiss.Height=28;dismiss.Padding=new Thickness(6);dismiss.HorizontalAlignment=HorizontalAlignment.Right;dismiss.VerticalAlignment=VerticalAlignment.Top;dismiss.Margin=new Thickness(0,7,7,0);row.Children.Add(dismiss);Surface.Child=row;TransitionContent=row;
             SourceInitialized+=(s,e)=> {var h=new WindowInteropHelper(this).Handle;Native.SetWindowLong(h,-20,Native.GetWindowLong(h,-20)|0x08000000);};
-            Closed+=(s,e)=>ClosedFlag=true;Update(entry);
+            motion.Tick+=(s,e)=>Frame();Closed+=(s,e)=>{ClosedFlag=true;motion.Stop();motionWatch.Stop();if(completion!=null)completion.TrySetResult(false);};Update(entry);
         }
-        internal void Update(NotificationEntry entry){Entry=entry;sender.Text=entry.App;title.Text=entry.Title;body.Text=entry.Body;body.Visibility=String.IsNullOrWhiteSpace(entry.Body)?Visibility.Collapsed:Visibility.Visible;icon.Child=entry.Icon!=null?AppIcons.Visual(entry.Icon,32):null;icon.Visibility=entry.Icon!=null?Visibility.Visible:Visibility.Collapsed;iconColumn.Width=new GridLength(entry.Icon!=null?45:0);artwork.Source=entry.Artwork;artwork.Visibility=entry.Artwork!=null?Visibility.Visible:Visibility.Collapsed;Expires=DateTime.UtcNow.AddSeconds(7);}
+        internal void PlaceBanner(System.Drawing.Rectangle screen,double x,double y,double width,double height)
+        {
+            monitor=screen;var next=new Rect(x,y,width,height);if(!IsVisible){bounds=next;ShowAt(screen,x,y,width,height);}else if(bounds!=next){bounds=next;Width=width;Height=height;Position();}
+        }
+        internal void Appear(){Animate(true);}
+        internal Task<bool> Disappear(){return Animate(false);}
+        Task<bool> Animate(bool opening)
+        {
+            if(completion!=null)completion.TrySetResult(false);completion=new TaskCompletionSource<bool>();var pending=completion.Task;motion.Stop();from=opening?0:progress;to=opening?1:0;
+            if(!Motion.Enabled||!IsVisible){progress=to;Position();completion.TrySetResult(true);return pending;}progress=from;Position();motionWatch.Restart();motion.Start();return pending;
+        }
+        void Frame()
+        {
+            double t=Math.Min(1,motionWatch.Elapsed.TotalMilliseconds/(to==1?280:160)),ease=1-Math.Pow(1-t,3);progress=from+(to-from)*ease;Position();if(t>=1){motion.Stop();motionWatch.Stop();completion.TrySetResult(true);}
+        }
+        void Position(){Opacity=progress;Native.BlurOpacity(this,progress);Native.Place(this,monitor,bounds.X+(1-progress)*8,bounds.Y,bounds.Width,bounds.Height);}
+        internal void Update(NotificationEntry entry)
+        {
+            entries.RemoveAll(n=>NotificationBanners.Key(n)==NotificationBanners.Key(entry));entries.Add(entry);entries.Sort((a,b)=>b.Created.CompareTo(a.Created));if(entries.Count>32)entries.RemoveRange(32,entries.Count-32);Present();Expires=DateTime.UtcNow.AddSeconds(7);
+        }
+        internal bool Retain(HashSet<string> current){if(entries.RemoveAll(n=>!current.Contains(NotificationBanners.Key(n)))>0&&entries.Count>0)Present();return entries.Count>0;}
+        void Present(){var entry=entries[0];Entry=entry;sender.Text=entry.App+(entries.Count>1?"  ·  알림 "+entries.Count+"개":"");title.Text=entry.Title;body.Text=entry.Body;body.Visibility=String.IsNullOrWhiteSpace(entry.Body)?Visibility.Collapsed:Visibility.Visible;icon.Child=entry.Icon!=null?AppIcons.Visual(entry.Icon,32):null;icon.Visibility=entry.Icon!=null?Visibility.Visible:Visibility.Collapsed;iconColumn.Width=new GridLength(entry.Icon!=null?45:0);artwork.Source=entry.Artwork;artwork.Visibility=entry.Artwork!=null?Visibility.Visible:Visibility.Collapsed;}
     }
 }

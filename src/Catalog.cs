@@ -50,7 +50,7 @@ namespace OneTaskBar
                 using(p) { p.Start(); BackgroundWork.HintChild(p); if(!p.WaitForExit(25000)) { p.Kill(); AppLog.Write("catalog","Get-StartApps timed out"); } }
                 if(File.Exists(cache)) {
                     var rows=new JavaScriptSerializer().Deserialize<List<AppEntry>>(File.ReadAllText(cache,Encoding.UTF8));
-                    if(rows!=null && rows.Count>0) { if(loadIcons)Parallel.ForEach(rows,new ParallelOptions {MaxDegreeOfParallelism=3},item=>item.LoadIcon()); return rows.OrderBy(a=>a.Name,StringComparer.CurrentCultureIgnoreCase).ToList(); }
+                    if(rows!=null && rows.Count>0) {foreach(var item in rows.Where(a=>!String.IsNullOrEmpty(a.AppID)&&!a.AppID.Contains("!"))){var shortcut=WebAppIcons.LaunchShortcut(item.AppID,item.Name);if(shortcut!=null&&shortcut.Target.EndsWith(".exe",StringComparison.OrdinalIgnoreCase)&&File.Exists(shortcut.Target)){item.Target=shortcut.File;item.Executable=shortcut.Target;}}if(loadIcons)Parallel.ForEach(rows,new ParallelOptions {MaxDegreeOfParallelism=3},item=>item.LoadIcon()); return rows.OrderBy(a=>a.Name,StringComparer.CurrentCultureIgnoreCase).ToList(); }
                 }
             } catch(Exception e) { AppLog.Write("catalog",e.Message); }
             var fallback=new List<AppEntry> { new AppEntry { Name="파일 탐색기",Target="explorer.exe" },new AppEntry { Name="설정",Target="ms-settings:" },new AppEntry { Name="메모장",Target="notepad.exe" } };
@@ -72,9 +72,9 @@ namespace OneTaskBar
                     string key=appId??path;
                     AppEntry entry;
                     if(!entries.TryGetValue(key,out entry)) { entry=new AppEntry { Name=title.ToString(),Target=String.IsNullOrEmpty(appId) ? path : null,AppID=appId,Executable=path };
-                        entry.LoadIcon(); if(entry.Icon==null) entry.Icon=Native.WindowIcon(handle); entries.Add(key,entry); }
+                        entry.Windows.Add(handle);entry.LoadIcon(); if(entry.Icon==null) entry.Icon=Native.WindowIcon(handle); entries.Add(key,entry); }
                     try{long started=p.StartTime.ToUniversalTime().Ticks;if(entry.StartedUtcTicks==0||started<entry.StartedUtcTicks)entry.StartedUtcTicks=started;}catch{}
-                    entry.Windows.Add(handle);
+                    if(!entry.Windows.Contains(handle))entry.Windows.Add(handle);
                 } } catch { }
                 return true;
             },IntPtr.Zero);

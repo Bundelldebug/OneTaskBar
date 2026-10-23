@@ -53,9 +53,19 @@ namespace OneTaskBar
             if(args.Contains("--power-probe")) {var before=Native.ReadPerformanceMode();if(!before.Available)return 1;try {Native.SetPerformanceMode(before.Selected);var after=Native.ReadPerformanceMode();bool same=after.Available&&before.Selected==after.Selected;AppLog.Json("power-mode-probe.json",new {passed=same,before=before,after=after});return same?0:1;}catch(Exception e){AppLog.Json("power-mode-probe.json",new {passed=false,error=e.Message,before=before});return 1;}}
             if(args.Contains("--launcher-probe"))return LauncherChecks.Probe();
             if(args.Contains("--launcher-keyboard-probe"))return LauncherInputChecks.Run();
+            if(args.Contains("--admin-targets-probe"))return AdminLaunch.Probe();
             if(args.Contains("--desktop-behavior-probe"))return DesktopBehaviorChecks.Run();
+            if(args.Contains("--taskbar-state-probe"))return DesktopBehaviorChecks.NativeState();
+            if(args.Contains("--taskbar-logo-probe"))return TaskbarLogoChecks.Probe();
             if(args.Contains("--app-screen-probe"))return AppScreenChecks.Run();
             if(args.Contains("--notification-assets-probe"))return NotificationAssetChecks.Run();
+            if(args.Contains("--notification-stack-probe"))return NotificationStackChecks.Run();
+            if(args.Contains("--wireless-scan-probe"))return WirelessScanChecks.Run();
+            if(args.Contains("--wireless-live-probe"))return WirelessScanChecks.Live();
+            if(args.Contains("--quick-size-probe"))return QuickSizeChecks.Run(args.Contains("--qa"));
+            if(args.Contains("--samsung-mode-probe"))return SamsungPerformanceChecks.Probe();
+            if(args.Contains("--compact-dock-probe"))return CompactDockChecks.Run();
+            if(args.Contains("--network-route-probe"))return NetworkRouteInfo.Probe();
             if(args.Contains("--memory-lifecycle-probe"))return MemoryChecks.Run();
             if(args.Contains("--media-source-probe"))return MediaArtwork.Probe();
             if(args.Contains("--artwork-resolver-probe"))return YouTubeArtworkChecks.Run();
@@ -68,12 +78,14 @@ namespace OneTaskBar
             if(args.Contains("--power-menu-probe"))return SystemPower.Probe();
             if(args.Contains("--quick-feature-probe"))return QuickFeatureChecks.Run();
             if(args.Contains("--nowbar-probe"))return NowBarChecks.Run();
+            if(args.Contains("--media-activation-probe"))return MediaActivationChecks.Run();
             if(args.Contains("--energy-probe"))return EnergyChecks.Run();
             if(args.Contains("--panel-transition-probe"))return PanelTransitionChecks.Run();
             if(args.Contains("--window-preview-probe"))return WindowPreviewChecks.Run(args.Contains("--inspect"));
             if(args.Contains("--popup-probe"))return PopupChecks.Run();
             if(args.Contains("--identity-package-probe"))return IdentityPackage.Probe();
             if(args.Contains("--dock-motion-probe"))return DockMotionChecks.Run();
+            if(args.Contains("--dock-overflow-probe"))return DockOverflowChecks.Run();
             if(args.Contains("--osd-mask-fixture")){var mask=new NativeOsdGate(()=>true,()=>false,()=>true);mask.Refresh();AppLog.Json("osd-mask-fixture.json",new {prepared=mask.Prepared,windows=mask.MaskedWindows.Select(h=>h.ToInt64()).ToArray()});return mask.Prepared>0?0:1;}
             if(args.Contains("--osd-recovery-probe"))return OsdChecks.Recovery();
             if(args.Contains("--native-start-probe")){var watch=Stopwatch.StartNew();bool sent=SystemPanels.Start();Thread.Sleep(900);bool visible=LauncherChecks.StartVisible();AppLog.Json("native-start-probe.json",new {passed=sent&&visible,sent=sent,nativeStart=visible,foreground=ReferenceChecks.FocusName(),milliseconds=watch.ElapsedMilliseconds});if(visible)SystemPanels.Start();else SystemPanels.CloseSearchProbe();return sent&&visible?0:1;}
@@ -119,7 +131,7 @@ namespace OneTaskBar
         {
             var checks=new List<string>();
             try {
-                EfficiencyChecks.Validate(checks);RuntimeCadence.Check(checks);RuntimeDockOrder.Check();checks.Add("stable-launch-order");LauncherLayout.Check();checks.Add("compact-launcher-layout");NowBarLayout.Check();checks.Add("nowbar-monitor-layout");ArtworkPalette.Check();checks.Add("artwork-color-contrast");MediaArtwork.Check(checks);StartDataChecks.Validate(checks);NotificationAssetChecks.Validate(checks);LauncherInputChecks.Validate(checks);DesktopBehaviorChecks.Validate(checks);
+                EfficiencyChecks.Validate(checks);RuntimeCadence.Check(checks);RuntimeDockOrder.Check();checks.Add("stable-launch-order");LauncherLayout.Check();checks.Add("compact-launcher-layout");NowBarLayout.Check();checks.Add("nowbar-monitor-layout");ArtworkPalette.Check();checks.Add("artwork-color-contrast");MediaArtwork.Check(checks);StartDataChecks.Validate(checks);NotificationAssetChecks.Validate(checks);NotificationStackChecks.Validate(checks);QuickSizeChecks.Validate(checks);SamsungPerformanceChecks.Validate(checks);NetworkRouteInfo.Validate(checks);LauncherInputChecks.Validate(checks);DesktopBehaviorChecks.Validate(checks);TaskbarLogoChecks.Validate(checks);
                 foreach(double width in new double[] { 1,200,288,344,600 }) foreach(double value in new double[] { -20,0,1,33,99,100,120 }) {
                     double f=PillSlider.FillWidth(width,value);
                     if(f<0 || f>width || (value==100 && f!=width)) throw new Exception("Slider endpoint "+width+" "+value);

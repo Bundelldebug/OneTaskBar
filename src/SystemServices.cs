@@ -8,6 +8,7 @@ using Windows.Devices.Radios;
 using Windows.Media.Control;
 using Windows.Foundation;
 using Windows.Storage.Streams;
+using Windows.Networking.Connectivity;
 
 namespace OneTaskBar
 {
@@ -45,7 +46,9 @@ namespace OneTaskBar
         GlobalSystemMediaTransportControlsSessionManager manager;
         GlobalSystemMediaTransportControlsSession session;
         internal bool? WifiOn,BluetoothOn;
-        internal bool? WifiPresent,BluetoothPresent;internal bool NetworkConnected;DateTime radioProbeAt;
+        internal bool? WifiPresent,BluetoothPresent;internal bool NetworkConnected;internal NetworkRoute NetworkRoute;DateTime radioProbeAt,networkAt;int networkDirty=1;
+        internal SystemServices(){try{NetworkInformation.NetworkStatusChanged+=NetworkChanged;}catch{}}
+        void NetworkChanged(object sender){Interlocked.Exchange(ref networkDirty,1);var changed=Changed;if(!disposed&&changed!=null)changed();}
         internal MediaState Media=new MediaState();
         readonly MediaArtwork artwork=new MediaArtwork();int propertiesDirty=1,playbackDirty=1;DateTime metadataAt,playbackAt;bool disposed;
         readonly MediaArtwork highArtwork=new MediaArtwork();string highAttempt;bool largeCover=Preferences.Current.NowBarLargeCover,highResolution=YouTubeArtwork.Enabled;
@@ -65,7 +68,7 @@ namespace OneTaskBar
             session=value;artwork.Clear();highArtwork.Clear();highAttempt=null;Interlocked.Exchange(ref propertiesDirty,1);metadataAt=DateTime.MinValue;
             if(session!=null)try{session.MediaPropertiesChanged+=PropertiesChanged;session.PlaybackInfoChanged+=PlaybackChanged;session.TimelinePropertiesChanged+=TimelineChanged;}catch{}
         }
-        public void Dispose(){disposed=true;SelectSession(null);if(manager!=null)try{manager.CurrentSessionChanged-=CurrentChanged;}catch{}manager=null;}
+        public void Dispose(){disposed=true;try{NetworkInformation.NetworkStatusChanged-=NetworkChanged;}catch{}SelectSession(null);if(manager!=null)try{manager.CurrentSessionChanged-=CurrentChanged;}catch{}manager=null;}
         internal async Task Refresh()
         {
             if(disposed)return;if(DateTime.UtcNow>=outputAt){outputAt=DateTime.UtcNow.AddSeconds(Interactive?2:10);try{OutputName=await BackgroundWork.Run(()=>Native.DefaultAudioOutputName());}catch{OutputName="오디오 출력";}}
@@ -85,7 +88,7 @@ namespace OneTaskBar
                 try{WifiPresent=System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces().Any(n=>n.NetworkInterfaceType==System.Net.NetworkInformation.NetworkInterfaceType.Wireless80211);}catch{}
                 try{BluetoothPresent=await Wait(Windows.Devices.Bluetooth.BluetoothAdapter.GetDefaultAsync())!=null;}catch{}
             }
-            try{NetworkConnected=System.Net.NetworkInformation.NetworkInterface.GetIsNetworkAvailable();}catch{}
+            if(Interlocked.Exchange(ref networkDirty,0)!=0||DateTime.UtcNow>=networkAt){networkAt=DateTime.UtcNow.AddSeconds(30);try{NetworkRoute=NetworkRouteInfo.Read();NetworkConnected=NetworkRoute!=NetworkRoute.None;}catch{try{NetworkConnected=System.Net.NetworkInformation.NetworkInterface.GetIsNetworkAvailable();NetworkRoute=NetworkConnected?NetworkRoute.Other:NetworkRoute.None;}catch{}}}
             try {
                 if(manager==null){manager=await Wait(GlobalSystemMediaTransportControlsSessionManager.RequestAsync());manager.CurrentSessionChanged+=CurrentChanged;}
                 if(Interlocked.Exchange(ref playbackDirty,0)==0&&Volatile.Read(ref propertiesDirty)==0&&DateTime.UtcNow<playbackAt&&DateTime.UtcNow<metadataAt&&!artwork.Due(DateTime.UtcNow))return;

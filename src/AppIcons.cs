@@ -53,15 +53,16 @@ namespace OneTaskBar
         }
         internal static ImageSource Get(AppEntry app)
         {
-            string key=(app.AppID??"")+"|"+(app.Target??app.Executable??"");
+            string key=!String.IsNullOrEmpty(app.AppID)&&app.AppID.Contains("!")?app.AppID:(app.AppID??"")+"|"+(app.Target??app.Executable??"");
+            if(WebAppIcons.IsWebApp(app.AppID))key=app.AppID+(app.Windows.Count>0?"|window":"|shortcut");
             Lazy<ImageSource> image;lock(cacheLock){CachedIcon item;if(cache.TryGetValue(key,out item)){recent.Remove(item.Position);recent.AddFirst(item.Position);image=item.Image;}else {image=new Lazy<ImageSource>(()=>Load(app));cache[key]=new CachedIcon {Image=image,Position=recent.AddFirst(key)};while(cache.Count>CacheLimit){string oldest=recent.Last.Value;recent.RemoveLast();cache.Remove(oldest);}}}return image.Value;
         }
         static ImageSource Load(AppEntry app)
         {
-            ImageSource result=null;
+            ImageSource result=WebAppIcons.Read(app);
             if(!String.IsNullOrEmpty(app.AppID)&&app.AppID.Contains("!")) {
-                var read=Task.Run(async()=>await SystemServices.AppLogo(app.AppID));
-                if(read.Wait(1600)&&read.Status==TaskStatus.RanToCompletion)result=read.Result;
+                result=TaskbarLogo.Read(app.AppID)??Native.AppIcon("shell:AppsFolder\\"+app.AppID);
+                if(result==null){var read=Task.Run(async()=>await SystemServices.AppLogo(app.AppID));if(read.Wait(1600)&&read.Status==TaskStatus.RanToCompletion)result=read.Result;}
             }
             if(result==null&&!String.IsNullOrEmpty(app.Target)&&app.Target.EndsWith(".lnk",StringComparison.OrdinalIgnoreCase))result=Native.ShortcutIcon(app.Target);
             string executable=app.Executable??app.Target;

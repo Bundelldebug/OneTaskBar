@@ -104,6 +104,7 @@ namespace OneTaskBar
                 else {dc.DrawGeometry(null,pen,Geometry.Parse("M15.5,8 Q19.5,12 15.5,16"));if(kind!="volume-low")dc.DrawGeometry(null,pen,Geometry.Parse("M18.5,4.5 Q25,12 18.5,19.5"));}
             } else if(kind=="bolt") dc.DrawGeometry(brush,null,Geometry.Parse("M14,1 L4,14 11,14 9,23 21,9 14,9 Z"));
             else if(kind=="apps") { for(int i=0;i<9;i++) dc.DrawEllipse(brush,null,new Point(5+(i%3)*7,5+(i/3)*7),1.5,1.5); }
+            else if(kind=="more") {for(int i=0;i<3;i++)dc.DrawEllipse(brush,null,new Point(5+i*7,12),1.5,1.5);}
             else if(kind=="windows-start") {foreach(int x in new[]{2,13})foreach(int y in new[]{2,13})dc.DrawRoundedRectangle(brush,null,new Rect(x,y,9,9),.5,.5);}
             else if(kind=="grip") {for(int i=0;i<6;i++)dc.DrawEllipse(brush,null,new Point(8+(i%2)*8,5+(i/2)*7),1.6,1.6);}
             else if(kind=="edit") {dc.DrawGeometry(null,pen,Geometry.Parse("M4,16 L16,4 20,8 8,20 3,21 Z M14,6 L18,10"));}
@@ -112,6 +113,7 @@ namespace OneTaskBar
             else if(kind=="task-manager") {dc.DrawRoundedRectangle(null,pen,new Rect(2,2,20,20),3,3);dc.DrawRoundedRectangle(brush,null,new Rect(6,12,2.5,6),.6,.6);dc.DrawRoundedRectangle(brush,null,new Rect(10.8,6,2.5,12),.6,.6);dc.DrawRoundedRectangle(brush,null,new Rect(15.5,9,2.5,9),.6,.6);}
             else if(kind=="audio-output") {dc.DrawGeometry(brush,null,Geometry.Parse("M3,6 L12,12 3,18 Z"));dc.DrawGeometry(null,pen,Geometry.Parse("M14,6 A7,7 0 0 1 14,18 M17,2 A11,11 0 0 1 17,22"));}
             else if(kind=="headphones") {dc.DrawGeometry(null,pen,Geometry.Parse("M4,16 L4,10 A8,8 0 0 1 20,10 L20,16"));dc.DrawRoundedRectangle(brush,null,new Rect(2,12,5,9),2,2);dc.DrawRoundedRectangle(brush,null,new Rect(17,12,5,9),2,2);}
+            else if(kind=="ethernet"||kind=="ethernet-off") {dc.DrawGeometry(null,pen,Geometry.Parse("M4,3 L20,3 Q21,3 21,4 L21,14 17,14 17,18 7,18 7,14 3,14 3,4 Q3,3 4,3 Z"));for(int i=0;i<4;i++)line(7.5+i*3,6,7.5+i*3,9);line(12,18,12,22);if(kind=="ethernet-off"){line(4,21,21,4);}}
             else if(kind=="network"||kind=="network-off") {dc.DrawRoundedRectangle(null,pen,new Rect(3,3,18,12),2,2);line(12,15,12,21);line(7,21,17,21);if(kind=="network-off")line(3,22,22,2);}
             else if(kind=="chevron") { line(8,5,15,12); line(15,12,8,19); }
             else if(kind=="back") {line(15,5,8,12);line(8,12,15,19);}
@@ -154,7 +156,7 @@ namespace OneTaskBar
             b.Resources["ButtonRadius"]=new CornerRadius(18);
             if(buttonTemplate==null)buttonTemplate=(ControlTemplate)System.Windows.Markup.XamlReader.Parse(
                 "<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Button'><Border x:Name='p' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' Background='{TemplateBinding Background}' BorderBrush='{TemplateBinding BorderBrush}' BorderThickness='{TemplateBinding BorderThickness}' CornerRadius='{DynamicResource ButtonRadius}' Padding='{TemplateBinding Padding}'><ContentPresenter HorizontalAlignment='{TemplateBinding HorizontalContentAlignment}' VerticalAlignment='{TemplateBinding VerticalContentAlignment}'/></Border></ControlTemplate>");
-            b.Template=buttonTemplate;AutomationProperties.SetName(b,hint); b.Click+=(s,e)=>action();Motion.Button(b);return b;
+            b.Template=buttonTemplate;b.FocusVisualStyle=null;AutomationProperties.SetName(b,hint); b.Click+=(s,e)=>action();Motion.Button(b);return b;
         }
         internal static TextBlock TextBlock(string text,double size,Brush color)
         {return new TextBlock {Text=text,FontFamily=SystemFonts.MessageFontFamily,FontSize=size,Foreground=color,VerticalAlignment=VerticalAlignment.Center};}
@@ -164,6 +166,7 @@ namespace OneTaskBar
     {
         public string Kind; public Brush Color=Paint.Text;public int Generation;public int Signal=-1,Traffic=-1;
         public Glyph(string kind,double size) { Kind=kind; Width=Height=size; IsHitTestVisible=false; }
+        internal void Update(string kind,Brush color){if(Kind==kind&&Color==color)return;Kind=kind;Color=color;InvalidateVisual();}
         protected override void OnRender(DrawingContext dc) { Paint.Icon(dc,Kind,Color,new Point(ActualWidth/2,ActualHeight/2),Math.Min(ActualHeight,ActualWidth)-2,Generation,Signal,Traffic); }
     }
     internal sealed class PillSlider : FrameworkElement

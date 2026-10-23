@@ -10,7 +10,7 @@ using Windows.Devices.Enumeration;
 
 namespace OneTaskBar
 {
-    internal sealed class WifiNetwork {internal string Name,Profile;internal int Signal,Authentication;internal bool Secure,Connected;internal Guid Adapter;internal byte[] Ssid;}
+    internal sealed class WifiNetwork {internal string Name,Profile;internal int Signal,Authentication,Generation;internal bool Secure,Connected;internal Guid Adapter;internal byte[] Ssid;}
     internal sealed class OutputDevice {internal string Id,Name;internal bool Current;}
     internal sealed class PowerPlan {internal Guid Id;internal string Name;internal bool Current;}
     internal sealed class PerformanceMode {public bool Available;public Guid Selected,Effective;public string Name;}
@@ -37,16 +37,21 @@ namespace OneTaskBar
         }
         internal static List<WifiNetwork> WifiNetworks()
         {
-            var result=new List<WifiNetwork>();IntPtr client=IntPtr.Zero,interfaces=IntPtr.Zero;
+            IntPtr client=IntPtr.Zero,interfaces=IntPtr.Zero;
             try {uint agreed;uint error=WlanOpenHandle(2,IntPtr.Zero,out agreed,out client);if(error!=0)throw new System.ComponentModel.Win32Exception((int)error);
-                if(WlanEnumInterfaces(client,IntPtr.Zero,out interfaces)!=0)return result;
-                for(int a=0;a<Marshal.ReadInt32(interfaces);a++) {var id=(Guid)Marshal.PtrToStructure(IntPtr.Add(interfaces,8+a*532),typeof(Guid));WlanScan(client,ref id,IntPtr.Zero,IntPtr.Zero,IntPtr.Zero);IntPtr list;
-                    error=WlanGetAvailableNetworkList(client,ref id,0,IntPtr.Zero,out list);if(error!=0)throw new System.ComponentModel.Win32Exception((int)error);
+                if(WlanEnumInterfaces(client,IntPtr.Zero,out interfaces)!=0)return new List<WifiNetwork>();var adapters=new List<Guid>();
+                for(int a=0;a<Marshal.ReadInt32(interfaces);a++)adapters.Add((Guid)Marshal.PtrToStructure(IntPtr.Add(interfaces,8+a*532),typeof(Guid)));return ReadWifiNetworks(client,adapters);
+            }finally{if(interfaces!=IntPtr.Zero)WlanFreeMemory(interfaces);if(client!=IntPtr.Zero)WlanCloseHandle(client,IntPtr.Zero);}
+        }
+        static List<WifiNetwork> ReadWifiNetworks(IntPtr client,IEnumerable<Guid> adapters)
+        {
+            var result=new List<WifiNetwork>();foreach(var adapter in adapters){var id=adapter;IntPtr list;
+                    uint error=WlanGetAvailableNetworkList(client,ref id,0,IntPtr.Zero,out list);if(error!=0)throw new System.ComponentModel.Win32Exception((int)error);
                     try {for(int n=0;n<Marshal.ReadInt32(list);n++){var p=IntPtr.Add(list,8+n*628);int length=Math.Min(32,Math.Max(0,Marshal.ReadInt32(p,512)));var bytes=new byte[length];Marshal.Copy(IntPtr.Add(p,516),bytes,0,length);if(length==0)continue;
-                        result.Add(new WifiNetwork {Name=Encoding.UTF8.GetString(bytes),Profile=Marshal.PtrToStringUni(p),Adapter=id,Ssid=bytes,Signal=Marshal.ReadInt32(p,604),Secure=Marshal.ReadInt32(p,608)!=0,Authentication=Marshal.ReadInt32(p,612),Connected=(Marshal.ReadInt32(p,620)&1)!=0});}}
+                        int generation=0;for(int phy=0;phy<Math.Min(8,Math.Max(0,Marshal.ReadInt32(p,564)));phy++)generation=Math.Max(generation,WifiLink.GenerationFor(Marshal.ReadInt32(p,568+phy*4)));
+                        result.Add(new WifiNetwork {Name=Encoding.UTF8.GetString(bytes),Profile=Marshal.PtrToStringUni(p),Adapter=id,Ssid=bytes,Signal=Math.Max(0,Math.Min(100,Marshal.ReadInt32(p,604))),Secure=Marshal.ReadInt32(p,608)!=0,Authentication=Marshal.ReadInt32(p,612),Connected=(Marshal.ReadInt32(p,620)&1)!=0,Generation=generation});}}
                     finally{WlanFreeMemory(list);}
                 }
-            }finally{if(interfaces!=IntPtr.Zero)WlanFreeMemory(interfaces);if(client!=IntPtr.Zero)WlanCloseHandle(client,IntPtr.Zero);}
             return result.GroupBy(n=>n.Name).Select(g=>g.OrderByDescending(n=>n.Connected).ThenByDescending(n=>!String.IsNullOrEmpty(n.Profile)).First()).OrderByDescending(n=>n.Connected).ThenByDescending(n=>n.Signal).ToList();
         }
         internal static void ConnectWifi(WifiNetwork network,string password)

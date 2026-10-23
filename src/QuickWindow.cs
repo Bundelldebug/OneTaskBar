@@ -8,8 +8,10 @@ using System.Windows.Media.Imaging;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Threading;
 
 namespace OneTaskBar
 {
@@ -36,7 +38,7 @@ namespace OneTaskBar
         internal string[] ToggleKeys {get{return toggleButtons.Keys.ToArray();}}
         readonly List<TextBlock> actionNames=new List<TextBlock>();
         readonly TextBlock notice=Paint.TextBlock("",11,Paint.Muted);
-        bool themeBusy;bool? darkMode;
+        bool themeBusy;bool? darkMode;long clockSecond=-1;DateTime calendarDate;
         System.Windows.Media.ImageSource samsungIcon;string samsungIconKey;
         internal bool SamsungIconLoaded {get{return samsungIcon!=null;}}
         async void LoadSamsungIcon(AppEntry app)
@@ -50,6 +52,18 @@ namespace OneTaskBar
         readonly List<FrameworkElement> grips=new List<FrameworkElement>();
         readonly ReorderGroup sections;
         readonly UniformGrid actionButtons;
+        readonly Border actionCard;
+        readonly Grid actionFrame;
+        readonly Border actionOutline;
+        readonly QuickResizeGrip resizeGrip=new QuickResizeGrip();
+        readonly Button actionEdit,actionHandle;
+        readonly Border actionHandleBar;
+        readonly TextBlock actionEditBack=Paint.TextBlock("크기 조절로 돌아가기",10,Paint.Text);
+        readonly DispatcherTimer sizeSave=new DispatcherTimer {Interval=TimeSpan.FromMilliseconds(250)};
+        bool editingActions,resizingActions;
+        int resizeColumns,resizeRows;
+        double resizeWidth,resizeHeight,resizeAvailable;
+        Point resizeOrigin;
         readonly TextBlock editLabel=Paint.TextBlock("배치 편집",11,Paint.Text);
         readonly Border editHint;
         bool editing,layoutDirty;
@@ -77,14 +91,16 @@ namespace OneTaskBar
             var scrolled=new DockPanel();
             notice.Visibility=Visibility.Collapsed;notice.TextWrapping=TextWrapping.Wrap;notice.Margin=new Thickness(5,5,5,9);DockPanel.SetDock(notice,Dock.Top);scrolled.Children.Add(notice);
             var help=new Grid {Margin=new Thickness(5,5,5,9)};var message=Paint.TextBlock("아이콘 또는 ⋮⋮ 묶음을 드래그",10,Paint.Muted);message.VerticalAlignment=VerticalAlignment.Center;help.Children.Add(message);
-            var reset=Paint.Action("초기화",()=>LayoutOrder.Reset("quick."));reset.FontSize=10;reset.Padding=new Thickness(8,5,8,5);reset.HorizontalAlignment=HorizontalAlignment.Right;help.Children.Add(reset);
-            editHint=new Border {Child=help,Visibility=Visibility.Collapsed};DockPanel.SetDock(editHint,Dock.Top);scrolled.Children.Add(editHint);scrolled.Children.Add(body);
+            var reset=Paint.Action("초기화",()=>{SetCollapsedGrid(4,1);LayoutOrder.Reset("quick.");});reset.FontSize=10;reset.Padding=new Thickness(8,5,8,5);reset.HorizontalAlignment=HorizontalAlignment.Right;help.Children.Add(reset);
+            var editor=new StackPanel();editor.Children.Add(help);
+            var sizeHelp=Paint.TextBlock("모서리를 끌어 크기 조절 · 편집을 눌러 토글 순서 변경",10,Paint.Muted);sizeHelp.TextWrapping=TextWrapping.Wrap;sizeHelp.Margin=new Thickness(5,0,5,10);editor.Children.Add(sizeHelp);
+            editHint=new Border {Child=editor,Visibility=Visibility.Collapsed};DockPanel.SetDock(editHint,Dock.Top);scrolled.Children.Add(editHint);scrolled.Children.Add(body);
             connections=new Grid {Height=62,Margin=new Thickness(0,0,0,10)};connections.ColumnDefinitions.Add(new ColumnDefinition());connections.ColumnDefinitions.Add(new ColumnDefinition());
             var pair=new ReorderGroup("quick.connections",connections,Orientation.Horizontal,()=>editing,PlacePair);groups.Add(pair);
             wifiTile=Connection("Wi-Fi",wifiName,wifiGlyph,()=>shell.Radio("wifi"),()=>shell.ShowDetail("wifi"),out wifiCircle);pair.Add("wifi",wifiTile);
             bluetoothTile=Connection("블루투스",bluetoothState,bluetoothGlyph,()=>shell.Radio("bluetooth"),()=>shell.ShowDetail("bluetooth"),out bluetoothCircle);pair.Add("bluetooth",bluetoothTile);AddSection("connections",connections);
             var actions=new UniformGrid {Columns=4,Rows=3,Height=210,Margin=new Thickness(7,7,7,4),VerticalAlignment=VerticalAlignment.Top};actionButtons=actions;
-            var actionOrder=new ReorderGroup("quick.actions",actions,Orientation.Horizontal,()=>editing);groups.Add(actionOrder);
+            var actionOrder=new ReorderGroup("quick.actions",actions,Orientation.Horizontal,()=>editing&&editingActions);groups.Add(actionOrder);
             actionOrder.Add("mute",RoundAction("volume","음소거","mute"));
             actionOrder.Add("theme",RoundAction("moon","다크 모드","theme"));
             actionOrder.Add("dnd",RoundAction("dnd","방해 금지","dnd"));
@@ -96,21 +112,63 @@ namespace OneTaskBar
             actionOrder.Add("startup",RoundAction("startup","자동 실행","startup"));
             actionOrder.Add("slider-scroll",RoundAction("scroll","스크롤 조절","slider-scroll"));
             actionArea.Children.Add(actions);
-            var handle=Paint.Button(new Border {Width=28,Height=3,CornerRadius=new CornerRadius(2),Background=Paint.Brush("#70F4F8F5")},()=>ExpandActions(),"빠른 설정 더 보기 · 접기");handle.Background=Brushes.Transparent;handle.Height=11;handle.Padding=new Thickness(20,4,20,4);handle.VerticalAlignment=VerticalAlignment.Bottom;actionArea.Children.Add(handle);
-            AddSection("actions",Card(actionArea,34,new Thickness(0,0,0,10)));
+            actionHandleBar=new Border {Width=28,Height=3,CornerRadius=new CornerRadius(2),Background=Paint.Brush("#70F4F8F5")};
+            actionHandle=Paint.Button(actionHandleBar,()=>{if(editing)EditActions(false);else ExpandActions();},"빠른 설정 더 보기 · 접기");actionHandle.Background=Brushes.Transparent;actionHandle.Height=11;actionHandle.Padding=new Thickness(20,4,20,4);actionHandle.VerticalAlignment=VerticalAlignment.Bottom;actionArea.Children.Add(actionHandle);
+            actionCard=Card(actionArea,34,new Thickness(0));actionFrame=new Grid {Margin=new Thickness(0,0,0,10),HorizontalAlignment=HorizontalAlignment.Left};actionFrame.Children.Add(actionCard);
+            actionOutline=new Border {CornerRadius=new CornerRadius(34),BorderBrush=Paint.Brush("#90FFFFFF"),BorderThickness=new Thickness(2),IsHitTestVisible=false,Visibility=Visibility.Collapsed};actionFrame.Children.Add(actionOutline);
+            actionEdit=Paint.Action("편집",()=>EditActions(true));actionEdit.HorizontalAlignment=HorizontalAlignment.Center;actionEdit.VerticalAlignment=VerticalAlignment.Center;actionEdit.Background=Paint.Brush("#75000000");actionEdit.Padding=new Thickness(13,5,13,5);actionEdit.FontSize=11;actionEdit.Resources["ButtonRadius"]=new CornerRadius(18);actionEdit.Visibility=Visibility.Collapsed;actionFrame.Children.Add(actionEdit);
+            resizeGrip.Visibility=Visibility.Collapsed;AutomationProperties.SetName(resizeGrip,"기능 토글 크기 조절");AutomationProperties.SetHelpText(resizeGrip,"모서리를 끌거나 방향키로 가로 열 수와 세로 행 수를 조절합니다.");actionFrame.Children.Add(resizeGrip);
+            resizeGrip.DragStarted+=(s,e)=>{BeginToggleResize();resizeOrigin=Mouse.GetPosition(Surface);};resizeGrip.DragDelta+=(s,e)=>{var point=Mouse.GetPosition(Surface);ResizeToggleBy(point.X-resizeOrigin.X,point.Y-resizeOrigin.Y);};resizeGrip.DragCompleted+=(s,e)=>FinishToggleResize(e.Canceled);
+            resizeGrip.KeyDown+=(s,e)=>{if(resizeGrip.IsDragging)return;int x=e.Key==Key.Left?-1:e.Key==Key.Right?1:0,y=e.Key==Key.Up?-1:e.Key==Key.Down?1:0;if(x==0&&y==0)return;SetCollapsedGrid(QuickToggleSize.Columns(Preferences.Current)+x,QuickToggleSize.Rows(Preferences.Current)+y);e.Handled=true;};
+            AddSection("actions",actionFrame);sectionFrames["actions"].SizeChanged+=(s,e)=>ApplyActionWidth(false);
             themeToggle=Paint.Button(themeGlyph,()=>ToggleTheme(),"Windows 다크 모드 전환");themeToggle.Width=themeToggle.Height=44;themeToggle.Padding=new Thickness(0);themeToggle.Background=Brushes.Transparent;themeToggle.Resources["ButtonRadius"]=new CornerRadius(22);
             themeCircle=new Border {Width=44,Height=44,CornerRadius=new CornerRadius(22),Background=Paint.Brush(QuickPanel.Inactive),Child=themeToggle};AddSection("brightness",SliderRow(brightness,themeCircle));
             mute=IconButton("volume",()=>shell.Mute(),"음소거 전환",44);soundGlyphs.Add((Glyph)mute.Content);muteCircle=new Border {Width=44,Height=44,CornerRadius=new CornerRadius(22),Background=Paint.Brush(QuickPanel.Inactive),Child=mute};
             AddSection("volume",SliderRow(volume,muteCircle));
-            mediaPlayer=new MediaPlayerView(shell.Media,shell.SeekMedia,()=>shell.ShowDetail("sound"),condensed:true);
+            mediaPlayer=new MediaPlayerView(shell.Media,shell.SeekMedia,()=>shell.ShowDetail("sound"),condensed:true,openApp:shell.OpenMediaApplication);
             var mediaCard=Card(mediaPlayer,28,new Thickness(0,0,0,10));mediaPlayer.PaletteChanged=palette=>{mediaCard.Background=mediaPlayer.IsCompact?QuickPanel.Card:mediaPlayer.MediaBackground;mediaCard.CornerRadius=new CornerRadius(mediaPlayer.IsCompact?34:28);};AddSection("media",mediaCard);
             shortcuts=new UniformGrid {Columns=2};var bottomOrder=new ReorderGroup("quick.shortcuts",shortcuts,Orientation.Horizontal,()=>editing,PlacePair);groups.Add(bottomOrder);
             devicesTile=WideTile("devices","주변 기기 연결","samsung-devices",new Thickness(0));windowsTile=WideTile("windows-settings","Windows 설정","windows-settings",new Thickness(0));bottomOrder.Add("devices",devicesTile);bottomOrder.Add("focus",windowsTile);AddSection("shortcuts",shortcuts);
             var utilities=new Grid {Margin=new Thickness(0,10,0,10)};utilities.ColumnDefinitions.Add(new ColumnDefinition());utilities.ColumnDefinitions.Add(new ColumnDefinition());var capture=WideTile("screenshot","화면 캡처","screen-capture",new Thickness(0,0,5,0));var manager=WideTile("task-manager","작업 관리자","task-manager",new Thickness(5,0,0,0));Grid.SetColumn(manager,1);utilities.Children.Add(capture);utilities.Children.Add(manager);AddSection("utilities",utilities);
             root.Children.Add(new SmoothScrollViewer {Content=scrolled,VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});Surface.Child=root;brightness.Light=volume.Light=true;brightness.DarkTrack=volume.DarkTrack=true;ApplyOrder();
-            LayoutOrder.Changed+=OrderChanged;DragReorder.Finished+=DragFinished;Closed+=(s,e)=> {LayoutOrder.Changed-=OrderChanged;DragReorder.Finished-=DragFinished;};
+            sizeSave.Tick+=(s,e)=>FlushSize();LayoutOrder.Changed+=OrderChanged;DragReorder.Finished+=DragFinished;IsVisibleChanged+=(s,e)=>{if(!IsVisible&&resizeGrip.IsDragging)resizeGrip.CancelDrag();};Closed+=(s,e)=> {if(resizeGrip.IsDragging)resizeGrip.CancelDrag();FlushSize();LayoutOrder.Changed-=OrderChanged;DragReorder.Finished-=DragFinished;};
             brightness.Changed+=v=>shell.Bright(v);volume.Changed+=v=>shell.Volume(v);
             Deactivated+=(s,e)=> {if(!Program.Inspectable&&IsVisible&&!IsMouseOver&&!DragReorder.Active)Hide();};
+        }
+        internal void SetCollapsedGrid(int columns,int rows)
+        {
+            columns=QuickToggleSize.Columns(columns);rows=QuickToggleSize.Rows(rows);
+            bool changed=columns!=QuickToggleSize.Columns(Preferences.Current)||rows!=QuickToggleSize.Rows(Preferences.Current);
+            Preferences.Current.QuickToggleColumns=columns;Preferences.Current.QuickToggleRows=rows;expanded=false;editingActions=false;PresentActions(false);
+            if(changed){sizeSave.Stop();sizeSave.Start();}
+        }
+        internal void BeginToggleResize()
+        {
+            if(!editing||editingActions||resizingActions)return;resizingActions=true;
+            resizeColumns=QuickToggleSize.Columns(Preferences.Current);resizeRows=QuickToggleSize.Rows(Preferences.Current);resizeAvailable=ActionAvailableWidth;resizeWidth=QuickToggleSize.Width(resizeAvailable,resizeColumns);resizeHeight=QuickToggleSize.Height(resizeRows);
+        }
+        internal void ResizeToggleBy(double horizontal,double vertical)
+        {
+            if(!resizingActions)return;int columns=QuickToggleSize.SnapColumns(resizeWidth+horizontal,resizeAvailable,QuickToggleSize.Columns(Preferences.Current)),rows=QuickToggleSize.SnapRows(resizeHeight+vertical,QuickToggleSize.Rows(Preferences.Current));
+            if(columns!=QuickToggleSize.Columns(Preferences.Current)||rows!=QuickToggleSize.Rows(Preferences.Current))SetCollapsedGrid(columns,rows);
+        }
+        internal void FinishToggleResize(bool cancelled)
+        {
+            if(!resizingActions)return;resizingActions=false;if(cancelled)SetCollapsedGrid(resizeColumns,resizeRows);FlushSize();
+        }
+        void FlushSize(){if(!sizeSave.IsEnabled)return;sizeSave.Stop();Preferences.Save();}
+        internal void EditActions(bool value)
+        {
+            if(!editing)return;editingActions=value;expanded=false;PresentActions(false);
+        }
+        bool AllActions {get{return expanded||(editing&&editingActions);}}
+        double ActionAvailableWidth {get{return sectionFrames["actions"].ActualWidth-(editing?18:0);}}
+        void ApplyActionWidth(bool animate)
+        {
+            if(actionFrame==null)return;double available=ActionAvailableWidth;if(available<=0)return;
+            double target=AllActions?available:QuickToggleSize.Width(available,QuickToggleSize.Columns(Preferences.Current)),from=actionFrame.ActualWidth;
+            if(!Double.IsNaN(actionFrame.Width)&&Math.Abs(actionFrame.Width-target)<.1)return;actionFrame.BeginAnimation(WidthProperty,null);actionFrame.Width=target;
+            if(animate&&Motion.Enabled&&IsVisible&&from>0)actionFrame.BeginAnimation(WidthProperty,Motion.PanelTween(from,target,280));
         }
         static void PlacePair(FrameworkElement element,int index) {Grid.SetColumn(element,index);element.Margin=index==0?new Thickness(0,0,5,0):new Thickness(5,0,0,0);}
         void AddSection(string key,FrameworkElement content)
@@ -120,7 +178,7 @@ namespace OneTaskBar
         }
         internal void EditLayout(bool value)
         {
-            editing=value;editLabel.Text=value?"완료":"배치 편집";editHint.Visibility=value?Visibility.Visible:Visibility.Collapsed;
+            if(resizeGrip.IsDragging)resizeGrip.CancelDrag();editing=value;editingActions=false;expanded=false;if(!value)FlushSize();editLabel.Text=value?"완료":"배치 편집";editHint.Visibility=value?Visibility.Visible:Visibility.Collapsed;
             foreach(var column in gripColumns)column.Width=new GridLength(value?18:0);foreach(var grip in grips)grip.Visibility=value?Visibility.Visible:Visibility.Collapsed;
             SetHitTesting(body,!value);PresentActions(false);body.InvalidateMeasure();body.InvalidateArrange();
         }
@@ -136,23 +194,35 @@ namespace OneTaskBar
         {
             double bottom=0;foreach(FrameworkElement element in body.Children){double top=element.TranslatePoint(new Point(),body).Y;if(top<bottom-.5)return false;bottom=top+element.ActualHeight;}return true;
         }
-        internal object LayoutSnapshot() {return new {editing=editing,expanded=expanded,visibleActionLabels=actionNames.Count(n=>n.Visibility==Visibility.Visible),circleRadius=21.5,buttonsUnclipped=ButtonsUnclipped(),sections=sections.Keys,groups=groups.Skip(1).Select(g=>g.Keys).ToArray(),noOverlap=LayoutFits(),actionHeight=actionArea.ActualHeight,soundIcon=volume.Kind,themeAvailable=themeToggle.IsEnabled,dark=darkMode,sizes=sections.Items.Select(i=>new {key=i.Key,height=i.Element.ActualHeight,y=i.Element.TranslatePoint(new Point(),body).Y}).ToArray()};}
+        internal double ActionWidth {get{return actionFrame.ActualWidth;}}
+        internal double ActionHeight {get{return actionArea.ActualHeight;}}
+        internal QuickResizeGrip ResizeGrip {get{return resizeGrip;}}
+        internal Button ActionEditor {get{return actionEdit;}}
+        internal int VisibleActions {get{return actionButtons.Children.Cast<FrameworkElement>().Count(e=>e.Visibility==Visibility.Visible);}}
+        internal bool ActionsFit {get{return ButtonsUnclipped();}}
+        internal object ActionBounds() {return new {width=actionButtons.ActualWidth,height=actionButtons.ActualHeight,items=actionButtons.Children.Cast<StackPanel>().Where(i=>i.Visibility==Visibility.Visible).Select(i=>new {width=i.ActualWidth,height=i.ActualHeight,button=i.Children.OfType<Button>().First().TransformToAncestor(actionButtons).TransformBounds(new Rect(0,0,43,43))}).ToArray()};}
+        internal object LayoutSnapshot() {return new {editing=editing,editingActions=editingActions,expanded=expanded,visibleActionLabels=actionNames.Count(n=>n.Visibility==Visibility.Visible),visibleActions=VisibleActions,columns=QuickToggleSize.Columns(Preferences.Current),rows=QuickToggleSize.Rows(Preferences.Current),resizeHandle=resizeGrip.IsVisible,circleRadius=21.5,buttonsUnclipped=ButtonsUnclipped(),sections=sections.Keys,groups=groups.Skip(1).Select(g=>g.Keys).ToArray(),noOverlap=LayoutFits(),actionHeight=actionArea.ActualHeight,actionWidth=actionFrame.ActualWidth,soundIcon=volume.Kind,themeAvailable=themeToggle.IsEnabled,dark=darkMode,sizes=sections.Items.Select(i=>new {key=i.Key,height=i.Element.ActualHeight,y=i.Element.TranslatePoint(new Point(),body).Y}).ToArray()};}
         bool ButtonsUnclipped()
         {
             var clip=VisualTreeHelper.GetClip(actionButtons);Rect bounds=clip!=null?clip.Bounds:new Rect(0,0,actionButtons.ActualWidth,actionButtons.ActualHeight);
-            foreach(StackPanel item in actionButtons.Children.Cast<StackPanel>().Take(expanded||editing?actionNames.Count:4)){var button=item.Children.OfType<Button>().FirstOrDefault();if(button==null)continue;Rect rect=button.TransformToAncestor(actionButtons).TransformBounds(new Rect(0,0,button.ActualWidth,button.ActualHeight));if(rect.Top<bounds.Top||rect.Bottom>bounds.Bottom||rect.Left<bounds.Left||rect.Right>bounds.Right)return false;}return true;
+            foreach(StackPanel item in actionButtons.Children.Cast<StackPanel>().Where(i=>i.Visibility==Visibility.Visible)){var button=item.Children.OfType<Button>().FirstOrDefault();if(button==null)continue;Rect rect=button.TransformToAncestor(actionButtons).TransformBounds(new Rect(0,0,button.ActualWidth,button.ActualHeight));if(rect.Top<bounds.Top||rect.Bottom>bounds.Bottom||rect.Left<bounds.Left||rect.Right>bounds.Right)return false;}return true;
         }
         void ExpandActions()
         {
             SetExpanded(!expanded);
         }
-        internal void SetExpanded(bool value) {expanded=value;PresentActions(true);}
+        internal void SetExpanded(bool value) {if(editing){EditActions(value);return;}expanded=value;bool originalShape=QuickToggleSize.Columns(Preferences.Current)==4&&QuickToggleSize.Rows(Preferences.Current)==1;PresentActions(originalShape);if(!originalShape)Motion.Fade(actionButtons,.7,1,170);}
         internal object AudioSnapshot() {return new {slider=volume.Kind,buttons=soundGlyphs.Select(g=>g.Kind).ToArray()};}
         void PresentActions(bool animate)
         {
-            int token=++actionMotion;bool show=expanded||editing;double from=actionArea.Height,target=show?232:62;actionArea.BeginAnimation(HeightProperty,null);actionArea.Height=target;
+            ++actionMotion;bool show=AllActions;int columns=QuickToggleSize.Columns(Preferences.Current),rows=QuickToggleSize.Rows(Preferences.Current);double from=actionArea.Height,target=show?232:QuickToggleSize.Height(rows);actionArea.BeginAnimation(HeightProperty,null);actionArea.Height=target;
+            actionButtons.Columns=show?4:columns;actionButtons.Rows=show?3:rows;actionButtons.Height=show?(editing?200:210):target-18;
+            int index=0;foreach(FrameworkElement item in actionButtons.Children){item.Visibility=show||index<columns*rows?Visibility.Visible:Visibility.Collapsed;item.VerticalAlignment=show?VerticalAlignment.Top:VerticalAlignment.Center;item.Opacity=editing&&!editingActions?.65:1;index++;}ApplyActionWidth(animate);
             if(animate&&Motion.Enabled&&IsVisible)actionArea.BeginAnimation(HeightProperty,Motion.PanelTween(from,target,330));
-            foreach(var name in actionNames){name.BeginAnimation(OpacityProperty,null);if(show){name.Visibility=Visibility.Visible;Motion.Fade(name,animate?0:1,1,220);}else if(animate&&Motion.Enabled&&name.IsVisible){var fade=Motion.Tween(name.Opacity,0,150);fade.Completed+=(s,e)=> {if(token==actionMotion)name.Visibility=Visibility.Collapsed;};name.Opacity=0;name.BeginAnimation(OpacityProperty,fade);}else {name.Visibility=Visibility.Collapsed;name.Opacity=0;}}
+            foreach(var name in actionNames){name.BeginAnimation(OpacityProperty,null);if(show){name.Visibility=Visibility.Visible;Motion.Fade(name,animate?0:1,1,220);}else {name.Visibility=Visibility.Collapsed;name.Opacity=0;}}
+            actionOutline.Visibility=editing?Visibility.Visible:Visibility.Collapsed;actionEdit.Visibility=editing&&!editingActions?Visibility.Visible:Visibility.Collapsed;actionEdit.IsHitTestVisible=editing&&!editingActions;resizeGrip.Visibility=editing&&!editingActions?Visibility.Visible:Visibility.Collapsed;
+            actionHandle.Visibility=editing&&!editingActions?Visibility.Collapsed:Visibility.Visible;actionHandle.IsHitTestVisible=!editing||editingActions;actionHandle.Content=editing?(UIElement)actionEditBack:actionHandleBar;actionHandle.Height=editing?24:11;actionHandle.Padding=editing?new Thickness(7,2,7,2):new Thickness(20,4,20,4);
+            resizeGrip.ToolTip="기능 토글 "+columns+"열 × "+rows+"행 · 드래그 또는 방향키로 조절";AutomationProperties.SetItemStatus(resizeGrip,columns+"열 "+rows+"행");
         }
         void ToggleTheme(){InvokeToggle("theme");}
         async void InvokeToggle(string key)
@@ -231,17 +301,17 @@ namespace OneTaskBar
             if(availableConnections.Length==1)availableConnections[0].Margin=new Thickness(0);
             sectionFrames["brightness"].Visibility=brightAvailable?Visibility.Visible:Visibility.Collapsed;
             double powerSlot=PowerDisplay.Slot(state,Preferences.Current.DesktopPowerWatts);footerPower.Visibility=powerSlot>0?Visibility.Visible:Visibility.Collapsed;battery.Width=powerSlot==78?70:62;footerPower.ToolTip=state.Known?"배터리 및 전원":"직접 입력한 PC 전력값 · 실시간 측정 아님";
-            time.Text=DateTime.Now.ToString("H:mm:ss");date.Text=DateTime.Now.ToString("M월 d일 dddd",System.Globalization.CultureInfo.GetCultureInfo("ko-KR"));battery.Update(state);
+            var now=DateTime.Now;long second=now.Ticks/TimeSpan.TicksPerSecond;if(second!=clockSecond){clockSecond=second;time.Text=now.ToString("H:mm:ss");}if(calendarDate!=now.Date){calendarDate=now.Date;date.Text=now.ToString("M월 d일 dddd",System.Globalization.CultureInfo.GetCultureInfo("ko-KR"));}battery.Update(state);
             brightness.Value=Math.Max(0,bright);brightness.IsEnabled=brightAvailable;brightness.ToolTip=brightAvailable?"밝기":"연결된 디스플레이는 Windows 밝기 조절을 지원하지 않습니다";
-            string soundKind=SoundIcon.For(sound,muted,audioAvailable);volume.Kind=soundKind;volume.Value=muted?0:sound;volume.IsEnabled=audioAvailable;volume.InvalidateVisual();
+            string soundKind=SoundIcon.For(sound,muted,audioAvailable);if(volume.Kind!=soundKind){volume.Kind=soundKind;volume.InvalidateVisual();}volume.Value=muted?0:sound;volume.IsEnabled=audioAvailable;
             foreach(var glyph in soundGlyphs)if(glyph.Kind!=soundKind){glyph.Kind=soundKind;glyph.InvalidateVisual();Motion.Fade(glyph,.45,1,150);}Motion.Background(muteCircle,soundKind=="mute"?QuickPanel.Inactive:Paint.ControlWhiteColor);
-            var muteGlyph=(Glyph)mute.Content;muteGlyph.Color=soundKind=="mute"?Paint.ControlWhite:Paint.Ink;muteGlyph.InvalidateVisual();
+            var muteGlyph=(Glyph)mute.Content;muteGlyph.Update(muteGlyph.Kind,soundKind=="mute"?Paint.ControlWhite:Paint.Ink);
             var theme=WindowsTheme.Read();themeToggle.IsEnabled=theme.Available&&!themeBusy;themeToggle.ToolTip=theme.Available?(theme.Dark?"다크 모드 켜짐 · 라이트 모드로 전환":"다크 모드 꺼짐 · 다크 모드로 전환"):"Windows 색 모드를 읽지 못했습니다";AutomationProperties.SetItemStatus(themeToggle,theme.Dark?"켜짐":"꺼짐");
             if(darkMode!=theme.Dark){darkMode=theme.Dark;themeGlyph.Kind=theme.Dark?"moon":"brightness";themeGlyph.InvalidateVisual();Motion.Background(themeCircle,theme.Dark?Paint.ControlWhiteColor:QuickPanel.Inactive);Motion.Fade(themeGlyph,.35,1,180);}
-            themeGlyph.Color=theme.Dark?Paint.Ink:Paint.ControlWhite;themeGlyph.InvalidateVisual();
+            themeGlyph.Update(themeGlyph.Kind,theme.Dark?Paint.Ink:Paint.ControlWhite);
             bool wifi=shell.Services.WifiOn??shell.Wifi!=null,bluetooth=shell.Services.BluetoothOn??false;
             Motion.Background(wifiCircle,wifi?Paint.ControlWhiteColor:QuickPanel.Inactive);Motion.Background(bluetoothCircle,bluetooth?Paint.ControlWhiteColor:QuickPanel.Inactive);
-            wifiGlyph.Color=wifi?Paint.Ink:Paint.ControlWhite;bluetoothGlyph.Color=bluetooth?Paint.Ink:Paint.ControlWhite;wifiGlyph.InvalidateVisual();bluetoothGlyph.InvalidateVisual();
+            wifiGlyph.Update(wifiGlyph.Kind,wifi?Paint.Ink:Paint.ControlWhite);bluetoothGlyph.Update(bluetoothGlyph.Kind,bluetooth?Paint.Ink:Paint.ControlWhite);
             wifiGlyph.Opacity=wifi?1:.5;bluetoothGlyph.Opacity=bluetooth?1:.5;wifiName.Text=shell.Wifi??(wifi?"연결 안 됨":"꺼짐");bluetoothState.Text=shell.Services.BluetoothOn.HasValue?(bluetooth?"켜짐":"꺼짐"):"연결 설정";
             var efficiency=shell.Toggles.Power();var disturb=shell.Toggles.Disturb.State;
             foreach(var pair in toggleButtons){string key=pair.Key;bool value=key=="mute"?muted:key=="theme"?theme.Dark:key=="dnd"?disturb.Enabled:key=="efficiency"?efficiency.Selected==QuickActions.EfficientMode:key=="awake"?shell.Toggles.Awake:key=="wifi"?wifi:key=="bluetooth"?bluetooth:key=="animations"?Preferences.Current.Animations:key=="slider-scroll"?Preferences.Current.QuickSliderScroll:shell.Toggles.Startup;

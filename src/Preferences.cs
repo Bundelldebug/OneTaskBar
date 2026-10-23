@@ -14,6 +14,8 @@ namespace OneTaskBar
         public bool NativeStartKey=true,NativeSearch=false;
         public bool NativeStartButton=false;
         public bool QuickSliderScroll=false;
+        public int QuickToggleWidthPercent=100,QuickToggleCollapsedHeight=62;
+        public int QuickToggleColumns,QuickToggleRows;
         public bool ChargeSoundEnabled=false;
         public string ChargeSoundFile;
         public bool NowBarLargeCover=false;

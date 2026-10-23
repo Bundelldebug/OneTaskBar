@@ -82,6 +82,22 @@ namespace OneTaskBar
                 var image=Imaging.CreateBitmapSourceFromHIcon(icon,System.Windows.Int32Rect.Empty,BitmapSizeOptions.FromEmptyOptions()); image.Freeze(); return image;
             } catch { return null; }
         }
+        internal static string ShortcutAppId(string file)
+        {
+            var info=ShortcutInfo(file);return info!=null?info.Id:null;
+        }
+        internal static AppShortcut ShortcutInfo(string file)
+        {
+            object link=null;try{link=Activator.CreateInstance(Type.GetTypeFromCLSID(new Guid("00021401-0000-0000-C000-000000000046")));((IPersistFile)link).Load(file,0);StringBuilder target=new StringBuilder(32768),arguments=new StringBuilder(32768);((IShellLink)link).GetPath(target,target.Capacity,IntPtr.Zero,4);((IShellLink)link).GetArguments(arguments,arguments.Capacity);return new AppShortcut {File=file,Id=AppIdProperty((IPropertyStore)link,5),Target=target.ToString(),Arguments=arguments.ToString()};}catch{return null;}finally{if(link!=null)Marshal.FinalReleaseComObject(link);}
+        }
+        static string AppIdProperty(IPropertyStore store,uint property)
+        {
+            var key=new PropertyKey {Format=new Guid("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3"),Id=property};Variant value;store.GetValue(ref key,out value);try{return value.Type==31?Marshal.PtrToStringUni(value.Pointer):null;}finally{PropVariantClear(ref value);}
+        }
+        internal static ImageSource WindowRelaunchIcon(IntPtr window)
+        {
+            IPropertyStore store=null;try{var id=typeof(IPropertyStore).GUID;if(SHGetPropertyStoreForWindow(window,ref id,out store)!=0)return null;string resource=AppIdProperty(store,3);return WebAppIcons.ReadResource(resource);}catch{return null;}finally{if(store!=null)Marshal.ReleaseComObject(store);}
+        }
         [DllImport("user32.dll",CharSet=CharSet.Unicode)]static extern uint PrivateExtractIcons(string file,int index,int width,int height,out IntPtr icon,out uint id,uint count,uint flags);
         [DllImport("user32.dll")]static extern bool DestroyIcon(IntPtr icon);
         internal static ImageSource ResourceIcon(string file,int index)
@@ -111,7 +127,13 @@ namespace OneTaskBar
         [DllImport("user32.dll")]static extern bool IsZoomed(IntPtr window);
         internal static bool CoversMonitor(RectI rect,System.Drawing.Rectangle screen,bool maximized,bool framed){return !(maximized&&framed)&&rect.Left<=screen.Left&&rect.Top<=screen.Top&&rect.Right>=screen.Right&&rect.Bottom>=screen.Bottom;}
         internal static bool TaskbarAutoHide(){if(TaskbarMask.TransientState)return TaskbarMask.SavedAutoHide;var data=new AppBarData {Size=(uint)Marshal.SizeOf(typeof(AppBarData))};return (SHAppBarMessage(4,ref data).ToUInt64()&1)!=0;}
-        internal static void SetTaskbarAutoHide(bool value){var data=new AppBarData {Size=(uint)Marshal.SizeOf(typeof(AppBarData))};uint state=(uint)SHAppBarMessage(4,ref data).ToUInt64(),next=value?state|1:state&~1U;if(TaskbarMask.TransientState){TaskbarMask.SavedAutoHide=value;DesktopLease.RecordTemporaryState(next);}data.Param=new IntPtr(next);SHAppBarMessage(10,ref data);}
+        internal static void SetTaskbarAutoHide(bool value)
+        {
+            lock(TaskbarMask.Gate){var handle=FindWindow("Shell_TrayWnd",null);if(handle==IntPtr.Zero)throw new InvalidOperationException("Windows 작업표시줄을 찾지 못했습니다.");
+                // ABM_GETSTATE ignores hWnd, but ABM_SETSTATE requires the taskbar HWND.
+                var data=new AppBarData {Size=(uint)Marshal.SizeOf(typeof(AppBarData)),Window=handle};uint state=(uint)SHAppBarMessage(4,ref data).ToUInt64(),next=value?state|1:state&~1U;
+                if(TaskbarMask.TransientState){TaskbarMask.SavedAutoHide=value;DesktopLease.RecordTemporaryState(next);}data.Param=new IntPtr(next);SHAppBarMessage(10,ref data);}
+        }
         internal static RectI WorkArea(Forms.Screen screen) {var data=new MonitorData {Size=Marshal.SizeOf(typeof(MonitorData))};GetMonitorInfo(MonitorFromPoint(new PointI {X=screen.Bounds.Left+1,Y=screen.Bounds.Top+1},2),ref data);return data.Work;}
         internal static void Activate(IntPtr h)
         {
@@ -327,7 +349,7 @@ namespace OneTaskBar
         Native.AppBarData Data() {return new Native.AppBarData {Size=(uint)Marshal.SizeOf(typeof(Native.AppBarData)),Window=source.Handle,Edge=3};}
         IntPtr Message(IntPtr h,int msg,IntPtr w,IntPtr l,ref bool handled) {if(msg==0x8053){if(w.ToInt32()==1)Update();else if(w.ToInt32()==0&&stateChanged!=null)stateChanged();}return IntPtr.Zero;}
         internal void SetAutoHide(bool value){if(autoHide==value)return;autoHide=value;Update();}
-        internal static int ReservationTop(System.Drawing.Rectangle screen,double scale,int availableBottom,bool hidden){return hidden?availableBottom:Math.Min(availableBottom,screen.Bottom-(int)Math.Round(60*scale));}
+        internal static int ReservationTop(System.Drawing.Rectangle screen,double scale,int availableBottom,bool hidden){return hidden?availableBottom:Math.Min(availableBottom,screen.Bottom-(int)Math.Round(68*scale));}
         void Update()
         {
             if(busy||disposed) return; busy=true;

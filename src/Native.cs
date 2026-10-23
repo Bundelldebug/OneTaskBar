@@ -95,8 +95,12 @@ namespace OneTaskBar
             if(SetWindowRgn(handle,region,true)==0){DeleteObject(region);state.Width=0;}
         }
         internal static RectI InputBounds(Rect clip,double scale){return new RectI {Left=Math.Max(0,(int)Math.Floor(clip.Left*scale)-1),Top=Math.Max(0,(int)Math.Floor(clip.Top*scale)-1),Right=(int)Math.Ceiling(clip.Right*scale)+1,Bottom=(int)Math.Ceiling(clip.Bottom*scale)+1};}
-        internal static bool ClipWindow(IntPtr window,RectI bounds){var region=CreateRectRgn(bounds.Left,bounds.Top,bounds.Right,bounds.Bottom);if(SetWindowRgn(window,region,true)!=0)return true;DeleteObject(region);return false;}
+        // WPF/composition presents the changed surface itself. A synchronous GDI
+        // repaint here duplicates that work on every media morph frame.
+        internal static bool ClipWindow(IntPtr window,RectI bounds){var region=CreateRectRgn(bounds.Left,bounds.Top,bounds.Right,bounds.Bottom);if(SetWindowRgn(window,region,false)!=0)return true;DeleteObject(region);return false;}
         internal static void EnableBlur(Window window,bool enabled){RegionState state;if(regions.TryGetValue(window,out state)&&state.Backdrop!=null)state.Backdrop.Enable(enabled);}
+        internal static void BlurOpacity(Window window,double value){RegionState state;if(regions.TryGetValue(window,out state)&&state.Backdrop!=null)state.Backdrop.SetOpacity(value);}
+        internal static double BlurOpacity(Window window){RegionState state;return regions.TryGetValue(window,out state)&&state.Backdrop!=null?state.Backdrop.Opacity:0;}
         internal static double PrepareMonitor(Window window,System.Drawing.Rectangle screen)
         {
             var handle=new WindowInteropHelper(window).EnsureHandle();var monitor=MonitorFromPoint(new PointI {X=screen.Left+screen.Width/2,Y=screen.Top+screen.Height/2},2);

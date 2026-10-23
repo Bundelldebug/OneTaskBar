@@ -37,7 +37,7 @@ namespace OneTaskBar
         readonly DispatcherTimer popupTimer;
         readonly double radius;
         int width,height,corner,popupX=Int32.MinValue,popupY=Int32.MinValue;
-        Native.RectI placedBounds;bool shown;Rect? lastClip;
+        Native.RectI placedBounds;bool shown,enabled=true;double opacity=1;Rect? lastClip;
         Native.RectI? inputClip;
         internal LiveBackdrop(Window window,double radius)
         {
@@ -87,7 +87,10 @@ namespace OneTaskBar
             if(!force&&shown&&bounds.Left==placedBounds.Left&&bounds.Top==placedBounds.Top&&bounds.Right==placedBounds.Right&&bounds.Bottom==placedBounds.Bottom)return;
             Native.SetWindowPos(background,overlay,bounds.Left,bounds.Top,bounds.Right-bounds.Left,bounds.Bottom-bounds.Top,0x10|0x40);placedBounds=bounds;shown=true;
         }
-        internal void Enable(bool value){if(root!=null)root.Opacity=value?1:0;}
+        internal double Opacity {get{return root!=null?root.Opacity:0;}}
+        internal void Enable(bool value){enabled=value;ApplyOpacity();}
+        internal void SetOpacity(double value){opacity=Math.Max(0,Math.Min(1,value));ApplyOpacity();}
+        void ApplyOpacity(){if(root!=null)root.Opacity=enabled?(float)opacity:0;}
         internal void Resize()
         {
             if(target==null)return;Native.RectI bounds;var handle=Overlay;
