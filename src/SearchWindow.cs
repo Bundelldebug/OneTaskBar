@@ -58,7 +58,7 @@ namespace OneTaskBar
             files=new StackPanel();files.Children.Add(Label("파일과 사진을 찾고 있습니다…",12,LightPanel.Muted));filesCard=Card("내 파일",files);
             debounce.Start();
         }
-        List<AppEntry> Recommendations() {var choices=new List<AppEntry>();foreach(var app in shell.Pins.Concat(shell.Running).Concat(shell.Apps)){var installed=shell.Apps.FirstOrDefault(a=>Catalog.Same(a,app))??app;if(!choices.Any(a=>Catalog.Same(a,installed)))choices.Add(installed);if(choices.Count==8)break;}return choices;}
+        internal List<AppEntry> Recommendations() {return shell.RecentApps.Recommend(shell.Apps,shell.Running);}
         Border Card(string title,UIElement body,Action extra=null)
         {
             var panel=new StackPanel();var head=new Grid {Margin=new Thickness(0,0,0,16)};var text=Label(title,17,Paint.Ink);text.FontWeight=FontWeights.SemiBold;head.Children.Add(text);
@@ -69,7 +69,7 @@ namespace OneTaskBar
         void AppCard(string title,List<AppEntry> apps)
         {
             var wrap=new WrapPanel();foreach(var entry in apps){var app=entry;var body=new StackPanel {Width=88,Height=96};FrameworkElement icon=AppIcons.Visual(app,44);icon.HorizontalAlignment=HorizontalAlignment.Center;icon.Margin=new Thickness(0,4,0,9);body.Children.Add(icon);var text=Label(app.Name,12,Paint.Ink);text.TextAlignment=TextAlignment.Center;text.TextWrapping=TextWrapping.Wrap;text.MaxHeight=34;body.Children.Add(text);
-                Action launch=()=>Open(()=>app.Launch(),app.Name);var button=Paint.Button(body,launch,app.Name);button.Padding=new Thickness(3);button.Margin=new Thickness(2);button.Background=Brushes.Transparent;button.ContextMenu=WindowPicker.Menu(app,shell,allowAdmin:true);Navigation.Add(button,launch);wrap.Children.Add(button);}Card(title,wrap);
+                Action launch=()=>{var modifiers=Keyboard.Modifiers;Open(()=>shell.LaunchApp(app,modifiers),app.Name);};var button=Paint.Button(body,launch,app.Name);button.Padding=new Thickness(3);button.Margin=new Thickness(2);button.Background=Brushes.Transparent;button.ContextMenu=WindowPicker.Menu(app,shell,allowAdmin:true);Navigation.Add(button,launch);wrap.Children.Add(button);}Card(title,wrap);
         }
         void SettingCard(string title,IEnumerable<SearchSetting> settings)
         {

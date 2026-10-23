@@ -18,9 +18,11 @@ namespace OneTaskBar
         const string format="OneTaskBar.LayoutMove";
         sealed class Session {internal string Id=Guid.NewGuid().ToString("N"),Scope,Key;internal Func<string,bool> PendingDrop;}
         static Session active;static InsertionMark mark;static AdornerLayer layer;
-        internal static bool Active {get{return active!=null;}}
+        internal static bool Active {get{return active!=null||DockDragController.Active;}}
         internal static int StartedMoves,CompletedMoves;
         internal static event Action Finished;
+        internal static void PointerStarted(){StartedMoves++;}
+        internal static void PointerFinished(bool committed){if(committed)CompletedMoves++;var notify=Finished;if(notify!=null)notify();}
         internal static void DropArea(FrameworkElement target,string scope,Func<bool> enabled,Func<string,Point,bool> drop,Action<string,Point> preview=null,bool capture=false)
         {
             target.AllowDrop=true;
@@ -72,14 +74,16 @@ namespace OneTaskBar
             [DllImport("user32.dll")]static extern bool EnableWindow(IntPtr window,bool enabled);
             System.Drawing.Point last=new System.Drawing.Point(Int32.MinValue,Int32.MinValue);
             bool inputDisabled;
-            internal DragGhost(FrameworkElement source)
+            readonly Point grab;
+            internal DragGhost(FrameworkElement source,Point? anchor=null)
             {
                 var presentation=PresentationSource.FromVisual(source);double scale=presentation==null?1:presentation.CompositionTarget.TransformToDevice.M11;Width=Math.Max(1,source.ActualWidth);Height=Math.Max(1,source.ActualHeight);
+                grab=anchor??new Point(Width/2,Height/2);
                 var bitmap=new RenderTargetBitmap((int)Math.Ceiling(Width*scale),(int)Math.Ceiling(Height*scale),96*scale,96*scale,PixelFormats.Pbgra32);bitmap.Render(source);bitmap.Freeze();
                 Content=new Image {Source=bitmap,Stretch=Stretch.Fill};WindowStyle=WindowStyle.None;ResizeMode=ResizeMode.NoResize;AllowsTransparency=true;Background=Brushes.Transparent;ShowInTaskbar=false;ShowActivated=false;Topmost=true;Focusable=false;IsHitTestVisible=false;Opacity=.94;
                 SourceInitialized+=(s,e)=>{var h=new WindowInteropHelper(this).Handle;Native.SetWindowLong(h,-20,Native.GetWindowLong(h,-20)|0x80|0x08000000|0x20);HwndSource.FromHwnd(h).AddHook((IntPtr hwnd,int msg,IntPtr wp,IntPtr lp,ref bool handled)=>{if(msg==0x84){handled=true;return new IntPtr(-1);}if(msg==0x21){handled=true;return new IntPtr(3);}return IntPtr.Zero;});};
             }
-            internal void Follow(){var point=System.Windows.Forms.Cursor.Position;if(point==last)return;last=point;var h=new WindowInteropHelper(this).Handle;if(!inputDisabled){EnableWindow(h,false);inputDisabled=true;}double scale=Math.Max(96,Native.GetDpiForWindow(h))/96.0;Native.SetWindowPos(h,new IntPtr(-1),point.X-(int)(Width*scale/2),point.Y-(int)(Height*scale/2),(int)Math.Ceiling(Width*scale),(int)Math.Ceiling(Height*scale),0x10);}
+            internal void Follow(){var point=System.Windows.Forms.Cursor.Position;if(point==last)return;last=point;var h=new WindowInteropHelper(this).Handle;if(!inputDisabled){EnableWindow(h,false);inputDisabled=true;}double scale=Math.Max(96,Native.GetDpiForWindow(h))/96.0;Native.SetWindowPos(h,new IntPtr(-1),point.X-(int)(grab.X*scale),point.Y-(int)(grab.Y*scale),(int)Math.Ceiling(Width*scale),(int)Math.Ceiling(Height*scale),0x10);}
         }
         sealed class InsertionMark : Adorner
         {

@@ -20,7 +20,7 @@ namespace OneTaskBar
         internal DockOverflow(ShellController controller,DockHost owner,Button button,Action visibilityChanged)
         {
             shell=controller;dock=owner;anchor=button;changed=visibilityChanged;
-            openDelay.Tick+=(s,e)=>{openDelay.Stop();Open();};closeDelay.Tick+=(s,e)=>{closeDelay.Stop();if(!anchor.IsMouseOver&&popup!=null&&!popup.IsMouseOver&&!ContextOpen())Hide();};
+            openDelay.Tick+=(s,e)=>{openDelay.Stop();Open();};closeDelay.Tick+=(s,e)=>{closeDelay.Stop();if(!DragReorder.Active&&!anchor.IsMouseOver&&popup!=null&&!popup.IsMouseOver&&!ContextOpen())Hide();};
             anchor.MouseEnter+=(s,e)=>{closeDelay.Stop();if(!IsOpen)openDelay.Start();};anchor.MouseLeave+=(s,e)=>{openDelay.Stop();ScheduleClose();};
         }
         bool ContextOpen(){return popup!=null&&Menus(popup.Surface).Any(m=>m.IsOpen);}
@@ -39,14 +39,15 @@ namespace OneTaskBar
         void Fill()
         {
             if(popup==null)return;int columns=Math.Max(1,Math.Min(Math.Min(8,entries.Count),(int)((dock.Screen.Bounds.Width/dock.Scale-48)/50)));double width=columns*50+24,height=Math.Min(Math.Min(276,Math.Max(60,dock.Screen.Bounds.Height/dock.Scale-110)),Math.Ceiling(entries.Count/(double)columns)*52+24);var grid=new UniformGrid {Columns=columns,Margin=new Thickness(12)};
-            foreach(var entry in entries){var item=entry;var content=new Grid {Width=42,Height=44};var icon=AppIcons.Visual(item,32);icon.VerticalAlignment=VerticalAlignment.Top;icon.Margin=new Thickness(0,2,0,0);content.Children.Add(icon);if(item.Windows.Count>0)content.Children.Add(new Border {Width=4,Height=4,Background=Paint.Ink,CornerRadius=new CornerRadius(2),VerticalAlignment=VerticalAlignment.Bottom,HorizontalAlignment=HorizontalAlignment.Center});Button button=null;button=Paint.Button(content,()=>{if(item.Windows.Count>1)shell.ActivateApp(item,button);else{Hide();item.Launch();}},item.Name);button.Width=50;button.Height=52;button.Padding=new Thickness(0);button.Background=Brushes.Transparent;button.ContextMenu=WindowPicker.Menu(item,shell);button.ContextMenuOpening+=(s,e)=>closeDelay.Stop();button.ContextMenuClosing+=(s,e)=>ScheduleClose();grid.Children.Add(button);}
+            foreach(var entry in entries){var item=entry;var content=new Grid {Width=42,Height=44};var icon=AppIcons.Visual(item,32);icon.VerticalAlignment=VerticalAlignment.Top;icon.Margin=new Thickness(0,2,0,0);content.Children.Add(icon);if(item.Windows.Count>0)content.Children.Add(new Border {Width=4,Height=4,Background=Paint.Ink,CornerRadius=new CornerRadius(2),VerticalAlignment=VerticalAlignment.Bottom,HorizontalAlignment=HorizontalAlignment.Center});Button button=null;button=Paint.Button(content,()=>{var modifiers=System.Windows.Input.Keyboard.Modifiers;if(item.Windows.Count>1&&!AppClick.Elevate(modifiers))shell.ActivateApp(item,button);else{Hide();shell.LaunchApp(item,modifiers);}},item.Name);button.Width=50;button.Height=52;button.Padding=new Thickness(0);button.Background=Brushes.Transparent;dock.DragApps.Attach(button,()=>item);button.ContextMenu=WindowPicker.Menu(item,shell);button.ContextMenuOpening+=(s,e)=>closeDelay.Stop();button.ContextMenuClosing+=(s,e)=>ScheduleClose();grid.Children.Add(button);}
             popup.Width=width;popup.Height=height;popup.Surface.Child=new SmoothScrollViewer {Content=grid,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};popup.TransitionContent=(FrameworkElement)popup.Surface.Child;
         }
         bool Contains(Native.PointI point)
         {
             if(ContextOpen())return true;if(popup!=null&&popup.IsVisible){Native.RectI bounds;if(Native.GetWindowRect(new WindowInteropHelper(popup).Handle,out bounds)&&point.X>=bounds.Left&&point.X<bounds.Right&&point.Y>=bounds.Top&&point.Y<bounds.Bottom)return true;}if(anchor.IsVisible){Point pointA=anchor.PointToScreen(new Point()),pointB=anchor.PointToScreen(new Point(anchor.ActualWidth,anchor.ActualHeight));return point.X>=pointA.X&&point.X<pointB.X&&point.Y>=pointA.Y&&point.Y<pointB.Y;}return false;
         }
-        void ScheduleClose(){if(IsOpen&&!ContextOpen())closeDelay.Start();}
+        void ScheduleClose(){if(IsOpen&&!DragReorder.Active&&!ContextOpen())closeDelay.Start();}
+        internal void AfterDrag(){ScheduleClose();}
         internal async void Hide()
         {
             openDelay.Stop();closeDelay.Stop();if(outside!=null){outside.Dispose();outside=null;}var old=popup;popup=null;if(changed!=null)changed();if(old==null)return;await old.DismissAsync();old.Close();

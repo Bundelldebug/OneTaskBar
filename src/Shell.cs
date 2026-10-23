@@ -81,6 +81,11 @@ namespace OneTaskBar
         internal QuickWindow Quick;internal DrawerWindow Drawer;internal StartWindow StartMenu;internal SearchWindow Finder;internal WelcomeWindow Welcome;internal NotificationWindow Center;internal DetailWindow Detail;
         internal NotificationConnectWindow NotificationLink;
         internal readonly WindowPreviewManager Previews=new WindowPreviewManager();
+        internal readonly RecentAppUsage RecentApps=new RecentAppUsage(Path.Combine(AppLog.Data,"recent-apps.json"));
+        internal readonly WindowPlacement Placement;
+        internal Action<AppEntry> ElevationDispatch;
+        internal Action<AppEntry> LaunchDispatch;
+        IntPtr recentForeground;
         HudWindow hud;
         DateTime hudUntil,queryAt,appsAt,commitBrightnessUntil,sourceUntil;
         bool brightnessBusy,runningBusy,disposed,servicesBusy,pinsBusy; bool? exactSource;
@@ -106,6 +111,7 @@ namespace OneTaskBar
         public ShellController(bool demo=false)
         {
             Demo=demo;
+            Placement=new WindowPlacement(this);
             Banners=new NotificationBanners(this);
             if(demo) return;
             keys=new VolumeKeys();
@@ -269,6 +275,7 @@ namespace OneTaskBar
         internal void PinStart(AppEntry entry,bool pin){StartPins.Set(entry,pin);if(StartMenu!=null&&StartMenu.IsVisible)StartMenu.RefreshPins();}
         internal void ActivateApp(AppEntry entry,FrameworkElement anchor,IntPtr beforeClick=default(IntPtr))
         {
+            if(AppClick.Elevate(System.Windows.Input.Keyboard.Modifiers)){LaunchApp(entry,System.Windows.Input.Keyboard.Modifiers);return;}RecentApps.Record(entry);
             var windows=entry.Windows.Where(Native.IsWindow).ToList();
             var foreground=beforeClick!=IntPtr.Zero&&Native.IsWindow(beforeClick)?beforeClick:Native.GetForegroundWindow();var root=Native.GetAncestor(foreground,3);var active=windows.FirstOrDefault(h=>h==foreground||h==root);
             if(active!=IntPtr.Zero&&!Native.IsIconic(active)){Native.ShowWindow(active,6);return;}
@@ -277,6 +284,16 @@ namespace OneTaskBar
                 Native.Activate(windows[0]); return;
             }
             var launch=entry.Copy();launch.Windows.Clear();launch.Launch();appsAt=DateTime.MinValue;
+        }
+        internal void LaunchApp(AppEntry entry,System.Windows.Input.ModifierKeys modifiers)
+        {
+            if(entry==null)return;
+            if(AppClick.Elevate(modifiers)){Previews.Close();if(ElevationDispatch!=null){ElevationDispatch(entry);return;}if(AdminLaunch.Prepare(entry)==null){ActionNotice.Show("이 앱은 관리자 권한 실행을 지원하지 않습니다.");return;}AdminLaunch.Start(entry,this);return;}
+            RecentApps.Record(entry);if(LaunchDispatch!=null)LaunchDispatch(entry);else entry.Launch();
+        }
+        void RememberForeground(IntPtr window)
+        {
+            if(window==IntPtr.Zero||window==recentForeground)return;var root=Native.GetAncestor(window,3);var entry=Running.FirstOrDefault(a=>a.Windows.Contains(window)||a.Windows.Contains(root));if(entry==null)return;recentForeground=window;RecentApps.Record(entry);
         }
         internal async void Radio(string kind)
         {
@@ -488,6 +505,7 @@ namespace OneTaskBar
             if(Desktop)ExplorerBridge.KeepTrayPosition(trayDock!=null?trayDock.TrayAnchor():null);
             var foreground=Native.GetForegroundWindow(); uint foregroundPid; Native.GetWindowThreadProcessId(foreground,out foregroundPid);
             if(foregroundPid!=ownPid) LastApplication=foreground;
+            if(foregroundPid!=ownPid)RememberForeground(foreground);
             if(Desktop){SyncAutoHide(false);foreach(var dock in docks){dock.UpdateVisibility(Native.IsFullScreen(dock.Screen),DockAutoHide);if(foreground!=lastForeground)dock.UpdateActive(LastApplication);}}
             lastForeground=foreground;
             bool battery=Power.Known&&!Power.Connected;double cadence=RuntimeCadence.Pulse(Desktop,battery,interactive,docks.Count>0&&docks.All(d=>!d.Apps.IsVisible),true);if(timer.Interval.TotalMilliseconds!=cadence)timer.Interval=TimeSpan.FromMilliseconds(cadence);
@@ -519,7 +537,7 @@ namespace OneTaskBar
                 appsAt=now.AddSeconds(5); runningBusy=true;
                 BackgroundWork.Run(()=> {var watch=Stopwatch.StartNew();var running=Catalog.Running();return new {Running=running,Elapsed=watch.Elapsed.TotalMilliseconds};}).ContinueWith(t=>Application.Current.Dispatcher.BeginInvoke(new Action(()=> {
                     runningBusy=false; if(disposed || t.Status!=TaskStatus.RanToCompletion) return;
-                    string old=String.Join("|",DockApps().Select(a=>a.Key+":"+String.Join(",",a.Windows)));Running=t.Result.Running;lastAppRefreshMs=t.Result.Elapsed;
+                    string old=String.Join("|",DockApps().Select(a=>a.Key+":"+String.Join(",",a.Windows)));Running=t.Result.Running;lastAppRefreshMs=t.Result.Elapsed;RememberForeground(Native.GetForegroundWindow());
                     string fresh=String.Join("|",DockApps().Select(a=>a.Key+":"+String.Join(",",a.Windows)));
                     if(old!=fresh) foreach(var dock in docks) dock.Rebuild();
                 })));
@@ -669,7 +687,7 @@ namespace OneTaskBar
             if(disposed) return; disposed=true;
             Desktop=false;
             TaskbarMask.Active=false;
-            timer.Stop(); SystemEvents.DisplaySettingsChanged-=DisplayChanged; SystemEvents.PowerModeChanged-=PowerChanged;
+            timer.Stop();RecentApps.Dispose();Placement.Dispose(); SystemEvents.DisplaySettingsChanged-=DisplayChanged; SystemEvents.PowerModeChanged-=PowerChanged;
             ConnectionSound.Dispose();
             Previews.Dispose();if(brightnessEvents!=null)brightnessEvents.Dispose();
             if(keys!=null) keys.Dispose();

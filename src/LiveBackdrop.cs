@@ -25,6 +25,8 @@ namespace OneTaskBar
         internal static int VisibleCount {get{int count=0;foreach(var item in instances)if(item.background!=IntPtr.Zero&&Native.IsWindowVisible(item.background))count++;return count;}}
         [DllImport("user32.dll",CharSet=CharSet.Unicode)]static extern IntPtr CreateWindowEx(int ex,string cls,string title,uint style,int x,int y,int width,int height,IntPtr parent,IntPtr menu,IntPtr instance,IntPtr data);
         [DllImport("user32.dll")]static extern bool DestroyWindow(IntPtr window);
+        [DllImport("user32.dll")]static extern bool EnableWindow(IntPtr window,bool enabled);
+        [DllImport("user32.dll")]static extern bool SetLayeredWindowAttributes(IntPtr window,uint key,byte alpha,uint flags);
         [DllImport("dwmapi.dll")]static extern int DwmSetWindowAttribute(IntPtr window,int attribute,ref int value,int size);
         IntPtr background;
         DesktopWindowTarget target;
@@ -68,8 +70,13 @@ namespace OneTaskBar
             }
             // WPF owns its HWND's compositor target. Put the backdrop in a separate, non-input,
             // no-redirection HWND and make the transparent WPF window its owner-ordered overlay.
-            background=CreateWindowEx(0x00200000|0x08000000|0x80|0x20|(topmost?0x8:0),"static","One TaskBar · 블러",0x88000000,0,0,1,1,IntPtr.Zero,IntPtr.Zero,IntPtr.Zero,IntPtr.Zero);
+            bool passThrough=window is TransientGlass;
+            background=CreateWindowEx(0x00200000|0x08000000|0x80|0x20|(passThrough?0x80000:0)|(topmost?0x8:0),"static","One TaskBar · 블러",0x88000000,0,0,1,1,IntPtr.Zero,IntPtr.Zero,IntPtr.Zero,IntPtr.Zero);
             if(background==IntPtr.Zero)throw new System.ComponentModel.Win32Exception();
+            // The composition host is visual-only. WS_EX_TRANSPARENT alone does
+            // not exclude a non-layered HWND from every native hit-test path.
+            EnableWindow(background,false);
+            if(passThrough&&!SetLayeredWindowAttributes(background,0,255,2))throw new System.ComponentModel.Win32Exception();
             int host=1;DwmSetWindowAttribute(background,17,ref host,4);
             if(window!=null)new WindowInteropHelper(window).Owner=background;
             IntPtr raw;

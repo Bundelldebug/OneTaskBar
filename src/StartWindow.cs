@@ -186,7 +186,7 @@ namespace OneTaskBar
             if(entries.Count==0){var empty=Paint.TextBlock("최근 사용한 파일이 여기에 표시됩니다.",12,Paint.Muted);empty.TextWrapping=TextWrapping.Wrap;empty.Margin=new Thickness(9,12,9,15);recent.Children.Add(empty);}
         }
         internal void FixtureRecent(List<StartRecent> entries){cachedRecent=entries;recentUntil=DateTime.UtcNow.AddHours(1);RenderRecent(entries);}
-        async void Launch(AppEntry entry){if(await DismissAsync())entry.Launch();}
+        async void Launch(AppEntry entry){var modifiers=Keyboard.Modifiers;if(await DismissAsync())shell.LaunchApp(entry,modifiers);}
         async void OpenFolder(Environment.SpecialFolder folder){if(await DismissAsync())Native.Open(Environment.GetFolderPath(folder));}
         internal ContextMenu PowerMenu(FrameworkElement target)
         {

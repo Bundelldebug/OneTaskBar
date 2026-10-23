@@ -18,6 +18,7 @@ desktop-lease.json
 notification-registration.json
 settings.json
 search-history.json
+recent-apps.json
 start-pins.json
 apps-layout.json
 native-toast-lease.json

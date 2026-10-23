@@ -34,6 +34,7 @@ namespace OneTaskBar
             var groups=new StackPanel();
             var desktopRows=new StackPanel();desktop=Row(desktopRows,"Windows 작업표시줄 대체","기본 작업표시줄과 전환합니다",shell.Desktop,v=> {shell.SetDesktop(v);Show();Activate();});
             autoHide=Row(desktopRows,"작업표시줄 자동 숨기기","Windows 설정과 함께 적용됩니다. 화면 아래쪽에 커서를 대면 다시 표시합니다",shell.Demo?shell.DockAutoHide:Native.TaskbarAutoHide(),v=>shell.SetAutoHide(v));
+            Row(desktopRows,"앱 드래그로 분할·팝업 열기","독의 앱을 화면 가장자리로 끌면 분할, 중앙으로 끌면 팝업으로 엽니다. 독 안에서는 순서를 바꿉니다",Preferences.Current.DockWindowDrop,v=>Preferences.Set(p=>p.DockWindowDrop=v));
             startup=Row(desktopRows,"로그인 시 자동 시작","Windows 로그인 후 One TaskBar을 실행합니다",StartupPreference.Enabled,v=> {try{StartupPreference.Set(v);status.Text=v?"로그인 자동 시작을 켰습니다":"로그인 자동 시작을 껐습니다";}catch(Exception e){status.Text="자동 시작 설정을 저장하지 못했습니다: "+e.Message;}});
             Group(groups,"데스크톱",desktopRows);
             var panels=new StackPanel();

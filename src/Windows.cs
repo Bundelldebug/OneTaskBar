@@ -26,7 +26,7 @@ namespace OneTaskBar
         readonly Button quickAccess,trayAccess;
         readonly Button startButton;readonly Glyph startGlyph=new Glyph("apps",23){Color=Paint.Ink};
         internal readonly Button TaskViewButton;
-        internal readonly Button OverflowButton;internal readonly DockOverflow Overflow;
+        internal readonly Button OverflowButton;internal readonly DockOverflow Overflow;internal readonly DockDragController DragApps;
         readonly Button powerAccess;readonly ColumnDefinition powerColumn;double powerWidth=58;
         readonly ShellController controller;
         readonly Dictionary<IntPtr,Border> indicators=new Dictionary<IntPtr,Border>();
@@ -50,12 +50,13 @@ namespace OneTaskBar
         internal bool DockVisible {get{return visible;}}internal bool EdgeVisible {get{return revealEdge!=null&&revealEdge.Visible;}}
         internal bool AutoHideAnimating {get{return visibilityTimer.IsEnabled;}}internal double RevealProgress {get{return reveal;}}
         IntPtr pressedForeground;
+        internal IntPtr WindowDragPartner {get{var foreground=Native.GetForegroundWindow();if(controller.Running.Any(a=>a.Windows.Contains(foreground)))return foreground;if(controller.Running.Any(a=>a.Windows.Contains(pressedForeground)))return pressedForeground;return controller.LastApplication;}}
         bool closed;internal NowBar MediaBar {get;private set;}
         internal DockHost(ShellController shell,Forms.Screen screen)
         {
             controller=shell; Screen=screen;
             hideDelay.Tick+=(s,e)=>CompleteAutoHide(InUse());
-            pinDivider.RenderTransform=dividerOffset;Canvas.SetTop(pinDivider,9);Panel.SetZIndex(pinDivider,2);appCanvas.Children.Add(pinDivider);DragReorder.DropArea(appCanvas,"dock.apps",()=>!closed,DropAt,PreviewAt,true);DragReorder.Finished+=EndDragPreview;
+            pinDivider.RenderTransform=dividerOffset;Canvas.SetTop(pinDivider,9);Panel.SetZIndex(pinDivider,2);appCanvas.Children.Add(pinDivider);DragApps=new DockDragController(this,shell,appCanvas,PreviewAt,DropAt,PreviewHome);DragReorder.Finished+=EndDragPreview;
             var search=Paint.Button(new Glyph("search",20){Color=Paint.Ink},()=>controller.ToggleSearch(this),"검색");search.Padding=new Thickness(0);search.Background=Brushes.Transparent;search.Width=42;search.Height=42;Canvas.SetLeft(search,10);appCanvas.Children.Add(search);Apps.Surface.Child=appCanvas;
             var desktops=Paint.Button(new Glyph("desktops",19){Color=Paint.Ink},()=>controller.OpenTaskView(),"데스크톱 전환 · 작업 보기");TaskViewButton=desktops;desktops.Padding=new Thickness(0);desktops.Background=Brushes.Transparent;desktops.Width=desktops.Height=42;Canvas.SetLeft(desktops,52);appCanvas.Children.Add(desktops);
             OverflowButton=Paint.Button(new Glyph("more",23){Color=Paint.Ink},()=>Overflow.Toggle(),"숨겨진 앱");OverflowButton.Width=46;OverflowButton.Height=42;OverflowButton.Padding=new Thickness(0);OverflowButton.Background=Brushes.Transparent;OverflowButton.Visibility=Visibility.Collapsed;Panel.SetZIndex(OverflowButton,3);appCanvas.Children.Add(OverflowButton);Overflow=new DockOverflow(shell,this,OverflowButton,QueueHide);
@@ -143,7 +144,7 @@ namespace OneTaskBar
             cell.Dot=new Border {Width=4,Height=4,CornerRadius=new CornerRadius(2),Background=Paint.Ink,VerticalAlignment=VerticalAlignment.Bottom,HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(0,0,0,2)};content.Children.Add(cell.Dot);
             cell.Button=Paint.Button(content,()=>{controller.Previews.Close();var before=pressedForeground;pressedForeground=IntPtr.Zero;controller.ActivateApp(cell.Entry,cell.Button,before);},entry.Name);cell.Button.Width=46;cell.Button.Height=42;cell.Button.Padding=new Thickness(0);cell.Button.Background=Brushes.Transparent;cell.Button.RenderTransform=cell.Offset;
             cell.Button.MouseEnter+=(s,e)=>{ToolTipService.SetIsEnabled(cell.Button,cell.Entry.Windows.Count==0);controller.Previews.Enter(cell.Entry,cell.Button,this);};cell.Button.MouseLeave+=(s,e)=>{controller.Previews.Leave();ToolTipService.SetIsEnabled(cell.Button,true);};cell.Button.PreviewMouseLeftButtonDown+=(s,e)=>controller.Previews.Close();cell.Button.ContextMenuOpening+=(s,e)=>controller.Previews.Close();
-            cell.Button.ContextMenuOpening+=(sender,args)=>cell.Button.ContextMenu=WindowPicker.Menu(cell.Entry,controller);cell.Button.ContextMenu=WindowPicker.Menu(entry,controller);Motion.Dock(cell.Button,cell.Icon);DragReorder.Attach(cell.Button,cell.Button,"dock.apps",entry.Key,Orientation.Horizontal,()=>!closed,controller.MoveDock,PreviewDock);return cell;
+            cell.Button.ContextMenuOpening+=(sender,args)=>cell.Button.ContextMenu=WindowPicker.Menu(cell.Entry,controller);cell.Button.ContextMenu=WindowPicker.Menu(entry,controller);Motion.Dock(cell.Button,cell.Icon);DragApps.Attach(cell.Button,()=>cell.Entry);return cell;
         }
         internal void PreviewDock(string source,string target,bool after)
         {
@@ -164,6 +165,7 @@ namespace OneTaskBar
             pendingDockDrop=DropTarget(source,point);if(pendingDockDrop.Target==null)PreviewGroup(source,pendingDockDrop.Pinned);else PreviewDock(source,pendingDockDrop.Target,pendingDockDrop.After);
         }
         bool DropAt(string source,Point point){var target=DropTarget(source,point);return target.Target==null?controller.MoveDockGroup(source,target.Pinned):controller.MoveDock(source,target.Target,target.After);}
+        void PreviewHome(string source){DockCell moving;if(!cells.TryGetValue(source,out moving))return;pendingDockDrop=null;PreviewOrder(cells.Values.Where(c=>!c.Leaving).OrderBy(c=>c.X).ToList(),moving,moving.Entry.Pinned);}
         void PreviewGroup(string source,bool pinned)
         {
             DockCell moving;if(!cells.TryGetValue(source,out moving))return;var order=cells.Values.Where(c=>!c.Leaving&&c!=moving).OrderBy(c=>c.X).ToList();order.Add(moving);PreviewOrder(order,moving,pinned);
@@ -271,7 +273,7 @@ namespace OneTaskBar
             return new TrayPlacement(trayAccess.PointToScreen(new Point(trayAccess.ActualWidth/2,0)),Screen.Bounds,Scale);
         }
         internal object Inspect() {return new {scale=Scale,visible=visible,autoHide=autoHide,revealEdge=EdgeVisible,apps=Native.RegionInfo(Apps),start=Native.RegionInfo(Start),status=Native.RegionInfo(Status),blur=Apps.HasBlur&&Status.HasBlur,nowBar=MediaBar!=null?Native.RegionInfo(MediaBar):null};}
-        internal void Close() { if(closed) return; closed=true;DragReorder.Finished-=EndDragPreview;resizeTimer.Stop();visibilityTimer.Stop();hideDelay.Stop();Overflow.Dispose();if(revealEdge!=null){revealEdge.Dispose();revealEdge=null;}if(MediaBar!=null)MediaBar.Close();cells.Clear(); Start.Close(); Apps.Close(); Status.Close(); }
+        internal void Close() { if(closed) return; closed=true;DragApps.Dispose();DragReorder.Finished-=EndDragPreview;resizeTimer.Stop();visibilityTimer.Stop();hideDelay.Stop();Overflow.Dispose();if(revealEdge!=null){revealEdge.Dispose();revealEdge=null;}if(MediaBar!=null)MediaBar.Close();cells.Clear(); Start.Close(); Apps.Close(); Status.Close(); }
     }
     internal sealed class HudWindow : GlassWindow
     {
@@ -343,7 +345,7 @@ namespace OneTaskBar
             if(shell.Apps.Count==0) items.Children.Add(Paint.TextBlock("설치된 앱을 불러오는 중…",14,Paint.Text));
             count.Text=(folder==null?shell.Apps.Count:Current().Count)+"개 앱";
         }
-        async void Launch(AppEntry app){if(await DismissAsync())app.Launch();}
+        async void Launch(AppEntry app){var modifiers=Keyboard.Modifiers;if(await DismissAsync())shell.LaunchApp(app,modifiers);}
         internal void OpenFolder(string key){if(!tiles.Any(t=>t.Key==key&&t.Folder))return;folder=key;RenderApps();if(Motion.Enabled)Motion.Fade(items,.55,1,160);}
         internal void CloseFolder(){CommitName();folder=null;RenderApps();}
         void CommitName(){if(renaming||folder==null)return;renaming=true;try{if(shell.AppScreen.Rename(folder,folderName.Text))tiles=shell.AppScreen.Tiles(shell.Apps);var node=tiles.FirstOrDefault(t=>t.Key==folder);if(node!=null)folderName.Text=node.Name;}finally{renaming=false;}}

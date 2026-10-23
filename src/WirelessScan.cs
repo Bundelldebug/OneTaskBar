@@ -26,24 +26,29 @@ namespace OneTaskBar
         static async Task<WirelessSnapshot> Bluetooth(CancellationToken token)
         {
             string filter="("+BluetoothDevice.GetDeviceSelectorFromPairingState(true)+") OR ("+BluetoothDevice.GetDeviceSelectorFromPairingState(false)+") OR ("+BluetoothLEDevice.GetDeviceSelectorFromPairingState(true)+") OR ("+BluetoothLEDevice.GetDeviceSelectorFromPairingState(false)+")";
-            var watcher=DeviceInformation.CreateWatcher(filter,new[]{"System.Devices.Aep.IsConnected"},DeviceInformationKind.AssociationEndpoint);
+            var properties=new[]{"System.Devices.Aep.IsConnected","System.Devices.Aep.Bluetooth.Cod.Major","System.Devices.Aep.Bluetooth.Cod.Minor"};var watcher=DeviceInformation.CreateWatcher(filter,properties,DeviceInformationKind.AssociationEndpoint);
             var found=new Dictionary<string,DeviceInformation>(StringComparer.Ordinal);var gate=new object();bool accepting=true;
             var ended=new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             TypedEventHandler<DeviceWatcher,DeviceInformation> added=(s,d)=>{lock(gate)if(accepting)found[d.Id]=d;};
             TypedEventHandler<DeviceWatcher,DeviceInformationUpdate> updated=(s,d)=>{lock(gate){DeviceInformation previous;if(accepting&&found.TryGetValue(d.Id,out previous))previous.Update(d);}};
-            TypedEventHandler<DeviceWatcher,DeviceInformationUpdate> removed=(s,d)=>{lock(gate)if(accepting)found.Remove(d.Id);};
+            TypedEventHandler<DeviceWatcher,DeviceInformationUpdate> removed=(s,d)=>{lock(gate)if(accepting){DeviceInformation previous;if(!found.TryGetValue(d.Id,out previous)||!previous.Pairing.IsPaired)found.Remove(d.Id);}};
             TypedEventHandler<DeviceWatcher,object> completed=(s,e)=>{};
             TypedEventHandler<DeviceWatcher,object> stopped=(s,e)=>ended.TrySetResult(s.Status!=DeviceWatcherStatus.Aborted);
             watcher.Added+=added;watcher.Updated+=updated;watcher.Removed+=removed;watcher.EnumerationCompleted+=completed;watcher.Stopped+=stopped;
             try{
-                token.ThrowIfCancellationRequested();watcher.Start();await Task.WhenAny(Task.Delay(4500,token),ended.Task);token.ThrowIfCancellationRequested();
-                if(ended.Task.IsCompleted&&!await ended.Task)throw new InvalidOperationException("블루투스 검색을 시작하지 못했습니다. 장치 상태를 확인해 주세요.");
-                lock(gate)return new WirelessSnapshot {Devices=found.Values.Where(d=>!String.IsNullOrWhiteSpace(d.Name)).OrderByDescending(d=>d.Pairing.IsPaired).ThenBy(d=>d.Name,StringComparer.CurrentCultureIgnoreCase).ToList()};
+                token.ThrowIfCancellationRequested();var registered=RegisteredBluetooth(properties,token);Exception scanError=null;try{watcher.Start();await Task.WhenAny(Task.Delay(4500,token),ended.Task);}catch(OperationCanceledException){throw;}catch(Exception error){scanError=error;}token.ThrowIfCancellationRequested();
+                var known=await registered;token.ThrowIfCancellationRequested();lock(gate)foreach(var device in known){DeviceInformation current;if(!found.TryGetValue(device.Id,out current)||!current.Pairing.IsPaired)found[device.Id]=device;}
+                bool failed=scanError!=null||ended.Task.IsCompleted&&!await ended.Task;
+                lock(gate){if(failed&&found.Count==0)throw new InvalidOperationException("블루투스 검색을 시작하지 못했습니다. 장치 상태를 확인해 주세요.");return new WirelessSnapshot {Devices=found.Values.Where(d=>!String.IsNullOrWhiteSpace(d.Name)).OrderByDescending(d=>d.Pairing.IsPaired).ThenBy(d=>d.Name,StringComparer.CurrentCultureIgnoreCase).ToList(),Notice=failed?"주변 검색을 완료하지 못해 등록된 기기를 표시합니다. 블루투스 상태를 확인해 주세요.":null};}
             }finally{
                 lock(gate)accepting=false;
                 if(watcher.Status==DeviceWatcherStatus.Started||watcher.Status==DeviceWatcherStatus.EnumerationCompleted)watcher.Stop();
                 watcher.Added-=added;watcher.Updated-=updated;watcher.Removed-=removed;watcher.EnumerationCompleted-=completed;watcher.Stopped-=stopped;
             }
+        }
+        static async Task<List<DeviceInformation>> RegisteredBluetooth(string[] properties,CancellationToken token)
+        {
+            try{string selector="("+BluetoothDevice.GetDeviceSelectorFromPairingState(true)+") OR ("+BluetoothLEDevice.GetDeviceSelectorFromPairingState(true)+")";var operation=DeviceInformation.FindAllAsync(selector,properties,DeviceInformationKind.AssociationEndpoint);using(token.Register(()=>{try{operation.Cancel();}catch{}})){var read=SystemServices.Wait(operation);if(await Task.WhenAny(read,Task.Delay(3500,token))!=read){operation.Cancel();return new List<DeviceInformation>();}return (await read).ToList();}}catch{return new List<DeviceInformation>();}
         }
     }
     internal static partial class Native

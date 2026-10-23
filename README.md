@@ -84,6 +84,14 @@ YouTube high-resolution covers are optional and off by default. When enabled, on
 
 Code and the original One TaskBar icon are under the [MIT license](LICENSE). [Third-party notices](THIRD_PARTY_NOTICES.txt) include the Liquid Dock reference. This repository contains no Samsung APK, extracted launcher artwork, wallpapers, fonts, or user screenshots/recordings. Installed third-party logos are read at runtime and remain their owners' property. This is an independent project and is not affiliated with Microsoft or Samsung. Open-source licensing does not guarantee that no third party will ever make a copyright or trademark complaint.
 
+## 8.5.6
+
+- Ctrl+Shift-click an app in the dock, Start, All apps, Search or overflow to request Windows elevation for supported desktop targets. Packaged apps and settings URIs do not support this route; normal Windows consent applies.
+- Drag a dock app toward the left/right work area for a split or toward the center for a popup-sized window. Animated previews, Escape/bottom cancellation, monitor-aware placement and complementary placement of the previous ordinary window are included. Settings → Desktop can disable window dropping while retaining dock reordering. Windows that prohibit resizing cannot be split.
+- Bluetooth details show native device-type icons, connection status, registered devices and new devices. Selecting a registered device opens management options; removal requires explicit selection and confirmation.
+- Search recommends recently launched/activated apps rather than fixed pins. Only up to 64 app identities and timestamps are saved locally; documents and window titles are excluded. Writes are debounced after activity.
+- Temporary preview/notice content and live blur fade together and pass pointer input through both HWNDs. Drag cancellation restores focus; monitor DPI is cached during gestures and temporary timers/input registrations are released.
+
 ## 8.5.5
 
 - Same-app notifications collapse into one capsule showing the latest content, time and count. Expand/collapse transitions animate; top-right popups slide/fade with their blur. Individual actions/group clearing and retained expansion survive arrivals.

@@ -98,6 +98,9 @@ namespace OneTaskBar
                 if(kind=="wifi-off")line(3,3,21,21);else if(kind=="wifi-disconnected"){line(18,15,22,19);line(22,15,18,19);}
             } else if(kind=="bluetooth") {
                 dc.DrawGeometry(null,pen,Geometry.Parse("M6,6 L18,17 12,22 12,2 18,7 6,18"));
+            } else if(kind=="computer") {dc.DrawRoundedRectangle(null,pen,new Rect(2,3,20,13),2,2);line(12,16,12,21);line(7,21,17,21);
+            } else if(kind=="keyboard") {dc.DrawRoundedRectangle(null,pen,new Rect(1,5,22,14),2.5,2.5);for(int y=0;y<2;y++)for(int x=0;x<5;x++)dc.DrawRoundedRectangle(brush,null,new Rect(4+x*3.6,8+y*3.3,1.5,1.5),.2,.2);line(7,16,17,16);
+            } else if(kind=="mouse") {dc.DrawRoundedRectangle(null,pen,new Rect(6,2,12,20),6,6);line(12,3,12,9);line(7,10,17,10);
             } else if(kind=="volume" || kind=="mute" || kind=="volume-low") {
                 dc.DrawGeometry(brush,new Pen(brush,.6){LineJoin=PenLineJoin.Round},Geometry.Parse("M3,9 L7,9 12,5 12,19 7,15 3,15 Z"));
                 if(kind=="mute") { line(16,9,22,15); line(22,9,16,15); }
@@ -113,6 +116,7 @@ namespace OneTaskBar
             else if(kind=="task-manager") {dc.DrawRoundedRectangle(null,pen,new Rect(2,2,20,20),3,3);dc.DrawRoundedRectangle(brush,null,new Rect(6,12,2.5,6),.6,.6);dc.DrawRoundedRectangle(brush,null,new Rect(10.8,6,2.5,12),.6,.6);dc.DrawRoundedRectangle(brush,null,new Rect(15.5,9,2.5,9),.6,.6);}
             else if(kind=="audio-output") {dc.DrawGeometry(brush,null,Geometry.Parse("M3,6 L12,12 3,18 Z"));dc.DrawGeometry(null,pen,Geometry.Parse("M14,6 A7,7 0 0 1 14,18 M17,2 A11,11 0 0 1 17,22"));}
             else if(kind=="headphones") {dc.DrawGeometry(null,pen,Geometry.Parse("M4,16 L4,10 A8,8 0 0 1 20,10 L20,16"));dc.DrawRoundedRectangle(brush,null,new Rect(2,12,5,9),2,2);dc.DrawRoundedRectangle(brush,null,new Rect(17,12,5,9),2,2);}
+            else if(kind=="microphone") {dc.DrawRoundedRectangle(brush,null,new Rect(8,2,8,13),4,4);dc.DrawGeometry(null,pen,Geometry.Parse("M5,11 L5,12 A7,7 0 0 0 19,12 L19,11 M12,19 L12,22 M8,22 L16,22"));}
             else if(kind=="ethernet"||kind=="ethernet-off") {dc.DrawGeometry(null,pen,Geometry.Parse("M4,3 L20,3 Q21,3 21,4 L21,14 17,14 17,18 7,18 7,14 3,14 3,4 Q3,3 4,3 Z"));for(int i=0;i<4;i++)line(7.5+i*3,6,7.5+i*3,9);line(12,18,12,22);if(kind=="ethernet-off"){line(4,21,21,4);}}
             else if(kind=="network"||kind=="network-off") {dc.DrawRoundedRectangle(null,pen,new Rect(3,3,18,12),2,2);line(12,15,12,21);line(7,21,17,21);if(kind=="network-off")line(3,22,22,2);}
             else if(kind=="chevron") { line(8,5,15,12); line(15,12,8,19); }

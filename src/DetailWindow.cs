@@ -26,7 +26,8 @@ namespace OneTaskBar
         internal string StatusText {get{return status.Text;}}
         internal int BodyRows {get{return body.Children.Count;}}
         bool closed,busy,changingMode,changingSamsung;Guid? selectedMode;int samsungMode=-1;
-        internal override bool CanRelease {get{return !busy&&!changingMode&&!changingSamsung&&!checkingSamsung;}}
+        int deviceActions;
+        internal override bool CanRelease {get{return deviceActions==0&&!busy&&!changingMode&&!changingSamsung&&!checkingSamsung;}}
         internal bool TimerActive {get{return ticker.IsEnabled;}}
         internal DetailWindow(ShellController controller,string kind,Func<CancellationToken,Task<WirelessSnapshot>> loader=null)
         {
@@ -38,7 +39,7 @@ namespace OneTaskBar
             refreshButton=Paint.Button(scanIndicator,()=>{Reload();if(page=="power")CheckSamsungAccess(true);},"다시 검색");refreshButton.Width=30;refreshButton.Background=Brushes.Transparent;refreshButton.Padding=new Thickness(0);refreshButton.HorizontalAlignment=HorizontalAlignment.Right;header.Children.Add(refreshButton);DockPanel.SetDock(header,Dock.Top);root.Children.Add(header);
             status.TextWrapping=TextWrapping.Wrap;status.Margin=new Thickness(5,10,5,0);DockPanel.SetDock(status,Dock.Bottom);root.Children.Add(status);
             root.Children.Add(new SmoothScrollViewer {Content=body,VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});Surface.Child=root;
-            Closed+=(s,e)=> {closed=true;ticker.Stop();CancelScan();};Deactivated+=(s,e)=> {if(!Program.Inspectable&&IsVisible&&!IsMouseOver)Hide();};if(!Wireless)Reload();
+            Closed+=(s,e)=> {closed=true;ticker.Stop();CancelScan();};Deactivated+=(s,e)=> {if(deviceActions==0&&!Program.Inspectable&&IsVisible&&!IsMouseOver)Hide();};if(!Wireless)Reload();
             ticker.Tick+=(s,e)=> {if(page=="focus")FocusStatus();else if(page=="power"&&!busy&&!changingMode&&!changingSamsung)RefreshPowerSelection();};
             IsVisibleChanged+=(s,e)=> {if(IsVisible&&(page=="focus"||page=="power"))ticker.Start();else ticker.Stop();if(Wireless){if(IsVisible)Reload();else CancelScan();}else scanIndicator.SetScanning(busy&&IsVisible);};
         }
@@ -97,8 +98,8 @@ namespace OneTaskBar
                     foreach(var network in snapshot.Networks){var item=network;body.Children.Add(WifiNetworkView.Create(item,()=>SelectNetwork(item)));}
                     status.Text=snapshot.Notice??(snapshot.Networks.Count==0?"사용 가능한 네트워크가 없습니다. Wi-Fi 상태를 확인해 주세요.":"저장된 네트워크는 바로 연결합니다. 새 네트워크는 비밀번호를 입력해 연결할 수 있습니다.");
                 }else{
-                    foreach(var device in snapshot.Devices){var item=device;Action(item.Name+"  ·  "+(item.Pairing.IsPaired?"페어링됨 · 해제":"페어링"),async()=>{try{status.Text=await BluetoothOperations.Pair(item);}catch(Exception error){status.Text=error.Message;}});}
-                    status.Text=snapshot.Notice??(snapshot.Devices.Count==0?"주변 기기를 찾지 못했습니다. 기기의 페어링 모드를 켜고 다시 검색해 주세요.":"기기를 눌러 페어링하거나 해제할 수 있습니다. PIN 확인창에서 두 기기의 번호를 확인해 주세요.");
+                    var peers=BluetoothDeviceView.Rows(snapshot.Devices);foreach(bool registered in new[]{true,false}){var rows=peers.Where(p=>p.Paired==registered).ToList();if(rows.Count==0)continue;Text(registered?"등록된 기기":"새 기기");foreach(var peer in rows){var item=peer;Button button=null;button=BluetoothDeviceView.Create(item,()=>SelectBluetooth(item,button));if(item.Paired)button.PreviewMouseRightButtonUp+=(s,e)=>{e.Handled=true;SelectBluetooth(item,button);};body.Children.Add(button);}}
+                    status.Text=snapshot.Notice??(snapshot.Devices.Count==0?"주변 기기를 찾지 못했습니다. 기기의 페어링 모드를 켜고 다시 검색해 주세요.":"새 기기를 눌러 페어링합니다. 등록된 기기는 메뉴에서 연결 관리 또는 제거를 선택할 수 있습니다.");
                 }
             }catch(OperationCanceledException){}catch(Exception error){if(!closed&&revision==scanVersion)status.Text="재검색하지 못했습니다: "+error.Message;}
             finally{if(revision==scanVersion){scan=null;busy=false;refreshButton.IsEnabled=true;scanIndicator.SetScanning(false);}source.Dispose();}
@@ -109,6 +110,12 @@ namespace OneTaskBar
                 var row=new Grid();row.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(42)});row.ColumnDefinitions.Add(new ColumnDefinition());row.Children.Add(new Glyph("phone",28));var text=new StackPanel();text.Children.Add(Paint.TextBlock("인스턴트 핫스팟",14,Paint.Text));text.Children.Add(Paint.TextBlock("Windows에서 기기 선택 · 연결",11,Paint.Muted));Grid.SetColumn(text,1);row.Children.Add(text);var button=Paint.Button(row,OpenInstantHotspot,"Windows 인스턴트 핫스팟 연결 화면 열기");button.Background=QuickPanel.Card;button.HorizontalContentAlignment=HorizontalAlignment.Stretch;button.Padding=new Thickness(13,12,13,12);button.Margin=new Thickness(0,4,0,7);body.Children.Add(button);
             }
             Action((page=="wifi"?"Wi-Fi":"블루투스")+((page=="wifi"?shell.Services.WifiOn:shell.Services.BluetoothOn)==true?" 끄기":" 켜기"),()=>ToggleRadio(page));
+        }
+        async void SelectBluetooth(BluetoothPeer peer,Button button)
+        {
+            if(peer.Device==null||closed)return;
+            if(peer.Paired){var menu=new ContextMenu {PlacementTarget=button};menu.Opened+=(s,e)=>deviceActions++;menu.Closed+=(s,e)=>deviceActions=Math.Max(0,deviceActions-1);var manage=new MenuItem {Header="Windows에서 연결 관리"};manage.Click+=async(s,e)=>{if(await DismissAsync())Native.Open("ms-settings:bluetooth");};menu.Items.Add(manage);var remove=new MenuItem {Header="등록된 기기 제거…"};remove.Click+=async(s,e)=>{deviceActions++;try{if(MessageBox.Show(this,peer.Name+" 기기의 등록을 해제할까요? 다시 사용하려면 페어링해야 합니다.","기기 제거",MessageBoxButton.YesNo,MessageBoxImage.Question)!=MessageBoxResult.Yes)return;button.IsEnabled=false;status.Text=await BluetoothOperations.Pair(peer.Device);if(!closed&&IsVisible)Reload();}catch(Exception error){if(!closed)status.Text=error.Message;}finally{deviceActions=Math.Max(0,deviceActions-1);button.IsEnabled=true;}};menu.Items.Add(remove);menu.IsOpen=true;return;}
+            deviceActions++;button.IsEnabled=false;try{status.Text="페어링 중…";status.Text=await BluetoothOperations.Pair(peer.Device);if(!closed&&IsVisible)Reload();}catch(Exception error){if(!closed)status.Text=error.Message;}finally{deviceActions--;button.IsEnabled=true;}
         }
         async void OpenInstantHotspot(){if(await DismissAsync())Native.Open("ms-availablenetworks:");}
         async void ToggleRadio(string kind)
