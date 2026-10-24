@@ -136,7 +136,7 @@ namespace OneTaskBar
             themeToggle=Paint.Button(themeGlyph,()=>ToggleTheme(),"Windows 다크 모드 전환");themeToggle.Width=themeToggle.Height=44;themeToggle.Padding=new Thickness(0);themeToggle.Background=Brushes.Transparent;themeToggle.Resources["ButtonRadius"]=new CornerRadius(22);
             themeCircle=new Border {Width=44,Height=44,CornerRadius=new CornerRadius(22),Background=Paint.Brush(QuickPanel.Inactive),Child=themeToggle};AddSection("brightness",SliderRow(brightness,themeCircle));
             mute=IconButton("volume",()=>shell.Mute(),"음소거 전환",44);soundGlyphs.Add((Glyph)mute.Content);muteCircle=new Border {Width=44,Height=44,CornerRadius=new CornerRadius(22),Background=Paint.Brush(QuickPanel.Inactive),Child=mute};
-            AddSection("volume",SliderRow(volume,muteCircle));
+            AddSection("volume",SliderRow(volume,muteCircle,()=>shell.ShowDetail("sound")));
             mediaPlayer=new MediaPlayerView(shell.Media,shell.SeekMedia,()=>shell.ShowDetail("sound"),condensed:true,openApp:shell.OpenMediaApplication);
             var mediaCard=Card(mediaPlayer,28,new Thickness(0,0,0,10));mediaPlayer.PaletteChanged=palette=>{mediaCard.Background=mediaPlayer.IsCompact?QuickPanel.Card:mediaPlayer.MediaBackground;mediaCard.CornerRadius=new CornerRadius(mediaPlayer.IsCompact?34:28);};AddSection("media",mediaCard);
             shortcuts=new UniformGrid {Columns=2};var bottomOrder=new ReorderGroup("quick.shortcuts",shortcuts,Orientation.Horizontal,()=>editing,PlacePair);groups.Add(bottomOrder);
@@ -285,10 +285,10 @@ namespace OneTaskBar
             var button=(QuickToggleButton)Paint.Button(new Glyph(icon,20),()=>InvokeToggle(page),label+" 켜기 · 끄기",true);button.Width=button.Height=43;button.Padding=new Thickness(0);button.Resources["ButtonRadius"]=new CornerRadius(21.5);button.Tag=page;button.HorizontalAlignment=HorizontalAlignment.Center;toggleButtons[page]=button;content.Children.Add(button);if(icon=="volume")soundGlyphs.Add((Glyph)button.Content);
             var name=Paint.TextBlock(label,10.5,Paint.Muted);name.HorizontalAlignment=HorizontalAlignment.Center;name.Margin=new Thickness(0,5,0,0);actionNames.Add(name);content.Children.Add(name);return content;
         }
-        static Border SliderRow(PillSlider slider,UIElement action)
+        static Border SliderRow(PillSlider slider,UIElement action,Action output=null)
         {
             var grid=new Grid {Margin=new Thickness(12,9,12,9)};grid.ColumnDefinitions.Add(new ColumnDefinition());grid.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(52)});
-            slider.Height=44;slider.Margin=new Thickness(0,0,8,0);grid.Children.Add(slider);Grid.SetColumn(action,1);grid.Children.Add(action);return Card(grid,34,new Thickness(0,0,0,10));
+            slider.Height=44;slider.Margin=new Thickness(0,0,8,0);grid.Children.Add(output==null?(UIElement)slider:slider.WithOutputAction(output));Grid.SetColumn(action,1);grid.Children.Add(action);return Card(grid,34,new Thickness(0,0,0,10));
         }
         Border WideTile(string icon,string label,string page,Thickness margin)
         {

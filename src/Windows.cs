@@ -30,7 +30,7 @@ namespace OneTaskBar
         readonly Button powerAccess;readonly ColumnDefinition powerColumn;double powerWidth=58;
         readonly ShellController controller;
         readonly Dictionary<IntPtr,Border> indicators=new Dictionary<IntPtr,Border>();
-        sealed class DockCell {internal AppEntry Entry;internal Button Button;internal Border Dot;internal FrameworkElement Icon;internal TranslateTransform Offset=new TranslateTransform();internal double X=Double.NaN;internal bool Leaving;internal int Token;}
+        sealed class DockCell {internal AppEntry Entry;internal Button Button;internal Border Dot;internal Border Icon;internal ImageSource IconSource;internal TranslateTransform Offset=new TranslateTransform();internal double X=Double.NaN;internal bool Leaving;internal int Token;}
         readonly Canvas appCanvas=new Canvas {Height=42,VerticalAlignment=VerticalAlignment.Center,Background=Brushes.Transparent};
         readonly Border pinDivider=new Border {Width=1,Height=24,CornerRadius=new CornerRadius(.5),Background=Brushes.Black,IsHitTestVisible=false};
         readonly TranslateTransform dividerOffset=new TranslateTransform();double dividerX=Double.NaN;
@@ -129,7 +129,7 @@ namespace OneTaskBar
             }
             indicators.Clear();
             for(int i=0;i<shown.Length;i++){
-                var entry=shown[i];DockCell cell;bool added=!cells.TryGetValue(entry.Key,out cell);if(added){cell=CreateCell(entry);cells.Add(entry.Key,cell);appCanvas.Children.Add(cell.Button);}else cell.Entry=entry;
+                var entry=shown[i];DockCell cell;bool added=!cells.TryGetValue(entry.Key,out cell);if(added){cell=CreateCell(entry);cells.Add(entry.Key,cell);appCanvas.Children.Add(cell.Button);}else{cell.Entry=entry;if(!Object.ReferenceEquals(cell.IconSource,entry.Icon)){cell.IconSource=entry.Icon;cell.Icon.Child=entry.Icon!=null?AppIcons.Visual(entry.Icon,30):new Glyph("window",30){Color=Paint.Ink};}if((string)cell.Button.ToolTip!=entry.Name){cell.Button.ToolTip=entry.Name;System.Windows.Automation.AutomationProperties.SetName(cell.Button,entry.Name);}}
                 bool returning=cell.Leaving;cell.Leaving=false;cell.Token++;cell.Button.IsHitTestVisible=true;
                 double x=DockLayout.AppOffset+i*46+(i>=pinned?12:0),oldX=Double.IsNaN(cell.X)?x+16:cell.X+cell.Offset.X;
                 if(added||returning||resetPreview||Math.Abs(cell.X-x)>.01){cell.X=x;Canvas.SetLeft(cell.Button,x);cell.Offset.BeginAnimation(TranslateTransform.XProperty,null);cell.Offset.X=0;cell.Offset.BeginAnimation(TranslateTransform.YProperty,null);cell.Offset.Y=0;
@@ -140,7 +140,7 @@ namespace OneTaskBar
         }
         DockCell CreateCell(AppEntry entry)
         {
-            var cell=new DockCell {Entry=entry};var content=new Grid {Width=44,Height=42};cell.Icon=entry.Icon!=null?AppIcons.Visual(entry.Icon,30):new Glyph("window",30){Color=Paint.Ink};cell.Icon.VerticalAlignment=VerticalAlignment.Top;cell.Icon.Margin=new Thickness(0,4,0,0);RenderOptions.SetBitmapScalingMode(cell.Icon,BitmapScalingMode.HighQuality);content.Children.Add(cell.Icon);
+            var cell=new DockCell {Entry=entry,IconSource=entry.Icon};var content=new Grid {Width=44,Height=42};cell.Icon=new Border {Width=30,Height=30,Child=entry.Icon!=null?AppIcons.Visual(entry.Icon,30):new Glyph("window",30){Color=Paint.Ink}};cell.Icon.VerticalAlignment=VerticalAlignment.Top;cell.Icon.Margin=new Thickness(0,4,0,0);RenderOptions.SetBitmapScalingMode(cell.Icon,BitmapScalingMode.HighQuality);content.Children.Add(cell.Icon);
             cell.Dot=new Border {Width=4,Height=4,CornerRadius=new CornerRadius(2),Background=Paint.Ink,VerticalAlignment=VerticalAlignment.Bottom,HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(0,0,0,2)};content.Children.Add(cell.Dot);
             cell.Button=Paint.Button(content,()=>{controller.Previews.Close();var before=pressedForeground;pressedForeground=IntPtr.Zero;controller.ActivateApp(cell.Entry,cell.Button,before);},entry.Name);cell.Button.Width=46;cell.Button.Height=42;cell.Button.Padding=new Thickness(0);cell.Button.Background=Brushes.Transparent;cell.Button.RenderTransform=cell.Offset;
             cell.Button.MouseEnter+=(s,e)=>{ToolTipService.SetIsEnabled(cell.Button,cell.Entry.Windows.Count==0);controller.Previews.Enter(cell.Entry,cell.Button,this);};cell.Button.MouseLeave+=(s,e)=>{controller.Previews.Leave();ToolTipService.SetIsEnabled(cell.Button,true);};cell.Button.PreviewMouseLeftButtonDown+=(s,e)=>controller.Previews.Close();cell.Button.ContextMenuOpening+=(s,e)=>controller.Previews.Close();
@@ -281,7 +281,7 @@ namespace OneTaskBar
         internal readonly bool Modern=Preferences.Current.UIVersion>=90;
         internal double DisplayHeight {get{return Modern?QuickWidgetBoard.ControlHeight:62;}}
         internal PillSlider Slider {get{return slider;}}
-        internal HudWindow() { Title="One TaskBar · 밝기 및 음량"; Width=286; Height=DisplayHeight; Radius=DisplayHeight/2;Dark=Modern;Surface.Background=Modern?QuickPanel.Glass:GrayPanel.Glass; Surface.CornerRadius=new CornerRadius(Radius); Surface.Child=slider; ShowActivated=false;
+        internal HudWindow() { Title="One TaskBar · 밝기 및 음량"; Width=286; Height=DisplayHeight; Radius=DisplayHeight/2;Dark=Modern;UnifiedFade=true;Surface.Background=Modern?QuickPanel.Glass:GrayPanel.Glass; Surface.CornerRadius=new CornerRadius(Radius); Surface.Child=slider; ShowActivated=false;
             if(Modern){slider.Margin=new Thickness(0);slider.Height=Double.NaN;slider.MinWidth=0;slider.NoTrackBorder=true;slider.LinearFill=true;Surface.BorderThickness=new Thickness(0);Surface.BorderBrush=Brushes.Transparent;}
             SourceInitialized+=(s,e)=> { var h=new WindowInteropHelper(this).Handle; Native.SetWindowLong(h,-20,Native.GetWindowLong(h,-20)|0x80|0x08000000); };
         }

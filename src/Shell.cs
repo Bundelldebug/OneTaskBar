@@ -172,7 +172,7 @@ namespace OneTaskBar
             Audio.Read(); previousVolume=Audio.Value; previousMuted=Audio.Muted; chargeState.Observe(Power.Connected);
             Notifications.Check();
             BackgroundWork.Run(()=>Catalog.Read(false)).ContinueWith(t=>Application.Current.Dispatcher.BeginInvoke(new Action(()=> {
-                if(disposed) return; if(t.Status==TaskStatus.RanToCompletion) Apps=t.Result; else AppLog.Write("apps",t.Exception.ToString());
+                if(disposed) return; if(t.Status==TaskStatus.RanToCompletion){Apps=t.Result;pinsAt=DateTime.MinValue;} else AppLog.Write("apps",t.Exception.ToString());
                 if(StartMenu!=null&&StartMenu.IsVisible)StartMenu.RefreshPins();if(Drawer!=null&&Drawer.IsVisible)Drawer.Reload();if(Finder!=null&&Finder.IsVisible)Finder.Reload(); foreach(var dock in docks) dock.Rebuild();
             })));
             timer.Start(); SetDesktop(desktop);
@@ -207,7 +207,7 @@ namespace OneTaskBar
             if(value) {
                 var imported=ExplorerBridge.ReadApps();if(imported.Count>0){explorerItems=imported;ExplorerBridge.Save(imported);}
                 ExplorerBridge.CacheTray();
-                Running=Catalog.Running();Pins=Catalog.ReadPins(Apps,explorerItems,Running);
+                Running=Catalog.Running(Apps);Pins=Catalog.ReadPins(Apps,explorerItems,Running);
                 lease=DesktopLease.Acquire();
                 TaskbarMask.Active=true;
                 // Watch this process; recovery tokens protect newer desktop leases.
@@ -543,11 +543,11 @@ namespace OneTaskBar
             }
             if(Desktop && now>=appsAt && !runningBusy) {
                 appsAt=now.AddSeconds(5); runningBusy=true;
-                BackgroundWork.Run(()=> {var watch=Stopwatch.StartNew();var running=Catalog.Running();return new {Running=running,Elapsed=watch.Elapsed.TotalMilliseconds};}).ContinueWith(t=>Application.Current.Dispatcher.BeginInvoke(new Action(()=> {
+                var installed=Apps;BackgroundWork.Run(()=> {var watch=Stopwatch.StartNew();var running=Catalog.Running(installed);return new {Running=running,Elapsed=watch.Elapsed.TotalMilliseconds};}).ContinueWith(t=>Application.Current.Dispatcher.BeginInvoke(new Action(()=> {
                     runningBusy=false; if(disposed || t.Status!=TaskStatus.RanToCompletion) return;
-                    string old=String.Join("|",DockApps().Select(a=>a.Key+":"+String.Join(",",a.Windows)));Running=t.Result.Running;lastAppRefreshMs=t.Result.Elapsed;RememberForeground(Native.GetForegroundWindow());
+                    string old=String.Join("|",DockApps().Select(a=>a.Key+":"+String.Join(",",a.Windows)));var oldRunning=Running;Running=t.Result.Running;lastAppRefreshMs=t.Result.Elapsed;RememberForeground(Native.GetForegroundWindow());
                     string fresh=String.Join("|",DockApps().Select(a=>a.Key+":"+String.Join(",",a.Windows)));
-                    if(old!=fresh) foreach(var dock in docks) dock.Rebuild();
+                    if(old!=fresh||Catalog.PresentationChanged(oldRunning,Running)) foreach(var dock in docks) dock.Rebuild();
                 })));
                 Native.HideTaskbars(); DesktopLease.SuppressCharging();
             }
@@ -555,8 +555,8 @@ namespace OneTaskBar
                 BackgroundWork.Run(()=> {var mirror=ExplorerBridge.ReadApps();if(mirror.Count==0)mirror=previousMirror;return new {Mirror=mirror,Pins=Catalog.ReadPins(installed,mirror,running)};}).ContinueWith(t=>Application.Current.Dispatcher.BeginInvoke(new Action(()=> {
                     pinsBusy=false;if(disposed||t.Status!=TaskStatus.RanToCompletion)return;
                     if(revision!=pinRevision){pinsAt=DateTime.MinValue;return;}
-                    var old=String.Join("|",Pins.Select(a=>a.Key));Pins=t.Result.Pins;explorerItems=t.Result.Mirror;ExplorerBridge.Save(explorerItems);
-                    if(old!=String.Join("|",Pins.Select(a=>a.Key)))foreach(var dock in docks)dock.Rebuild();
+                    var old=Pins;Pins=t.Result.Pins;explorerItems=t.Result.Mirror;ExplorerBridge.Save(explorerItems);
+                    if(Catalog.PresentationChanged(old,Pins))foreach(var dock in docks)dock.Rebuild();
                 })));}
             ++iteration;if(now>=liveStateAt){liveStateAt=now.AddSeconds(30);AppLog.Json("live-state.json",new {time=DateTimeOffset.Now.ToString("o"),sequence=iteration,pulseMilliseconds=cadence,desktop=Desktop,battery=Power.Level,connected=Power.Connected,volume=Audio.Value,muted=Audio.Muted,brightness=Brightness,displays=docks.Count,apps=Apps.Count,pinned=Pins.Count,running=Running.Count,appRefreshMs=Math.Round(lastAppRefreshMs,1),wifi=Services.WifiOn,bluetooth=Services.BluetoothOn,media=Services.Media.Title,mediaActive=Services.Media.Active,retiredPanels=RetiredPanels,managedBytes=GC.GetTotalMemory(false),backdropCount=LiveBackdrop.InstanceCount,windowCount=Application.Current.Windows.Count,output=Services.OutputName,wifiSignal=WifiSignal,packaged=Notifications.Packaged,notificationsAllowed=Notifications.Allowed,cachedIcons=AppIcons.CachedCount,ecoWorkers=BackgroundWork.EcoWorkers,backgroundJobs=BackgroundWork.Completed,mediaMetadataReads=Services.MetadataReads,notificationSnapshotReads=Notifications.SnapshotReads,notificationCount=Notifications.Items.Count,inspectable=Program.Inspectable,quick=Quick!=null?Native.RegionInfo(Quick):null,center=Center!=null?Native.RegionInfo(Center):null,docks=docks.Select(d=>d.Inspect()).ToArray()});}
         }
@@ -603,7 +603,7 @@ namespace OneTaskBar
             bool position=!hud.IsVisible||hudScreen!=screen.DeviceName;
             if(hudScreen!=screen.DeviceName){new WindowInteropHelper(hud).EnsureHandle();Native.SetWindowPos(new WindowInteropHelper(hud).Handle,IntPtr.Zero,screen.Bounds.Left+20,screen.Bounds.Top+20,0,0,0x1|0x4|0x10);hudScale=Math.Max(96,Native.GetDpiForWindow(new WindowInteropHelper(hud).Handle))/96.0;hudScreen=screen.DeviceName;}
             double scale=hudScale,bottom=(screen.Bounds.Bottom-screen.WorkingArea.Bottom)/scale;
-            hud.Set(kind,value,muted,Services.OutputName);if(position)hud.ShowAt(screen.Bounds,(screen.Bounds.Width/scale-286)/2,screen.Bounds.Height/scale-Math.Max(bottom,64)-hud.DisplayHeight-20,286,hud.DisplayHeight);if(volumeStart&&!Demo)RefreshHudOutput(++hudOutputRevision);
+            hud.Set(kind,value,muted,Services.OutputName);if(position)hud.ShowAt(screen.Bounds,(screen.Bounds.Width/scale-286)/2,screen.Bounds.Height/scale-Math.Max(bottom,64)-hud.DisplayHeight-20,286,hud.DisplayHeight);else if(hud.IsDismissing)hud.Show();if(volumeStart&&!Demo)RefreshHudOutput(++hudOutputRevision);
             hudUntil=DateTime.UtcNow.AddSeconds(1.5);
         }
         async void RefreshHudOutput(int revision){try{string output=await BackgroundWork.Run(Native.DefaultAudioOutputName);if(!disposed&&revision==hudOutputRevision&&hud!=null&&hud.IsVisible&&HudKind=="volume"){Services.OutputName=output;hud.Set("volume",Audio.Value,Audio.Muted,output);}}catch(Exception error){AppLog.Once("hud-output-name",error.GetType().Name);}}

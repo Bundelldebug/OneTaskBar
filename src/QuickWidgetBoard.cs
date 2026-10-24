@@ -58,7 +58,7 @@ namespace OneTaskBar
         internal event Action Changed;
         internal ScrollViewer Scroller;
         const double Gap=10;
-        internal const double ControlHeight=64;
+        internal const double ControlHeight=60;
         double step=86,rowStep=74;string active;bool resize;
         Point origin;QuickWidgetSlot original;List<QuickWidgetSlot> before;
         readonly DispatcherTimer scroll=new DispatcherTimer {Interval=TimeSpan.FromMilliseconds(35)};

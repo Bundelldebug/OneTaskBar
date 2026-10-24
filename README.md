@@ -88,12 +88,13 @@ Code and the original One TaskBar icon are under the [MIT license](LICENSE). [Th
 
 Production signing is not active. The maintainer reported on 2026-10-24 that SignPath Foundation declined the application; no usable certificate was issued. See the [Code signing policy and privacy details](docs/CODE_SIGNING.md). Unsigned development artifacts are not production-signed releases.
 
-## 9.0.0 beta 1 (unsigned development build)
+## 9.0.0 (unsigned release candidate)
 
-- The first group in app settings selects **UI version: 8.5 / 9.0 beta**. Existing installations retain 8.5; the new grid uses a separate `quick-layout-9.json`. Switching versions or resetting the new grid preserves the original order and dimensions.
+- The first group in app settings selects **UI version: 8.5 / 9.0**. Existing installations retain 8.5; the new grid uses a separate `quick-layout-9.json`. Switching versions or resetting the new grid preserves the original order and dimensions.
 - In **Edit layout**, drag each quick-settings widget to move it and drag its corner to resize it. Regular widgets support 1–4 columns and 1–5 rows on a four-column grid. A 1×1 widget is circular. Overlapping neighbors move down, with scrolling for longer layouts.
 - Brightness and volume are borderless, independent from the dark-mode and mute widgets. Each supports horizontal 1×1–4×1 or vertical 1×1–1×5. Buds output symbols and the separate speaker mute button retain their existing behavior.
-- The medium control height is 64 DIP, shared by the keyboard volume/brightness HUD. Feature toggles expand inside the panel into the original ten-icon labeled grid, then restore the saved dimensions and positions on collapse.
+- Control height is slightly reduced to 60 DIP, with sliders and adjacent circular controls sharing a centerline. The keyboard volume/brightness HUD uses the same dimensions. Feature toggles expand inside the panel into the original ten-icon labeled grid, then restore the saved dimensions and positions on collapse.
+- The leading volume icon opens **Sound and output** without changing volume. Keyboard HUD fill, outline, tint and live backdrop dismiss with one opacity value; renewed input cancels dismissal. Quick-settings glass is more transparent.
 - Use **Edit layout → Edit in the feature-toggle group** to reorder its contents by dragging or arrow keys. The collapsed group shows the first four saved entries. Default circles are 48 DIP and adapt to narrow layouts without clipping. The order uses a separate `quick-toggle-order-9.json`.
 - In the internal editor, drag a toggle outside the group or right-click **Extract as a standalone toggle**. In layout editing, right-click a standalone toggle to **Put in feature-toggle group**. Collapsed circles have symmetric spacing and vertical centering.
 - UI 9 offers **Nearby devices** and **Galaxy Buds** as separate widgets that can coexist. UI 8.5 retains its replacement preference. **Settings → Desktop → Solid taskbar background** gives only the bottom dock an opaque gray surface without blur.
@@ -101,9 +102,10 @@ Production signing is not active. The maintainer reported on 2026-10-24 that Sig
 - The media widget has a minimum editable size of 2×2. Only the default 4×2 size temporarily contracts to one row when no media session is active, bringing lower widgets up. Active/paused sessions, custom sizes and editing retain the saved dimensions; presentation changes are never saved over the user layout.
 - Quick-settings media restores the large blurred artwork background. Compact cards prioritize metadata and transport controls; taller cards switch to a large cover layout without scaling down the entire interface. Missing artwork hides the image background.
 - Stale development Electron pins adopt the current Windows display name and native shortcut icon only when exactly one replacement exists in the same install folder. Pin identities and positions are preserved; ambiguous matches remain untouched.
+- Dock cells refresh late-arriving names/icons without replacing their animated button. Loading the native catalog triggers pin resolution; running-app metadata retains its window handles and activation behavior.
 - Home-shaped icons identify One TaskBar settings in quick settings, Start, search and the dock menu. Windows Settings and installed Samsung Settings keep their own icons.
 - Arrow keys move/resize focused edit handles; Escape cancels the current drag. Hidden widgets return through **Add item**. Right-click or Shift+F10 opens connection management on a 1×1 Wi-Fi/Bluetooth widget.
-- Beta source metadata is not a published release. Provider signing approval and final distribution validation are still required.
+- Version metadata does not mean a release has been published. No signing certificate is available; publishing an unsigned stable release requires separate maintainer authorization and clear release notes describing the validation limits.
 
 ## 8.5.7 (development; signed release pending)
 

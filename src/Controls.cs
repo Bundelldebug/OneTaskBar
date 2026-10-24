@@ -17,7 +17,7 @@ namespace OneTaskBar
     internal static class QuickPanel
     {
         // Black tint over the live host backdrop keeps background color without a milky layer.
-        internal static readonly Brush Glass=LightPanel.Tint("#A0000000","#94000000","#9E000000"),Card=Paint.Brush("#18FFFFFF");
+        internal static readonly Brush Glass=LightPanel.Tint("#80000000","#74000000","#7E000000"),Card=Paint.Brush("#18FFFFFF");
         internal const string Inactive="#2A000000";
     }
     internal static class GrayPanel
@@ -191,6 +191,12 @@ namespace OneTaskBar
         public bool ShowIcon=true,Slim,WheelAdjust=true;
         internal bool Vertical,NoTrackBorder,LinearFill;
         public event Action<double> Changed;
+        internal Button OutputButton {get;private set;}
+        internal FrameworkElement WithOutputAction(Action action)
+        {
+            var root=new Grid();root.Children.Add(this);OutputButton=Paint.Button(new Border(),action,"소리 및 출력");OutputButton.Padding=new Thickness(0);OutputButton.Background=Brushes.Transparent;OutputButton.Resources["ButtonRadius"]=new CornerRadius(40);root.Children.Add(OutputButton);
+            Action place=()=>{double size=Math.Max(0,Math.Min(ActualWidth,ActualHeight));OutputButton.Width=OutputButton.Height=size;OutputButton.Margin=Margin;OutputButton.HorizontalAlignment=Vertical?HorizontalAlignment.Center:HorizontalAlignment.Left;OutputButton.VerticalAlignment=Vertical?VerticalAlignment.Bottom:VerticalAlignment.Center;};SizeChanged+=(s,e)=>place();OutputButton.PreviewMouseWheel+=(s,e)=>{if(IsEnabled)OnMouseWheel(e);};return root;
+        }
         public double Value { get { return value; } set { double next=Clamp(value);if(this.value==next)return;this.value=next;double from=(double)GetValue(DisplayValueProperty);BeginAnimation(DisplayValueProperty,null);SetValue(DisplayValueProperty,next);if(AnimateValue&&!dragging&&Motion.Enabled&&IsVisible&&PresentationSource.FromVisual(this)!=null)BeginAnimation(DisplayValueProperty,Motion.Tween(from,next,160));InvalidateVisual(); } }
         public static double Clamp(double value) { return Double.IsNaN(value) || Double.IsInfinity(value) ? 0 : Math.Max(0,Math.Min(100,value)); }
         public static double FillWidth(double width,double value) { return Math.Max(0,width)*Clamp(value)/100; }
@@ -245,7 +251,9 @@ namespace OneTaskBar
         int motion;bool closed,hiding;Brush glassTint,solidTint;TaskCompletionSource<bool> dismissal;
         public readonly Border Surface;
         public double Radius=28; public bool Dark=true; public bool HasBlur;internal bool SoftCorners=true,OpaqueSurface,DockSurface;
-        internal bool StableSurface=true;internal FrameworkElement TransitionContent;
+        internal bool StableSurface=true,UnifiedFade;internal FrameworkElement TransitionContent;
+        static readonly DependencyProperty SurfaceFadeProperty=DependencyProperty.Register("SurfaceFade",typeof(double),typeof(GlassWindow),new PropertyMetadata(1.0,(d,e)=>{var window=(GlassWindow)d;if(window.Surface!=null)window.Surface.Opacity=(double)e.NewValue;Native.BlurOpacity(window,(double)e.NewValue);}));
+        void ResetFade(){BeginAnimation(SurfaceFadeProperty,null);SetValue(SurfaceFadeProperty,1.0);Surface.Opacity=1;Native.BlurOpacity(this,1);}
         internal Rect? BackdropClip;
         internal bool IsDismissing {get{return hiding;}}
         internal DateTime HiddenSince=DateTime.UtcNow;
@@ -292,7 +300,7 @@ namespace OneTaskBar
             new WindowInteropHelper(this).EnsureHandle(); Native.Place(this,screen,x,y,width,height); Show();
             Native.Place(this,screen,x,y,width,height);UpdateLayout(); Native.Round(this,Radius);
         }
-        public new void Show() {bool resume=StableSurface&&IsVisible&&hiding;++motion;hiding=false;CompleteDismissal(false);Surface.IsHitTestVisible=true;Surface.BeginAnimation(UIElement.OpacityProperty,null);Surface.Opacity=1;Surface.RenderTransform=Transform.Identity;if(StableSurface&&TransitionContent!=null&&!resume){TransitionContent.BeginAnimation(OpacityProperty,null);TransitionContent.Opacity=1;TransitionContent.RenderTransform=Transform.Identity;}base.Show();}
+        public new void Show() {bool resume=StableSurface&&IsVisible&&hiding;++motion;hiding=false;CompleteDismissal(false);if(UnifiedFade)ResetFade();Surface.IsHitTestVisible=true;Surface.BeginAnimation(UIElement.OpacityProperty,null);Surface.Opacity=1;Surface.RenderTransform=Transform.Identity;if(StableSurface&&TransitionContent!=null&&!resume){TransitionContent.BeginAnimation(OpacityProperty,null);TransitionContent.Opacity=1;TransitionContent.RenderTransform=Transform.Identity;}base.Show();}
         public void Pop()
         {
             if(TransitionContent==null)TransitionContent=Surface.Child as FrameworkElement;
@@ -307,6 +315,7 @@ namespace OneTaskBar
             if(TransitionContent==null)TransitionContent=Surface.Child as FrameworkElement;
             if(closed||!IsVisible){CompleteDismissal(!closed);return;}if(hiding)return;
             if(!Motion.Enabled){base.Hide();CompleteDismissal(true);return;}
+            if(UnifiedFade){hiding=true;Surface.IsHitTestVisible=false;int fadeToken=++motion;double from=(double)GetValue(SurfaceFadeProperty);SetValue(SurfaceFadeProperty,0.0);var fade=Motion.Tween(from,0,145);fade.Completed+=(s,e)=>{if(!closed&&fadeToken==motion){base.Hide();hiding=false;Surface.IsHitTestVisible=true;ResetFade();CompleteDismissal(true);}};BeginAnimation(SurfaceFadeProperty,fade);return;}
             if(StableSurface&&TransitionContent!=null){hiding=true;Surface.IsHitTestVisible=false;int contentToken=++motion;var fade=Motion.Launcher(TransitionContent,false);fade.Completed+=(s,e)=> {if(!closed&&contentToken==motion){base.Hide();hiding=false;Surface.IsHitTestVisible=true;TransitionContent.BeginAnimation(OpacityProperty,null);TransitionContent.Opacity=1;TransitionContent.RenderTransform=Transform.Identity;CompleteDismissal(true);}};TransitionContent.BeginAnimation(OpacityProperty,fade);return;}
             hiding=true;Surface.IsHitTestVisible=false;int token=++motion;Surface.RenderTransformOrigin=new Point(.85,1);var scale=new ScaleTransform(1,1);var shift=new TranslateTransform();var group=new TransformGroup();group.Children.Add(scale);group.Children.Add(shift);Surface.RenderTransform=group;
             scale.BeginAnimation(ScaleTransform.ScaleXProperty,new DoubleAnimation(.97,TimeSpan.FromMilliseconds(180)));scale.BeginAnimation(ScaleTransform.ScaleYProperty,new DoubleAnimation(.97,TimeSpan.FromMilliseconds(180)));shift.BeginAnimation(TranslateTransform.YProperty,new DoubleAnimation(9,TimeSpan.FromMilliseconds(180)));
@@ -318,7 +327,7 @@ namespace OneTaskBar
             if(closed)return Task.FromResult(false);if(!IsVisible)return Task.FromResult(true);
             if(dismissal==null)dismissal=new TaskCompletionSource<bool>();var pending=dismissal.Task;Hide();return pending;
         }
-        internal void HideImmediately(){++motion;hiding=false;Surface.BeginAnimation(OpacityProperty,null);Surface.Opacity=1;Surface.RenderTransform=Transform.Identity;Surface.IsHitTestVisible=true;if(TransitionContent!=null){TransitionContent.BeginAnimation(OpacityProperty,null);TransitionContent.Opacity=1;TransitionContent.RenderTransform=Transform.Identity;}base.Hide();CompleteDismissal(true);}
+        internal void HideImmediately(){++motion;hiding=false;if(UnifiedFade)ResetFade();Surface.BeginAnimation(OpacityProperty,null);Surface.Opacity=1;Surface.RenderTransform=Transform.Identity;Surface.IsHitTestVisible=true;if(TransitionContent!=null){TransitionContent.BeginAnimation(OpacityProperty,null);TransitionContent.Opacity=1;TransitionContent.RenderTransform=Transform.Identity;}base.Hide();CompleteDismissal(true);}
         void CompleteDismissal(bool completed) {var pending=dismissal;dismissal=null;if(pending!=null)pending.TrySetResult(completed);}
     }
 }
