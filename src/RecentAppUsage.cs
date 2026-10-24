@@ -13,7 +13,7 @@ namespace OneTaskBar
         readonly DispatcherTimer save=new DispatcherTimer {Interval=TimeSpan.FromSeconds(2)};bool dirty,disposed;
         internal RecentAppUsage(string path){file=path;try{if(File.Exists(file))foreach(var item in new JavaScriptSerializer().Deserialize<List<RecentAppUse>>(File.ReadAllText(file))??new List<RecentAppUse>())if(!String.IsNullOrWhiteSpace(item.Key)&&item.Key.Length<=32768&&item.UsedUtcTicks>0&&item.UsedUtcTicks<=DateTime.MaxValue.Ticks)times[item.Key]=item.UsedUtcTicks;Trim();}catch(Exception error){AppLog.Once("recent-apps-read",error.Message);}save.Tick+=(s,e)=>Flush();}
         internal void Record(AppEntry entry){Record(entry,DateTime.UtcNow);}
-        internal void Record(AppEntry entry,DateTime utc){if(disposed||entry==null||String.IsNullOrWhiteSpace(entry.Key)||!ApplicationEntry(entry))return;times[entry.Key]=utc.Ticks;Trim();dirty=true;save.Stop();save.Start();}
+        internal void Record(AppEntry entry,DateTime utc){if(disposed||entry==null||String.IsNullOrWhiteSpace(entry.Key)||!ApplicationEntry(entry))return;string key=entry.StoredKey==null?entry.Key:entry.AppID??entry.Target;if(String.IsNullOrWhiteSpace(key))return;times[key]=utc.Ticks;Trim();dirty=true;save.Stop();save.Start();}
         static bool ApplicationEntry(AppEntry entry){if(!String.IsNullOrEmpty(entry.AppID))return true;try{return String.Equals(Path.GetExtension(entry.Executable??entry.Target),".exe",StringComparison.OrdinalIgnoreCase);}catch{return false;}}
         void Trim(){foreach(string key in times.OrderByDescending(p=>p.Value).Skip(Limit).Select(p=>p.Key).ToArray())times.Remove(key);}
         internal List<AppEntry> Recommend(IEnumerable<AppEntry> installed,IEnumerable<AppEntry> running,int count=8)

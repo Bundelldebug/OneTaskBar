@@ -15,7 +15,7 @@ namespace OneTaskBar
     internal sealed class QuickWidgetLayout
     {
         internal const int Columns=4,MaximumHeight=5,MaximumRow=96;
-        internal static readonly string[] Keys={"wifi","bluetooth","toggles","brightness","theme","volume","mute","media","devices","windows","capture","manager"};
+        internal static readonly string[] Keys={"wifi","bluetooth","toggles","brightness","theme","volume","mute","media","devices","buds","windows","capture","manager","dnd","efficiency","awake","animations","startup","slider-scroll"};
         readonly string file;readonly bool presentation;
         internal List<QuickWidgetSlot> Items {get;private set;}
         internal QuickWidgetLayout(string path,bool presentation=false){file=path;this.presentation=presentation;Reset(false);try{if(File.Exists(file)&&new FileInfo(file).Length<=65536){var saved=new JavaScriptSerializer {MaxJsonLength=65536}.Deserialize<List<QuickWidgetSlot>>(File.ReadAllText(file));Restore(saved);}}catch(Exception e){AppLog.Once("quick9-layout-read",e.GetType().Name);}}
@@ -36,9 +36,9 @@ namespace OneTaskBar
         internal void Reset(bool save=true){Items=Defaults();if(save)Save();}
         static List<QuickWidgetSlot> Defaults()
         {
-            return new List<QuickWidgetSlot>{Slot("wifi",0,0,2,1),Slot("bluetooth",2,0,2,1),Slot("toggles",0,1,4,1),Slot("brightness",0,2,3,1),Slot("theme",3,2,1,1),Slot("volume",0,3,3,1),Slot("mute",3,3,1,1),Slot("media",0,4,4,2),Slot("devices",0,6,2,1),Slot("windows",2,6,2,1),Slot("capture",0,7,2,1),Slot("manager",2,7,2,1)};
+            return new List<QuickWidgetSlot>{Slot("wifi",0,0,2,1),Slot("bluetooth",2,0,2,1),Slot("toggles",0,1,4,1),Slot("brightness",0,2,3,1),Slot("theme",3,2,1,1),Slot("volume",0,3,3,1),Slot("mute",3,3,1,1),Slot("media",0,4,4,2),Slot("devices",0,6,2,1),Slot("buds",2,6,2,1),Slot("windows",0,7,2,1),Slot("capture",2,7,2,1),Slot("manager",0,8,2,1),Slot("dnd",0,9,1,1,true),Slot("efficiency",1,9,1,1,true),Slot("awake",2,9,1,1,true),Slot("animations",3,9,1,1,true),Slot("startup",0,10,1,1,true),Slot("slider-scroll",1,10,1,1,true)};
         }
-        static QuickWidgetSlot Slot(string key,int x,int y,int w,int h){return new QuickWidgetSlot {Key=key,X=x,Y=y,Columns=w,Rows=h};}
+        static QuickWidgetSlot Slot(string key,int x,int y,int w,int h,bool hidden=false){return new QuickWidgetSlot {Key=key,X=x,Y=y,Columns=w,Rows=h,Hidden=hidden};}
         internal bool Move(string key,int x,int y)
         {
             var item=Find(key);if(item==null||item.Hidden)return false;x=Clamp(x,0,4-item.Columns);y=Clamp(y,0,MaximumRow);if(item.X==x&&item.Y==y)return false;item.X=x;item.Y=y;Pack(item);return true;

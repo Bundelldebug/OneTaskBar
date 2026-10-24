@@ -14,6 +14,7 @@ namespace OneTaskBar
         public bool BudsConnectionPopups=true;
         public bool QuickGalaxyBuds=false;
         public int UIVersion=85;
+        public bool DockSolidBackground=false;
         public bool NativeStartKey=true,NativeSearch=false;
         public bool NativeStartButton=false;
         public bool QuickSliderScroll=false;

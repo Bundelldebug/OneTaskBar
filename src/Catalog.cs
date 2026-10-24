@@ -15,10 +15,10 @@ namespace OneTaskBar
         public string Name {get;set;} public string AppID {get;set;} public string Target {get;set;}
         public ImageSource Icon;
         public readonly List<IntPtr> Windows=new List<IntPtr>();
-        internal string Executable;internal long StartedUtcTicks;
+        internal string Executable,StoredKey;internal long StartedUtcTicks;
         internal bool Pinned;
         internal TaskbarItem ExplorerItem;
-        public string Key { get { return !String.IsNullOrEmpty(AppID) ? AppID : Target; } }
+        public string Key { get { return StoredKey??(!String.IsNullOrEmpty(AppID) ? AppID : Target); } }
         public void Launch()
         {
             if(Windows.Count>0) { Native.Activate(Windows[0]); return; }
@@ -30,7 +30,7 @@ namespace OneTaskBar
         }
         internal AppEntry Copy()
         {
-            var result=new AppEntry {Name=Name,AppID=AppID,Target=Target,Icon=Icon,Executable=Executable,Pinned=Pinned,ExplorerItem=ExplorerItem,StartedUtcTicks=StartedUtcTicks};
+            var result=new AppEntry {Name=Name,AppID=AppID,Target=Target,Icon=Icon,Executable=Executable,StoredKey=StoredKey,Pinned=Pinned,ExplorerItem=ExplorerItem,StartedUtcTicks=StartedUtcTicks};
             result.Windows.AddRange(Windows.Where(Native.IsWindow)); return result;
         }
         public void LoadIcon()
@@ -50,7 +50,7 @@ namespace OneTaskBar
                 using(p) { p.Start(); BackgroundWork.HintChild(p); if(!p.WaitForExit(25000)) { p.Kill(); AppLog.Write("catalog","Get-StartApps timed out"); } }
                 if(File.Exists(cache)) {
                     var rows=new JavaScriptSerializer().Deserialize<List<AppEntry>>(File.ReadAllText(cache,Encoding.UTF8));
-                    if(rows!=null && rows.Count>0) {foreach(var item in rows.Where(a=>!String.IsNullOrEmpty(a.AppID)&&!a.AppID.Contains("!"))){var shortcut=WebAppIcons.LaunchShortcut(item.AppID,item.Name);if(shortcut!=null&&shortcut.Target.EndsWith(".exe",StringComparison.OrdinalIgnoreCase)&&File.Exists(shortcut.Target)){item.Target=shortcut.File;item.Executable=shortcut.Target;}}if(loadIcons)Parallel.ForEach(rows,new ParallelOptions {MaxDegreeOfParallelism=3},item=>item.LoadIcon()); return rows.OrderBy(a=>a.Name,StringComparer.CurrentCultureIgnoreCase).ToList(); }
+                    if(rows!=null && rows.Count>0) {foreach(var item in rows.Where(a=>!String.IsNullOrEmpty(a.AppID)&&!a.AppID.Contains("!"))){bool direct=Path.IsPathRooted(item.AppID)&&File.Exists(item.AppID);if(direct)item.Target=item.Executable=item.AppID;var shortcut=WebAppIcons.LaunchShortcut(item.AppID,item.Name);if(shortcut!=null&&shortcut.Target.EndsWith(".exe",StringComparison.OrdinalIgnoreCase)&&File.Exists(shortcut.Target)&&(!direct||String.Equals(shortcut.Target,item.AppID,StringComparison.OrdinalIgnoreCase))){item.Target=shortcut.File;item.Executable=shortcut.Target;}}if(loadIcons)Parallel.ForEach(rows,new ParallelOptions {MaxDegreeOfParallelism=3},item=>item.LoadIcon()); return rows.OrderBy(a=>a.Name,StringComparer.CurrentCultureIgnoreCase).ToList(); }
                 }
             } catch(Exception e) { AppLog.Write("catalog",e.Message); }
             var fallback=new List<AppEntry> { new AppEntry { Name="파일 탐색기",Target="explorer.exe" },new AppEntry { Name="설정",Target="ms-settings:" },new AppEntry { Name="메모장",Target="notepad.exe" } };
@@ -86,6 +86,20 @@ namespace OneTaskBar
             if(!String.IsNullOrEmpty(a.AppID) && !String.IsNullOrEmpty(b.AppID)) return String.Equals(a.AppID,b.AppID,StringComparison.OrdinalIgnoreCase);
             string x=a.Executable??a.Target,y=b.Executable??b.Target;
             return !String.IsNullOrEmpty(x)&&!String.IsNullOrEmpty(y)&&String.Equals(x,y,StringComparison.OrdinalIgnoreCase);
+        }
+        internal static AppEntry ResolveInstalled(AppEntry saved,IEnumerable<AppEntry> installed)
+        {
+            var apps=installed.ToList();var known=apps.FirstOrDefault(a=>String.Equals(a.Key,saved.Key,StringComparison.OrdinalIgnoreCase))??apps.FirstOrDefault(a=>Same(a,saved));
+            string old=saved.Executable??saved.Target;
+            string folder=ExecutableFolder(old,true);
+            if(known==null&&folder!=null){
+                var aliases=apps.Where(a=>String.Equals(ExecutableFolder(a.Executable??a.Target??a.AppID,false),folder,StringComparison.OrdinalIgnoreCase)).Take(2).ToArray();if(aliases.Length==1)known=aliases[0];
+            }
+            if(known==null)return saved.Copy();var result=known.Copy();result.StoredKey=saved.Key;return result;
+        }
+        static string ExecutableFolder(string path,bool electron)
+        {
+            try{if(String.IsNullOrEmpty(path)||!Path.IsPathRooted(path)||!path.EndsWith(".exe",StringComparison.OrdinalIgnoreCase)||String.Equals(Path.GetFileNameWithoutExtension(path),"electron",StringComparison.OrdinalIgnoreCase)!=electron)return null;return Path.GetDirectoryName(Path.GetFullPath(path));}catch(ArgumentException){return null;}catch(NotSupportedException){return null;}catch(PathTooLongException){return null;}
         }
         internal static List<AppEntry> Merge(IEnumerable<AppEntry> pinned,IEnumerable<AppEntry> running)
         {
@@ -126,7 +140,7 @@ namespace OneTaskBar
                 foreach(var preference in preferences.Where(p=>p.Hidden)) ordered.RemoveAll(a=>String.Equals(a.Key,preference.Key,StringComparison.OrdinalIgnoreCase));
                 foreach(var preference in preferences.Where(p=>!p.Hidden)) if(!ordered.Any(a=>String.Equals(a.Key,preference.Key,StringComparison.OrdinalIgnoreCase))) {
                     var found=installed.FirstOrDefault(a=>String.Equals(a.Key,preference.Key,StringComparison.OrdinalIgnoreCase));
-                    var entry=found!=null ? found.Copy() : new AppEntry {Name=preference.Name,Target=preference.Target,AppID=preference.AppID,Executable=preference.Executable};
+                    var entry=found!=null ? found.Copy() : ResolveInstalled(new AppEntry {Name=preference.Name,Target=preference.Target,AppID=preference.AppID,Executable=preference.Executable},installed);
                     entry.Pinned=true; entry.LoadIcon(); ordered.Add(entry);
                 }
             }} catch(Exception e) {AppLog.Write("pins",e.Message);}

@@ -50,7 +50,7 @@ namespace OneTaskBar
         internal List<StartTile> Tiles(List<AppEntry> apps)
         {
             Seed(apps);var known=apps.Where(a=>!String.IsNullOrEmpty(a.Key)).GroupBy(a=>a.Key,StringComparer.OrdinalIgnoreCase).ToDictionary(g=>g.Key,g=>g.First(),StringComparer.OrdinalIgnoreCase);
-            Func<StartPinNode,StartTile> leaf=node=> {AppEntry app;return new StartTile {Key=node.Key,Name=node.Name,App=known.TryGetValue(node.Key,out app)?app.Copy():new AppEntry {Name=node.Name,AppID=node.AppID,Target=node.Target,Executable=node.Executable}};};
+            Func<StartPinNode,StartTile> leaf=node=> {AppEntry app;if(known.TryGetValue(node.Key,out app))app=app.Copy();else app=Catalog.ResolveInstalled(new AppEntry {Name=node.Name,AppID=node.AppID,Target=node.Target,Executable=node.Executable},apps);return new StartTile {Key=node.Key,Name=app.Name??node.Name,App=app};};
             return items.Select(n=>n.Folder?new StartTile {Key=n.Key,Name=n.Name,Children=n.Children.Select(leaf).ToList()}:leaf(n)).ToList();
         }
         internal void Set(AppEntry app,bool pin)

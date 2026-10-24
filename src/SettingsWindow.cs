@@ -16,6 +16,7 @@ namespace OneTaskBar
     {
         readonly ShellController shell;
         bool releasing;
+        FrameworkElement legacyBudsOption,independentBudsHint;
         internal void ReleaseIdle(){releasing=true;Close();}
         readonly ToggleSwitch desktop,startup,autoHide;
         readonly TextBlock status=Paint.TextBlock("변경한 설정은 바로 적용되고 다음 실행에도 유지됩니다",11,Paint.Muted);
@@ -34,11 +35,12 @@ namespace OneTaskBar
             var quick=Paint.Action("빠른 설정",()=>shell.ToggleQuick(null));quick.HorizontalAlignment=HorizontalAlignment.Left;actions.Children.Add(quick);footer.Children.Add(actions);DockPanel.SetDock(footer,Dock.Bottom);root.Children.Add(footer);
             var groups=new StackPanel();
             var uiRows=new StackPanel();var versions=new UniformGrid {Columns=2,Margin=new Thickness(12,8,12,8)};var legacy=Paint.Action("8.5",()=>{});var modern=Paint.Action("9.0 베타",()=>{});
-            Action showVersion=()=>{bool current=Preferences.Current.UIVersion>=90;legacy.Background=current?AppSettingsPalette.AccentLight:AppSettingsPalette.Accent;modern.Background=current?AppSettingsPalette.Accent:AppSettingsPalette.AccentLight;legacy.Foreground=current?AppSettingsPalette.Text:Paint.ControlWhite;modern.Foreground=current?Paint.ControlWhite:AppSettingsPalette.Text;((TextBlock)legacy.Content).Foreground=legacy.Foreground;((TextBlock)modern.Content).Foreground=modern.Foreground;};
+            Action showVersion=()=>{bool current=Preferences.Current.UIVersion>=90;legacy.Background=current?AppSettingsPalette.AccentLight:AppSettingsPalette.Accent;modern.Background=current?AppSettingsPalette.Accent:AppSettingsPalette.AccentLight;legacy.Foreground=current?AppSettingsPalette.Text:Paint.ControlWhite;modern.Foreground=current?Paint.ControlWhite:AppSettingsPalette.Text;((TextBlock)legacy.Content).Foreground=legacy.Foreground;((TextBlock)modern.Content).Foreground=modern.Foreground;if(legacyBudsOption!=null)legacyBudsOption.Visibility=current?Visibility.Collapsed:Visibility.Visible;if(independentBudsHint!=null)independentBudsHint.Visibility=current?Visibility.Visible:Visibility.Collapsed;};
             legacy.Click+=(s,e)=>{Preferences.Set(p=>p.UIVersion=85);showVersion();};modern.Click+=(s,e)=>{Preferences.Set(p=>p.UIVersion=90);showVersion();};legacy.Margin=new Thickness(0,0,5,0);modern.Margin=new Thickness(5,0,0,0);legacy.Height=modern.Height=44;System.Windows.Automation.AutomationProperties.SetName(legacy,"UI 버전 8.5");System.Windows.Automation.AutomationProperties.SetName(modern,"UI 버전 9.0 베타");versions.Children.Add(legacy);versions.Children.Add(modern);uiRows.Children.Add(versions);var uiHint=Paint.TextBlock("8.5 배치와 9.0 개별 메뉴 배치는 따로 저장됩니다",12.5,AppSettingsPalette.Muted);uiHint.Margin=new Thickness(14,0,14,14);uiHint.TextWrapping=TextWrapping.Wrap;uiRows.Children.Add(uiHint);Group(groups,"UI 버전",uiRows);showVersion();
             var desktopRows=new StackPanel();desktop=Row(desktopRows,"Windows 작업표시줄 대체","기본 작업표시줄과 전환합니다",shell.Desktop,v=> {shell.SetDesktop(v);Show();Activate();});
             autoHide=Row(desktopRows,"작업표시줄 자동 숨기기","Windows 설정과 함께 적용됩니다. 화면 아래쪽에 커서를 대면 다시 표시합니다",shell.Demo?shell.DockAutoHide:Native.TaskbarAutoHide(),v=>shell.SetAutoHide(v));
             Row(desktopRows,"앱 드래그로 분할·팝업 열기","독의 앱을 화면 가장자리로 끌면 분할, 중앙으로 끌면 팝업으로 엽니다. 독 안에서는 순서를 바꿉니다",Preferences.Current.DockWindowDrop,v=>Preferences.Set(p=>p.DockWindowDrop=v));
+            Row(desktopRows,"작업표시줄 단색 배경","하단 작업표시줄을 블러 없는 회색 단색으로 표시합니다",Preferences.Current.DockSolidBackground,v=>Preferences.Set(p=>p.DockSolidBackground=v));
             startup=Row(desktopRows,"로그인 시 자동 시작","Windows 로그인 후 One TaskBar을 실행합니다",StartupPreference.Enabled,v=> {try{StartupPreference.Set(v);status.Text=v?"로그인 자동 시작을 켰습니다":"로그인 자동 시작을 껐습니다";}catch(Exception e){status.Text="자동 시작 설정을 저장하지 못했습니다: "+e.Message;}});
             Group(groups,"데스크톱",desktopRows);
             var panels=new StackPanel();
@@ -47,7 +49,7 @@ namespace OneTaskBar
             Row(panels,"Galaxy Buds 연결 팝업","버즈 연결 정보를 오른쪽 아래에 표시합니다. 등록된 기기의 상태 변경만 감지합니다",Preferences.Current.BudsConnectionPopups,v=>Preferences.Set(p=>p.BudsConnectionPopups=v));
             var notificationLink=Paint.Action("Windows 알림 연결 · 권한 관리",()=>shell.ShowNotificationConnection());notificationLink.HorizontalContentAlignment=HorizontalAlignment.Left;notificationLink.Margin=new Thickness(12,5,12,12);panels.Children.Add(notificationLink);
             ChoiceRow(panels,"빠른 설정","Wi-Fi·소리·배터리 버튼에서 열 화면",Preferences.Current.NativeQuickSettings,v=>Preferences.Set(p=>p.NativeQuickSettings=v));
-            Row(panels,"주변 기기 연결 대신 Galaxy Buds 열기","빠른 설정 버튼에서 Galaxy Buds 앱을 같은 위치에 엽니다. Galaxy Buds 앱 설치가 필요합니다",Preferences.Current.QuickGalaxyBuds,v=>Preferences.Set(p=>p.QuickGalaxyBuds=v));
+            var legacyBuds=Row(panels,"8.5에서 주변 기기 연결 대신 Galaxy Buds 열기","Galaxy Buds 앱 설치가 필요합니다",Preferences.Current.QuickGalaxyBuds,v=>Preferences.Set(p=>p.QuickGalaxyBuds=v));legacyBudsOption=(FrameworkElement)legacyBuds.Parent;var budsHint=Paint.TextBlock("9.0에서는 주변 기기 연결과 Galaxy Buds를 각각 배치할 수 있습니다. 빠른 설정의 배치 편집 → 항목 추가에서 선택하세요.",12.5,AppSettingsPalette.Muted);budsHint.TextWrapping=TextWrapping.Wrap;budsHint.Margin=new Thickness(15,12,15,12);independentBudsHint=budsHint;panels.Children.Add(budsHint);showVersion();
             Row(panels,"슬라이더 스크롤 조절","밝기·음량·재생 위치 위에서 휠이나 트랙패드 스크롤로 값을 바꿉니다. 기본은 꺼짐입니다",Preferences.Current.QuickSliderScroll,v=>Preferences.Set(p=>p.QuickSliderScroll=v));
             Group(groups,"패널 선택",panels);
             var launcher=new StackPanel();

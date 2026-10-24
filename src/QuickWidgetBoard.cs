@@ -74,6 +74,7 @@ namespace OneTaskBar
         internal void AddWidget(string key){Layout.SetHidden(key,false);Save();Reflow(true);}
         internal void Reset(){Cancel();Layout.Reset(false);Save();Reflow(true);}
         internal void Save(){if(!Layout.Save()&&Changed!=null)Changed();}
+        internal Point CellAt(Point point){return new Point(Math.Max(0,Math.Floor(point.X/step)),Math.Max(0,Math.Floor(point.Y/rowStep)));}
         internal void SetExpanded(bool value,bool animate=true){var frame=Frames["toggles"];Size previous=new Size(frame.Body.ActualWidth,frame.Body.ActualHeight);frame.AnimateSize(previous,false);Expanded=value;Reflow(animate);frame.AnimateSize(previous,animate);}
         internal void SetMediaIdle(bool value){if(mediaIdle==value)return;mediaIdle=value;var frame=Frames["media"];Size previous=new Size(frame.Body.ActualWidth,frame.Body.ActualHeight);frame.AnimateSize(previous,false);Reflow(true);frame.AnimateSize(previous,true);}
         void PresentLayout(){var media=Layout.Find("media");bool compact=mediaIdle&&!Editing&&!media.Hidden&&media.Columns==4&&media.Rows==2;if(!Expanded&&!compact){presentationLayout=null;return;}presentationLayout=new QuickWidgetLayout(null,true);presentationLayout.Restore(Layout.Copy());if(compact){presentationLayout.Resize("media",4,1,false);foreach(var item in presentationLayout.Items)if(item.Y>=media.Y+2)item.Y--;}if(Expanded)presentationLayout.Resize("toggles",4,3,false);}

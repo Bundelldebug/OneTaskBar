@@ -377,7 +377,8 @@ namespace OneTaskBar
         {
             var samsung=SamsungSettings();if(samsung==null){if(Quick!=null)Quick.Feedback("삼성 설정이 설치되어 있지 않습니다.");return;}OpenQuickApplication(samsung);
         }
-        internal void OpenSamsungDevices() {var devices=QuickDevicesApplication();if(devices==null){if(Quick!=null)Quick.Feedback(Preferences.Current.QuickGalaxyBuds?"Galaxy Buds 앱이 설치되어 있지 않습니다.":"삼성 주변 기기 연결 앱이 설치되어 있지 않습니다.");return;}OpenQuickApplication(devices,Preferences.Current.QuickGalaxyBuds);}
+        internal void OpenSamsungDevices() {OpenQuickDevices(Preferences.Current.QuickGalaxyBuds);}
+        internal void OpenQuickDevices(bool buds) {var devices=buds?GalaxyBuds():SamsungDevices();if(devices==null){if(Quick!=null)Quick.Feedback(buds?"Galaxy Buds 앱이 설치되어 있지 않습니다.":"삼성 주변 기기 연결 앱이 설치되어 있지 않습니다.");return;}OpenQuickApplication(devices,buds);}
         internal void OpenWindowsSettings() {OpenQuickApplication(new AppEntry {Target="ms-settings:"});}
         async void OpenQuickApplication(AppEntry app,bool position=false)
         {

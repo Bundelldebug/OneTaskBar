@@ -31,7 +31,7 @@ namespace OneTaskBar
     }
     internal static class LightPanel
     {
-        internal static readonly Brush Glass=Tint("#9BE5EBE7","#7BC5D0C9","#8FD8E2DB"),DockGlass=Tint("#AADFE7E2","#82C3D0C7","#96D5E1D9"),Muted=Paint.Brush("#FF4C5B52"),Card=Paint.Brush("#24FFFFFF");
+        internal static readonly Brush Glass=Tint("#9BE5EBE7","#7BC5D0C9","#8FD8E2DB"),DockGlass=Tint("#AADFE7E2","#82C3D0C7","#96D5E1D9"),DockSolid=Paint.Brush("#FFBAC1C7"),Muted=Paint.Brush("#FF4C5B52"),Card=Paint.Brush("#24FFFFFF");
         internal static Brush Tint(string top,string middle,string bottom)
         {
             var brush=new LinearGradientBrush();brush.StartPoint=new Point(0,0);brush.EndPoint=new Point(0,1);
@@ -244,7 +244,7 @@ namespace OneTaskBar
     {
         int motion;bool closed,hiding;Brush glassTint,solidTint;TaskCompletionSource<bool> dismissal;
         public readonly Border Surface;
-        public double Radius=28; public bool Dark=true; public bool HasBlur;internal bool SoftCorners=true,OpaqueSurface;
+        public double Radius=28; public bool Dark=true; public bool HasBlur;internal bool SoftCorners=true,OpaqueSurface,DockSurface;
         internal bool StableSurface=true;internal FrameworkElement TransitionContent;
         internal Rect? BackdropClip;
         internal bool IsDismissing {get{return hiding;}}
@@ -282,7 +282,7 @@ namespace OneTaskBar
         void ApplyMaterial()
         {
             if(glassTint==null)return;
-            bool enabled=HasBlur&&Preferences.Current.Blur;Native.EnableBlur(this,enabled);Surface.Background=enabled?glassTint:solidTint??Paint.Brush(Dark?"#FF344139":"#FFE0E5E2");
+            bool enabled=HasBlur&&Preferences.Current.Blur&&!(DockSurface&&Preferences.Current.DockSolidBackground);Native.EnableBlur(this,enabled);Surface.Background=enabled?glassTint:solidTint??Paint.Brush(Dark?"#FF344139":"#FFE0E5E2");
         }
         internal void SetMaterial(Brush tint,Brush solid){glassTint=tint;solidTint=solid;if(new WindowInteropHelper(this).Handle==IntPtr.Zero)Surface.Background=tint;else ApplyMaterial();}
         public void ShowAt(System.Drawing.Rectangle screen,double x,double y,double width,double height)

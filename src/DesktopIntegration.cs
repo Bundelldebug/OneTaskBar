@@ -88,7 +88,7 @@ namespace OneTaskBar
         }
         internal static AppShortcut ShortcutInfo(string file)
         {
-            object link=null;try{link=Activator.CreateInstance(Type.GetTypeFromCLSID(new Guid("00021401-0000-0000-C000-000000000046")));((IPersistFile)link).Load(file,0);StringBuilder target=new StringBuilder(32768),arguments=new StringBuilder(32768);((IShellLink)link).GetPath(target,target.Capacity,IntPtr.Zero,4);((IShellLink)link).GetArguments(arguments,arguments.Capacity);return new AppShortcut {File=file,Id=AppIdProperty((IPropertyStore)link,5),Target=target.ToString(),Arguments=arguments.ToString()};}catch{return null;}finally{if(link!=null)Marshal.FinalReleaseComObject(link);}
+            object link=null;try{link=Activator.CreateInstance(Type.GetTypeFromCLSID(new Guid("00021401-0000-0000-C000-000000000046")));((IPersistFile)link).Load(file,0);StringBuilder target=new StringBuilder(32768),arguments=new StringBuilder(32768);((IShellLink)link).GetPath(target,target.Capacity,IntPtr.Zero,4);((IShellLink)link).GetArguments(arguments,arguments.Capacity);var result=new AppShortcut {File=file,Target=target.ToString(),Arguments=arguments.ToString()};try{result.Id=AppIdProperty((IPropertyStore)link,5);}catch{}return result;}catch{return null;}finally{if(link!=null)Marshal.FinalReleaseComObject(link);}
         }
         static string AppIdProperty(IPropertyStore store,uint property)
         {
