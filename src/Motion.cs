@@ -10,7 +10,10 @@ namespace OneTaskBar
 {
     internal static class Motion
     {
-        internal static bool Enabled {get{return Preferences.Current.Animations&&SystemParameters.ClientAreaAnimation;}}
+        static int animationFixtures;
+        internal static bool Enabled {get{return Preferences.Current.Animations&&(animationFixtures>0||SystemParameters.ClientAreaAnimation);}}
+        internal static IDisposable WithAnimationsForFixture(){if(!Program.Inspectable)throw new InvalidOperationException("Animation fixture requires inspectable mode");return new AnimationFixture();}
+        sealed class AnimationFixture : IDisposable {bool disposed;internal AnimationFixture(){animationFixtures++;}public void Dispose(){if(disposed)return;disposed=true;animationFixtures--;}}
         internal static DoubleAnimation Tween(double from,double to,int milliseconds)
         {
             return new DoubleAnimation(from,to,TimeSpan.FromMilliseconds(milliseconds)) {EasingFunction=new CubicEase {EasingMode=EasingMode.EaseOut},FillBehavior=FillBehavior.Stop};
