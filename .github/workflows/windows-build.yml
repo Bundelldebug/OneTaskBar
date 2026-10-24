@@ -25,7 +25,7 @@ jobs:
       - name: Validate both quick settings interfaces
         shell: pwsh
         run: |
-          foreach ($probe in @('quick9-probe','quick-size-probe')) {
+          foreach ($probe in @('quick9-probe','quick-size-probe','nowbar-probe','memory-lifecycle-probe')) {
             $env:ONE_TASKBAR_DATA = Join-Path $env:RUNNER_TEMP ('OneTaskBar-'+$probe)
             New-Item -ItemType Directory -Path $env:ONE_TASKBAR_DATA -Force | Out-Null
             $test = Start-Process -FilePath ./dist/OneTaskBar.exe -ArgumentList ('--'+$probe) -WindowStyle Hidden -PassThru
@@ -40,5 +40,7 @@ jobs:
             ${{ runner.temp }}/OneTaskBar-self-test/self-test.json
             ${{ runner.temp }}/OneTaskBar-quick9-probe/quick9-probe.json
             ${{ runner.temp }}/OneTaskBar-quick-size-probe/quick-size-probe.json
+            ${{ runner.temp }}/OneTaskBar-nowbar-probe/nowbar-probe.json
+            ${{ runner.temp }}/OneTaskBar-memory-lifecycle-probe/memory-lifecycle-probe.json
           if-no-files-found: warn
           retention-days: 14

@@ -17,7 +17,7 @@ namespace OneTaskBar
     internal static class QuickPanel
     {
         // Black tint over the live host backdrop keeps background color without a milky layer.
-        internal static readonly Brush Glass=LightPanel.Tint("#80000000","#74000000","#7E000000"),Card=Paint.Brush("#18FFFFFF");
+        internal static readonly Brush Glass=LightPanel.Tint("#A0000000","#94000000","#9E000000"),Card=Paint.Brush("#18FFFFFF");
         internal const string Inactive="#2A000000";
     }
     internal static class GrayPanel

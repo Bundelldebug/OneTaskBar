@@ -71,7 +71,7 @@ namespace OneTaskBar
         readonly DispatcherTimer timer=new DispatcherTimer { Interval=TimeSpan.FromMilliseconds(100) };
         readonly ShellEvents shellEvents;
         readonly VolumeKeys keys;
-        readonly EventWaitHandle stop,show,notificationProbe,panelProbe,connectNotifications,bannerProbe,actionProbe;
+        readonly EventWaitHandle stop,show,notificationProbe,panelProbe,hudProbe,connectNotifications,bannerProbe,actionProbe;
         readonly List<RegisteredWaitHandle> waits=new List<RegisteredWaitHandle>();
         readonly HwndSource messages;
         readonly IntPtr powerNotify,brightnessNotify,displayNotify;
@@ -144,6 +144,7 @@ namespace OneTaskBar
             bannerProbe=new EventWaitHandle(false,EventResetMode.AutoReset,@"Local\OneTaskBar.ProbeBanners");
             actionProbe=new EventWaitHandle(false,EventResetMode.AutoReset,@"Local\OneTaskBar.ProbeNotificationAction");
             panelProbe=new EventWaitHandle(false,EventResetMode.AutoReset,@"Local\OneTaskBar.ProbePanels");
+            hudProbe=new EventWaitHandle(false,EventResetMode.AutoReset,@"Local\OneTaskBar.ProbeHud");
             connectNotifications=new EventWaitHandle(false,EventResetMode.AutoReset,@"Local\OneTaskBar.ConnectNotifications");
             waits.Add(ThreadPool.RegisterWaitForSingleObject(stop,(s,t)=>Application.Current.Dispatcher.BeginInvoke(new Action(()=>Application.Current.Shutdown())),null,Timeout.Infinite,false));
             waits.Add(ThreadPool.RegisterWaitForSingleObject(show,(s,t)=>Application.Current.Dispatcher.BeginInvoke(new Action(ShowWelcome)),null,Timeout.Infinite,false));
@@ -151,6 +152,7 @@ namespace OneTaskBar
             waits.Add(ThreadPool.RegisterWaitForSingleObject(bannerProbe,(s,t)=>Application.Current.Dispatcher.BeginInvoke(new Action(ProbeBanners)),null,Timeout.Infinite,false));
             waits.Add(ThreadPool.RegisterWaitForSingleObject(actionProbe,(s,t)=>Application.Current.Dispatcher.BeginInvoke(new Action(ProbeNotificationAction)),null,Timeout.Infinite,false));
             waits.Add(ThreadPool.RegisterWaitForSingleObject(panelProbe,(s,t)=>Application.Current.Dispatcher.BeginInvoke(new Action(ProbePanels)),null,Timeout.Infinite,false));
+            waits.Add(ThreadPool.RegisterWaitForSingleObject(hudProbe,(s,t)=>Application.Current.Dispatcher.BeginInvoke(new Action(ProbeHud)),null,Timeout.Infinite,false));
             waits.Add(ThreadPool.RegisterWaitForSingleObject(connectNotifications,(s,t)=>Application.Current.Dispatcher.BeginInvoke(new Action(()=>ShowNotificationConnection())),null,Timeout.Infinite,false));
             tray=new Forms.NotifyIcon { Text=Program.AppName,Visible=true };
             string icon=Path.Combine(AppLog.Root,"assets","OneTaskBar.ico"); if(File.Exists(icon)) tray.Icon=new System.Drawing.Icon(icon);
@@ -568,6 +570,7 @@ namespace OneTaskBar
         {
             if(disposed||DragReorder.Active||externalLaunching||nativePanelBusy)return;
             Quick=ReleasePanel(Quick,now);Center=ReleasePanel(Center,now);Detail=ReleasePanel(Detail,now);Drawer=ReleasePanel(Drawer,now);Finder=ReleasePanel(Finder,now);StartMenu=ReleasePanel(StartMenu,now);
+            hud=ReleasePanel(hud,now);if(hud==null)hudScreen=null;
             if(Welcome!=null&&Welcome.IdleForRelease(now)){Welcome.ReleaseIdle();Welcome=null;RetiredPanels++;}
         }
         internal static double MonitorScale(Forms.Screen screen,Window window)
@@ -598,13 +601,21 @@ namespace OneTaskBar
         {
             if(!Desktop&&!Demo)return;
             bool volumeStart=kind=="volume"&&(!HudVisible||HudKind!="volume");if(kind!="volume")hudOutputRevision++;HudUpdates++;HudKind=kind;hudChangedAt=DateTime.UtcNow;
-            if(hud==null)hud=new HudWindow();
+            if(hud==null){hud=new HudWindow();hudScreen=null;}
             var screen=Forms.Screen.FromPoint(Forms.Cursor.Position);
             bool position=!hud.IsVisible||hudScreen!=screen.DeviceName;
             if(hudScreen!=screen.DeviceName){new WindowInteropHelper(hud).EnsureHandle();Native.SetWindowPos(new WindowInteropHelper(hud).Handle,IntPtr.Zero,screen.Bounds.Left+20,screen.Bounds.Top+20,0,0,0x1|0x4|0x10);hudScale=Math.Max(96,Native.GetDpiForWindow(new WindowInteropHelper(hud).Handle))/96.0;hudScreen=screen.DeviceName;}
             double scale=hudScale,bottom=(screen.Bounds.Bottom-screen.WorkingArea.Bottom)/scale;
-            hud.Set(kind,value,muted,Services.OutputName);if(position)hud.ShowAt(screen.Bounds,(screen.Bounds.Width/scale-286)/2,screen.Bounds.Height/scale-Math.Max(bottom,64)-hud.DisplayHeight-20,286,hud.DisplayHeight);else if(hud.IsDismissing)hud.Show();if(volumeStart&&!Demo)RefreshHudOutput(++hudOutputRevision);
+            hud.Set(kind,value,muted,Services.OutputName);if(position)hud.ShowAt(screen.Bounds,(screen.Bounds.Width/scale-286)/2,screen.Bounds.Height/scale-Math.Max(bottom,64)-hud.DisplayHeight-20,286,hud.DisplayHeight);else hud.Reveal();if(volumeStart&&!Demo)RefreshHudOutput(++hudOutputRevision);
             hudUntil=DateTime.UtcNow.AddSeconds(1.5);
+        }
+        object HudSnapshot()
+        {
+            if(hud==null)return null;var handle=new WindowInteropHelper(hud).Handle;Native.RectI rect;Native.GetWindowRect(handle,out rect);int cloak;Native.DwmGetWindowAttribute(handle,14,out cloak,4);return new {kind=HudKind,visible=hud.IsVisible,nativeVisible=Native.IsWindowVisible(handle),windowOpacity=hud.Opacity,surfaceOpacity=hud.Surface.Opacity,sliderOpacity=hud.Slider.Opacity,blurOpacity=Native.BlurOpacity(hud),dismissing=hud.IsDismissing,left=rect.Left,top=rect.Top,width=rect.Right-rect.Left,height=rect.Bottom-rect.Top,sliderWidth=hud.Slider.ActualWidth,sliderHeight=hud.Slider.ActualHeight,cloaked=cloak};
+        }
+        async void ProbeHud()
+        {
+            try{int prior=HudUpdates;var before=HudSnapshot();ShowHud("volume",Audio.Value,Audio.Muted);await Task.Delay(150);var volume=HudSnapshot();await Task.Delay(1700);ShowHud("brightness",Math.Max(0,Brightness),false);await Task.Delay(150);var brightness=HudSnapshot();AppLog.Json("hud-probe.json",new {desktop=Desktop,keysEnabled=keys!=null&&keys.Enabled,brightnessEvents=BrightnessEventsReady,priorRequests=prior,requests=HudUpdates,before=before,volume=volume,brightness=brightness,deviceValuesChanged=false});}catch(Exception e){AppLog.Json("hud-probe.json",new {error=e.ToString()});}
         }
         async void RefreshHudOutput(int revision){try{string output=await BackgroundWork.Run(Native.DefaultAudioOutputName);if(!disposed&&revision==hudOutputRevision&&hud!=null&&hud.IsVisible&&HudKind=="volume"){Services.OutputName=output;hud.Set("volume",Audio.Value,Audio.Muted,output);}}catch(Exception error){AppLog.Once("hud-output-name",error.GetType().Name);}}
         bool ReplaceNativeOsd()
@@ -725,6 +736,7 @@ namespace OneTaskBar
             if(actionProbe!=null)actionProbe.Dispose();
             if(connectNotifications!=null)connectNotifications.Dispose();
             if(panelProbe!=null)panelProbe.Dispose();
+            if(hudProbe!=null)hudProbe.Dispose();
         }
     }
 }

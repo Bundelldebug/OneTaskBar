@@ -40,6 +40,7 @@ namespace OneTaskBar
             if(args.Contains("--notification-action-probe")) { Signal("ProbeNotificationAction"); return 0; }
             if(args.Contains("--phone-companion-probe")){var phone=PhoneCompanion.Read();int reads=PhoneCompanion.Reads,decodes=PhoneCompanion.Decodes;var again=PhoneCompanion.Read();bool cached=Object.ReferenceEquals(phone,again)&&reads==PhoneCompanion.Reads&&decodes==PhoneCompanion.Decodes;bool passed=phone.Available&&cached&&phone.Actions.ContainsKey("open");AppLog.Json("phone-companion-probe.json",new {passed=passed,available=phone.Available,connectionPresent=!String.IsNullOrEmpty(phone.Status),batteryPresent=!String.IsNullOrEmpty(phone.Battery),phoneImage=phone.Image!=null,genericActions=phone.Actions.Count,unchangedMetadataAndArtworkReused=cached,backgroundPolling=false,phoneCommandsExecuted=false});return passed?0:1;}
             if(args.Contains("--panel-probe")) { Signal("ProbePanels"); return 0; }
+            if(args.Contains("--hud-probe")) { Signal("ProbeHud"); return 0; }
             if(args.Contains("--native-panels-probe")) {
                 TaskbarMask.Active=TaskbarMask.Protected(Native.FindWindow("Shell_TrayWnd",null));
                 var results=new List<object>();bool passed=true;
