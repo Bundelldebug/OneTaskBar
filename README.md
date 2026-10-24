@@ -88,7 +88,7 @@ Code and the original One TaskBar icon are under the [MIT license](LICENSE). [Th
 
 Production signing is not active. The maintainer reported on 2026-10-24 that SignPath Foundation declined the application; no usable certificate was issued. See the [Code signing policy and privacy details](docs/CODE_SIGNING.md). Unsigned development artifacts are not production-signed releases.
 
-## 9.0.0 (unsigned release candidate)
+## 9.0.0 (unsigned stable release)
 
 - The first group in app settings selects **UI version: 8.5 / 9.0**. Existing installations retain 8.5; the new grid uses a separate `quick-layout-9.json`. Switching versions or resetting the new grid preserves the original order and dimensions.
 - In **Edit layout**, drag each quick-settings widget to move it and drag its corner to resize it. Regular widgets support 1–4 columns and 1–5 rows on a four-column grid. A 1×1 widget is circular. Overlapping neighbors move down, with scrolling for longer layouts.
@@ -105,7 +105,7 @@ Production signing is not active. The maintainer reported on 2026-10-24 that Sig
 - Dock cells refresh late-arriving names/icons without replacing their animated button. Loading the native catalog triggers pin resolution; running-app metadata retains its window handles and activation behavior.
 - Home-shaped icons identify One TaskBar settings in quick settings, Start, search and the dock menu. Windows Settings and installed Samsung Settings keep their own icons.
 - Arrow keys move/resize focused edit handles; Escape cancels the current drag. Hidden widgets return through **Add item**. Right-click or Shift+F10 opens connection management on a 1×1 Wi-Fi/Bluetooth widget.
-- Version metadata does not mean a release has been published. No signing certificate is available; publishing an unsigned stable release requires separate maintainer authorization and clear release notes describing the validation limits.
+- On 2026-10-24 the maintainer authorized publishing 9.0.0 as an unsigned stable release with clear notice of possible Windows execution blocking. No signing certificate is available. A clean Defender scan and successful execution on this PC do not guarantee acceptance on every PC; see the release notes for the validated files and limits.
 
 ## 8.5.7 (development; signed release pending)
 

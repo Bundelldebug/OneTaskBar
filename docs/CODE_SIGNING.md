@@ -4,6 +4,8 @@ Production signing is **not activated**. There is no approved signing account or
 
 The [SignPath Foundation](https://signpath.org/) application is declined. The prepared signing workflow remains inactive; no credentials or certificate have been issued. A future signing provider would need separate enrollment and approval before that workflow can be activated.
 
+On 2026-10-24 the maintainer explicitly authorized **9.0.0 only** to be published as an unsigned stable release, with the unsigned status and possible Windows blocking disclosed. Its exact locally validated main/helper, installer and portable archive are identified by checksums and Defender reports. This exception does not claim a trusted publisher, change Windows protection, authorize future unsigned versions, or disable the normal signed-publication gate.
+
 ## Roles and approval
 
 Project maintainer, reviewer and signing approver: [Bundelldebug](https://github.com/Bundelldebug). External contributions must be reviewed before signing. Repository and signing-service access must use MFA. Each signing request needs maintainer approval under the provider's rules. Keys stay with the signing provider; no private key or certificate trust is installed by this program.
