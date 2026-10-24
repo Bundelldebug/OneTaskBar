@@ -1,6 +1,6 @@
 # Code signing policy
 
-Production signing is **not activated**. There is no approved signing account or usable publisher certificate in this workspace. A local unsigned build passing a virus scan or running once does not establish publisher trust. No 8.5.7 production release is authorized by this policy until the checks below pass.
+Production signing is **not activated**. There is no approved signing account or usable publisher certificate in this workspace. The Foundation application was submitted on 2026-10-24; provider approval is pending. A local unsigned build passing a virus scan or running once does not establish publisher trust. No 8.5.7 production release is authorized by this policy until the checks below pass.
 
 The planned no-cost route for GitHub releases is [SignPath Foundation](https://signpath.org/). Acceptance requires their project review; it is not automatic. [Microsoft Store MSIX](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/code-signing-options) is another free route, requiring a verified developer account, a Store identity, packaging work and certification. Merely listing the current EXE installer in the Store does not sign it.
 
