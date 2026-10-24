@@ -29,6 +29,7 @@ namespace OneTaskBar
         internal ArtworkPalette Palette {get;private set;}MediaState media;ImageSource artwork;DateTime lastActive;bool expanded,wanted,closed;IntPtr previousWindow;
         internal string PlayKind {get{return expandedContent.PlayKind;}}internal bool Expanded {get{return expanded;}}internal Rect Shape {get{return current;}}internal double TitleOffset {get{return title.Offset;}}internal bool MarqueeOverflow {get{return title.NaturalWidth>title.ActualWidth+.5;}}
         internal Button CompactButton {get{return compact;}}internal Button PlayButton {get{return expandedContent.PlayButton;}}internal Button NextButton {get{return expandedContent.NextButton;}}internal Button PreviousButton {get{return expandedContent.PreviousButton;}}internal PillSlider SeekBar {get{return expandedContent.SeekBar;}}
+        internal bool OutputBudsIcon {get{return expandedContent.OutputBudsIcon;}}
         internal bool TitleAnimating {get{return title.IsAnimating;}}
         internal bool ReservesSpace {get{return wanted&&media!=null&&(DateTime.UtcNow-lastActive).TotalMilliseconds<900;}}
         internal bool LargeCoverVisible {get{return expanded&&expandedContent.LargeCoverVisible;}}

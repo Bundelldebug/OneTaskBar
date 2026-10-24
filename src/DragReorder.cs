@@ -34,7 +34,7 @@ namespace OneTaskBar
         {
             if(String.IsNullOrEmpty(key))return;
             Point origin=new Point();bool armed=false;target.AllowDrop=true;
-            handle.PreviewMouseLeftButtonDown+=(s,e)=> {if(e.Handled||e.StylusDevice!=null||!enabled())return;origin=e.GetPosition(handle);armed=true;};
+            handle.PreviewMouseLeftButtonDown+=(s,e)=> {if(Program.Inspectable&&scope=="start.pins")AppLog.Write("start-drag-down","handled="+e.Handled+" stylus="+(e.StylusDevice!=null)+" enabled="+enabled());if(e.Handled||e.StylusDevice!=null||!enabled())return;origin=e.GetPosition(handle);armed=true;};
             handle.PreviewMouseLeftButtonUp+=(s,e)=>armed=false;
             handle.PreviewMouseMove+=(s,e)=> {
                 if(!armed||Active||!enabled()||e.LeftButton!=MouseButtonState.Pressed)return;
@@ -42,7 +42,7 @@ namespace OneTaskBar
                 armed=false;e.Handled=true;Mouse.Capture(null);active=new Session {Scope=scope,Key=key};double opacity=target.Opacity;DragGhost ghost=null;GiveFeedbackEventHandler feedback=null;
                 try {if(scope=="dock.apps"||scope=="start.pins"||scope=="drawer.apps"){ghost=new DragGhost(target);ghost.Show();ghost.Follow();feedback=(sender,args)=>{ghost.Follow();args.UseDefaultCursors=false;Mouse.SetCursor(Cursors.Arrow);args.Handled=true;};handle.GiveFeedback+=feedback;}target.Opacity=.28;StartedMoves++;if(DragDrop.DoDragDrop(handle,new DataObject(format,active.Id),DragDropEffects.Move)!=DragDropEffects.None)CompletedMoves++;}
                 catch(Exception error){AppLog.Write("layout-drag",error.Message);}
-                finally {if(feedback!=null)handle.GiveFeedback-=feedback;if(ghost!=null)ghost.Close();Mouse.SetCursor(null);target.Opacity=opacity;ClearMark();active=null;var notify=Finished;if(notify!=null)notify();}
+                finally {if(Program.Inspectable&&scope=="start.pins")AppLog.Write("start-drag-end","pending="+(active.PendingDrop!=null)+" completed="+CompletedMoves+" buttons="+System.Windows.Forms.Control.MouseButtons);if(feedback!=null)handle.GiveFeedback-=feedback;if(ghost!=null)ghost.Close();Mouse.SetCursor(null);target.Opacity=opacity;ClearMark();active=null;var notify=Finished;if(notify!=null)notify();}
             };
             DragEventHandler over=(s,e)=> {
                 if(e.Handled||!Matches(e.Data,scope)||!enabled())return;e.Handled=true;e.Effects=DragDropEffects.Move;

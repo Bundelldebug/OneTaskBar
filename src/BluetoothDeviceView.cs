@@ -9,15 +9,21 @@ namespace OneTaskBar
 {
     internal sealed class BluetoothPeer
     {
-        internal string Key,Name,Icon="bluetooth";internal bool Paired,Connected,ConnectionKnown;internal DeviceInformation Device;
+        internal string Key,Name,Icon="bluetooth";internal bool Paired,Connected,ConnectionKnown;internal DeviceInformation Device;internal Guid? Container;
         internal string State {get{return Connected?"연결됨":Paired?(ConnectionKnown?"등록됨 · 연결 안 됨":"등록됨"):"새 기기 · 페어링 가능";}}
         internal static BluetoothPeer Read(DeviceInformation device){var row=From(device.Id,device.Name,device.Pairing.IsPaired,device.Properties);row.Device=device;return row;}
-        internal static BluetoothPeer From(string key,string name,bool paired,IReadOnlyDictionary<string,object> properties){object connection;var row=new BluetoothPeer {Key=key,Name=name,Paired=paired,Connected=Boolean(properties,"System.Devices.Aep.IsConnected"),ConnectionKnown=properties.TryGetValue("System.Devices.Aep.IsConnected",out connection)&&connection is bool};int major=Number(properties,"System.Devices.Aep.Bluetooth.Cod.Major"),minor=Number(properties,"System.Devices.Aep.Bluetooth.Cod.Minor");row.Icon=major==1?"computer":major==2?"phone":major==4?(minor==1||minor==2||minor==6?"headphones":minor==4?"microphone":"volume"):major==5&&minor>=0?((minor&32)!=0?"mouse":(minor&16)!=0?"keyboard":"bluetooth"):"bluetooth";return row;}
+        internal static BluetoothPeer From(string key,string name,bool paired,IReadOnlyDictionary<string,object> properties){object connection;var row=new BluetoothPeer {Key=key,Name=name,Paired=paired,Container=ContainerId(properties),Connected=Boolean(properties,"System.Devices.Aep.IsConnected"),ConnectionKnown=properties.TryGetValue("System.Devices.Aep.IsConnected",out connection)&&connection is bool};int major=Number(properties,"System.Devices.Aep.Bluetooth.Cod.Major"),minor=Number(properties,"System.Devices.Aep.Bluetooth.Cod.Minor");row.Icon=major==1?"computer":major==2?"phone":major==4?(minor==1||minor==2||minor==6?"headphones":minor==4?"microphone":"volume"):major==5&&minor>=0?((minor&32)!=0?"mouse":(minor&16)!=0?"keyboard":"bluetooth"):"bluetooth";return row;}
+        internal static Guid? ContainerId(IReadOnlyDictionary<string,object> properties){object value;Guid id;return properties.TryGetValue("System.Devices.Aep.ContainerId",out value)&&value!=null&&Guid.TryParse(value.ToString(),out id)&&id!=Guid.Empty?(Guid?)id:null;}
         static bool Boolean(IReadOnlyDictionary<string,object> properties,string name){object value;return properties.TryGetValue(name,out value)&&value is bool&&(bool)value;}
         static int Number(IReadOnlyDictionary<string,object> properties,string name){object value;try{return properties.TryGetValue(name,out value)&&value!=null?Convert.ToInt32(value):-1;}catch{return -1;}}
     }
     internal static class BluetoothDeviceView
     {
+        internal static string ConnectedCaption(IEnumerable<BluetoothPeer> peers)
+        {
+            var connected=peers.Where(p=>p.Connected).GroupBy(p=>p.Container.HasValue?"id:"+p.Container.Value.ToString("N"):"name:"+(String.IsNullOrWhiteSpace(p.Name)?p.Key:BudsConnectionTracker.Normalize(p.Name)),StringComparer.OrdinalIgnoreCase).Select(g=>g.OrderBy(p=>System.Text.RegularExpressions.Regex.IsMatch(p.Name??"",@"^LE[_ -]|[ _-]LE$",System.Text.RegularExpressions.RegexOptions.IgnoreCase)).ThenBy(p=>p.Name,StringComparer.CurrentCultureIgnoreCase).First()).ToList();
+            return connected.Count==0?"연결 안 됨":connected.Count==1?(String.IsNullOrWhiteSpace(connected[0].Name)?"블루투스 기기":connected[0].Name):"기기 "+connected.Count+"개 연결됨";
+        }
         internal static Button Create(BluetoothPeer peer,Action select)
         {
             var row=new Grid();row.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(49)});row.ColumnDefinitions.Add(new ColumnDefinition());var glyph=new Glyph(peer.Icon,27){Color=peer.Connected?Paint.Ink:Paint.Text};row.Children.Add(new Border {Width=39,Height=39,CornerRadius=new CornerRadius(20),Background=peer.Connected?Paint.ControlWhite:Brushes.Transparent,HorizontalAlignment=HorizontalAlignment.Left,Child=glyph});

@@ -56,7 +56,7 @@ namespace OneTaskBar
             try {
                 if(page=="sound") {
                     var slider=new PillSlider("volume") {Value=shell.Audio.Muted?0:shell.Audio.Value,Light=true,DarkTrack=true};slider.Changed+=v=>shell.Volume(v);body.Children.Add(Card(slider));Action(shell.Audio.Muted?"음소거 해제":"음소거",()=> {shell.Mute();Reload();});
-                    var outputs=await Task.Run(()=>Native.AudioOutputs());if(closed)return;
+                    var outputs=await Task.Run(()=>Native.AudioOutputs());if(closed)return;if(outputs.Any(o=>o.Current&&BudsInfo.IsBuds(o.Name))){var symbol=await BackgroundWork.Run(BudsDeviceData.ShortcutIcon);if(closed)return;slider.SetDeviceIcon(symbol);}
                     foreach(var output in outputs){var d=output;Action((d.Current?"✓  ":"")+d.Name,async()=> {try{await Task.Run(()=>Native.SetAudioOutput(d.Id));shell.Audio.Dispose();shell.Audio.Read();Reload();}catch(Exception e){status.Text=e.Message;}});}
                     status.Text="출력 장치를 선택하면 Windows의 기본 소리 출력도 함께 바뀝니다.";
                 } else if(page=="power") {

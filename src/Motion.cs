@@ -49,13 +49,29 @@ namespace OneTaskBar
                 button.ApplyTemplate();var part=button.Template.FindName("p",button) as Border;if(part==null)return;
                 var transform=part.RenderTransform as ScaleTransform;if(transform==null){transform=new ScaleTransform(1,1);part.RenderTransform=transform;part.RenderTransformOrigin=new Point(.5,.5);}
                 double x=transform.ScaleX,y=transform.ScaleY;transform.BeginAnimation(ScaleTransform.ScaleXProperty,null);transform.BeginAnimation(ScaleTransform.ScaleYProperty,null);
-                transform.ScaleX=transform.ScaleY=scale;
-                if(Enabled){transform.BeginAnimation(ScaleTransform.ScaleXProperty,Tween(x,scale,150));transform.BeginAnimation(ScaleTransform.ScaleYProperty,Tween(y,scale,150));}
+                var target=ButtonScale(button,scale);transform.ScaleX=target.X;transform.ScaleY=target.Y;
+                if(Enabled){transform.BeginAnimation(ScaleTransform.ScaleXProperty,Tween(x,target.X,150));transform.BeginAnimation(ScaleTransform.ScaleYProperty,Tween(y,target.Y,150));}
                 Fade(part,part.Opacity,opacity,130);
             };
             button.MouseEnter+=(s,e)=>apply(Preferences.Current.Hover?1.025:1,.88);button.MouseLeave+=(s,e)=>apply(1,1);
             button.PreviewMouseLeftButtonDown+=(s,e)=>apply(.94,.72);button.PreviewMouseLeftButtonUp+=(s,e)=>apply(button.IsMouseOver&&Preferences.Current.Hover?1.025:1,button.IsMouseOver?.88:1);
             button.LostMouseCapture+=(s,e)=> {bool over=button.IsMouseOver&&!DragReorder.Active;apply(over&&Preferences.Current.Hover?1.025:1,over?.88:1);};
+        }
+        internal static Point LimitScale(Rect button,Rect viewport,Point requested)
+        {
+            if(button.Width<=0||button.Height<=0||viewport.IsEmpty)return requested;double cx=button.X+button.Width/2,cy=button.Y+button.Height/2;
+            return new Point(requested.X<=1?requested.X:Math.Max(1,Math.Min(requested.X,2*Math.Min(cx-viewport.Left,viewport.Right-cx)/button.Width)),requested.Y<=1?requested.Y:Math.Max(1,Math.Min(requested.Y,2*Math.Min(cy-viewport.Top,viewport.Bottom-cy)/button.Height)));
+        }
+        static Point ButtonScale(Button button,double scale)
+        {
+            var result=new Point(scale,scale);if(scale<=1)return result;
+            // Keep hover feedback inside each real viewport; do not let enlarged
+            // rounded ends spill under a scroll presenter or a clipped card.
+            for(var parent=VisualTreeHelper.GetParent(button);parent!=null;parent=VisualTreeHelper.GetParent(parent)){
+                var element=parent as FrameworkElement;if(element==null||element.ActualWidth<1||element.ActualHeight<1)continue;var clip=VisualTreeHelper.GetClip(element);
+                if(!(element is ScrollContentPresenter)&&!element.ClipToBounds&&clip==null)continue;
+                try{var box=button.TransformToAncestor(element).TransformBounds(new Rect(0,0,button.ActualWidth,button.ActualHeight));result=LimitScale(box,clip!=null?clip.Bounds:new Rect(0,0,element.ActualWidth,element.ActualHeight),result);}catch(InvalidOperationException){}
+            }return result;
         }
         internal static void Dock(Button button,FrameworkElement icon)
         {

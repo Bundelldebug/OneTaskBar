@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <zip-file>
+    <pe-file path="OneTaskBar.exe" product-name="One TaskBar" file-version="${version}" product-version="${version}"><authenticode-sign /></pe-file>
+    <pe-file path="OneTaskBar.Guard.exe" product-name="One TaskBar" file-version="${version}" product-version="${version}"><authenticode-sign /></pe-file>
+    <powershell-file path="Read-Apps.ps1"><authenticode-sign /></powershell-file>
+    <powershell-file path="Install.ps1"><authenticode-sign /></powershell-file>
+    <powershell-file path="Uninstall.ps1"><authenticode-sign /></powershell-file>
+  </zip-file>
+</artifact-configuration>

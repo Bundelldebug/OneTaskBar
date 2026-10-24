@@ -19,6 +19,7 @@ namespace OneTaskBar
         [DllImport("user32.dll")]static extern void mouse_event(uint flags,uint x,uint y,uint data,UIntPtr extra);
         static async Task<bool> Drag(StartWindow window,Button source,Point destination)
         {
+            window.Activate();await Task.Delay(80);
             var owner=new WindowInteropHelper(window).Handle;var origin=source.PointToScreen(new Point(source.ActualWidth/2,source.ActualHeight/2));var cursor=System.Windows.Forms.Cursor.Position;
             return await Task.Run(()=> {bool down=false;try{if(Native.GetAncestor(WindowFromPoint(new Native.PointI {X=(int)origin.X,Y=(int)origin.Y}),2)!=owner)return false;SetCursorPos((int)origin.X,(int)origin.Y);System.Threading.Thread.Sleep(40);mouse_event(2,0,0,0,UIntPtr.Zero);down=true;for(int i=1;i<=24;i++){double t=i/24.0;SetCursorPos((int)Math.Round(origin.X+(destination.X-origin.X)*t),(int)Math.Round(origin.Y+(destination.Y-origin.Y)*t));System.Threading.Thread.Sleep(20);}System.Threading.Thread.Sleep(110);return true;}finally{if(down){mouse_event(4,0,0,0,UIntPtr.Zero);System.Threading.Thread.Sleep(130);}SetCursorPos(cursor.X,cursor.Y);}});
         }

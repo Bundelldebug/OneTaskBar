@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -281,7 +281,10 @@ namespace OneTaskBar
         internal HudWindow() { Title="One TaskBar · 밝기 및 음량"; Width=286; Height=62; Radius=31;Dark=false;Surface.Background=GrayPanel.Glass; Surface.CornerRadius=new CornerRadius(31); Surface.Child=slider; ShowActivated=false;
             SourceInitialized+=(s,e)=> { var h=new WindowInteropHelper(this).Handle; Native.SetWindowLong(h,-20,Native.GetWindowLong(h,-20)|0x80|0x08000000); };
         }
-        internal void Set(string kind,double value,bool muted) { slider.Kind=kind=="volume"?SoundIcon.For(value,muted,true):kind;slider.Value=muted?0:value; }
+        bool budsOutput,deviceIconRequested;ImageSource deviceSymbol;
+        internal bool BudsIcon {get{return slider.HasDeviceIcon;}}
+        async void LoadDeviceSymbol(){deviceIconRequested=true;try{deviceSymbol=await BackgroundWork.Run(BudsDeviceData.ShortcutIcon);slider.SetDeviceIcon(budsOutput?deviceSymbol:null);}catch(Exception error){AppLog.Once("hud-device-symbol",error.GetType().Name);}}
+        internal void Set(string kind,double value,bool muted,string outputName=null){string icon=kind=="volume"?SoundIcon.For(value,muted,true):kind;if(slider.Kind!=icon){slider.Kind=icon;slider.InvalidateVisual();}slider.Value=muted?0:value;budsOutput=kind=="volume"&&BudsInfo.IsBuds(outputName);if(budsOutput&&!deviceIconRequested)LoadDeviceSymbol();slider.SetDeviceIcon(budsOutput?deviceSymbol:null);}
     }
     internal sealed class DrawerWindow : GlassWindow
     {

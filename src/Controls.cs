@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Automation;
@@ -133,6 +133,7 @@ namespace OneTaskBar
             else if(kind=="pin") {dc.DrawGeometry(null,pen,Geometry.Parse("M8,3 L16,3 15,10 19,14 5,14 9,10 Z M12,14 L12,22"));}
             else if(kind=="airplane") dc.DrawGeometry(brush,null,Geometry.Parse("M11,2 Q12,0 13,2 L14,9 23,15 23,17 14,14 14,20 17,22 17,24 12,22 7,24 7,22 10,20 10,14 1,17 1,15 10,9 Z"));
             else if(kind=="battery") { dc.DrawRoundedRectangle(null,pen,new Rect(1,6,20,12),3,3); line(23,10,23,14); dc.DrawGeometry(brush,null,Geometry.Parse("M12,7 L7,13 11,13 10,17 17,10 13,10 Z")); }
+            else if(kind=="battery-plain") {dc.DrawRoundedRectangle(null,pen,new Rect(1,6,20,12),3,3);line(23,10,23,14);dc.DrawRoundedRectangle(brush,null,new Rect(4,9,12,6),1,1);}
             else if(kind=="person") { dc.DrawEllipse(brush,null,new Point(12,4),2.5,2.5); line(3,9,21,9); line(12,7,12,15); line(12,15,7,23); line(12,15,17,23); }
             else if(kind=="settings") dc.DrawGeometry(brush,null,gear);
             else if(kind=="windows-settings") dc.DrawGeometry(brush,null,windowsGear);
@@ -169,13 +170,20 @@ namespace OneTaskBar
     internal sealed class Glyph : FrameworkElement
     {
         public string Kind; public Brush Color=Paint.Text;public int Generation;public int Signal=-1,Traffic=-1;
+        DeviceSymbol device;
+        internal bool HasDeviceIcon {get{return device!=null&&device.Source!=null;}}
+        internal void SetDeviceIcon(ImageSource image){if(device==null){if(image==null)return;device=new DeviceSymbol();}if(device.Set(image))InvalidateVisual();}
         public Glyph(string kind,double size) { Kind=kind; Width=Height=size; IsHitTestVisible=false; }
         internal void Update(string kind,Brush color){if(Kind==kind&&Color==color)return;Kind=kind;Color=color;InvalidateVisual();}
-        protected override void OnRender(DrawingContext dc) { Paint.Icon(dc,Kind,Color,new Point(ActualWidth/2,ActualHeight/2),Math.Min(ActualHeight,ActualWidth)-2,Generation,Signal,Traffic); }
+        protected override void OnRender(DrawingContext dc) {var center=new Point(ActualWidth/2,ActualHeight/2);double size=Math.Min(ActualHeight,ActualWidth)-2;if(HasDeviceIcon)device.Draw(dc,Color,center,size,false);else Paint.Icon(dc,Kind,Color,center,size,Generation,Signal,Traffic);}
     }
     internal sealed class PillSlider : FrameworkElement
     {
         public string Kind; double value; bool dragging;
+        DeviceSymbol device;
+        internal bool HasDeviceIcon {get{return device!=null&&device.Source!=null;}}
+        internal void SetDeviceIcon(ImageSource image){if(device==null){if(image==null)return;device=new DeviceSymbol();}if(device.Set(image))InvalidateVisual();}
+        void DrawIcon(DrawingContext dc,string kind,Brush color,Point center,double size){if(HasDeviceIcon)device.Draw(dc,color,center,size,kind=="mute");else Paint.Icon(dc,kind,color,center,size);}
         static readonly DependencyProperty DisplayValueProperty=DependencyProperty.Register("DisplayValue",typeof(double),typeof(PillSlider),new FrameworkPropertyMetadata(0.0,FrameworkPropertyMetadataOptions.AffectsRender));
         public bool Tablet=true,AnimateValue=true;
         public bool Light,DarkTrack;
@@ -197,8 +205,8 @@ namespace OneTaskBar
             dc.DrawRoundedRectangle(Paint.Brush(DarkTrack?"#26000000":IsEnabled ? "#3C77817F" : "#286E7775"),new Pen(Paint.Brush("#288B9692"),.7),track,thickness/2,thickness/2);
             double fillOpacity=1;if(shown>0)dc.DrawGeometry(Tablet?Paint.ControlWhite:Brushes.Black,null,fill);
             var c=new Point(h*(capsule?.5:.70),h/2); double icon=h*.44;
-            if(ShowIcon)Paint.Icon(dc,iconKind,DarkTrack?Paint.ControlWhite:Tablet&&!Light?Paint.Brush("#D8E8EDEA"):Paint.Brush("#FF303A36"),c,icon);
-            if(ShowIcon&&shown>0) {dc.PushOpacity(fillOpacity);dc.PushClip(fill);Paint.Icon(dc,iconKind,Tablet?Paint.Brush(!Light&&Kind=="brightness"?"#FFEC7D4E":"#FF35413B"):Paint.Brush("#FFF5F5F1"),c,icon);dc.Pop();dc.Pop();}
+            if(ShowIcon)DrawIcon(dc,iconKind,DarkTrack?Paint.ControlWhite:Tablet&&!Light?Paint.Brush("#D8E8EDEA"):Paint.Brush("#FF303A36"),c,icon);
+            if(ShowIcon&&shown>0) {dc.PushOpacity(fillOpacity);dc.PushClip(fill);DrawIcon(dc,iconKind,Tablet?Paint.Brush(!Light&&Kind=="brightness"?"#FFEC7D4E":"#FF35413B"):Paint.Brush("#FFF5F5F1"),c,icon);dc.Pop();dc.Pop();}
             if(Slim&&IsEnabled)dc.DrawEllipse(Paint.ControlWhite,null,new Point(FillWidth(Math.Max(0,w-10),shown)+5,h/2),4.5,4.5);
             if(IsKeyboardFocused) dc.DrawRoundedRectangle(null,new Pen(Paint.Brush("#9ED4F0E5"),1.5),new Rect(1,1,w-2,h-2),h/2,h/2);
         }

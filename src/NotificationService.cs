@@ -27,6 +27,7 @@ namespace OneTaskBar
         UserNotificationListener listener;
         readonly Dictionary<string,ImageSource> icons=new Dictionary<string,ImageSource>(StringComparer.OrdinalIgnoreCase);
         readonly Dictionary<string,Guid> activators=new Dictionary<string,Guid>(StringComparer.OrdinalIgnoreCase);
+        readonly Dictionary<string,int> assetReads=new Dictionary<string,int>(StringComparer.Ordinal);
         bool reading,subscribed,disposed;int dirty=1;DateTime nextRead;
         internal int SnapshotReads;internal bool Interactive;internal Action Updated;internal Action<List<NotificationEntry>> SnapshotReady;
         internal Func<List<AppEntry>> AppCatalog;List<AppEntry> iconCatalog;
@@ -62,13 +63,15 @@ namespace OneTaskBar
                     uint notificationId=item.Id;string appId=item.AppInfo.AppUserModelId??item.AppInfo.DisplayInfo.DisplayName;ImageSource icon;
                     if(!icons.TryGetValue(appId,out icon)){icon=await Logo(item.AppInfo);if(icon==null){var known=catalog.FirstOrDefault(a=>String.Equals(a.AppID,appId,StringComparison.OrdinalIgnoreCase))??catalog.FirstOrDefault(a=>String.Equals(a.Name,item.AppInfo.DisplayInfo.DisplayName,StringComparison.OrdinalIgnoreCase));if(known!=null)icon=known.Icon??await BackgroundWork.Run(()=>AppIcons.Get(known));}icons[appId]=icon;}
                     Guid activator;if(!activators.TryGetValue(appId,out activator)){activator=NotificationActivation.Callback(appId);activators[appId]=activator;}
-                    var previous=Items.FirstOrDefault(n=>n.Id==item.Id&&n.AppId==appId&&n.Title==(text.FirstOrDefault()??"알림")&&n.Body==String.Join("\n",text.Skip(1)));
+                    var previous=Items.FirstOrDefault(n=>n.Id==item.Id&&n.AppId==appId&&n.Created==item.CreationTime&&n.Title==(text.FirstOrDefault()??"알림")&&n.Body==String.Join("\n",text.Skip(1)));
                     var payload=previous!=null?previous.Payload:NotificationPayload.Read(appId,text);ImageSource artwork=previous!=null?previous.Artwork:null,overrideIcon=previous!=null?previous.Icon:null;
-                    if(previous==null){var native=await BackgroundWork.Run(()=>NativeToastAssets.Read(appId,notificationId,text));if(payload==null)payload=native;var assets=native??payload;if(assets!=null){overrideIcon=await BackgroundWork.Run(()=>NativeToastAssets.Image(appId,assets.LogoSource,true));artwork=await BackgroundWork.Run(()=>NativeToastAssets.Image(appId,assets.ImageSource,false));}}
+                    string assetKey=appId+"|"+notificationId+"|"+item.CreationTime.UtcDateTime.Ticks;int attempts;assetReads.TryGetValue(assetKey,out attempts);
+                    if(previous==null||artwork==null&&attempts<2){assetReads[assetKey]=attempts+1;var native=await BackgroundWork.Run(()=>NativeToastAssets.Read(appId,notificationId,text));if(native!=null&&payload!=null)native.SuppressPopup=payload.SuppressPopup;payload=native??payload;var assets=native??payload;if(assets!=null){overrideIcon=overrideIcon??await BackgroundWork.Run(()=>NativeToastAssets.Image(appId,assets.LogoSource,true));artwork=artwork??await BackgroundWork.Run(()=>NativeToastAssets.Image(appId,assets.ImageSource,false));}if(artwork==null&&BudsInfo.Toast(new NotificationEntry {AppId=appId,App=item.AppInfo.DisplayInfo.DisplayName,Title=text.FirstOrDefault(),Body=String.Join("\n",text.Skip(1))})!=null)artwork=await BackgroundWork.Run(()=>BudsDeviceData.Picture(text.FirstOrDefault()));}
                     result.Add(new NotificationEntry {Id=item.Id,App=item.AppInfo.DisplayInfo.DisplayName,AppId=appId,Icon=overrideIcon??icon,Artwork=artwork,Created=item.CreationTime,Title=text.FirstOrDefault()??"알림",Body=String.Join("\n",text.Skip(1)),Payload=payload,Activator=activator,NativeWindow=previous!=null?previous.NativeWindow:IntPtr.Zero,NativeSignature=previous!=null?previous.NativeSignature:null});
                     }catch(Exception error){AppLog.Once("notification-item",error.Message);}
                 }
                 Items=result.OrderByDescending(n=>n.Created).ToList();
+                var assetKeys=new HashSet<string>(Items.Select(n=>n.AppId+"|"+n.Id+"|"+n.Created.UtcDateTime.Ticks),StringComparer.Ordinal);foreach(var key in assetReads.Keys.Where(k=>!assetKeys.Contains(k)).ToArray())assetReads.Remove(key);
                 var ready=SnapshotReady;if(!disposed&&ready!=null)ready(Items);
             }catch(Exception e){Allowed=false;AppLog.Once("notification-read",e.Message);Status="Windows 알림을 읽지 못했습니다";}finally{reading=false;}
         }

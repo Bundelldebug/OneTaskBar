@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.IO;
 using System.Collections.Generic;
@@ -22,6 +22,13 @@ namespace OneTaskBar
         readonly BatteryPill battery=new BatteryPill {Width=62,Height=25};
         readonly TextBlock time=Paint.TextBlock("",23,Paint.Text),date=Paint.TextBlock("",11,Paint.Muted);
         readonly TextBlock wifiName=Paint.TextBlock("연결 안 됨",11,Paint.Muted),bluetoothState=Paint.TextBlock("기기 연결",11,Paint.Muted);
+        internal string BluetoothCaption {get{return bluetoothState.Text;}}
+        TextBlock devicesName;Glyph devicesIcon;Border devicesIconHost;bool budsIconRequested,budsAudio;int budsIconRevision;ImageSource budsSymbol;readonly Image devicesNativeIcon=new Image {Width=22,Height=22,Stretch=Stretch.Uniform};internal string DevicesLabel {get{return devicesName.Text;}}
+        internal bool BudsIconLoaded {get{return devicesIconHost.Child is Image;}}
+        internal bool VolumeBudsIcon {get{return volume.HasDeviceIcon;}}
+        internal bool MediaBudsIcon {get{return mediaPlayer.OutputBudsIcon;}}
+        async void LoadBudsIcon(){budsIconRequested=true;int request=++budsIconRevision;try{var image=await BackgroundWork.Run(BudsDeviceData.ShortcutIcon);if(image!=null&&request==budsIconRevision){budsSymbol=image;UpdateBudsIcons();}}catch(Exception error){AppLog.Once("quick-buds-icon",error.GetType().Name);}}
+        void UpdateBudsIcons(){if(Preferences.Current.QuickGalaxyBuds&&budsSymbol!=null){devicesNativeIcon.Source=budsSymbol;if(devicesIconHost.Child!=devicesNativeIcon)devicesIconHost.Child=devicesNativeIcon;}else if(devicesIconHost.Child!=devicesIcon)devicesIconHost.Child=devicesIcon;volume.SetDeviceIcon(budsAudio?budsSymbol:null);}
         readonly MediaPlayerView mediaPlayer;
         readonly Border wifiCircle,bluetoothCircle;
         readonly Glyph wifiGlyph=new Glyph("wifi",20),bluetoothGlyph=new Glyph("bluetooth",20);
@@ -131,7 +138,7 @@ namespace OneTaskBar
             devicesTile=WideTile("devices","주변 기기 연결","samsung-devices",new Thickness(0));windowsTile=WideTile("windows-settings","Windows 설정","windows-settings",new Thickness(0));bottomOrder.Add("devices",devicesTile);bottomOrder.Add("focus",windowsTile);AddSection("shortcuts",shortcuts);
             var utilities=new Grid {Margin=new Thickness(0,10,0,10)};utilities.ColumnDefinitions.Add(new ColumnDefinition());utilities.ColumnDefinitions.Add(new ColumnDefinition());var capture=WideTile("screenshot","화면 캡처","screen-capture",new Thickness(0,0,5,0));var manager=WideTile("task-manager","작업 관리자","task-manager",new Thickness(5,0,0,0));Grid.SetColumn(manager,1);utilities.Children.Add(capture);utilities.Children.Add(manager);AddSection("utilities",utilities);
             root.Children.Add(new SmoothScrollViewer {Content=scrolled,VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});Surface.Child=root;brightness.Light=volume.Light=true;brightness.DarkTrack=volume.DarkTrack=true;ApplyOrder();
-            sizeSave.Tick+=(s,e)=>FlushSize();LayoutOrder.Changed+=OrderChanged;DragReorder.Finished+=DragFinished;IsVisibleChanged+=(s,e)=>{if(!IsVisible&&resizeGrip.IsDragging)resizeGrip.CancelDrag();};Closed+=(s,e)=> {if(resizeGrip.IsDragging)resizeGrip.CancelDrag();FlushSize();LayoutOrder.Changed-=OrderChanged;DragReorder.Finished-=DragFinished;};
+            sizeSave.Tick+=(s,e)=>FlushSize();LayoutOrder.Changed+=OrderChanged;DragReorder.Finished+=DragFinished;IsVisibleChanged+=(s,e)=>{if(!IsVisible&&resizeGrip.IsDragging)resizeGrip.CancelDrag();};Closed+=(s,e)=> {budsIconRevision++;if(resizeGrip.IsDragging)resizeGrip.CancelDrag();FlushSize();LayoutOrder.Changed-=OrderChanged;DragReorder.Finished-=DragFinished;};
             brightness.Changed+=v=>shell.Bright(v);volume.Changed+=v=>shell.Volume(v);
             Deactivated+=(s,e)=> {if(!Program.Inspectable&&IsVisible&&!IsMouseOver&&!DragReorder.Active)Hide();};
         }
@@ -269,7 +276,7 @@ namespace OneTaskBar
         }
         Border WideTile(string icon,string label,string page,Thickness margin)
         {
-            var row=new StackPanel {Orientation=Orientation.Horizontal};row.Children.Add(new Glyph(icon,22) {Margin=new Thickness(0,0,9,0)});row.Children.Add(Paint.TextBlock(label,11,Paint.Text));
+            var row=new StackPanel {Orientation=Orientation.Horizontal};var glyph=new Glyph(icon,22) {Margin=new Thickness(0,0,9,0)};var text=Paint.TextBlock(label,11,Paint.Text);if(page=="samsung-devices"){devicesName=text;devicesIcon=glyph;glyph.Margin=new Thickness(0);devicesIconHost=new Border {Width=22,Height=22,Margin=new Thickness(0,0,9,0),Child=glyph};row.Children.Add(devicesIconHost);}else row.Children.Add(glyph);row.Children.Add(text);
             var button=Paint.Button(row,()=>OpenPage(page),label);button.Background=Brushes.Transparent;button.Height=59;button.Padding=new Thickness(9,7,9,7);return Card(button,30,margin);
         }
         void OpenPage(string page)
@@ -294,7 +301,7 @@ namespace OneTaskBar
             brightness.WheelAdjust=volume.WheelAdjust=Preferences.Current.QuickSliderScroll;
             var samsung=shell.SamsungSettings();if(samsung!=null&&samsungIconKey!=samsung.Key){samsungIconKey=samsung.Key;samsungSettings.Content=AppIcons.Visual(samsung,24);LoadSamsungIcon(samsung);}
             samsungSettings.Visibility=samsung!=null?Visibility.Visible:Visibility.Collapsed;
-            bool devices=shell.SamsungDevices()!=null;devicesTile.Visibility=devices?Visibility.Visible:Visibility.Collapsed;shortcuts.Columns=devices?2:1;if(!devices)windowsTile.Margin=new Thickness(0);
+            bool buds=Preferences.Current.QuickGalaxyBuds,devices=shell.QuickDevicesApplication()!=null;string devicesTitle=buds?"Galaxy Buds":"주변 기기 연결";if(devicesName.Text!=devicesTitle){devicesName.Text=devicesTitle;devicesIcon.Update(buds?"bluetooth":"devices",Paint.Text);var shortcut=((Border)devicesTile).Child;shortcut.SetValue(FrameworkElement.ToolTipProperty,devicesTitle);AutomationProperties.SetName(shortcut,devicesTitle);}budsAudio=audioAvailable&&BudsInfo.IsBuds(shell.Services.OutputName);if((buds&&devices||budsAudio)&&!budsIconRequested)LoadBudsIcon();UpdateBudsIcons();devicesTile.Visibility=devices?Visibility.Visible:Visibility.Collapsed;shortcuts.Columns=devices?2:1;if(!devices)windowsTile.Margin=new Thickness(0);
             wifiTile.Visibility=shell.Services.WifiPresent==false?Visibility.Collapsed:Visibility.Visible;bluetoothTile.Visibility=shell.Services.BluetoothPresent==false?Visibility.Collapsed:Visibility.Visible;
             var availableConnections=connections.Children.OfType<FrameworkElement>().Where(e=>e.Visibility==Visibility.Visible).ToArray();sectionFrames["connections"].Visibility=availableConnections.Length==0?Visibility.Collapsed:Visibility.Visible;
             connections.ColumnDefinitions[1].Width=availableConnections.Length>1?new GridLength(1,GridUnitType.Star):new GridLength(0);for(int i=0;i<availableConnections.Length;i++)PlacePair(availableConnections[i],i);
@@ -312,7 +319,7 @@ namespace OneTaskBar
             bool wifi=shell.Services.WifiOn??shell.Wifi!=null,bluetooth=shell.Services.BluetoothOn??false;
             Motion.Background(wifiCircle,wifi?Paint.ControlWhiteColor:QuickPanel.Inactive);Motion.Background(bluetoothCircle,bluetooth?Paint.ControlWhiteColor:QuickPanel.Inactive);
             wifiGlyph.Update(wifiGlyph.Kind,wifi?Paint.Ink:Paint.ControlWhite);bluetoothGlyph.Update(bluetoothGlyph.Kind,bluetooth?Paint.Ink:Paint.ControlWhite);
-            wifiGlyph.Opacity=wifi?1:.5;bluetoothGlyph.Opacity=bluetooth?1:.5;wifiName.Text=shell.Wifi??(wifi?"연결 안 됨":"꺼짐");bluetoothState.Text=shell.Services.BluetoothOn.HasValue?(bluetooth?"켜짐":"꺼짐"):"연결 설정";
+            wifiGlyph.Opacity=wifi?1:.5;bluetoothGlyph.Opacity=bluetooth?1:.5;wifiName.Text=shell.Wifi??(wifi?"연결 안 됨":"꺼짐");bluetoothState.Text=shell.Services.BluetoothOn.HasValue?(bluetooth?(shell.Buds.ConnectedCaption??"연결 안 됨"):"꺼짐"):"연결 설정";bluetoothState.ToolTip=bluetoothState.Text;
             var efficiency=shell.Toggles.Power();var disturb=shell.Toggles.Disturb.State;
             foreach(var pair in toggleButtons){string key=pair.Key;bool value=key=="mute"?muted:key=="theme"?theme.Dark:key=="dnd"?disturb.Enabled:key=="efficiency"?efficiency.Selected==QuickActions.EfficientMode:key=="awake"?shell.Toggles.Awake:key=="wifi"?wifi:key=="bluetooth"?bluetooth:key=="animations"?Preferences.Current.Animations:key=="slider-scroll"?Preferences.Current.QuickSliderScroll:shell.Toggles.Startup;
                 bool available=!pendingToggles.Contains(key)&&(key=="mute"?audioAvailable:key=="theme"?theme.Available&&!themeBusy:key=="dnd"?disturb.Available:key=="efficiency"?efficiency.Available:key=="wifi"?shell.Services.WifiPresent!=false:key=="bluetooth"?shell.Services.BluetoothPresent!=false:true);pair.Value.RefreshState(value,available);}

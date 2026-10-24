@@ -41,6 +41,8 @@ namespace OneTaskBar
         {
             object pattern;if(!element.TryGetCurrentPattern(InvokePattern.Pattern,out pattern))return false;if(!inspectOnly)((InvokePattern)pattern).Invoke();return true;
         }
+        static bool InvokeButton(AutomationElement root,string label,bool inspectOnly){var buttons=root.FindAll(TreeScope.Descendants,new AndCondition(new PropertyCondition(AutomationElement.ControlTypeProperty,ControlType.Button),new PropertyCondition(AutomationElement.NameProperty,label)));return buttons.Count==1&&Invoke(buttons[0],inspectOnly);}
+        internal static bool ToastAction(NotificationEntry item,string label,bool inspectOnly){if(item.NativeWindow==IntPtr.Zero||String.IsNullOrEmpty(item.NativeSignature))return false;try{var match=NativeToastView.Read(item.NativeWindow).FirstOrDefault(v=>v.Signature==item.NativeSignature&&v.Matches(item));return match!=null&&match.Element!=null&&InvokeButton(match.Element,label,inspectOnly);}catch{return false;}}
         static string Text(AutomationElement root,string id){var element=root.FindFirst(TreeScope.Descendants,new PropertyCondition(AutomationElement.AutomationIdProperty,id));return element==null?"":element.Current.Name;}
         static List<AutomationElement> MatchHistory(AutomationElement root,NotificationEntry item)
         {
@@ -57,7 +59,7 @@ namespace OneTaskBar
             if(result.Count>1&&item.Created.LocalDateTime.Date==DateTime.Today){string time=item.Created.LocalDateTime.ToString("t",System.Globalization.CultureInfo.CurrentCulture);var timed=result.Where(e=>Text(e,"TimeStamp")==time).ToList();if(timed.Count==1)return timed;}
             return result;
         }
-        internal static NotificationOpenResult History(NotificationEntry item,bool inspectOnly)
+        internal static NotificationOpenResult History(NotificationEntry item,bool inspectOnly,string actionLabel=null)
         {
             var result=new NotificationOpenResult {Method="native-notification-center"};lock(actionLock){
                 IntPtr center=FindCenter();bool already=center!=IntPtr.Zero&&Native.GetAncestor(Native.GetForegroundWindow(),2)==center,opened=false,invoked=false;
@@ -66,7 +68,7 @@ namespace OneTaskBar
                     if(!already){current=mask;if(center!=IntPtr.Zero)mask.Acquire(center);if(!SystemPanels.Toggle(true))return result;opened=true;}
                     for(int i=0;i<18;i++){
                         if(center==IntPtr.Zero)center=FindCenter();if(center!=IntPtr.Zero&&Native.IsWindowVisible(center)){
-                            if(!already)mask.Acquire(center);var root=AutomationElement.FromHandle(center);if(root!=null){var matches=MatchHistory(root,item);if(matches.Count==1){result.Exact=true;result.Method="native-toast-history";if(!inspectOnly){invoked=Invoke(matches[0],false);result.Invoked=invoked;}return result;}}
+                            if(!already)mask.Acquire(center);var root=AutomationElement.FromHandle(center);if(root!=null){var matches=MatchHistory(root,item);if(matches.Count==1){result.Exact=actionLabel==null||InvokeButton(matches[0],actionLabel,true);result.Method=actionLabel==null?"native-toast-history":"native-history-button";if(!inspectOnly&&result.Exact){invoked=actionLabel==null?Invoke(matches[0],false):InvokeButton(matches[0],actionLabel,false);result.Invoked=invoked;}if(result.Exact)return result;}}
                         }
                         if(inspectOnly)break;Thread.Sleep(45);
                     }

@@ -14,7 +14,7 @@ namespace OneTaskBar
     internal sealed class PhoneSnapshot
     {
         internal string Name="휴대폰 연결",Status="휴대폰과 연결 앱에서 기기를 연결해 주세요.",Battery;
-        internal bool Available;internal bool? Connected,Bluetooth;
+        internal bool Available;internal bool? Connected,Bluetooth,Charging;
         internal DateTime Updated;internal BitmapSource Image;
         internal readonly Dictionary<string,string> Actions=new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);
     }
@@ -54,6 +54,7 @@ namespace OneTaskBar
                 string lower=result.Status.ToLowerInvariant();if(lower.Contains("disconnected")||lower.Contains("not connected")||lower.Contains("연결되지")||lower.Contains("연결 안")||lower.Contains("연결 끊"))result.Connected=false;else if(lower.Contains("connected")||lower.Contains("연결됨"))result.Connected=true;
                 string bluetooth=images.Select(n=>Text(n,"altText")).FirstOrDefault(t=>t.IndexOf("bluetooth",StringComparison.OrdinalIgnoreCase)>=0);if(bluetooth!=null){string text=bluetooth.ToLowerInvariant();if(text.Contains("꺼져")||text.Contains("off"))result.Bluetooth=false;else if(text.Contains("켜져")||text.Contains("on"))result.Bluetooth=true;}
                 foreach(var node in status.Where(n=>Text(n,"type")=="TextBlock")){var percent=Regex.Match(Text(node,"text"),@"^\s*(100|[0-9]{1,2})\s*%\s*$");if(percent.Success){result.Battery=percent.Groups[1].Value+"%";break;}}
+                result.Charging=ChargingState(status.SelectMany(n=>new[]{Text(n,"altText"),Text(n,"text"),Text(n,"url")}));
                 string picture=body.Take(nameIndex).SelectMany(n=>Nodes(n)).Where(n=>Text(n,"type")=="Image").Select(n=>Text(n,"url")).FirstOrDefault(u=>u.StartsWith("data:image/",StringComparison.OrdinalIgnoreCase));
                 if(picture!=null&&picture.Length<=524288){int start=picture.IndexOf(";base64,",StringComparison.OrdinalIgnoreCase);if(start>0)try{var bytes=Convert.FromBase64String(picture.Substring(start+8));using(var stream=new MemoryStream(bytes)){var image=new BitmapImage();image.BeginInit();image.CacheOption=BitmapCacheOption.OnLoad;image.DecodePixelWidth=160;image.StreamSource=stream;image.EndInit();image.Freeze();result.Image=image;Decodes++;}}catch{}}
                 foreach(var node in body.SelectMany(n=>Nodes(n)).Take(300)){
@@ -62,6 +63,13 @@ namespace OneTaskBar
                 foreach(var action in Many(Get(root,"companionActions")).Take(12)){string safe=SafeAction(Text(action,"url"));if(safe==null)continue;string route=safe.Substring("ms-phone:".Length).Split('?')[0];if(route=="")result.Actions["open"]=safe;else if(route=="remoting")result.Actions["screen"]=safe;}
                 return result;
             }catch(ArgumentException){return empty;}catch(InvalidOperationException){return empty;}catch(FormatException){return empty;}
+        }
+        internal static bool? ChargingState(IEnumerable<string> descriptions)
+        {
+            // Unknown is shown as an ordinary battery, never as a charging claim.
+            string text=String.Join(" ",descriptions.Where(s=>!String.IsNullOrEmpty(s)&&!s.StartsWith("data:",StringComparison.OrdinalIgnoreCase))).ToLowerInvariant();
+            if(Regex.IsMatch(text,@"not\s*charging|discharging|충전\s*(?:중)?\s*(?:이\s*)?(?:아님|아닙|안|하지)|배터리\s*사용"))return false;
+            if(Regex.IsMatch(text,@"charging|충전\s*중"))return true;return null;
         }
         internal static PhoneSnapshot Read(bool force=false)
         {
@@ -95,12 +103,13 @@ namespace OneTaskBar
         internal bool HasPhone {get{return snapshot!=null&&snapshot.Available;}}
         internal int EnabledActions {get{return actions.Values.Count(b=>b.IsEnabled);}}
         internal Button ActionButton(string key){Button button;return actions.TryGetValue(key,out button)?button:null;}
+        internal bool ChargingIcon {get{return batteryIcon.Kind=="battery";}}
         internal void Update(PhoneSnapshot value)
         {
             snapshot=value;name.Text=value.Name;status.Text=value.Status;
             if(value.Image!=null){var image=new Image {Source=value.Image,Width=46,Height=100,Stretch=Stretch.UniformToFill,Clip=new RectangleGeometry(new Rect(0,0,46,100),6,6)};portrait.Child=new Border {Width=52,Height=108,CornerRadius=new CornerRadius(9),Background=Paint.Brush("#FF101713"),BorderBrush=Paint.Brush("#65FFFFFF"),BorderThickness=new Thickness(1.5),Child=image,HorizontalAlignment=HorizontalAlignment.Center};}else portrait.Child=new Glyph("phone",76);
             connection.Visibility=value.Available?Visibility.Visible:Visibility.Collapsed;connection.Color=value.Connected==true?Paint.Brush("#FF9BE4C1"):Paint.Muted;connection.ToolTip=value.Status;bluetooth.Visibility=value.Bluetooth.HasValue?Visibility.Visible:Visibility.Collapsed;bluetooth.Opacity=value.Bluetooth==true?1:.4;bluetooth.ToolTip=value.Bluetooth==true?"휴대폰 Bluetooth 켜짐":"휴대폰 Bluetooth 꺼짐";
-            battery.Text=value.Battery??"";batteryIcon.Visibility=String.IsNullOrEmpty(value.Battery)?Visibility.Collapsed:Visibility.Visible;foreach(var pair in actions)pair.Value.IsEnabled=value.Actions.ContainsKey(pair.Key);screen.Visibility=value.Actions.ContainsKey("screen")?Visibility.Visible:Visibility.Collapsed;
+            battery.Text=value.Battery??"";batteryIcon.Kind=value.Charging==true?"battery":"battery-plain";batteryIcon.InvalidateVisual();batteryIcon.ToolTip=value.Charging==true?"휴대폰 충전 중":value.Charging==false?"휴대폰 배터리 사용 중":"휴대폰 배터리";batteryIcon.Visibility=String.IsNullOrEmpty(value.Battery)?Visibility.Collapsed:Visibility.Visible;foreach(var pair in actions)pair.Value.IsEnabled=value.Actions.ContainsKey(pair.Key);screen.Visibility=value.Actions.ContainsKey("screen")?Visibility.Visible:Visibility.Collapsed;
             updated.Text=value.Available?"최근 수신 · "+value.Updated.ToLocalTime().ToString("M/d H:mm")+((DateTime.UtcNow-value.Updated).TotalMinutes>3?"\n휴대폰과 연결에서 갱신할 수 있습니다.":""):"연결 후 기기 상태와 바로가기가 표시됩니다.";primary.Content=Paint.TextBlock(value.Available?"휴대폰과 연결 열기  ›":"휴대폰 연결하기  ›",12,Paint.Text);
         }
         void Launch(string key){string uri;if(snapshot!=null&&snapshot.Actions.TryGetValue(key,out uri))open(uri);else if(key=="open")open("ms-settings:mobile-devices-addphone-direct");}

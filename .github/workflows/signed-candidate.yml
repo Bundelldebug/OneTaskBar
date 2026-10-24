@@ -1,0 +1,115 @@
+name: Signed release candidate
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  candidate:
+    if: github.ref == 'refs/heads/main' && github.repository == 'Bundelldebug/OneTaskBar'
+    runs-on: windows-2025
+    environment: release-signing
+    timeout-minutes: 60
+    env:
+      SIGNPATH_ORGANIZATION_ID: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+      SIGNPATH_PROJECT_SLUG: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+      SIGNPATH_POLICY_SLUG: ${{ vars.SIGNPATH_POLICY_SLUG }}
+      SIGNPATH_PAYLOAD_CONFIG: ${{ vars.SIGNPATH_PAYLOAD_CONFIG }}
+      SIGNPATH_SETUP_CONFIG: ${{ vars.SIGNPATH_SETUP_CONFIG }}
+      PUBLISHER_THUMBPRINT: ${{ vars.PUBLISHER_THUMBPRINT }}
+      SIGNPATH_TOKEN_PRESENT: ${{ secrets.SIGNPATH_API_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Require approved provider configuration
+        shell: pwsh
+        run: |
+          if ($env:SIGNPATH_TOKEN_PRESENT -ne 'true') { throw 'Signing is not configured. Obtain provider approval first.' }
+          if ($env:SIGNPATH_ORGANIZATION_ID -notmatch '^[0-9a-fA-F-]{36}$' -or $env:PUBLISHER_THUMBPRINT -notmatch '^[0-9a-fA-F]{40}$') { throw 'Approved organization and publisher pin required.' }
+          foreach ($name in @('SIGNPATH_PROJECT_SLUG','SIGNPATH_POLICY_SLUG','SIGNPATH_PAYLOAD_CONFIG','SIGNPATH_SETUP_CONFIG')) {
+            if ([Environment]::GetEnvironmentVariable($name) -notmatch '^[a-zA-Z0-9_-]+$') { throw ('Missing/invalid approved configuration: '+$name) }
+          }
+      - name: Build reviewed source and self-test
+        id: build
+        shell: pwsh
+        run: |
+          ./Build.ps1 -SkipTests
+          $env:ONE_TASKBAR_DATA = Join-Path $env:RUNNER_TEMP 'OneTaskBar-candidate-self-test'
+          New-Item -ItemType Directory -Path $env:ONE_TASKBAR_DATA -Force | Out-Null
+          $test = Start-Process -FilePath ./dist/OneTaskBar.exe -ArgumentList '--self-test' -WindowStyle Hidden -Wait -PassThru
+          if ($test.ExitCode -ne 0) { Get-Content (Join-Path $env:ONE_TASKBAR_DATA 'self-test.json'); throw 'Self-test failed' }
+          $version = [Diagnostics.FileVersionInfo]::GetVersionInfo((Resolve-Path ./dist/OneTaskBar.exe)).FileVersion
+          'version='+$version | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        id: payload
+        with:
+          name: unsigned-payload-for-signing
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Request payload signatures
+        uses: signpath/github-action-submit-signing-request@c92b958760219087e01f8d67a1669ed57afe2627 # v2
+        id: signed-payload
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_PAYLOAD_CONFIG }}
+          github-artifact-id: ${{ steps.payload.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: .build/signed-payload
+          parameters: |
+            version: ${{ toJSON(steps.build.outputs.version) }}
+      - name: Validate signed payload and package Setup
+        shell: pwsh
+        run: |
+          foreach ($name in @('OneTaskBar.exe','OneTaskBar.Guard.exe','Read-Apps.ps1','Install.ps1','Uninstall.ps1')) {
+            Copy-Item -LiteralPath (Join-Path .build/signed-payload $name) -Destination (Join-Path dist $name) -Force
+          }
+          ./tools/Test-ReleaseSignatures.ps1 -PayloadOnly -SignerThumbprint $env:PUBLISHER_THUMBPRINT
+          ./tools/BuildInstaller.ps1 -SkipBuild
+          New-Item -ItemType Directory -Path .build/setup-for-signing -Force | Out-Null
+          Copy-Item -LiteralPath release/OneTaskBar-Setup.exe -Destination .build/setup-for-signing/OneTaskBar-Setup.exe
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        id: setup
+        with:
+          name: unsigned-setup-for-signing
+          path: .build/setup-for-signing/OneTaskBar-Setup.exe
+          if-no-files-found: error
+          retention-days: 7
+      - name: Request Setup signature
+        uses: signpath/github-action-submit-signing-request@c92b958760219087e01f8d67a1669ed57afe2627 # v2
+        id: signed-setup
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_SETUP_CONFIG }}
+          github-artifact-id: ${{ steps.setup.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: .build/signed-setup
+          parameters: |
+            version: ${{ toJSON(steps.build.outputs.version) }}
+      - name: Verify complete candidate
+        shell: pwsh
+        env:
+          PAYLOAD_REQUEST_ID: ${{ steps.signed-payload.outputs.signing-request-id }}
+          SETUP_REQUEST_ID: ${{ steps.signed-setup.outputs.signing-request-id }}
+          CANDIDATE_VERSION: ${{ steps.build.outputs.version }}
+        run: |
+          Copy-Item -LiteralPath .build/signed-setup/OneTaskBar-Setup.exe -Destination release/OneTaskBar-Setup.exe -Force
+          ./tools/Test-ReleaseSignatures.ps1 -SignerThumbprint $env:PUBLISHER_THUMBPRINT
+          $lines = @('OneTaskBar-Setup.exe','OneTaskBar-Portable-x64.zip') | ForEach-Object { ((Get-FileHash -LiteralPath (Join-Path release $_) -Algorithm SHA256).Hash.ToLowerInvariant())+'  '+$_ }
+          [IO.File]::WriteAllLines((Join-Path (Resolve-Path release) 'SHA256SUMS.txt'),[string[]]$lines,[Text.Encoding]::ASCII)
+          [ordered]@{commit=$env:GITHUB_SHA;run=('https://github.com/'+$env:GITHUB_REPOSITORY+'/actions/runs/'+$env:GITHUB_RUN_ID);version=$env:CANDIDATE_VERSION;payloadSigningRequest=$env:PAYLOAD_REQUEST_ID;setupSigningRequest=$env:SETUP_REQUEST_ID} | ConvertTo-Json | Set-Content -LiteralPath release/candidate-origin.json -Encoding utf8
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: signed-candidate
+          path: release/
+          if-no-files-found: error
+          retention-days: 30
+# There is deliberately no publication permission or automatic GitHub release.
+# Validate the signed candidate on the protected target PC before Publish-Release.ps1.

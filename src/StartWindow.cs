@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -24,6 +24,10 @@ namespace OneTaskBar
         internal readonly TextBox Search=new TextBox {FontSize=14,Foreground=Paint.Ink,Background=Brushes.Transparent,BorderThickness=new Thickness(0),Padding=new Thickness(6,9,6,9),MaxLength=120};
         List<StartTile> pinned=new List<StartTile>();List<StartRecent> cachedRecent;
         readonly Grid pinHeading,folderHeading;readonly TextBox folderName;readonly Grid recentHeading;
+        readonly Button recentMore;bool moreRecent;
+        readonly StackPanel body=new StackPanel(),pagination;readonly SmoothScrollViewer bodyScroll;
+        internal Button RecentMoreButton {get{return recentMore;}}
+        internal bool RecentPage {get{return moreRecent;}}
         readonly Dictionary<string,Button> pinButtons=new Dictionary<string,Button>(StringComparer.OrdinalIgnoreCase);string dragPreview,groupTarget,openFolder;bool renaming;
         DateTime recentUntil;bool recentBusy,composing,queued,closed;int pinPage,load;
         internal int PinnedCount {get{return pinButtons.Count;}}
@@ -53,10 +57,9 @@ namespace OneTaskBar
             var tools=new StackPanel {Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right};
             tools.Children.Add(Tool("folder","문서",()=>OpenFolder(Environment.SpecialFolder.MyDocuments)));
             tools.Children.Add(Tool("phone","휴대폰과 연결",()=>OpenPhone("ms-settings:mobile-devices-addphone-direct")));
-            tools.Children.Add(Tool("settings","Windows 설정",async()=> {if(await DismissAsync())shell.OpenWindowsSettings();}));
+            tools.Children.Add(Tool("settings","One TaskBar 설정",async()=> {if(await DismissAsync())shell.OpenHomeSettings();}));
             Button power=null;power=Tool("power","전원",()=> {power.ContextMenu=PowerMenu(power);power.ContextMenu.IsOpen=true;});tools.Children.Add(power);footer.Children.Add(tools);DockPanel.SetDock(footer,Dock.Bottom);root.Children.Add(footer);
 
-            var body=new StackPanel();
             pinHeading=Heading("고정됨");var all=Paint.Action("모든 앱  ›",()=>shell.ToggleDrawer(null));all.HorizontalAlignment=HorizontalAlignment.Right;all.FontSize=11;all.Height=31;pinHeading.Children.Add(all);body.Children.Add(pinHeading);
             folderHeading=new Grid {Height=40,Visibility=Visibility.Collapsed,Margin=new Thickness(0,0,0,7)};folderHeading.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(40)});folderHeading.ColumnDefinitions.Add(new ColumnDefinition());
             var back=Tool("back","고정 앱으로 돌아가기 · 앱을 놓으면 폴더 밖으로 이동",()=> {CommitFolderName();openFolder=null;pinPage=0;RenderPins();});folderHeading.Children.Add(back);
@@ -65,12 +68,12 @@ namespace OneTaskBar
             DragReorder.DropArea(folderHeading,"start.pins",()=>openFolder!=null,(key,point)=> {bool moved=shell.StartPins.Extract(key);if(moved)openFolder=null;return moved;},(key,point)=>dragPreview="extract");
             pins.Margin=new Thickness(0,7,0,0);body.Children.Add(pins);
             DragReorder.DropArea(pins,"start.pins",()=>!closed&&IsVisible,DropPin,PreviewPinDrop,true);
-            var pagination=new StackPanel {Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Center,Height=28};
+            pagination=new StackPanel {Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Center,Height=28};
             previous=Tool("back","이전 고정 앱",()=> {pinPage--;RenderPins();});previous.Width=28;previous.Height=26;
             next=Tool("chevron","다음 고정 앱",()=> {pinPage++;RenderPins();});next.Width=28;next.Height=26;pagination.Children.Add(previous);page.Margin=new Thickness(7,0,7,0);pagination.Children.Add(page);pagination.Children.Add(next);body.Children.Add(pagination);
-            recentHeading=Heading("최근 항목");recentHeading.Margin=new Thickness(8,14,8,9);var documents=Paint.Action("폴더 열기  ›",()=>OpenFolder(Environment.SpecialFolder.Recent));documents.HorizontalAlignment=HorizontalAlignment.Right;documents.FontSize=11;documents.Height=31;recentHeading.Children.Add(documents);body.Children.Add(recentHeading);
+            recentHeading=Heading("최근 항목");recentHeading.Margin=new Thickness(8,14,8,9);recentMore=Paint.Action("더 보기  ›",()=>ShowRecentPage(!moreRecent));recentMore.HorizontalAlignment=HorizontalAlignment.Right;recentMore.FontSize=11;recentMore.Height=31;recentHeading.Children.Add(recentMore);body.Children.Add(recentHeading);
             recent.Margin=new Thickness(0,0,0,3);body.Children.Add(recent);
-            root.Children.Add(new SmoothScrollViewer {Content=body,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
+            bodyScroll=new SmoothScrollViewer {Content=body,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};root.Children.Add(bodyScroll);
             var layout=new Grid();layout.ColumnDefinitions.Add(new ColumnDefinition());phoneColumn=new ColumnDefinition {Width=new GridLength(278)};layout.ColumnDefinitions.Add(phoneColumn);layout.Children.Add(root);Phone=new PhonePane(OpenPhone,()=>LoadPhone(true)){Margin=new Thickness(0,18,18,18)};Grid.SetColumn(Phone,1);layout.Children.Add(Phone);
             Surface.Child=layout;TransitionContent=layout;
             SizeChanged+=(s,e)=>UpdatePinColumns();
@@ -83,9 +86,12 @@ namespace OneTaskBar
         void QueueSearch(){if(queued||Search.Text.Length==0)return;queued=true;Dispatcher.BeginInvoke(new Action(()=> {queued=false;if(!composing&&IsVisible&&!String.IsNullOrWhiteSpace(Search.Text))shell.ToggleSearch(null,Search.Text);}),System.Windows.Threading.DispatcherPriority.Background);}
         internal void Reload()
         {
-            Search.Text="";openFolder=null;pinPage=0;RefreshPins();
-            RenderRecent(cachedRecent??new List<StartRecent>());LoadRecent();if(Phone.Visibility==Visibility.Visible)LoadPhone();
+            Search.Text="";openFolder=null;pinPage=0;moreRecent=false;RefreshPins();
+            if(!StartRecentFeed.Enabled()){cachedRecent=null;recentUntil=DateTime.MinValue;}RenderRecent(cachedRecent??new List<StartRecent>());LoadRecent();if(Phone.Visibility==Visibility.Visible)LoadPhone();
         }
+        internal void ShowRecentPage(bool value){moreRecent=value;UpdateRecentPage();RenderRecent(cachedRecent??new List<StartRecent>());bodyScroll.ScrollToTop();if(IsVisible&&Motion.Enabled)Motion.Fade(body,.65,1,170);}
+        void UpdateRecentPage(){pins.Visibility=pagination.Visibility=moreRecent?Visibility.Collapsed:Visibility.Visible;pinHeading.Visibility=!moreRecent&&openFolder==null?Visibility.Visible:Visibility.Collapsed;folderHeading.Visibility=!moreRecent&&openFolder!=null?Visibility.Visible:Visibility.Collapsed;recentHeading.Visibility=recent.Visibility=openFolder==null?Visibility.Visible:Visibility.Collapsed;recentHeading.Margin=new Thickness(8,moreRecent?0:14,8,9);}
+        protected override void OnPreviewKeyDown(KeyEventArgs e){if(e.Key==Key.Escape&&moreRecent){ShowRecentPage(false);e.Handled=true;return;}base.OnPreviewKeyDown(e);}
         internal void Configure(double width,double height){Width=width;Height=height;bool wide=width>=830;phoneColumn.Width=new GridLength(wide?278:0);Phone.Visibility=wide?Visibility.Visible:Visibility.Collapsed;UpdatePinColumns();}
         async void LoadPhone(bool force=false)
         {
@@ -110,6 +116,7 @@ namespace OneTaskBar
             }
             if(current.Count==0){var empty=Paint.TextBlock("앱을 우클릭해 시작 화면에 고정해 보세요.",12,Paint.Muted);empty.TextWrapping=TextWrapping.Wrap;pins.Children.Add(empty);}
             page.Text=pages>1?(pinPage+1)+" / "+pages:"";previous.Visibility=next.Visibility=pages>1?Visibility.Visible:Visibility.Collapsed;previous.IsEnabled=pinPage>0;next.IsEnabled=pinPage<pages-1;
+            UpdateRecentPage();
         }
         internal Button PinButton(string key){Button button;return pinButtons.TryGetValue(key,out button)?button:null;}
         internal string[] PinnedKeys {get{return CurrentTiles().Select(p=>p.Key).ToArray();}}
@@ -166,24 +173,17 @@ namespace OneTaskBar
         async void LoadRecent()
         {
             if(recentBusy||DateTime.UtcNow<recentUntil)return;recentBusy=true;int request=++load;
-            try {var items=await BackgroundWork.Run(ReadRecent);if(closed||request!=load)return;cachedRecent=items;recentUntil=DateTime.UtcNow.AddSeconds(30);if(IsVisible)RenderRecent(items);}
+            try {var items=await BackgroundWork.Run(StartRecentFeed.Read);if(closed||request!=load)return;cachedRecent=items;recentUntil=DateTime.UtcNow.AddSeconds(5);if(IsVisible)RenderRecent(items);}
             catch(Exception error){AppLog.Once("start-recent",error.Message);}finally{recentBusy=false;}
-        }
-        internal static List<StartRecent> ReadRecent()
-        {
-            string path=Environment.GetFolderPath(Environment.SpecialFolder.Recent);var result=new List<StartRecent>();if(!Directory.Exists(path))return result;
-            foreach(var file in new DirectoryInfo(path).EnumerateFiles("*.lnk",SearchOption.TopDirectoryOnly).OrderByDescending(f=>f.LastWriteTimeUtc).Take(36)){
-                string target=Native.ShortcutTarget(file.FullName);if(String.IsNullOrEmpty(target)||!File.Exists(target)&&!Directory.Exists(target)||result.Any(r=>String.Equals(r.App.Executable,target,StringComparison.OrdinalIgnoreCase)))continue;
-                result.Add(new StartRecent {App=new AppEntry {Name=Path.GetFileNameWithoutExtension(file.Name),Target=file.FullName,Executable=target},Time=file.LastWriteTime});if(result.Count==6)break;
-            }return result;
         }
         void RenderRecent(List<StartRecent> entries)
         {
-            recent.Children.Clear();foreach(var value in entries){var item=value;var app=item.App;var row=new Grid();row.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(41)});row.ColumnDefinitions.Add(new ColumnDefinition());row.Children.Add(AppIcons.Visual(app,32));
-                var words=new StackPanel {VerticalAlignment=VerticalAlignment.Center};var name=Paint.TextBlock(app.Name,12,Paint.Text);name.TextTrimming=TextTrimming.CharacterEllipsis;words.Children.Add(name);words.Children.Add(Paint.TextBlock(item.Time.ToString("M월 d일  H:mm"),10,Paint.Muted));Grid.SetColumn(words,1);row.Children.Add(words);
+            recentMore.Content=Paint.TextBlock(moreRecent?"‹  뒤로":"더 보기  ›",11,Paint.Text);recentMore.ToolTip=moreRecent?"시작 화면으로 돌아가기":"최근 항목 화면 열기";recentMore.IsEnabled=moreRecent||entries.Count>8;recentMore.Opacity=recentMore.IsEnabled?1:.45;
+            recent.Children.Clear();foreach(var value in entries.Take(moreRecent?24:8)){var item=value;var app=item.App;var row=new Grid();row.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(41)});row.ColumnDefinitions.Add(new ColumnDefinition());row.Children.Add(AppIcons.Visual(app,32));
+                var words=new StackPanel {VerticalAlignment=VerticalAlignment.Center};var name=Paint.TextBlock(app.Name,12,Paint.Text);name.TextTrimming=TextTrimming.CharacterEllipsis;words.Children.Add(name);words.Children.Add(Paint.TextBlock("최근 열람 · "+item.Time.ToString("M월 d일  H:mm"),10,Paint.Muted));Grid.SetColumn(words,1);row.Children.Add(words);
                 var button=Paint.Button(row,()=>Launch(app),app.Name);button.Background=Brushes.Transparent;button.HorizontalContentAlignment=HorizontalAlignment.Stretch;button.Margin=new Thickness(1,1,1,2);button.Padding=new Thickness(9);button.Height=56;recent.Children.Add(button);
             }
-            if(entries.Count==0){var empty=Paint.TextBlock("최근 사용한 파일이 여기에 표시됩니다.",12,Paint.Muted);empty.TextWrapping=TextWrapping.Wrap;empty.Margin=new Thickness(9,12,9,15);recent.Children.Add(empty);}
+            if(entries.Count==0){var empty=Paint.TextBlock("Windows에서 기록한 최근 항목이 여기에 표시됩니다.",12,Paint.Muted);empty.TextWrapping=TextWrapping.Wrap;empty.Margin=new Thickness(9,12,9,15);recent.Children.Add(empty);}
         }
         internal void FixtureRecent(List<StartRecent> entries){cachedRecent=entries;recentUntil=DateTime.UtcNow.AddHours(1);RenderRecent(entries);}
         async void Launch(AppEntry entry){var modifiers=Keyboard.Modifiers;if(await DismissAsync())shell.LaunchApp(entry,modifiers);}
@@ -196,5 +196,5 @@ namespace OneTaskBar
             }return menu;
         }
     }
-    internal sealed class StartRecent {internal AppEntry App;internal DateTime Time;}
+    internal sealed class StartRecent {internal AppEntry App;internal DateTime Time;internal string RecentLink;}
 }

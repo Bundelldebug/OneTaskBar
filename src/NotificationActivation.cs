@@ -11,10 +11,12 @@ using Windows.UI.Notifications;
 
 namespace OneTaskBar
 {
+    internal sealed class NotificationAction {internal string Label,Arguments,Type,TargetPackage;internal bool InputRequired;}
     internal sealed class NotificationPayload
     {
         internal string Arguments="",Type="foreground",TargetPackage="";internal bool SuppressPopup;
         internal string LogoSource,ImageSource;
+        internal readonly List<NotificationAction> Actions=new List<NotificationAction>();
         internal static string TextKey(IEnumerable<string> values) {return Regex.Replace(String.Concat(values),@"\s+","");}
         internal static NotificationPayload Parse(string xml,IEnumerable<string> text)
         {
@@ -25,6 +27,7 @@ namespace OneTaskBar
             var payload=new NotificationPayload {Arguments=toast.GetAttribute("launch"),Type=String.IsNullOrEmpty(toast.GetAttribute("activationType"))?"foreground":toast.GetAttribute("activationType"),TargetPackage=toast.GetAttribute("protocolActivationTargetApplicationPfn")};
             string baseUri=((XmlElement)binding).GetAttribute("baseUri");if(String.IsNullOrEmpty(baseUri))baseUri=((XmlElement)binding.ParentNode).GetAttribute("baseUri");
             foreach(XmlElement image in binding.SelectNodes(".//image")){string source=image.GetAttribute("src");if(String.IsNullOrWhiteSpace(source)||source.Length>4096)continue;Uri root,absolute;if(Uri.TryCreate(baseUri,UriKind.Absolute,out root)&&Uri.TryCreate(root,source,out absolute))source=absolute.AbsoluteUri;if(image.GetAttribute("placement")=="appLogoOverride")payload.LogoSource=source;else if(payload.ImageSource==null||image.GetAttribute("placement")=="hero")payload.ImageSource=source;}
+            foreach(XmlElement action in toast.SelectNodes("actions/action")){string label=action.GetAttribute("content"),arguments=action.GetAttribute("arguments"),type=action.GetAttribute("activationType");if(String.IsNullOrWhiteSpace(label)||label.Length>200||arguments.Length>8192||payload.Actions.Count>=5)continue;payload.Actions.Add(new NotificationAction {Label=label,Arguments=arguments,Type=String.IsNullOrEmpty(type)?"foreground":type,TargetPackage=action.GetAttribute("protocolActivationTargetApplicationPfn"),InputRequired=!String.IsNullOrEmpty(action.GetAttribute("hint-inputId"))});}
             return payload;
         }
         internal static NotificationPayload Read(string appId,string[] text)
@@ -32,7 +35,7 @@ namespace OneTaskBar
             try {
                 var matches=new List<NotificationPayload>();
                 foreach(var toast in ToastNotificationManager.GetDefault().History.GetHistory(appId)) {try {var payload=Parse(toast.Content.GetXml(),text);if(payload!=null){payload.SuppressPopup=toast.SuppressPopup;matches.Add(payload);}}catch{}}
-                var unique=matches.GroupBy(p=>p.Type+"\0"+p.Arguments+"\0"+p.TargetPackage+"\0"+p.SuppressPopup).Select(g=>g.First()).ToList();
+                var unique=matches.GroupBy(p=>p.Type+"\0"+p.Arguments+"\0"+p.TargetPackage+"\0"+p.SuppressPopup+"\0"+String.Join("\0",p.Actions.Select(a=>a.Label+"\u001e"+a.Arguments+"\u001e"+a.Type+"\u001e"+a.TargetPackage+"\u001e"+a.InputRequired))).Select(g=>g.First()).ToList();
                 return unique.Count==1?unique[0]:null;
             }catch(Exception e){AppLog.Once("notification-payload",e.Message);return null;}
         }
@@ -87,6 +90,18 @@ namespace OneTaskBar
                 catch(Exception e){AppLog.Once("notification-callback",e.Message);result.Exact=false;}finally{if(instance!=null&&Marshal.IsComObject(instance))Marshal.ReleaseComObject(instance);}}
             if(inspectOnly)return result;
             return NativeNotificationRoute.History(item,false);
+        }
+        internal static NotificationOpenResult Action(NotificationEntry item,NotificationAction action,bool inspectOnly)
+        {
+            if(item==null||action==null||item.Payload==null||!item.Payload.Actions.Contains(action))return new NotificationOpenResult {Method="invalid-action"};
+            if(NativeNotificationRoute.ToastAction(item,action.Label,inspectOnly))return new NotificationOpenResult {Invoked=!inspectOnly,Exact=true,Method="native-toast-button"};
+            if(!action.InputRequired&&action.Type=="protocol"){
+                Uri uri;if(!Uri.TryCreate(action.Arguments,UriKind.Absolute,out uri))return new NotificationOpenResult {Method="invalid-protocol-action"};var result=new NotificationOpenResult {Exact=true,Payload=true,Method="protocol-action"};
+                if(!inspectOnly){var options=new Windows.System.LauncherOptions();if(!String.IsNullOrEmpty(action.TargetPackage))options.TargetApplicationPackageFamilyName=action.TargetPackage;result.Invoked=SystemServices.Wait(Windows.System.Launcher.LaunchUriAsync(uri,options)).GetAwaiter().GetResult();}return result;
+            }
+            Guid callback=item.Activator;if(callback==Guid.Empty&&!inspectOnly)callback=Callback(item.AppId);
+            if(!action.InputRequired&&(action.Type=="foreground"||action.Type=="background")&&callback!=Guid.Empty){var result=new NotificationOpenResult {Exact=true,Payload=true,Method="toast-button-callback"};if(inspectOnly)return result;object instance=null;try{AllowSetForegroundWindow(UInt32.MaxValue);instance=Create(callback,typeof(INotificationCallback));((INotificationCallback)instance).Activate(item.AppId,action.Arguments,IntPtr.Zero,0);result.Invoked=true;return result;}catch(Exception error){AppLog.Once("notification-button",error.Message);}finally{if(instance!=null&&Marshal.IsComObject(instance))Marshal.ReleaseComObject(instance);}}
+            return NativeNotificationRoute.History(item,inspectOnly,action.Label);
         }
     }
 }

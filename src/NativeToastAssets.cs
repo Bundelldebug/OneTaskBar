@@ -38,11 +38,11 @@ namespace OneTaskBar
             finally{if(statement!=IntPtr.Zero)sqlite3_finalize(statement);if(database!=IntPtr.Zero)sqlite3_close(database);}
         }
         internal static string Decode(byte[] bytes){bool unicode=bytes.Length>1&&(bytes[0]==255&&bytes[1]==254||bytes[1]==0);return (unicode?Encoding.Unicode:Encoding.UTF8).GetString(bytes).TrimStart('\ufeff').TrimEnd('\0');}
-        internal static ImageSource Image(string appId,string source,bool logo)
+        internal static ImageSource Image(string appId,string source,bool logo,int pixels=640)
         {
             try{
                 string path=Resolve(appId,source);if(path==null||!File.Exists(path)||new FileInfo(path).Length>8388608)return null;
-                using(var stream=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete)){var image=BitmapDecode.Frozen(stream,logo?96:640);return logo?AppIcons.Normalize(image):image;}
+                using(var stream=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete)){var image=BitmapDecode.Frozen(stream,logo?96:Math.Max(96,Math.Min(1280,pixels)));return logo?AppIcons.Normalize(image):image;}
             }catch{return null;}
         }
         internal static string Resolve(string appId,string source)

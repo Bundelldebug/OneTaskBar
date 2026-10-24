@@ -90,7 +90,7 @@ namespace OneTaskBar
         }
         internal void Show(NotificationEntry item)
         {
-            if(disposed)return;var existing=visible.FirstOrDefault(b=>String.Equals(NotificationStack.AppKey(b.Entry),NotificationStack.AppKey(item),StringComparison.OrdinalIgnoreCase));if(existing!=null){existing.Update(item);Layout();return;}
+            if(disposed)return;if(shell.Buds.ShowNative(item))return;var existing=visible.FirstOrDefault(b=>String.Equals(NotificationStack.AppKey(b.Entry),NotificationStack.AppKey(item),StringComparison.OrdinalIgnoreCase));if(existing!=null){existing.Update(item);Layout();return;}
             while(visible.Count>=3)Close(visible[0],false);
             var banner=new NotificationBanner(item,Open,Close);visible.Add(banner);Shown++;Layout();banner.Appear();expiry.Start();
         }
@@ -162,6 +162,6 @@ namespace OneTaskBar
             entries.RemoveAll(n=>NotificationBanners.Key(n)==NotificationBanners.Key(entry));entries.Add(entry);entries.Sort((a,b)=>b.Created.CompareTo(a.Created));if(entries.Count>32)entries.RemoveRange(32,entries.Count-32);Present();Expires=DateTime.UtcNow.AddSeconds(7);
         }
         internal bool Retain(HashSet<string> current){if(entries.RemoveAll(n=>!current.Contains(NotificationBanners.Key(n)))>0&&entries.Count>0)Present();return entries.Count>0;}
-        void Present(){var entry=entries[0];Entry=entry;sender.Text=entry.App+(entries.Count>1?"  ·  알림 "+entries.Count+"개":"");title.Text=entry.Title;body.Text=entry.Body;body.Visibility=String.IsNullOrWhiteSpace(entry.Body)?Visibility.Collapsed:Visibility.Visible;icon.Child=entry.Icon!=null?AppIcons.Visual(entry.Icon,32):null;icon.Visibility=entry.Icon!=null?Visibility.Visible:Visibility.Collapsed;iconColumn.Width=new GridLength(entry.Icon!=null?45:0);artwork.Source=entry.Artwork;artwork.Visibility=entry.Artwork!=null?Visibility.Visible:Visibility.Collapsed;}
+        void Present(){var entry=entries[0];Entry=entry;sender.Text=entry.App+(entries.Count>1?"  ·  알림 "+entries.Count+"개":"");title.Text=entry.Title;body.Text=entry.Body;body.Visibility=String.IsNullOrWhiteSpace(entry.Body)?Visibility.Collapsed:Visibility.Visible;var source=NotificationStackView.CardIcon(entry);icon.Child=source!=null?AppIcons.Visual(source,32):null;icon.Visibility=source!=null?Visibility.Visible:Visibility.Collapsed;iconColumn.Width=new GridLength(source!=null?45:0);artwork.Source=entry.Artwork;artwork.Visibility=entry.Artwork!=null?Visibility.Visible:Visibility.Collapsed;}
     }
 }

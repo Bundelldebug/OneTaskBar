@@ -5,5 +5,5 @@ using System.Reflection;
 [assembly: AssemblyCompany("OneTaskBar contributors")]
 [assembly: AssemblyCopyright("Copyright 2026 OneTaskBar contributors. MIT License.")]
 // Increment only the patch number unless the owner requests a major/minor change.
-[assembly: AssemblyVersion("8.5.6.0")]
-[assembly: AssemblyFileVersion("8.5.6.0")]
+[assembly: AssemblyVersion("8.5.7.0")]
+[assembly: AssemblyFileVersion("8.5.7.0")]

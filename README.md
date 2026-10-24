@@ -84,6 +84,25 @@ YouTube high-resolution covers are optional and off by default. When enabled, on
 
 Code and the original One TaskBar icon are under the [MIT license](LICENSE). [Third-party notices](THIRD_PARTY_NOTICES.txt) include the Liquid Dock reference. This repository contains no Samsung APK, extracted launcher artwork, wallpapers, fonts, or user screenshots/recordings. Installed third-party logos are read at runtime and remain their owners' property. This is an independent project and is not affiliated with Microsoft or Samsung. Open-source licensing does not guarantee that no third party will ever make a copyright or trademark complaint.
 
+## Code signing policy
+
+Production signing is not yet active. Free signing through SignPath Foundation is being requested and requires provider approval. Planned attribution after acceptance: “Free code signing provided by SignPath.io, certificate by SignPath Foundation”. See the [Code signing policy and privacy details](docs/CODE_SIGNING.md). Unsigned development artifacts are not production-signed releases.
+
+## 8.5.7 (development; signed release pending)
+
+- Start Recent reads the Windows-maintained Recent document shortcuts directly and orders them by the Windows record timestamp. It respects Windows recent-history settings/policies. It no longer scans user folders, the file index or app install dates to synthesize recommendations. This is the native recent-document source, not an export of Windows 11's entire Recommended ranking, recently added app list or cloud recommendations.
+- Recent's former folder action is now Show more: opens a dedicated recent-items page inside Start, with up to 24 items and a Back action. Pins are replaced on that page; search, footer and Phone Link remain available.
+- Individual notification details expand to show the complete wrapped title/body, independently of app-stack expansion, with scrolling in the center. Available artwork is visible on collapsed cards too; absent images remain absent. Native artwork retries are bounded and opening the center refreshes metadata.
+- Galaxy Buds connection capsules appear at the bottom right. Only paired Windows endpoint state changes are observed; no unpaired discovery, pairing, GATT connection or radio change is performed. Initial connected devices are not replayed. Matching Samsung Settings connection banners merge into the same capsule. The app icon is omitted; the actual product image remains. Original battery diagrams use the popup's full content width and remain visible in the center. Optional product artwork is read from installed Samsung Settings resources and is not bundled.
+- Battery values are displayed only when Windows/the original OEM notification supplies them. The popup respects quiet/fullscreen/display state and has a separate setting under Panels, in addition to the global notification-popup setting.
+- Phone Link's battery bolt now requires an explicit native charging state. Unknown and discharging states use an ordinary battery icon.
+- Original notification action buttons, including Connect when supplied, retain their own activation arguments. Rich native battery artwork is not replaced by a later generic connection event. Missing left/right/case percentages are not fabricated.
+- Quick settings shows a single connected Bluetooth device's name or the physical connected-device count, deduplicating Classic/LE endpoints. An optional setting replaces Nearby devices with Galaxy Buds and anchors its app window to the quick panel's corner.
+- Galaxy Buds uses the battery-ring earbud symbol from the installed Galaxy Buds app. With Buds selected as audio output, the volume slider, media output labels in quick settings/expanded media player and keyboard volume HUD use that symbol; the separate mute buttons keep their speaker symbols. The icon is decoded once at 96 pixels and its tinted drawings are cached. No OEM artwork is bundled and One TaskBar's own application icon is unchanged.
+- Button hover growth respects scroll viewports and clipped cards throughout quick settings and detail pages. Press feedback and available-room hover animation remain enabled.
+- The Start footer gear opens One TaskBar settings. The Windows Settings pinned app keeps its own normal action.
+- The current development main/helper passed normal execution and are installed on the test PC with Smart App Control and Defender enabled. They remain unsigned; this does not establish acceptance on other PCs or of another build. No 8.5.7 stable or beta release is published. Production publication requires approved, timestamped publisher signatures and protected-PC checks. The later recent-app save change was rolled back; no security setting, exclusion or trust certificate was changed.
+
 ## 8.5.6
 
 - Ctrl+Shift-click an app in the dock, Start, All apps, Search or overflow to request Windows elevation for supported desktop targets. Packaged apps and settings URIs do not support this route; normal Windows consent applies.

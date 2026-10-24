@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -59,6 +59,7 @@ namespace OneTaskBar
         internal readonly QuickActions Toggles=new QuickActions();
         internal readonly NotificationService Notifications=new NotificationService();
         internal readonly NotificationBanners Banners;
+        internal readonly BudsConnections Buds;
         readonly List<DockHost> docks=new List<DockHost>();
         DockHost trayDock;
         bool trayBusy;
@@ -86,7 +87,7 @@ namespace OneTaskBar
         internal Action<AppEntry> ElevationDispatch;
         internal Action<AppEntry> LaunchDispatch;
         IntPtr recentForeground;
-        HudWindow hud;
+        HudWindow hud;int hudOutputRevision;
         DateTime hudUntil,queryAt,appsAt,commitBrightnessUntil,sourceUntil;
         bool brightnessBusy,runningBusy,disposed,servicesBusy,pinsBusy; bool? exactSource;
         bool guardStarted;
@@ -113,6 +114,7 @@ namespace OneTaskBar
             Demo=demo;
             Placement=new WindowPlacement(this);
             Banners=new NotificationBanners(this);
+            Buds=new BudsConnections(this);
             if(demo) return;
             keys=new VolumeKeys();
             keys.InterceptStart=()=>Desktop&&!Preferences.Current.NativeStartKey;
@@ -186,7 +188,7 @@ namespace OneTaskBar
                         exactSource=Marshal.ReadInt32(lp,20)==0; sourceUntil=DateTime.UtcNow.AddSeconds(2);
                     }
                     if(guid==new Guid("8ffee2c6-2d01-46be-adb9-398addc5b4ff")&&Marshal.ReadInt32(lp,16)>=4)ApplyBrightness(Marshal.ReadInt32(lp,20));
-                    if(guid==new Guid("2b84c20e-ad23-4ddf-93db-05ffbd7efca5")&&Marshal.ReadInt32(lp,16)>=4){DisplayAwake=Marshal.ReadInt32(lp,20)!=0;if(DisplayAwake){servicesAt=appsAt=wifiAt=queryAt=DateTime.MinValue;}else foreach(var dock in docks)dock.Refresh(Power);}
+                    if(guid==new Guid("2b84c20e-ad23-4ddf-93db-05ffbd7efca5")&&Marshal.ReadInt32(lp,16)>=4){DisplayAwake=Marshal.ReadInt32(lp,20)!=0;Buds.Refresh();if(DisplayAwake){servicesAt=appsAt=wifiAt=queryAt=DateTime.MinValue;}else foreach(var dock in docks)dock.Refresh(Power);}
                 }
                 Tick();
             }
@@ -200,7 +202,7 @@ namespace OneTaskBar
         {
             if(disposed) return;
             if(Desktop==value && (value ? docks.Count>0 : true)) return;
-            Desktop=value;Banners.Refresh();if(osdGate!=null)osdGate.Refresh();Preferences.Current.DesktopMode=value;Preferences.Save();if(keys!=null) keys.Enabled=value;
+            Desktop=value;Banners.Refresh();Buds.Refresh();if(osdGate!=null)osdGate.Refresh();Preferences.Current.DesktopMode=value;Preferences.Save();if(keys!=null) keys.Enabled=value;
             if(value) {
                 var imported=ExplorerBridge.ReadApps();if(imported.Count>0){explorerItems=imported;ExplorerBridge.Save(imported);}
                 ExplorerBridge.CacheTray();
@@ -257,7 +259,7 @@ namespace OneTaskBar
         {
             if(disposed)return;
             SyncAutoHide(true);
-            Notifications.Check();Banners.Refresh();
+            Notifications.Check();Banners.Refresh();Buds.Refresh();
             Services.ArtworkModeChanged();
             if(!Preferences.Current.ChargeSoundEnabled)ConnectionSound.Dispose();
             if(Preferences.Current.NativeSearch&&Finder!=null)Finder.Hide();
@@ -366,16 +368,18 @@ namespace OneTaskBar
         }
         bool externalLaunching;
         internal AppEntry SamsungDevices() {return Apps.FirstOrDefault(a=>(a.AppID??"").IndexOf("SamsungMyDevices",StringComparison.OrdinalIgnoreCase)>=0)??Apps.FirstOrDefault(a=>a.Name=="주변 기기 연결");}
+        internal AppEntry GalaxyBuds() {return Apps.FirstOrDefault(a=>(a.AppID??"").IndexOf("SAMSUNGELECTRONICSCO.LTD.GalaxyBuds_",StringComparison.OrdinalIgnoreCase)>=0)??Apps.FirstOrDefault(a=>a.Name=="Galaxy Buds"||a.Name=="갤럭시 버즈");}
+        internal AppEntry QuickDevicesApplication(){return Preferences.Current.QuickGalaxyBuds?GalaxyBuds():SamsungDevices();}
         internal void OpenSamsungSettings()
         {
             var samsung=SamsungSettings();if(samsung==null){if(Quick!=null)Quick.Feedback("삼성 설정이 설치되어 있지 않습니다.");return;}OpenQuickApplication(samsung);
         }
-        internal void OpenSamsungDevices() {var devices=SamsungDevices();if(devices==null){if(Quick!=null)Quick.Feedback("삼성 주변 기기 연결 앱이 설치되어 있지 않습니다.");return;}OpenQuickApplication(devices);}
+        internal void OpenSamsungDevices() {var devices=QuickDevicesApplication();if(devices==null){if(Quick!=null)Quick.Feedback(Preferences.Current.QuickGalaxyBuds?"Galaxy Buds 앱이 설치되어 있지 않습니다.":"삼성 주변 기기 연결 앱이 설치되어 있지 않습니다.");return;}OpenQuickApplication(devices,Preferences.Current.QuickGalaxyBuds);}
         internal void OpenWindowsSettings() {OpenQuickApplication(new AppEntry {Target="ms-settings:"});}
-        async void OpenQuickApplication(AppEntry app)
+        async void OpenQuickApplication(AppEntry app,bool position=false)
         {
             if(externalLaunching||disposed)return;externalLaunching=true;
-            try {bool dismissed=Quick==null||await Quick.DismissAsync();if(dismissed&&!disposed)app.Launch();}
+            try {var screen=Quick!=null&&Quick.IsVisible?Forms.Screen.FromHandle(new WindowInteropHelper(Quick).Handle):Forms.Screen.FromPoint(Forms.Cursor.Position);var anchor=Quick!=null&&Quick.IsVisible?QuickAppPlacement.Rectangle(Native.VisibleArrangeBounds(new WindowInteropHelper(Quick).Handle)):new System.Drawing.Rectangle(screen.WorkingArea.Right-380,screen.WorkingArea.Bottom-650,380,650);bool dismissed=Quick==null||await Quick.DismissAsync();if(dismissed&&!disposed){LaunchApp(app,System.Windows.Input.ModifierKeys.None);appsAt=DateTime.MinValue;if(position)await QuickAppPlacement.Position(app,anchor,screen.WorkingArea,()=>disposed,()=>Running);}}
             catch(Exception error){if(Quick!=null)Quick.Feedback("앱을 열지 못했습니다: "+error.Message);AppLog.Write("quick-launch",error.Message);}
             finally {externalLaunching=false;}
         }
@@ -489,7 +493,7 @@ namespace OneTaskBar
         {
             try{await Task.WhenAll(Services.Refresh(),Notifications.Refresh());}
             catch(Exception error){AppLog.Once("services",error.Message);}
-            finally{servicesBusy=false;if(!disposed)Banners.Refresh();}
+            finally{servicesBusy=false;if(!disposed){Banners.Refresh();Buds.Refresh();}}
         }
         void Tick()
         {
@@ -589,15 +593,16 @@ namespace OneTaskBar
         internal void ShowHud(string kind,double value,bool muted)
         {
             if(!Desktop&&!Demo)return;
-            HudUpdates++;HudKind=kind;hudChangedAt=DateTime.UtcNow;
+            bool volumeStart=kind=="volume"&&(!HudVisible||HudKind!="volume");if(kind!="volume")hudOutputRevision++;HudUpdates++;HudKind=kind;hudChangedAt=DateTime.UtcNow;
             if(hud==null)hud=new HudWindow();
             var screen=Forms.Screen.FromPoint(Forms.Cursor.Position);
             bool position=!hud.IsVisible||hudScreen!=screen.DeviceName;
             if(hudScreen!=screen.DeviceName){new WindowInteropHelper(hud).EnsureHandle();Native.SetWindowPos(new WindowInteropHelper(hud).Handle,IntPtr.Zero,screen.Bounds.Left+20,screen.Bounds.Top+20,0,0,0x1|0x4|0x10);hudScale=Math.Max(96,Native.GetDpiForWindow(new WindowInteropHelper(hud).Handle))/96.0;hudScreen=screen.DeviceName;}
             double scale=hudScale,bottom=(screen.Bounds.Bottom-screen.WorkingArea.Bottom)/scale;
-            hud.Set(kind,value,muted);if(position)hud.ShowAt(screen.Bounds,(screen.Bounds.Width/scale-286)/2,screen.Bounds.Height/scale-Math.Max(bottom,64)-82,286,62);
+            hud.Set(kind,value,muted,Services.OutputName);if(position)hud.ShowAt(screen.Bounds,(screen.Bounds.Width/scale-286)/2,screen.Bounds.Height/scale-Math.Max(bottom,64)-82,286,62);if(volumeStart&&!Demo)RefreshHudOutput(++hudOutputRevision);
             hudUntil=DateTime.UtcNow.AddSeconds(1.5);
         }
+        async void RefreshHudOutput(int revision){try{string output=await BackgroundWork.Run(Native.DefaultAudioOutputName);if(!disposed&&revision==hudOutputRevision&&hud!=null&&hud.IsVisible&&HudKind=="volume"){Services.OutputName=output;hud.Set("volume",Audio.Value,Audio.Muted,output);}}catch(Exception error){AppLog.Once("hud-output-name",error.GetType().Name);}}
         bool ReplaceNativeOsd()
         {
             Audio.Read();if(previousVolume>=0&&(Math.Abs(Audio.Value-previousVolume)>=1||Audio.Muted!=previousMuted)){previousVolume=Audio.Value;previousMuted=Audio.Muted;ShowHud("volume",Audio.Value,Audio.Muted);return true;}
@@ -692,7 +697,7 @@ namespace OneTaskBar
             Previews.Dispose();if(brightnessEvents!=null)brightnessEvents.Dispose();
             if(keys!=null) keys.Dispose();
             if(osdGate!=null)osdGate.Dispose();
-            Banners.Dispose();Toggles.Dispose();Services.Dispose();Notifications.Dispose();
+            Banners.Dispose();Buds.Dispose();Toggles.Dispose();Services.Dispose();Notifications.Dispose();
             if(Finder!=null)Finder.Close();
             if(StartMenu!=null)StartMenu.Close();
             if(NotificationLink!=null)NotificationLink.Close();

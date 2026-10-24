@@ -36,7 +36,7 @@ namespace OneTaskBar
             if(disturbBusy)return;disturbBusy=true;disturb.IsEnabled=false;try{await shell.Toggles.Disturb.Toggle();}catch(Exception error){disturb.ToolTip=error.Message;}finally{disturbBusy=false;Refresh();}
         }
         void RequestAccess(){shell.ShowNotificationConnection();}
-        internal async void RefreshNotifications() {await shell.Notifications.Refresh();signature=null;if(IsVisible)Refresh();}
+        internal async void RefreshNotifications() {if(!shell.Demo)shell.Notifications.Invalidate();await shell.Notifications.Refresh();signature=null;if(IsVisible)Refresh();}
         async void OpenNotification(NotificationEntry item)
         {
             if(opening)return;opening=true;
