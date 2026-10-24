@@ -88,6 +88,17 @@ Code and the original One TaskBar icon are under the [MIT license](LICENSE). [Th
 
 Production signing is not yet active. Free signing through SignPath Foundation is being requested and requires provider approval. Planned attribution after acceptance: “Free code signing provided by SignPath.io, certificate by SignPath Foundation”. See the [Code signing policy and privacy details](docs/CODE_SIGNING.md). Unsigned development artifacts are not production-signed releases.
 
+## 9.0.0 beta 1 (development; signing approval pending)
+
+- The first group in app settings selects **UI version: 8.5 / 9.0 beta**. Existing installations retain 8.5; the new grid uses a separate `quick-layout-9.json`. Switching versions or resetting the new grid preserves the original order and dimensions.
+- In **Edit layout**, drag each quick-settings widget to move it and drag its corner to resize it. Regular widgets support 1–4 columns and 1–5 rows on a four-column grid. A 1×1 widget is circular. Overlapping neighbors move down, with scrolling for longer layouts.
+- Brightness and volume are borderless, independent from the dark-mode and mute widgets. Each supports horizontal 1×1–4×1 or vertical 1×1–1×5. Buds output symbols and the separate speaker mute button retain their existing behavior.
+- The medium control height is 64 DIP, shared by the keyboard volume/brightness HUD. Feature toggles expand inside the panel into the original ten-icon labeled grid, then restore the saved dimensions and positions on collapse.
+- The media widget has a minimum editable size of 2×2. Only the default 4×2 size temporarily contracts to one row when no media session is active, bringing lower widgets up. Active/paused sessions, custom sizes and editing retain the saved dimensions; presentation changes are never saved over the user layout.
+- Home-shaped icons identify One TaskBar settings in quick settings, Start, search and the dock menu. Windows Settings and installed Samsung Settings keep their own icons.
+- Arrow keys move/resize focused edit handles; Escape cancels the current drag. Hidden widgets return through **Add item**. Right-click or Shift+F10 opens connection management on a 1×1 Wi-Fi/Bluetooth widget.
+- Beta source metadata is not a published release. Provider signing approval and final distribution validation are still required.
+
 ## 8.5.7 (development; signed release pending)
 
 - Start Recent reads the Windows-maintained Recent document shortcuts directly and orders them by the Windows record timestamp. It respects Windows recent-history settings/policies. It no longer scans user folders, the file index or app install dates to synthesize recommendations. This is the native recent-document source, not an export of Windows 11's entire Recommended ranking, recently added app list or cloud recommendations.

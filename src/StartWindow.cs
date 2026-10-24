@@ -57,7 +57,7 @@ namespace OneTaskBar
             var tools=new StackPanel {Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right};
             tools.Children.Add(Tool("folder","문서",()=>OpenFolder(Environment.SpecialFolder.MyDocuments)));
             tools.Children.Add(Tool("phone","휴대폰과 연결",()=>OpenPhone("ms-settings:mobile-devices-addphone-direct")));
-            tools.Children.Add(Tool("settings","One TaskBar 설정",async()=> {if(await DismissAsync())shell.OpenHomeSettings();}));
+            tools.Children.Add(Tool("home","One TaskBar 설정",async()=> {if(await DismissAsync())shell.OpenHomeSettings();}));
             Button power=null;power=Tool("power","전원",()=> {power.ContextMenu=PowerMenu(power);power.ContextMenu.IsOpen=true;});tools.Children.Add(power);footer.Children.Add(tools);DockPanel.SetDock(footer,Dock.Bottom);root.Children.Add(footer);
 
             pinHeading=Heading("고정됨");var all=Paint.Action("모든 앱  ›",()=>shell.ToggleDrawer(null));all.HorizontalAlignment=HorizontalAlignment.Right;all.FontSize=11;all.Height=31;pinHeading.Children.Add(all);body.Children.Add(pinHeading);

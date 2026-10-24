@@ -97,7 +97,7 @@ namespace OneTaskBar
             Grid.SetColumn(battery,2);Panel.SetZIndex(battery,10);status.Children.Add(battery);
             var time=Paint.Button(clock,()=>controller.ToggleNotifications(this),"알림센터");time.Padding=new Thickness(0);time.Background=Brushes.Transparent;
             Grid.SetColumn(time,3); status.Children.Add(time); Status.Surface.Child=status;
-            var menu=new ContextMenu(); var settings=new MenuItem {Header="One TaskBar 설정",Icon=new Glyph("settings",18){Color=Paint.Ink}};settings.Click+=(s,e)=>controller.ShowWelcome();menu.Items.Add(settings);
+            var menu=new ContextMenu(); var settings=new MenuItem {Header="One TaskBar 설정",Icon=new Glyph("home",18){Color=Paint.Ink}};settings.Click+=(s,e)=>controller.ShowWelcome();menu.Items.Add(settings);
             var resetOrder=new MenuItem {Header="앱 순서 초기화"};resetOrder.Click+=(s,e)=>controller.ResetDockOrder();menu.Items.Add(resetOrder);
             var restore=new MenuItem {Header="Windows 작업표시줄로 돌아가기"};restore.Click+=(s,e)=>controller.SetDesktop(false);menu.Items.Add(restore);Start.ContextMenu=menu;
             Rebuild();
@@ -278,7 +278,11 @@ namespace OneTaskBar
     internal sealed class HudWindow : GlassWindow
     {
         readonly PillSlider slider=new PillSlider("volume") {Margin=new Thickness(10,9,10,9),IsHitTestVisible=false,AnimateValue=false,Light=true};
-        internal HudWindow() { Title="One TaskBar · 밝기 및 음량"; Width=286; Height=62; Radius=31;Dark=false;Surface.Background=GrayPanel.Glass; Surface.CornerRadius=new CornerRadius(31); Surface.Child=slider; ShowActivated=false;
+        internal readonly bool Modern=Preferences.Current.UIVersion>=90;
+        internal double DisplayHeight {get{return Modern?QuickWidgetBoard.ControlHeight:62;}}
+        internal PillSlider Slider {get{return slider;}}
+        internal HudWindow() { Title="One TaskBar · 밝기 및 음량"; Width=286; Height=DisplayHeight; Radius=DisplayHeight/2;Dark=Modern;Surface.Background=Modern?QuickPanel.Glass:GrayPanel.Glass; Surface.CornerRadius=new CornerRadius(Radius); Surface.Child=slider; ShowActivated=false;
+            if(Modern){slider.Margin=new Thickness(0);slider.Height=Double.NaN;slider.MinWidth=0;slider.NoTrackBorder=true;slider.LinearFill=true;Surface.BorderThickness=new Thickness(0);Surface.BorderBrush=Brushes.Transparent;}
             SourceInitialized+=(s,e)=> { var h=new WindowInteropHelper(this).Handle; Native.SetWindowLong(h,-20,Native.GetWindowLong(h,-20)|0x80|0x08000000); };
         }
         bool budsOutput,deviceIconRequested;ImageSource deviceSymbol;

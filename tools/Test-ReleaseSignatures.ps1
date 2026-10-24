@@ -11,7 +11,9 @@ if($pin -notmatch '\A[0-9A-F]{40}\z'){throw 'A publisher certificate thumbprint 
 if(-not $Report){$Report=Join-Path $project '.qa-data\release-signatures.json'}
 $files=@('dist\OneTaskBar.exe','dist\OneTaskBar.Guard.exe','dist\Read-Apps.ps1','dist\Install.ps1','dist\Uninstall.ps1')
 if(-not $PayloadOnly){$files+='release\OneTaskBar-Setup.exe'}
-$version=[Diagnostics.FileVersionInfo]::GetVersionInfo((Join-Path $project 'dist\OneTaskBar.exe')).FileVersion
+$mainInfo=[Diagnostics.FileVersionInfo]::GetVersionInfo((Join-Path $project 'dist\OneTaskBar.exe'))
+$version=$mainInfo.FileVersion
+$productVersion=$mainInfo.ProductVersion
 $rows=@()
 foreach($relative in $files){
     $path=Join-Path $project $relative
@@ -24,12 +26,12 @@ foreach($relative in $files){
     $metadata=$true
     if([IO.Path]::GetExtension($path) -eq '.exe'){
         $info=[Diagnostics.FileVersionInfo]::GetVersionInfo($path)
-        $metadata=$info.ProductName -eq 'One TaskBar' -and $info.FileVersion -eq $version
+        $metadata=$info.ProductName -eq 'One TaskBar' -and $info.FileVersion -eq $version -and $info.ProductVersion -eq $productVersion
     }
     $rows+=[pscustomobject]@{File=$relative;Sha256=(Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash;Status=$signature.Status.ToString();ExpectedPublisher=[bool]$matches;TimestampPresent=$null -ne $timestamp;MetadataMatches=[bool]$metadata;Passed=[bool]($trusted -and $matches -and $timestamp -and $metadata)}
 }
 $passed=@($rows|Where-Object {-not $_.Passed}).Count -eq 0
-$record=[pscustomobject]@{Passed=$passed;Version=$version;ExpectedSigner=$pin;PayloadOnly=[bool]$PayloadOnly;SecuritySettingsChanged=$false;Files=$rows}
+$record=[pscustomobject]@{Passed=$passed;Version=$version;ProductVersion=$productVersion;ExpectedSigner=$pin;PayloadOnly=[bool]$PayloadOnly;SecuritySettingsChanged=$false;Files=$rows}
 $parent=Split-Path -Parent ([IO.Path]::GetFullPath($Report));New-Item -ItemType Directory -Path $parent -Force|Out-Null
 [IO.File]::WriteAllText($Report,($record|ConvertTo-Json -Depth 5),[Text.UTF8Encoding]::new($false))
 if(-not $passed){throw 'Release stopped: every EXE and shipped PowerShell script needs a valid, timestamped signature from the approved publisher. See the signature report.'}

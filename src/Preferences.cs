@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Web.Script.Serialization;
 using Microsoft.Win32;
@@ -13,6 +13,7 @@ namespace OneTaskBar
         public bool NotificationPopups=true;
         public bool BudsConnectionPopups=true;
         public bool QuickGalaxyBuds=false;
+        public int UIVersion=85;
         public bool NativeStartKey=true,NativeSearch=false;
         public bool NativeStartButton=false;
         public bool QuickSliderScroll=false;

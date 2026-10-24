@@ -136,6 +136,7 @@ namespace OneTaskBar
             else if(kind=="battery-plain") {dc.DrawRoundedRectangle(null,pen,new Rect(1,6,20,12),3,3);line(23,10,23,14);dc.DrawRoundedRectangle(brush,null,new Rect(4,9,12,6),1,1);}
             else if(kind=="person") { dc.DrawEllipse(brush,null,new Point(12,4),2.5,2.5); line(3,9,21,9); line(12,7,12,15); line(12,15,7,23); line(12,15,17,23); }
             else if(kind=="settings") dc.DrawGeometry(brush,null,gear);
+            else if(kind=="home") dc.DrawGeometry(null,pen,Geometry.Parse("M2,11 L12,2 22,11 M5,9 L5,21 10,21 10,14 14,14 14,21 19,21 19,9"));
             else if(kind=="windows-settings") dc.DrawGeometry(brush,null,windowsGear);
             else if(kind=="window") { dc.DrawRoundedRectangle(null,pen,new Rect(2,3,20,18),2,2); line(2,8,22,8); }
             else if(kind=="desktops") {dc.DrawGeometry(null,pen,Geometry.Parse("M8,5 L8,3 Q8,2 10,2 L21,2 Q23,2 23,4 L23,15 Q23,17 21,17 L19,17"));dc.DrawRoundedRectangle(null,pen,new Rect(1,7,17,15),2,2);}
@@ -188,6 +189,7 @@ namespace OneTaskBar
         public bool Tablet=true,AnimateValue=true;
         public bool Light,DarkTrack;
         public bool ShowIcon=true,Slim,WheelAdjust=true;
+        internal bool Vertical,NoTrackBorder,LinearFill;
         public event Action<double> Changed;
         public double Value { get { return value; } set { double next=Clamp(value);if(this.value==next)return;this.value=next;double from=(double)GetValue(DisplayValueProperty);BeginAnimation(DisplayValueProperty,null);SetValue(DisplayValueProperty,next);if(AnimateValue&&!dragging&&Motion.Enabled&&IsVisible&&PresentationSource.FromVisual(this)!=null)BeginAnimation(DisplayValueProperty,Motion.Tween(from,next,160));InvalidateVisual(); } }
         public static double Clamp(double value) { return Double.IsNaN(value) || Double.IsInfinity(value) ? 0 : Math.Max(0,Math.Min(100,value)); }
@@ -201,18 +203,21 @@ namespace OneTaskBar
         {
             double w=ActualWidth,h=ActualHeight; if(w<=0 || h<=0) return;
             double shown=(double)GetValue(DisplayValueProperty);string iconKind=Kind.StartsWith("volume",StringComparison.Ordinal)?SoundIcon.For(value,false,IsEnabled):Kind;
-            bool capsule=Tablet&&ShowIcon&&!Slim;double thickness=Slim?6:h,top=(h-thickness)/2;var track=new Rect(0,top,w,thickness);var filled=capsule?CapsuleFillBounds(w,h,shown):new Rect(0,top,FillWidth(w,shown),thickness);double fillRadius=Math.Min(filled.Width,filled.Height)/2;var fill=new RectangleGeometry(filled,fillRadius,fillRadius);
-            dc.DrawRoundedRectangle(Paint.Brush(DarkTrack?"#26000000":IsEnabled ? "#3C77817F" : "#286E7775"),new Pen(Paint.Brush("#288B9692"),.7),track,thickness/2,thickness/2);
+            double axis=Vertical?h:w,cross=Vertical?w:h;bool capsule=Tablet&&ShowIcon&&!Slim&&!LinearFill;double thickness=Slim?6:cross,top=(cross-thickness)/2;var track=Vertical?new Rect(top,0,thickness,h):new Rect(0,top,w,thickness);var logical=capsule?CapsuleFillBounds(axis,cross,shown):new Rect(0,top,FillWidth(axis,shown),thickness);var filled=Vertical?new Rect(logical.Y,h-logical.Right,logical.Height,logical.Width):logical;double fillRadius=Math.Min(filled.Width,filled.Height)/2;var fill=new RectangleGeometry(filled,fillRadius,fillRadius);
+            dc.DrawRoundedRectangle(Paint.Brush(DarkTrack?"#26000000":IsEnabled ? "#3C77817F" : "#286E7775"),NoTrackBorder?null:new Pen(Paint.Brush("#288B9692"),.7),track,thickness/2,thickness/2);
+            bool clipTrack=LinearFill&&!Slim;if(clipTrack)dc.PushClip(new RectangleGeometry(track,thickness/2,thickness/2));
             double fillOpacity=1;if(shown>0)dc.DrawGeometry(Tablet?Paint.ControlWhite:Brushes.Black,null,fill);
-            var c=new Point(h*(capsule?.5:.70),h/2); double icon=h*.44;
+            var c=Vertical?new Point(w/2,h-cross*(Tablet&&ShowIcon&&!Slim?.5:.70)):new Point(cross*(Tablet&&ShowIcon&&!Slim?.5:.70),h/2); double icon=cross*.44;
             if(ShowIcon)DrawIcon(dc,iconKind,DarkTrack?Paint.ControlWhite:Tablet&&!Light?Paint.Brush("#D8E8EDEA"):Paint.Brush("#FF303A36"),c,icon);
             if(ShowIcon&&shown>0) {dc.PushOpacity(fillOpacity);dc.PushClip(fill);DrawIcon(dc,iconKind,Tablet?Paint.Brush(!Light&&Kind=="brightness"?"#FFEC7D4E":"#FF35413B"):Paint.Brush("#FFF5F5F1"),c,icon);dc.Pop();dc.Pop();}
-            if(Slim&&IsEnabled)dc.DrawEllipse(Paint.ControlWhite,null,new Point(FillWidth(Math.Max(0,w-10),shown)+5,h/2),4.5,4.5);
-            if(IsKeyboardFocused) dc.DrawRoundedRectangle(null,new Pen(Paint.Brush("#9ED4F0E5"),1.5),new Rect(1,1,w-2,h-2),h/2,h/2);
+            if(clipTrack)dc.Pop();
+            if(Slim&&IsEnabled)dc.DrawEllipse(Paint.ControlWhite,null,Vertical?new Point(w/2,h-FillWidth(Math.Max(0,h-10),shown)-5):new Point(FillWidth(Math.Max(0,w-10),shown)+5,h/2),4.5,4.5);
+            if(IsKeyboardFocused) dc.DrawRoundedRectangle(null,new Pen(Paint.Brush("#9ED4F0E5"),1.5),new Rect(1,1,Math.Max(0,w-2),Math.Max(0,h-2)),Math.Min(w,h)/2,Math.Min(w,h)/2);
         }
-        void Update(double x) {bool capsule=Tablet&&ShowIcon&&!Slim;double diameter=capsule?Math.Min(ActualWidth,ActualHeight):0;Value=Math.Round(Clamp((x-diameter/2)/Math.Max(1,ActualWidth-diameter)*100));if(Changed!=null)Changed(Value);}
-        protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e) { base.OnMouseLeftButtonDown(e); Focus(); dragging=true; CaptureMouse(); Update(e.GetPosition(this).X); e.Handled=true; }
-        protected override void OnMouseMove(MouseEventArgs e) { if(dragging && e.LeftButton==MouseButtonState.Pressed) Update(e.GetPosition(this).X); }
+        internal static double PositionValue(double width,double height,Point point,bool vertical,bool capsule){double axis=vertical?height:width,x=vertical?height-point.Y:point.X,diameter=capsule?Math.Min(width,height):0;return Math.Round(Clamp((x-diameter/2)/Math.Max(1,axis-diameter)*100));}
+        void Update(Point point) {Value=PositionValue(ActualWidth,ActualHeight,point,Vertical,Tablet&&ShowIcon&&!Slim&&!LinearFill);if(Changed!=null)Changed(Value);}
+        protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e) { base.OnMouseLeftButtonDown(e); Focus(); dragging=true; CaptureMouse(); Update(e.GetPosition(this)); e.Handled=true; }
+        protected override void OnMouseMove(MouseEventArgs e) { if(dragging && e.LeftButton==MouseButtonState.Pressed) Update(e.GetPosition(this)); }
         protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e) { dragging=false; ReleaseMouseCapture(); e.Handled=true; }
         protected override void OnLostMouseCapture(MouseEventArgs e) { dragging=false; }
         protected override void OnMouseWheel(MouseWheelEventArgs e) {if(!WheelAdjust){base.OnMouseWheel(e);return;}Value+=Math.Sign(e.Delta)*2; if(Changed!=null) Changed(Value); e.Handled=true; }
@@ -228,6 +233,7 @@ namespace OneTaskBar
             public PillPeer(PillSlider owner):base(owner) { }
             protected override AutomationControlType GetAutomationControlTypeCore() { return AutomationControlType.Slider; }
             protected override string GetClassNameCore() { return "OneTaskBar.PillSlider"; }
+            protected override AutomationOrientation GetOrientationCore(){return Pill.Vertical?AutomationOrientation.Vertical:AutomationOrientation.Horizontal;}
             public override object GetPattern(PatternInterface pattern) { return pattern==PatternInterface.RangeValue ? this : base.GetPattern(pattern); }
             public bool IsReadOnly { get { return !Pill.IsEnabled; } } public double LargeChange { get { return 10; } } public double SmallChange { get { return 2; } }
             public double Maximum { get { return 100; } } public double Minimum { get { return 0; } } public double Value { get { return Pill.Value; } }

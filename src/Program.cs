@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -55,6 +55,7 @@ namespace OneTaskBar
             if(args.Contains("--launcher-keyboard-probe"))return LauncherInputChecks.Run();
             if(args.Contains("--admin-targets-probe"))return AdminLaunch.Probe();
             if(args.Contains("--window-drop-probe"))return WindowDropChecks.Run();
+            if(args.Contains("--quick9-probe"))return QuickWidgetChecks.Run();
             if(args.Contains("--feature-857-probe"))return Feature857Checks.Run();
             if(args.Contains("--feature-857-live"))return Feature857Checks.Live();
             if(args.Contains("--desktop-behavior-probe"))return DesktopBehaviorChecks.Run();
@@ -134,7 +135,7 @@ namespace OneTaskBar
         {
             var checks=new List<string>();
             try {
-                EfficiencyChecks.Validate(checks);RuntimeCadence.Check(checks);RuntimeDockOrder.Check();checks.Add("stable-launch-order");LauncherLayout.Check();checks.Add("compact-launcher-layout");NowBarLayout.Check();checks.Add("nowbar-monitor-layout");ArtworkPalette.Check();checks.Add("artwork-color-contrast");MediaArtwork.Check(checks);StartDataChecks.Validate(checks);NotificationAssetChecks.Validate(checks);NotificationStackChecks.Validate(checks);QuickSizeChecks.Validate(checks);SamsungPerformanceChecks.Validate(checks);NetworkRouteInfo.Validate(checks);LauncherInputChecks.Validate(checks);DesktopBehaviorChecks.Validate(checks);TaskbarLogoChecks.Validate(checks);Feature856Checks.Validate(checks);Feature857Checks.Validate(checks);
+                EfficiencyChecks.Validate(checks);RuntimeCadence.Check(checks);RuntimeDockOrder.Check();checks.Add("stable-launch-order");LauncherLayout.Check();checks.Add("compact-launcher-layout");NowBarLayout.Check();checks.Add("nowbar-monitor-layout");ArtworkPalette.Check();checks.Add("artwork-color-contrast");MediaArtwork.Check(checks);StartDataChecks.Validate(checks);NotificationAssetChecks.Validate(checks);NotificationStackChecks.Validate(checks);QuickSizeChecks.Validate(checks);SamsungPerformanceChecks.Validate(checks);NetworkRouteInfo.Validate(checks);LauncherInputChecks.Validate(checks);DesktopBehaviorChecks.Validate(checks);TaskbarLogoChecks.Validate(checks);Feature856Checks.Validate(checks);Feature857Checks.Validate(checks);QuickWidgetChecks.Validate(checks);
                 foreach(double width in new double[] { 1,200,288,344,600 }) foreach(double value in new double[] { -20,0,1,33,99,100,120 }) {
                     double f=PillSlider.FillWidth(width,value);
                     if(f<0 || f>width || (value==100 && f!=width)) throw new Exception("Slider endpoint "+width+" "+value);

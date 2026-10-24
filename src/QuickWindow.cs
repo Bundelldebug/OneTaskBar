@@ -18,15 +18,19 @@ namespace OneTaskBar
     internal sealed class QuickWindow : GlassWindow
     {
         readonly ShellController shell;
+        readonly QuickGridSurface gridUI;
+        internal bool Modern {get{return gridUI!=null;}}
+        internal QuickGridSurface GridUI {get{return gridUI;}}
+        internal bool TogglePending(string key){return pendingToggles.Contains(key);}
         readonly PillSlider brightness=new PillSlider("brightness"),volume=new PillSlider("volume");
         readonly BatteryPill battery=new BatteryPill {Width=62,Height=25};
         readonly TextBlock time=Paint.TextBlock("",23,Paint.Text),date=Paint.TextBlock("",11,Paint.Muted);
         readonly TextBlock wifiName=Paint.TextBlock("연결 안 됨",11,Paint.Muted),bluetoothState=Paint.TextBlock("기기 연결",11,Paint.Muted);
-        internal string BluetoothCaption {get{return bluetoothState.Text;}}
-        TextBlock devicesName;Glyph devicesIcon;Border devicesIconHost;bool budsIconRequested,budsAudio;int budsIconRevision;ImageSource budsSymbol;readonly Image devicesNativeIcon=new Image {Width=22,Height=22,Stretch=Stretch.Uniform};internal string DevicesLabel {get{return devicesName.Text;}}
-        internal bool BudsIconLoaded {get{return devicesIconHost.Child is Image;}}
-        internal bool VolumeBudsIcon {get{return volume.HasDeviceIcon;}}
-        internal bool MediaBudsIcon {get{return mediaPlayer.OutputBudsIcon;}}
+        internal string BluetoothCaption {get{return Modern?gridUI.BluetoothCaption:bluetoothState.Text;}}
+        TextBlock devicesName;Glyph devicesIcon;Border devicesIconHost;bool budsIconRequested,budsAudio;int budsIconRevision;ImageSource budsSymbol;readonly Image devicesNativeIcon=new Image {Width=22,Height=22,Stretch=Stretch.Uniform};internal string DevicesLabel {get{return Modern?gridUI.DevicesLabel:devicesName.Text;}}
+        internal bool BudsIconLoaded {get{return Modern?gridUI.BudsIconLoaded:devicesIconHost.Child is Image;}}
+        internal bool VolumeBudsIcon {get{return Modern?gridUI.Volume.HasDeviceIcon:volume.HasDeviceIcon;}}
+        internal bool MediaBudsIcon {get{return Modern?gridUI.MediaBudsIcon:mediaPlayer.OutputBudsIcon;}}
         async void LoadBudsIcon(){budsIconRequested=true;int request=++budsIconRevision;try{var image=await BackgroundWork.Run(BudsDeviceData.ShortcutIcon);if(image!=null&&request==budsIconRevision){budsSymbol=image;UpdateBudsIcons();}}catch(Exception error){AppLog.Once("quick-buds-icon",error.GetType().Name);}}
         void UpdateBudsIcons(){if(Preferences.Current.QuickGalaxyBuds&&budsSymbol!=null){devicesNativeIcon.Source=budsSymbol;if(devicesIconHost.Child!=devicesNativeIcon)devicesIconHost.Child=devicesNativeIcon;}else if(devicesIconHost.Child!=devicesIcon)devicesIconHost.Child=devicesIcon;volume.SetDeviceIcon(budsAudio?budsSymbol:null);}
         readonly MediaPlayerView mediaPlayer;
@@ -41,13 +45,13 @@ namespace OneTaskBar
         readonly List<Glyph> soundGlyphs=new List<Glyph>();
         readonly Dictionary<string,QuickToggleButton> toggleButtons=new Dictionary<string,QuickToggleButton>();
         readonly HashSet<string> pendingToggles=new HashSet<string>();
-        internal QuickToggleButton FindToggle(string key){return toggleButtons[key];}
-        internal string[] ToggleKeys {get{return toggleButtons.Keys.ToArray();}}
+        internal QuickToggleButton FindToggle(string key){return Modern?gridUI.Toggles[key]:toggleButtons[key];}
+        internal string[] ToggleKeys {get{return Modern?gridUI.Toggles.Keys.ToArray():toggleButtons.Keys.ToArray();}}
         readonly List<TextBlock> actionNames=new List<TextBlock>();
         readonly TextBlock notice=Paint.TextBlock("",11,Paint.Muted);
         bool themeBusy;bool? darkMode;long clockSecond=-1;DateTime calendarDate;
         System.Windows.Media.ImageSource samsungIcon;string samsungIconKey;
-        internal bool SamsungIconLoaded {get{return samsungIcon!=null;}}
+        internal bool SamsungIconLoaded {get{return Modern?gridUI.SamsungIconLoaded:samsungIcon!=null;}}
         async void LoadSamsungIcon(AppEntry app)
         {
             try{var icon=app.Icon??await BackgroundWork.Run(()=>AppIcons.Get(app));if(icon!=null&&samsungIconKey==app.Key){samsungIcon=icon;samsungSettings.Content=AppIcons.Visual(icon,24);}}catch(Exception error){AppLog.Once("samsung-settings-icon",error.Message);}
@@ -74,19 +78,20 @@ namespace OneTaskBar
         readonly TextBlock editLabel=Paint.TextBlock("배치 편집",11,Paint.Text);
         readonly Border editHint;
         bool editing,layoutDirty;
-        internal bool Editing {get{return editing;}}
-        internal bool Expanded {get{return expanded;}}
+        internal bool Editing {get{return Modern?gridUI.Board.Editing:editing;}}
+        internal bool Expanded {get{return Modern?gridUI.Expanded:expanded;}}
         bool expanded;int actionMotion;readonly Grid actionArea=new Grid {Height=62,ClipToBounds=true};
         internal QuickWindow(ShellController controller)
         {
             shell=controller;Title="One TaskBar · 빠른 설정";Width=380;Height=650;Radius=30;Dark=true;Surface.CornerRadius=new CornerRadius(30);Surface.Background=QuickPanel.Glass;Surface.BorderBrush=Paint.Brush("#48FFFFFF");Surface.BorderThickness=new Thickness(.7);
+            if(Preferences.Current.UIVersion>=90){gridUI=new QuickGridSurface(this,shell);Surface.Child=gridUI.Root;Deactivated+=(s,e)=>{if(!Program.Inspectable&&IsVisible&&!IsMouseOver&&!gridUI.Board.GestureActive)Hide();};return;}
             var root=new DockPanel {Margin=new Thickness(18,19,18,14)};
             var header=new Grid {Height=47,Margin=new Thickness(4,0,2,12)};
             var heading=new StackPanel();time.FontWeight=FontWeights.SemiBold;heading.Children.Add(time);heading.Children.Add(date);header.Children.Add(heading);
             var tools=new StackPanel {Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Center};
             samsungSettings=Paint.Button(samsungIcon!=null?AppIcons.Visual(samsungIcon,24):(UIElement)new Glyph("settings",22),()=>shell.OpenSamsungSettings(),"삼성 설정");samsungSettings.Width=samsungSettings.Height=34;samsungSettings.Padding=new Thickness(0);samsungSettings.Background=Brushes.Transparent;tools.Children.Add(samsungSettings);
             tools.Children.Add(topPower=IconButton("power",()=>ShowPowerMenu(topPower),"전원",34));
-            tools.Children.Add(IconButton("settings",()=>shell.OpenHomeSettings(),"One TaskBar 설정",34));header.Children.Add(tools);
+            tools.Children.Add(IconButton("home",()=>shell.OpenHomeSettings(),"One TaskBar 설정",34));header.Children.Add(tools);
             DockPanel.SetDock(header,Dock.Top);root.Children.Add(header);
             var footer=new Grid {Height=31,Margin=new Thickness(3,9,3,0)};
             var power=Paint.Button(battery,()=>shell.ShowDetail("power"),"배터리 및 전원");power.Background=Brushes.Transparent;power.Padding=new Thickness(0);power.HorizontalAlignment=HorizontalAlignment.Left;footer.Children.Add(power);
@@ -142,8 +147,13 @@ namespace OneTaskBar
             brightness.Changed+=v=>shell.Bright(v);volume.Changed+=v=>shell.Volume(v);
             Deactivated+=(s,e)=> {if(!Program.Inspectable&&IsVisible&&!IsMouseOver&&!DragReorder.Active)Hide();};
         }
+        protected override void OnPreviewKeyDown(KeyEventArgs e)
+        {
+            if(Modern&&e.Key==Key.Escape&&(gridUI.Board.GestureActive||gridUI.Board.Editing)){if(gridUI.Board.GestureActive)gridUI.Board.Cancel();else gridUI.SetEditing(false);e.Handled=true;return;}base.OnPreviewKeyDown(e);
+        }
         internal void SetCollapsedGrid(int columns,int rows)
         {
+            if(Modern){gridUI.Board.Layout.Resize("toggles",columns,rows,false);gridUI.Board.Save();gridUI.Board.Reflow(true);return;}
             columns=QuickToggleSize.Columns(columns);rows=QuickToggleSize.Rows(rows);
             bool changed=columns!=QuickToggleSize.Columns(Preferences.Current)||rows!=QuickToggleSize.Rows(Preferences.Current);
             Preferences.Current.QuickToggleColumns=columns;Preferences.Current.QuickToggleRows=rows;expanded=false;editingActions=false;PresentActions(false);
@@ -151,21 +161,25 @@ namespace OneTaskBar
         }
         internal void BeginToggleResize()
         {
+            if(Modern){gridUI.Board.Begin("toggles",true);return;}
             if(!editing||editingActions||resizingActions)return;resizingActions=true;
             resizeColumns=QuickToggleSize.Columns(Preferences.Current);resizeRows=QuickToggleSize.Rows(Preferences.Current);resizeAvailable=ActionAvailableWidth;resizeWidth=QuickToggleSize.Width(resizeAvailable,resizeColumns);resizeHeight=QuickToggleSize.Height(resizeRows);
         }
         internal void ResizeToggleBy(double horizontal,double vertical)
         {
+            if(Modern){gridUI.Board.Drag();return;}
             if(!resizingActions)return;int columns=QuickToggleSize.SnapColumns(resizeWidth+horizontal,resizeAvailable,QuickToggleSize.Columns(Preferences.Current)),rows=QuickToggleSize.SnapRows(resizeHeight+vertical,QuickToggleSize.Rows(Preferences.Current));
             if(columns!=QuickToggleSize.Columns(Preferences.Current)||rows!=QuickToggleSize.Rows(Preferences.Current))SetCollapsedGrid(columns,rows);
         }
         internal void FinishToggleResize(bool cancelled)
         {
+            if(Modern){gridUI.Board.End(cancelled);return;}
             if(!resizingActions)return;resizingActions=false;if(cancelled)SetCollapsedGrid(resizeColumns,resizeRows);FlushSize();
         }
         void FlushSize(){if(!sizeSave.IsEnabled)return;sizeSave.Stop();Preferences.Save();}
         internal void EditActions(bool value)
         {
+            if(Modern){gridUI.ExpandToggles(value);return;}
             if(!editing)return;editingActions=value;expanded=false;PresentActions(false);
         }
         bool AllActions {get{return expanded||(editing&&editingActions);}}
@@ -185,6 +199,7 @@ namespace OneTaskBar
         }
         internal void EditLayout(bool value)
         {
+            if(Modern){gridUI.SetEditing(value);return;}
             if(resizeGrip.IsDragging)resizeGrip.CancelDrag();editing=value;editingActions=false;expanded=false;if(!value)FlushSize();editLabel.Text=value?"완료":"배치 편집";editHint.Visibility=value?Visibility.Visible:Visibility.Collapsed;
             foreach(var column in gripColumns)column.Width=new GridLength(value?18:0);foreach(var grip in grips)grip.Visibility=value?Visibility.Visible:Visibility.Collapsed;
             SetHitTesting(body,!value);PresentActions(false);body.InvalidateMeasure();body.InvalidateArrange();
@@ -199,16 +214,17 @@ namespace OneTaskBar
         void ApplyOrder() {foreach(var group in groups)group.Apply();PresentActions(false);body.InvalidateMeasure();body.InvalidateArrange();}
         internal bool LayoutFits()
         {
+            if(Modern)return gridUI.Board.Layout.Fits();
             double bottom=0;foreach(FrameworkElement element in body.Children){double top=element.TranslatePoint(new Point(),body).Y;if(top<bottom-.5)return false;bottom=top+element.ActualHeight;}return true;
         }
-        internal double ActionWidth {get{return actionFrame.ActualWidth;}}
-        internal double ActionHeight {get{return actionArea.ActualHeight;}}
-        internal QuickResizeGrip ResizeGrip {get{return resizeGrip;}}
-        internal Button ActionEditor {get{return actionEdit;}}
-        internal int VisibleActions {get{return actionButtons.Children.Cast<FrameworkElement>().Count(e=>e.Visibility==Visibility.Visible);}}
-        internal bool ActionsFit {get{return ButtonsUnclipped();}}
-        internal object ActionBounds() {return new {width=actionButtons.ActualWidth,height=actionButtons.ActualHeight,items=actionButtons.Children.Cast<StackPanel>().Where(i=>i.Visibility==Visibility.Visible).Select(i=>new {width=i.ActualWidth,height=i.ActualHeight,button=i.Children.OfType<Button>().First().TransformToAncestor(actionButtons).TransformBounds(new Rect(0,0,43,43))}).ToArray()};}
-        internal object LayoutSnapshot() {return new {editing=editing,editingActions=editingActions,expanded=expanded,visibleActionLabels=actionNames.Count(n=>n.Visibility==Visibility.Visible),visibleActions=VisibleActions,columns=QuickToggleSize.Columns(Preferences.Current),rows=QuickToggleSize.Rows(Preferences.Current),resizeHandle=resizeGrip.IsVisible,circleRadius=21.5,buttonsUnclipped=ButtonsUnclipped(),sections=sections.Keys,groups=groups.Skip(1).Select(g=>g.Keys).ToArray(),noOverlap=LayoutFits(),actionHeight=actionArea.ActualHeight,actionWidth=actionFrame.ActualWidth,soundIcon=volume.Kind,themeAvailable=themeToggle.IsEnabled,dark=darkMode,sizes=sections.Items.Select(i=>new {key=i.Key,height=i.Element.ActualHeight,y=i.Element.TranslatePoint(new Point(),body).Y}).ToArray()};}
+        internal double ActionWidth {get{return Modern?gridUI.Board.Frames["toggles"].ActualWidth:actionFrame.ActualWidth;}}
+        internal double ActionHeight {get{return Modern?gridUI.Board.Frames["toggles"].ActualHeight:actionArea.ActualHeight;}}
+        internal QuickResizeGrip ResizeGrip {get{return Modern?gridUI.Board.Frames["toggles"].Resize:resizeGrip;}}
+        internal Button ActionEditor {get{return Modern?gridUI.EditButton:actionEdit;}}
+        internal int VisibleActions {get{return Modern?gridUI.VisibleActions:actionButtons.Children.Cast<FrameworkElement>().Count(e=>e.Visibility==Visibility.Visible);}}
+        internal bool ActionsFit {get{return Modern?gridUI.Board.Layout.Fits():ButtonsUnclipped();}}
+        internal object ActionBounds() {if(Modern)return gridUI.Snapshot();return new {width=actionButtons.ActualWidth,height=actionButtons.ActualHeight,items=actionButtons.Children.Cast<StackPanel>().Where(i=>i.Visibility==Visibility.Visible).Select(i=>new {width=i.ActualWidth,height=i.ActualHeight,button=i.Children.OfType<Button>().First().TransformToAncestor(actionButtons).TransformBounds(new Rect(0,0,43,43))}).ToArray()};}
+        internal object LayoutSnapshot() {if(Modern)return gridUI.Snapshot();return new {editing=editing,editingActions=editingActions,expanded=expanded,visibleActionLabels=actionNames.Count(n=>n.Visibility==Visibility.Visible),visibleActions=VisibleActions,columns=QuickToggleSize.Columns(Preferences.Current),rows=QuickToggleSize.Rows(Preferences.Current),resizeHandle=resizeGrip.IsVisible,circleRadius=21.5,buttonsUnclipped=ButtonsUnclipped(),sections=sections.Keys,groups=groups.Skip(1).Select(g=>g.Keys).ToArray(),noOverlap=LayoutFits(),actionHeight=actionArea.ActualHeight,actionWidth=actionFrame.ActualWidth,soundIcon=volume.Kind,themeAvailable=themeToggle.IsEnabled,dark=darkMode,sizes=sections.Items.Select(i=>new {key=i.Key,height=i.Element.ActualHeight,y=i.Element.TranslatePoint(new Point(),body).Y}).ToArray()};}
         bool ButtonsUnclipped()
         {
             var clip=VisualTreeHelper.GetClip(actionButtons);Rect bounds=clip!=null?clip.Bounds:new Rect(0,0,actionButtons.ActualWidth,actionButtons.ActualHeight);
@@ -218,8 +234,8 @@ namespace OneTaskBar
         {
             SetExpanded(!expanded);
         }
-        internal void SetExpanded(bool value) {if(editing){EditActions(value);return;}expanded=value;bool originalShape=QuickToggleSize.Columns(Preferences.Current)==4&&QuickToggleSize.Rows(Preferences.Current)==1;PresentActions(originalShape);if(!originalShape)Motion.Fade(actionButtons,.7,1,170);}
-        internal object AudioSnapshot() {return new {slider=volume.Kind,buttons=soundGlyphs.Select(g=>g.Kind).ToArray()};}
+        internal void SetExpanded(bool value) {if(Modern){gridUI.ExpandToggles(value);return;}if(editing){EditActions(value);return;}expanded=value;bool originalShape=QuickToggleSize.Columns(Preferences.Current)==4&&QuickToggleSize.Rows(Preferences.Current)==1;PresentActions(originalShape);if(!originalShape)Motion.Fade(actionButtons,.7,1,170);}
+        internal object AudioSnapshot() {if(Modern)return new {slider=gridUI.Volume.Kind,buttons=new[]{((Glyph)gridUI.Toggles["mute"].Content).Kind}};return new {slider=volume.Kind,buttons=soundGlyphs.Select(g=>g.Kind).ToArray()};}
         void PresentActions(bool animate)
         {
             ++actionMotion;bool show=AllActions;int columns=QuickToggleSize.Columns(Preferences.Current),rows=QuickToggleSize.Rows(Preferences.Current);double from=actionArea.Height,target=show?232:QuickToggleSize.Height(rows);actionArea.BeginAnimation(HeightProperty,null);actionArea.Height=target;
@@ -232,7 +248,7 @@ namespace OneTaskBar
             resizeGrip.ToolTip="기능 토글 "+columns+"열 × "+rows+"행 · 드래그 또는 방향키로 조절";AutomationProperties.SetItemStatus(resizeGrip,columns+"열 "+rows+"행");
         }
         void ToggleTheme(){InvokeToggle("theme");}
-        async void InvokeToggle(string key)
+        internal async void InvokeToggle(string key)
         {
             if(pendingToggles.Contains(key))return;pendingToggles.Add(key);if(key=="theme")themeBusy=true;Refresh(shell.Power,shell.Brightness,shell.Audio.Value,shell.Audio.Muted,shell.Audio.Available,shell.Brightness>=0);
             try {
@@ -249,7 +265,7 @@ namespace OneTaskBar
             }catch(Exception error){Feedback(error.Message);}
             finally {pendingToggles.Remove(key);if(key=="theme")themeBusy=false;Refresh(shell.Power,shell.Brightness,shell.Audio.Value,shell.Audio.Muted,shell.Audio.Available,shell.Brightness>=0);}
         }
-        internal void Feedback(string text) {notice.Text=text;notice.Visibility=Visibility.Visible;}
+        internal void Feedback(string text) {if(Modern){gridUI.Feedback(text);return;}notice.Text=text;notice.Visibility=Visibility.Visible;}
         static Border Card(UIElement content,double radius,Thickness margin) {return new Border {CornerRadius=new CornerRadius(radius),Background=QuickPanel.Card,Child=content,Margin=margin};}
         static Button IconButton(string icon,Action action,string hint,double size)
         {
@@ -298,6 +314,7 @@ namespace OneTaskBar
         }
         internal void Refresh(PowerState state,int bright,double sound,bool muted,bool audioAvailable,bool brightAvailable)
         {
+            if(Modern){gridUI.Refresh(state,bright,sound,muted,audioAvailable,brightAvailable);return;}
             brightness.WheelAdjust=volume.WheelAdjust=Preferences.Current.QuickSliderScroll;
             var samsung=shell.SamsungSettings();if(samsung!=null&&samsungIconKey!=samsung.Key){samsungIconKey=samsung.Key;samsungSettings.Content=AppIcons.Visual(samsung,24);LoadSamsungIcon(samsung);}
             samsungSettings.Visibility=samsung!=null?Visibility.Visible:Visibility.Collapsed;

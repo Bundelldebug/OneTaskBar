@@ -42,7 +42,7 @@ namespace OneTaskBar
             new SearchSetting("블루투스","bluetooth 기기 연결 장치","bluetooth","ms-settings:bluetooth"),
             new SearchSetting("앱","프로그램 application 설치 제거","apps","ms-settings:appsfeatures"),
             new SearchSetting("키보드","keyboard 입력 언어 터치","window","ms-settings:typing"),
-            new SearchSetting("One TaskBar 설정","런처 독 시작 검색","settings",null)};
+            new SearchSetting("One TaskBar 설정","런처 독 시작 검색","home",null)};
         static string Fold(string text) {return new string((text??"").Normalize(NormalizationForm.FormKC).ToLowerInvariant().Where(c=>!Char.IsWhiteSpace(c)).ToArray());}
         internal static string Initials(string text) {var result=new StringBuilder();foreach(char c in Fold(text)){if(c>=0xac00&&c<=0xd7a3)result.Append((char)(0x1100+(c-0xac00)/588));else result.Append(c);}return result.ToString();}
         internal static bool Matches(string text,string query) {string normal=Fold(text),heads=Initials(text);return (query??"").Split(new[]{' ','\t'},StringSplitOptions.RemoveEmptyEntries).All(word=>normal.Contains(Fold(word))||heads.Contains(Fold(word)));}

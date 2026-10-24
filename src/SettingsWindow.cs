@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -32,6 +33,9 @@ namespace OneTaskBar
             var actions=new DockPanel();var quit=Paint.Action("종료 · Windows 작업표시줄 복원",()=>Application.Current.Shutdown());quit.Background=Paint.Brush("#30213328");DockPanel.SetDock(quit,Dock.Right);actions.Children.Add(quit);
             var quick=Paint.Action("빠른 설정",()=>shell.ToggleQuick(null));quick.HorizontalAlignment=HorizontalAlignment.Left;actions.Children.Add(quick);footer.Children.Add(actions);DockPanel.SetDock(footer,Dock.Bottom);root.Children.Add(footer);
             var groups=new StackPanel();
+            var uiRows=new StackPanel();var versions=new UniformGrid {Columns=2,Margin=new Thickness(12,8,12,8)};var legacy=Paint.Action("8.5",()=>{});var modern=Paint.Action("9.0 베타",()=>{});
+            Action showVersion=()=>{bool current=Preferences.Current.UIVersion>=90;legacy.Background=current?Paint.Brush("#18213328"):Paint.Brush("#FF33473E");modern.Background=current?Paint.Brush("#FF33473E"):Paint.Brush("#18213328");legacy.Foreground=current?Paint.Ink:Paint.ControlWhite;modern.Foreground=current?Paint.ControlWhite:Paint.Ink;((TextBlock)legacy.Content).Foreground=legacy.Foreground;((TextBlock)modern.Content).Foreground=modern.Foreground;};
+            legacy.Click+=(s,e)=>{Preferences.Set(p=>p.UIVersion=85);showVersion();};modern.Click+=(s,e)=>{Preferences.Set(p=>p.UIVersion=90);showVersion();};legacy.Margin=new Thickness(0,0,5,0);modern.Margin=new Thickness(5,0,0,0);System.Windows.Automation.AutomationProperties.SetName(legacy,"UI 버전 8.5");System.Windows.Automation.AutomationProperties.SetName(modern,"UI 버전 9.0 베타");versions.Children.Add(legacy);versions.Children.Add(modern);uiRows.Children.Add(versions);var uiHint=Paint.TextBlock("8.5 배치와 9.0 개별 메뉴 배치는 따로 저장됩니다",11,LightPanel.Muted);uiHint.Margin=new Thickness(14,0,14,12);uiRows.Children.Add(uiHint);Group(groups,"UI 버전",uiRows);showVersion();
             var desktopRows=new StackPanel();desktop=Row(desktopRows,"Windows 작업표시줄 대체","기본 작업표시줄과 전환합니다",shell.Desktop,v=> {shell.SetDesktop(v);Show();Activate();});
             autoHide=Row(desktopRows,"작업표시줄 자동 숨기기","Windows 설정과 함께 적용됩니다. 화면 아래쪽에 커서를 대면 다시 표시합니다",shell.Demo?shell.DockAutoHide:Native.TaskbarAutoHide(),v=>shell.SetAutoHide(v));
             Row(desktopRows,"앱 드래그로 분할·팝업 열기","독의 앱을 화면 가장자리로 끌면 분할, 중앙으로 끌면 팝업으로 엽니다. 독 안에서는 순서를 바꿉니다",Preferences.Current.DockWindowDrop,v=>Preferences.Set(p=>p.DockWindowDrop=v));

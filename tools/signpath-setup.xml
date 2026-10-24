@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
   <zip-file>
-    <pe-file path="OneTaskBar-Setup.exe" product-name="One TaskBar" file-version="${version}" product-version="${version}"><authenticode-sign /></pe-file>
+    <pe-file path="OneTaskBar-Setup.exe" product-name="One TaskBar" file-version="${version}" product-version="${productVersion}"><authenticode-sign /></pe-file>
   </zip-file>
 </artifact-configuration>

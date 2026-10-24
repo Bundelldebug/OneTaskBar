@@ -10,15 +10,24 @@ param(
 $ErrorActionPreference='Stop'
 $project=Split-Path -Parent $PSScriptRoot
 $main=Join-Path $project 'dist\OneTaskBar.exe'
-$version=[Version]([Diagnostics.FileVersionInfo]::GetVersionInfo($main).FileVersion)
-$expected='v'+$version.ToString(3)
+$mainInfo=[Diagnostics.FileVersionInfo]::GetVersionInfo($main)
+$version=[Version]$mainInfo.FileVersion
+$productVersion=$mainInfo.ProductVersion
+$beta=$productVersion -match '\A[0-9]+\.[0-9]+\.[0-9]+-beta\.[1-9][0-9]*\z'
+if($beta){
+    if($productVersion.Split('-')[0] -ne $version.ToString(3)){throw 'Beta product and file versions do not match.'}
+    $expected='v'+$productVersion
+}else{
+    if($productVersion -ne $version.ToString() -and $productVersion -ne $version.ToString(3)){throw 'Unsupported release product version.'}
+    $expected='v'+$version.ToString(3)
+}
 if($Tag -ne $expected){throw ('Release tag must match the tested application version: '+$expected)}
 # Verify before executing any candidate or contacting GitHub. No unsigned fallback.
 & (Join-Path $PSScriptRoot 'Test-ReleaseSignatures.ps1') -SignerThumbprint $SignerThumbprint
 $originPath=Join-Path $project 'release\candidate-origin.json'
 if(-not(Test-Path -LiteralPath $originPath)){throw 'The signed CI candidate origin record is required.'}
 $origin=Get-Content -LiteralPath $originPath -Raw|ConvertFrom-Json
-if($origin.commit -notmatch '\A[0-9a-f]{40}\z' -or $origin.version -ne $version.ToString() -or $origin.run -notmatch '\Ahttps://github.com/Bundelldebug/OneTaskBar/actions/runs/[0-9]+\z'){throw 'Candidate origin does not match this project/version.'}
+if($origin.commit -notmatch '\A[0-9a-f]{40}\z' -or $origin.version -ne $version.ToString() -or $origin.productVersion -ne $productVersion -or $origin.run -notmatch '\Ahttps://github.com/Bundelldebug/OneTaskBar/actions/runs/[0-9]+\z'){throw 'Candidate origin does not match this project/version.'}
 $head=@(& $GitPath -C $project rev-parse HEAD)
 if($LASTEXITCODE -ne 0 -or $head.Count -ne 1 -or $head[0] -ne $origin.commit){throw 'Check out the exact source commit from the signed CI candidate before validation.'}
 $dirty=@(& $GitPath -C $project status --porcelain --untracked-files=normal)
@@ -69,6 +78,8 @@ if($ValidateOnly){Write-Output 'Signed release validation passed. Nothing publis
 if(-not $NotesFile -or -not(Test-Path -LiteralPath $NotesFile)){throw 'A reviewed release notes file is required.'}
 Push-Location $project
 try{
-    & $GhPath release create $Tag $setup $portable (Join-Path $project 'release\SHA256SUMS.txt') --repo Bundelldebug/OneTaskBar --verify-tag --latest --title ($version.ToString(3)) --notes-file $NotesFile
+    $releaseArgs=@('release','create',$Tag,$setup,$portable,(Join-Path $project 'release\SHA256SUMS.txt'),'--repo','Bundelldebug/OneTaskBar','--verify-tag','--title',$productVersion,'--notes-file',$NotesFile)
+    if($beta){$releaseArgs+=@('--prerelease','--latest=false')}else{$releaseArgs+='--latest'}
+    & $GhPath @releaseArgs
     if($LASTEXITCODE -ne 0){throw 'GitHub release creation failed.'}
 }finally{Pop-Location}

@@ -115,6 +115,7 @@ namespace OneTaskBar
             Placement=new WindowPlacement(this);
             Banners=new NotificationBanners(this);
             Buds=new BudsConnections(this);
+            Preferences.Changed+=UIVersionChanged;
             if(demo) return;
             keys=new VolumeKeys();
             keys.InterceptStart=()=>Desktop&&!Preferences.Current.NativeStartKey;
@@ -255,9 +256,11 @@ namespace OneTaskBar
         }
         void LayoutChanged(string scope) {if(scope=="dock.apps"&&!DragReorder.Active)foreach(var dock in docks)dock.Rebuild();}
         void DragFinished() {if(!disposed)Application.Current.Dispatcher.BeginInvoke(new Action(()=> {if(!disposed)foreach(var dock in docks)dock.Rebuild();}));}
+        void UIVersionChanged(){if(disposed)return;bool modern=Preferences.Current.UIVersion>=90;if(Quick!=null&&Quick.Modern!=modern){Quick.Close();Quick=null;}if(hud!=null&&hud.Modern!=modern){hud.Close();hud=null;hudScreen=null;}}
         void OptionsChanged()
         {
             if(disposed)return;
+
             SyncAutoHide(true);
             Notifications.Check();Banners.Refresh();Buds.Refresh();
             Services.ArtworkModeChanged();
@@ -599,7 +602,7 @@ namespace OneTaskBar
             bool position=!hud.IsVisible||hudScreen!=screen.DeviceName;
             if(hudScreen!=screen.DeviceName){new WindowInteropHelper(hud).EnsureHandle();Native.SetWindowPos(new WindowInteropHelper(hud).Handle,IntPtr.Zero,screen.Bounds.Left+20,screen.Bounds.Top+20,0,0,0x1|0x4|0x10);hudScale=Math.Max(96,Native.GetDpiForWindow(new WindowInteropHelper(hud).Handle))/96.0;hudScreen=screen.DeviceName;}
             double scale=hudScale,bottom=(screen.Bounds.Bottom-screen.WorkingArea.Bottom)/scale;
-            hud.Set(kind,value,muted,Services.OutputName);if(position)hud.ShowAt(screen.Bounds,(screen.Bounds.Width/scale-286)/2,screen.Bounds.Height/scale-Math.Max(bottom,64)-82,286,62);if(volumeStart&&!Demo)RefreshHudOutput(++hudOutputRevision);
+            hud.Set(kind,value,muted,Services.OutputName);if(position)hud.ShowAt(screen.Bounds,(screen.Bounds.Width/scale-286)/2,screen.Bounds.Height/scale-Math.Max(bottom,64)-hud.DisplayHeight-20,286,hud.DisplayHeight);if(volumeStart&&!Demo)RefreshHudOutput(++hudOutputRevision);
             hudUntil=DateTime.UtcNow.AddSeconds(1.5);
         }
         async void RefreshHudOutput(int revision){try{string output=await BackgroundWork.Run(Native.DefaultAudioOutputName);if(!disposed&&revision==hudOutputRevision&&hud!=null&&hud.IsVisible&&HudKind=="volume"){Services.OutputName=output;hud.Set("volume",Audio.Value,Audio.Muted,output);}}catch(Exception error){AppLog.Once("hud-output-name",error.GetType().Name);}}
@@ -702,7 +705,7 @@ namespace OneTaskBar
             if(StartMenu!=null)StartMenu.Close();
             if(NotificationLink!=null)NotificationLink.Close();
             if(shellEvents!=null)shellEvents.Dispose();
-            Preferences.Changed-=OptionsChanged;
+            Preferences.Changed-=OptionsChanged;Preferences.Changed-=UIVersionChanged;
             LayoutOrder.Changed-=LayoutChanged;DragReorder.Finished-=DragFinished;
             foreach(var dock in docks) dock.Close(); docks.Clear();
             foreach(var reservation in reservations) reservation.Dispose(); reservations.Clear();
