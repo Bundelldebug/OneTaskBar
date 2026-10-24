@@ -149,7 +149,7 @@ namespace OneTaskBar
         }
         protected override void OnPreviewKeyDown(KeyEventArgs e)
         {
-            if(Modern&&e.Key==Key.Escape&&(gridUI.Board.GestureActive||gridUI.Board.Editing)){if(gridUI.Board.GestureActive)gridUI.Board.Cancel();else gridUI.SetEditing(false);e.Handled=true;return;}base.OnPreviewKeyDown(e);
+            if(Modern&&e.Key==Key.Escape&&(gridUI.Board.GestureActive||gridUI.Board.Editing)){if(gridUI.Board.ContentsEditing)gridUI.EditActions(false);else if(gridUI.Board.GestureActive)gridUI.Board.Cancel();else gridUI.SetEditing(false);e.Handled=true;return;}base.OnPreviewKeyDown(e);
         }
         internal void SetCollapsedGrid(int columns,int rows)
         {
@@ -179,7 +179,7 @@ namespace OneTaskBar
         void FlushSize(){if(!sizeSave.IsEnabled)return;sizeSave.Stop();Preferences.Save();}
         internal void EditActions(bool value)
         {
-            if(Modern){gridUI.ExpandToggles(value);return;}
+            if(Modern){gridUI.EditActions(value);return;}
             if(!editing)return;editingActions=value;expanded=false;PresentActions(false);
         }
         bool AllActions {get{return expanded||(editing&&editingActions);}}
@@ -220,7 +220,7 @@ namespace OneTaskBar
         internal double ActionWidth {get{return Modern?gridUI.Board.Frames["toggles"].ActualWidth:actionFrame.ActualWidth;}}
         internal double ActionHeight {get{return Modern?gridUI.Board.Frames["toggles"].ActualHeight:actionArea.ActualHeight;}}
         internal QuickResizeGrip ResizeGrip {get{return Modern?gridUI.Board.Frames["toggles"].Resize:resizeGrip;}}
-        internal Button ActionEditor {get{return Modern?gridUI.EditButton:actionEdit;}}
+        internal Button ActionEditor {get{return Modern?gridUI.Board.Frames["toggles"].ContentEditor:actionEdit;}}
         internal int VisibleActions {get{return Modern?gridUI.VisibleActions:actionButtons.Children.Cast<FrameworkElement>().Count(e=>e.Visibility==Visibility.Visible);}}
         internal bool ActionsFit {get{return Modern?gridUI.Board.Layout.Fits():ButtonsUnclipped();}}
         internal object ActionBounds() {if(Modern)return gridUI.Snapshot();return new {width=actionButtons.ActualWidth,height=actionButtons.ActualHeight,items=actionButtons.Children.Cast<StackPanel>().Where(i=>i.Visibility==Visibility.Visible).Select(i=>new {width=i.ActualWidth,height=i.ActualHeight,button=i.Children.OfType<Button>().First().TransformToAncestor(actionButtons).TransformBounds(new Rect(0,0,43,43))}).ToArray()};}

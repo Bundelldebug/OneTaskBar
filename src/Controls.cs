@@ -244,7 +244,7 @@ namespace OneTaskBar
     {
         int motion;bool closed,hiding;Brush glassTint,solidTint;TaskCompletionSource<bool> dismissal;
         public readonly Border Surface;
-        public double Radius=28; public bool Dark=true; public bool HasBlur;internal bool SoftCorners=true;
+        public double Radius=28; public bool Dark=true; public bool HasBlur;internal bool SoftCorners=true,OpaqueSurface;
         internal bool StableSurface=true;internal FrameworkElement TransitionContent;
         internal Rect? BackdropClip;
         internal bool IsDismissing {get{return hiding;}}
@@ -268,7 +268,7 @@ namespace OneTaskBar
                 "<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='ScrollBar'><Setter Property='Width' Value='4'/><Setter Property='Background' Value='Transparent'/><Setter Property='Template'><Setter.Value><ControlTemplate TargetType='ScrollBar'><Track x:Name='PART_Track' IsDirectionReversed='True' Orientation='{TemplateBinding Orientation}'><Track.Thumb><Thumb><Thumb.Template><ControlTemplate TargetType='Thumb'><Border Background='#55D5DFD9' CornerRadius='2'/></ControlTemplate></Thumb.Template></Thumb></Track.Thumb></Track></ControlTemplate></Setter.Value></Setter></Style>"));
             SourceInitialized+=(s,e)=> {
                 var hwnd=new WindowInteropHelper(this).Handle;Native.SetWindowLong(hwnd,-20,(Native.GetWindowLong(hwnd,-20)|0x80)&~0x40000);
-                glassTint=Surface.Background;HasBlur=Native.Blur(this,Radius,Dark);ApplyMaterial();
+                glassTint=Surface.Background;HasBlur=!OpaqueSurface&&Native.Blur(this,Radius,Dark);ApplyMaterial();
                 var source=HwndSource.FromHwnd(new WindowInteropHelper(this).Handle);if(source!=null)source.AddHook((IntPtr h,int msg,IntPtr w,IntPtr l,ref bool handled)=> {
                     if(msg==0x5||msg==0x2E0)Dispatcher.BeginInvoke(new Action(()=> {if(!closed)Native.Round(this,Radius);}),System.Windows.Threading.DispatcherPriority.Render);return IntPtr.Zero;
                 });

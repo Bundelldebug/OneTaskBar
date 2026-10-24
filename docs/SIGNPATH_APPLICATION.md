@@ -1,6 +1,6 @@
-# SignPath Foundation application draft
+# SignPath Foundation application record
 
-**Submitted on 2026-10-24.** The maintainer privately supplied contact information and approved the required terms/privacy consent. The official form displayed “Form submitted — Thank you, we'll be in touch soon.” after the interactive verification. This confirms form receipt, not provider approval, account activation or certificate issuance. Contact information and the confirmation screenshot are not published. Apply at https://signpath.org/apply after reviewing https://signpath.org/terms.html.
+**Declined, as reported by the maintainer on 2026-10-24.** The reason has not been supplied. The form was submitted earlier that day with approved terms/privacy consent, but receipt did not establish provider approval, account activation or certificate issuance. Contact information and the confirmation screenshot are not published. No new application or appeal has been submitted.
 
 - Project: One TaskBar
 - Repository: https://github.com/Bundelldebug/OneTaskBar

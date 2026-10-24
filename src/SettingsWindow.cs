@@ -22,7 +22,7 @@ namespace OneTaskBar
         internal readonly BatteryPill PreviewBattery=new BatteryPill {Width=56,Height=24,ExpandedWidth=90};
         internal WelcomeWindow(ShellController controller)
         {
-            shell=controller;Title=Program.AppName;ShowInTaskbar=false;Topmost=false;Width=700;Height=650;WindowStartupLocation=WindowStartupLocation.CenterScreen;Dark=false;Surface.Background=LightPanel.Glass;Surface.BorderBrush=Brushes.Transparent;Surface.BorderThickness=new Thickness(0);
+            shell=controller;Title=Program.AppName;ShowInTaskbar=false;Topmost=false;Width=760;Height=720;WindowStartupLocation=WindowStartupLocation.CenterScreen;Dark=false;OpaqueSurface=true;SetMaterial(AppSettingsPalette.Surface,AppSettingsPalette.Surface);Surface.BorderBrush=AppSettingsPalette.Stroke;Surface.BorderThickness=new Thickness(1);
             Icon=new BitmapImage(new Uri(Path.Combine(AppLog.Root,"assets","OneTaskBar.ico")));
             var root=new DockPanel {Margin=new Thickness(28,24,28,20)};
             var header=new Grid {Height=60,Margin=new Thickness(0,0,0,18)};
@@ -34,8 +34,8 @@ namespace OneTaskBar
             var quick=Paint.Action("빠른 설정",()=>shell.ToggleQuick(null));quick.HorizontalAlignment=HorizontalAlignment.Left;actions.Children.Add(quick);footer.Children.Add(actions);DockPanel.SetDock(footer,Dock.Bottom);root.Children.Add(footer);
             var groups=new StackPanel();
             var uiRows=new StackPanel();var versions=new UniformGrid {Columns=2,Margin=new Thickness(12,8,12,8)};var legacy=Paint.Action("8.5",()=>{});var modern=Paint.Action("9.0 베타",()=>{});
-            Action showVersion=()=>{bool current=Preferences.Current.UIVersion>=90;legacy.Background=current?Paint.Brush("#18213328"):Paint.Brush("#FF33473E");modern.Background=current?Paint.Brush("#FF33473E"):Paint.Brush("#18213328");legacy.Foreground=current?Paint.Ink:Paint.ControlWhite;modern.Foreground=current?Paint.ControlWhite:Paint.Ink;((TextBlock)legacy.Content).Foreground=legacy.Foreground;((TextBlock)modern.Content).Foreground=modern.Foreground;};
-            legacy.Click+=(s,e)=>{Preferences.Set(p=>p.UIVersion=85);showVersion();};modern.Click+=(s,e)=>{Preferences.Set(p=>p.UIVersion=90);showVersion();};legacy.Margin=new Thickness(0,0,5,0);modern.Margin=new Thickness(5,0,0,0);System.Windows.Automation.AutomationProperties.SetName(legacy,"UI 버전 8.5");System.Windows.Automation.AutomationProperties.SetName(modern,"UI 버전 9.0 베타");versions.Children.Add(legacy);versions.Children.Add(modern);uiRows.Children.Add(versions);var uiHint=Paint.TextBlock("8.5 배치와 9.0 개별 메뉴 배치는 따로 저장됩니다",11,LightPanel.Muted);uiHint.Margin=new Thickness(14,0,14,12);uiRows.Children.Add(uiHint);Group(groups,"UI 버전",uiRows);showVersion();
+            Action showVersion=()=>{bool current=Preferences.Current.UIVersion>=90;legacy.Background=current?AppSettingsPalette.AccentLight:AppSettingsPalette.Accent;modern.Background=current?AppSettingsPalette.Accent:AppSettingsPalette.AccentLight;legacy.Foreground=current?AppSettingsPalette.Text:Paint.ControlWhite;modern.Foreground=current?Paint.ControlWhite:AppSettingsPalette.Text;((TextBlock)legacy.Content).Foreground=legacy.Foreground;((TextBlock)modern.Content).Foreground=modern.Foreground;};
+            legacy.Click+=(s,e)=>{Preferences.Set(p=>p.UIVersion=85);showVersion();};modern.Click+=(s,e)=>{Preferences.Set(p=>p.UIVersion=90);showVersion();};legacy.Margin=new Thickness(0,0,5,0);modern.Margin=new Thickness(5,0,0,0);legacy.Height=modern.Height=44;System.Windows.Automation.AutomationProperties.SetName(legacy,"UI 버전 8.5");System.Windows.Automation.AutomationProperties.SetName(modern,"UI 버전 9.0 베타");versions.Children.Add(legacy);versions.Children.Add(modern);uiRows.Children.Add(versions);var uiHint=Paint.TextBlock("8.5 배치와 9.0 개별 메뉴 배치는 따로 저장됩니다",12.5,AppSettingsPalette.Muted);uiHint.Margin=new Thickness(14,0,14,14);uiHint.TextWrapping=TextWrapping.Wrap;uiRows.Children.Add(uiHint);Group(groups,"UI 버전",uiRows);showVersion();
             var desktopRows=new StackPanel();desktop=Row(desktopRows,"Windows 작업표시줄 대체","기본 작업표시줄과 전환합니다",shell.Desktop,v=> {shell.SetDesktop(v);Show();Activate();});
             autoHide=Row(desktopRows,"작업표시줄 자동 숨기기","Windows 설정과 함께 적용됩니다. 화면 아래쪽에 커서를 대면 다시 표시합니다",shell.Demo?shell.DockAutoHide:Native.TaskbarAutoHide(),v=>shell.SetAutoHide(v));
             Row(desktopRows,"앱 드래그로 분할·팝업 열기","독의 앱을 화면 가장자리로 끌면 분할, 중앙으로 끌면 팝업으로 엽니다. 독 안에서는 순서를 바꿉니다",Preferences.Current.DockWindowDrop,v=>Preferences.Set(p=>p.DockWindowDrop=v));
@@ -78,32 +78,37 @@ namespace OneTaskBar
             soundActions.Children.Add(Paint.Action("소리 파일 선택",()=> {var picker=new Microsoft.Win32.OpenFileDialog {Title="충전 연결음 선택",Filter="소리 파일|*.wav;*.mp3;*.wma;*.m4a;*.aac",CheckFileExists=true,Multiselect=false};if(picker.ShowDialog(this)!=true)return;Preferences.Set(p=> {p.ChargeSoundFile=picker.FileName;p.ChargeSoundEnabled=true;});soundName.Text=Path.GetFileName(picker.FileName);soundToggle.Refresh(true);status.Text="충전 연결음을 저장했습니다";}));
             soundActions.Children.Add(Paint.Action("미리 듣기",()=>shell.ConnectionSound.Play(Preferences.Current.ChargeSoundFile,message=>status.Text=message)));
             soundActions.Children.Add(Paint.Action("파일 지우기",()=> {Preferences.Set(p=> {p.ChargeSoundFile=null;p.ChargeSoundEnabled=false;});soundName.Text="선택한 파일 없음";soundToggle.Refresh(false);}));sounds.Children.Add(soundActions);Group(groups,"충전 소리",sounds);
-            var scroller=new SmoothScrollViewer {Content=groups,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};scroller.Resources[SystemParameters.VerticalScrollBarWidthKey]=5.0;root.Children.Add(scroller);Surface.Child=root;LightPanel.Apply(root);
+            var scroller=new SmoothScrollViewer {Content=groups,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,Padding=new Thickness(0,0,6,0)};scroller.Resources[SystemParameters.VerticalScrollBarWidthKey]=6.0;root.Children.Add(scroller);Surface.Child=root;AppSettingsPalette.Apply(root);
             MouseLeftButtonDown+=(s,e)=> {if(e.OriginalSource==header||e.OriginalSource==name)DragMove();};Closing+=(s,e)=> {if(!releasing&&!shell.IsDisposing&&!Application.Current.Dispatcher.HasShutdownStarted){e.Cancel=true;Hide();}};
         }
         static void Group(StackPanel target,string label,UIElement content)
         {
-            var title=Paint.TextBlock(label,12,Paint.Muted);title.Margin=new Thickness(13,4,0,8);target.Children.Add(title);
-            target.Children.Add(new Border {Background=Paint.Brush("#18FFFFFF"),CornerRadius=new CornerRadius(22),Padding=new Thickness(3),Child=content,Margin=new Thickness(0,0,0,17)});
+            var title=Paint.TextBlock(label,16,AppSettingsPalette.Text);title.FontWeight=FontWeights.SemiBold;title.Margin=new Thickness(4,6,0,10);target.Children.Add(title);
+            target.Children.Add(new Border {Background=Brushes.White,BorderBrush=AppSettingsPalette.Stroke,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(16),Padding=new Thickness(3),Child=content,Margin=new Thickness(0,0,0,21)});
         }
         static void ChoiceRow(StackPanel parent,string title,string description,bool native,Action<bool> changed,string customLabel="One TaskBar",string windowsLabel="Windows 기본")
         {
-            var row=new Grid {Margin=new Thickness(15,11,15,11),MinHeight=44};row.ColumnDefinitions.Add(new ColumnDefinition());row.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(218)});
-            var labels=new StackPanel {VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,12,0)};labels.Children.Add(Paint.TextBlock(title,14,Paint.Text));var detail=Paint.TextBlock(description,11,Paint.Muted);detail.TextWrapping=TextWrapping.Wrap;detail.Margin=new Thickness(0,3,0,0);labels.Children.Add(detail);row.Children.Add(labels);
+            var row=new Grid {Margin=new Thickness(15,13,15,13),MinHeight=54};row.ColumnDefinitions.Add(new ColumnDefinition());row.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(218)});
+            var labels=new StackPanel {VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,16,0)};var heading=Paint.TextBlock(title,15,AppSettingsPalette.Text);heading.FontWeight=FontWeights.SemiBold;heading.TextWrapping=TextWrapping.Wrap;labels.Children.Add(heading);var detail=Paint.TextBlock(description,12.5,AppSettingsPalette.Muted);detail.TextWrapping=TextWrapping.Wrap;detail.LineHeight=18;detail.Margin=new Thickness(0,5,0,0);labels.Children.Add(detail);row.Children.Add(labels);
             var options=new System.Windows.Controls.Primitives.UniformGrid {Columns=2};Button custom=null,windows=null;
-            Action refresh=()=> {custom.Background=!native?Paint.Brush("#BFFFFFFF"):Brushes.Transparent;windows.Background=native?Paint.Brush("#BFFFFFFF"):Brushes.Transparent;};
+            Action refresh=()=> {custom.Background=!native?AppSettingsPalette.AccentLight:Brushes.Transparent;windows.Background=native?AppSettingsPalette.AccentLight:Brushes.Transparent;};
             custom=Paint.Action(customLabel,()=> {if(!native)return;native=false;refresh();changed(false);});windows=Paint.Action(windowsLabel,()=> {if(native)return;native=true;refresh();changed(true);});
-            foreach(var button in new[]{custom,windows}){button.Height=34;button.Padding=new Thickness(6,5,6,5);button.Margin=new Thickness(1);button.FontSize=12;options.Children.Add(button);}refresh();
-            var frame=new Border {CornerRadius=new CornerRadius(20),Padding=new Thickness(2),Background=Paint.Brush("#18000000"),Child=options,VerticalAlignment=VerticalAlignment.Center};Grid.SetColumn(frame,1);row.Children.Add(frame);parent.Children.Add(row);
+            foreach(var button in new[]{custom,windows}){button.Height=40;button.Padding=new Thickness(6,5,6,5);button.Margin=new Thickness(1);((TextBlock)button.Content).FontSize=13;options.Children.Add(button);}refresh();
+            var frame=new Border {CornerRadius=new CornerRadius(22),Padding=new Thickness(2),Background=Paint.Brush("#FFF0F3F7"),Child=options,VerticalAlignment=VerticalAlignment.Center};Grid.SetColumn(frame,1);row.Children.Add(frame);parent.Children.Add(row);
         }
         internal void Feedback(string message) {status.Text=message;}
         static ToggleSwitch Row(StackPanel parent,string title,string description,bool value,Action<bool> changed)
         {
-            var grid=new Grid {Margin=new Thickness(15,10,15,10),MinHeight=38};grid.ColumnDefinitions.Add(new ColumnDefinition());grid.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(58)});
-            var labels=new StackPanel {VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,14,0)};labels.Children.Add(Paint.TextBlock(title,14,Paint.Text));var detail=Paint.TextBlock(description,11,Paint.Muted);detail.Margin=new Thickness(0,3,0,0);detail.TextWrapping=TextWrapping.Wrap;labels.Children.Add(detail);grid.Children.Add(labels);
+            var grid=new Grid {Margin=new Thickness(15,13,15,13),MinHeight=52};grid.ColumnDefinitions.Add(new ColumnDefinition());grid.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(58)});
+            var labels=new StackPanel {VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,18,0)};var heading=Paint.TextBlock(title,15,AppSettingsPalette.Text);heading.FontWeight=FontWeights.SemiBold;heading.TextWrapping=TextWrapping.Wrap;labels.Children.Add(heading);var detail=Paint.TextBlock(description,12.5,AppSettingsPalette.Muted);detail.Margin=new Thickness(0,5,0,0);detail.LineHeight=18;detail.TextWrapping=TextWrapping.Wrap;labels.Children.Add(detail);grid.Children.Add(labels);
             var toggle=new ToggleSwitch(title,value,changed) {HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Center};Grid.SetColumn(toggle,1);grid.Children.Add(toggle);parent.Children.Add(grid);return toggle;
         }
         internal void UpdateAutoHide(bool value){autoHide.Refresh(value);}
         internal void UpdateMode(){desktop.Refresh(shell.Desktop);startup.Refresh(StartupPreference.Enabled);UpdateAutoHide(shell.Demo?shell.DockAutoHide:Native.TaskbarAutoHide());}
+    }
+    internal static class AppSettingsPalette
+    {
+        internal static readonly Brush Surface=Paint.Brush("#FFF3F5F8"),Stroke=Paint.Brush("#FFD9E0E8"),Text=Paint.Brush("#FF202B3B"),Muted=Paint.Brush("#FF536174"),Accent=Paint.Brush("#FF245BC2"),AccentLight=Paint.Brush("#FFE8EFFB");
+        internal static void Apply(DependencyObject root){var text=root as TextBlock;if(text!=null){if(text.Foreground==Paint.Text||text.Foreground==Paint.Ink)text.Foreground=Text;else if(text.Foreground==Paint.Muted||text.Foreground==LightPanel.Muted)text.Foreground=Muted;if(text.FontSize<12.5)text.FontSize=12.5;}var control=root as Control;if(control!=null&&(control.Foreground==Paint.Text||control.Foreground==Paint.Ink))control.Foreground=Text;var glyph=root as Glyph;if(glyph!=null&&(glyph.Color==Paint.Text||glyph.Color==Paint.Ink))glyph.Color=Text;foreach(object child in LogicalTreeHelper.GetChildren(root)){var node=child as DependencyObject;if(node!=null)Apply(node);}}
     }
 }

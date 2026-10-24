@@ -18,6 +18,7 @@ namespace OneTaskBar
         internal readonly QuickResizeGrip Resize=new QuickResizeGrip();
         readonly Border outline;
         readonly Button remove;
+        internal readonly Button ContentEditor;
         readonly Action<QuickWidgetSlot> shape;
         int columns,rows,sizeMotion;
         internal QuickWidgetFrame(QuickWidgetBoard board,string key,string title,UIElement content,Action<QuickWidgetSlot> resized)
@@ -29,13 +30,14 @@ namespace OneTaskBar
             Mover=new Thumb {Template=new ControlTemplate(typeof(Thumb)){VisualTree=template},Cursor=Cursors.SizeAll,Focusable=true,FocusVisualStyle=null,Visibility=Visibility.Collapsed};Children.Add(Mover);
             remove=Paint.Action("−",()=>board.HideWidget(key));remove.Width=remove.Height=23;remove.Padding=new Thickness(0);remove.Foreground=Paint.Brush("#F66C77");((TextBlock)remove.Content).Foreground=remove.Foreground;remove.Background=Paint.ControlWhite;remove.Resources["ButtonRadius"]=new CornerRadius(12);remove.HorizontalAlignment=HorizontalAlignment.Left;remove.VerticalAlignment=VerticalAlignment.Top;remove.Visibility=Visibility.Collapsed;remove.ToolTip=title+" 숨기기";Children.Add(remove);
             Resize.Visibility=Visibility.Collapsed;Children.Add(Resize);AutomationProperties.SetName(Mover,title+" 위치 이동");AutomationProperties.SetHelpText(Mover,"드래그 또는 방향키로 이동합니다.");AutomationProperties.SetName(Resize,title+" 크기 조절");AutomationProperties.SetHelpText(Resize,"모서리를 끌거나 방향키로 크기를 조절합니다. Escape로 취소합니다.");
+            if(key=="toggles"){ContentEditor=Paint.Action("편집",()=>{if(board.EditContents!=null)board.EditContents();});ContentEditor.HorizontalAlignment=HorizontalAlignment.Center;ContentEditor.VerticalAlignment=VerticalAlignment.Center;ContentEditor.Padding=new Thickness(12,5,12,5);ContentEditor.Background=Paint.Brush("#C72D353A");((TextBlock)ContentEditor.Content).Foreground=Paint.ControlWhite;ContentEditor.Visibility=Visibility.Collapsed;AutomationProperties.SetName(ContentEditor,"기능 토글 내부 편집");Children.Add(ContentEditor);}
             Mover.DragStarted+=(s,e)=>board.Begin(key,false);Mover.DragDelta+=(s,e)=>board.Drag();Mover.DragCompleted+=(s,e)=>board.End(e.Canceled);
             Resize.DragStarted+=(s,e)=>board.Begin(key,true);Resize.DragDelta+=(s,e)=>board.Drag();Resize.DragCompleted+=(s,e)=>board.End(e.Canceled);
             Mover.KeyDown+=(s,e)=>board.Key(key,false,e);Resize.KeyDown+=(s,e)=>board.Key(key,true,e);
             SizeChanged+=(s,e)=>Curvature();
             Body.SizeChanged+=(s,e)=>Curvature();
         }
-        internal void Editing(bool editing){Body.IsHitTestVisible=!editing;Body.Opacity=editing?.72:1;Mover.Visibility=Resize.Visibility=remove.Visibility=outline.Visibility=editing?Visibility.Visible:Visibility.Collapsed;}
+        internal void Editing(bool editing){Body.IsHitTestVisible=!editing;Body.Opacity=editing?.72:1;Mover.Visibility=Resize.Visibility=remove.Visibility=outline.Visibility=editing?Visibility.Visible:Visibility.Collapsed;if(ContentEditor!=null)ContentEditor.Visibility=editing?Visibility.Visible:Visibility.Collapsed;}
         void Curvature(){double width=Body.ActualWidth,height=Body.ActualHeight,radius=columns==1||rows==1?Math.Min(width,height)/2:Math.Min(32,Math.Min(width,height)/2);Body.CornerRadius=outline.CornerRadius=new CornerRadius(radius);Body.Clip=new RectangleGeometry(new Rect(0,0,Math.Max(0,width),Math.Max(0,height)),radius,radius);}
         internal void AnimateSize(Size previous,bool animate){int token=++sizeMotion;Body.BeginAnimation(WidthProperty,null);Body.BeginAnimation(HeightProperty,null);Body.Width=Body.Height=Double.NaN;Body.HorizontalAlignment=HorizontalAlignment.Stretch;Body.VerticalAlignment=VerticalAlignment.Stretch;if(!animate||!Motion.Enabled||!IsVisible)return;Body.Width=ActualWidth;Body.Height=ActualHeight;Body.HorizontalAlignment=HorizontalAlignment.Left;Body.VerticalAlignment=VerticalAlignment.Top;var height=Motion.Tween(previous.Height,ActualHeight,170);height.Completed+=(s,e)=>{if(token==sizeMotion){Body.BeginAnimation(WidthProperty,null);Body.BeginAnimation(HeightProperty,null);Body.Width=Body.Height=Double.NaN;Body.HorizontalAlignment=HorizontalAlignment.Stretch;Body.VerticalAlignment=VerticalAlignment.Stretch;}};Body.BeginAnimation(WidthProperty,Motion.Tween(previous.Width,ActualWidth,170));Body.BeginAnimation(HeightProperty,height);}
         internal void Shape(QuickWidgetSlot slot){if(columns==slot.Columns&&rows==slot.Rows)return;columns=slot.Columns;rows=slot.Rows;shape(slot);Curvature();AutomationProperties.SetItemStatus(Resize,columns+"열 "+rows+"행");}
@@ -47,6 +49,8 @@ namespace OneTaskBar
         QuickWidgetLayout presentationLayout;bool mediaIdle;
         internal QuickWidgetLayout DisplayLayout {get{return presentationLayout??Layout;}}
         internal bool Expanded {get;private set;}
+        internal bool ContentsEditing {get;private set;}
+        internal Action EditContents;
         internal readonly Dictionary<string,QuickWidgetFrame> Frames=new Dictionary<string,QuickWidgetFrame>();
         internal bool Editing {get;private set;}
         internal bool GestureActive {get{return active!=null;}}
@@ -63,7 +67,9 @@ namespace OneTaskBar
         {
             var frame=new QuickWidgetFrame(this,key,title,content,shape);Frames.Add(key,frame);Children.Add(frame);
         }
-        internal void SetEditing(bool value){Cancel();Editing=value;foreach(var frame in Frames.Values)frame.Editing(value);Reflow(true);}
+        internal void SetEditing(bool value){Cancel();Editing=value;if(!value)ContentsEditing=false;ApplyEditing();Reflow(true);}
+        void ApplyEditing(){foreach(var frame in Frames.Values){frame.Editing(Editing&&!(ContentsEditing&&frame.Key=="toggles"));frame.IsEnabled=frame.IsHitTestVisible=!ContentsEditing||frame.Key=="toggles";}}
+        internal void SetContentsEditing(bool value){Cancel();ContentsEditing=value&&Editing;ApplyEditing();}
         internal void HideWidget(string key){if(!Editing)return;Layout.SetHidden(key,true);Save();Reflow(true);}
         internal void AddWidget(string key){Layout.SetHidden(key,false);Save();Reflow(true);}
         internal void Reset(){Cancel();Layout.Reset(false);Save();Reflow(true);}
