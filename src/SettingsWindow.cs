@@ -62,7 +62,7 @@ namespace OneTaskBar
             watts.PreviewTextInput+=(s,e)=>e.Handled=e.Text.Any(c=>c<'0'||c>'9');
             DataObject.AddPastingHandler(watts,(s,e)=> {string value=e.DataObject.GetData(typeof(string)) as string;int number;if(String.IsNullOrEmpty(value)||value.Length>4||!Int32.TryParse(value,out number)||number<0||number>9999)e.CancelCommand();});
             watts.TextChanged+=(s,e)=> {int number;if(Int32.TryParse(watts.Text,out number)&&number>=0&&number<=9999&&Preferences.Current.DesktopPowerWatts!=number)Preferences.Set(p=>p.DesktopPowerWatts=number);};watts.LostKeyboardFocus+=(s,e)=>watts.Text=PowerDisplay.Clamp(Preferences.Current.DesktopPowerWatts).ToString();Grid.SetColumn(watts,1);powerRow.Children.Add(watts);hardware.Children.Add(powerRow);Group(groups,"PC 호환성",hardware);
-            var appearance=new StackPanel();ThemeSetting(appearance);Row(appearance,"동적 블러","배경의 창과 화면 색을 캡슐에 반영합니다",Preferences.Current.Blur,v=>Preferences.Set(p=>p.Blur=v));TransparencySetting(appearance);
+            var appearance=new StackPanel();ThemeSetting(appearance);Row(appearance,"동적 블러","배경의 창과 화면 색을 캡슐에 반영합니다",Preferences.Current.Blur,v=>Preferences.Set(p=>p.Blur=v));
             Row(appearance,"호버 확대","마우스를 올린 앱 아이콘과 시작 버튼을 확대합니다",Preferences.Current.Hover,v=>Preferences.Set(p=>p.Hover=v));
             Row(appearance,"실행 중인 앱 표시","아이콘 아래에 실행 상태를 표시합니다",Preferences.Current.RunningDots,v=>Preferences.Set(p=>p.RunningDots=v));
             Row(appearance,"시계 초 표시","상태 캡슐 시계에 초를 표시합니다",Preferences.Current.Seconds,v=>Preferences.Set(p=>p.Seconds=v));Group(groups,"화면",appearance);
