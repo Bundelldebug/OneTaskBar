@@ -39,7 +39,7 @@ namespace OneTaskBar
         static readonly Brush legacyGlass=Tint("#9BE5EBE7","#7BC5D0C9","#8FD8E2DB"),legacyDock=Tint("#AADFE7E2","#82C3D0C7","#96D5E1D9"),legacyMuted=Paint.Brush("#FF4C5B52"),legacyCard=Paint.Brush("#24FFFFFF");
         internal static readonly Brush DockSolid=Paint.Brush("#FFBAC1C7");
         internal static Brush Glass {get{return Glass95.Enabled?Glass95.Surface:PanelMaterial.Surface(Glass95.Dark,false);}}
-        internal static Brush DockGlass {get{return Glass95.Enabled?Glass95.Surface:legacyDock;}}
+        internal static Brush DockGlass {get{return Glass95.Enabled?PanelMaterial.Surface(Glass95.DockDark,true):Glass95.DockDark?PanelMaterial.Surface(true,false):legacyDock;}}
         internal static Brush Muted {get{return Glass95.Enabled?Glass95.Muted:PanelMaterial.Light?legacyMuted:Paint.Muted;}}
         internal static Brush Card {get{return Glass95.Enabled?Glass95.Card:PanelMaterial.Light?PanelMaterial.LightCard:legacyCard;}}
         internal static Brush Tint(string top,string middle,string bottom)
@@ -75,6 +75,8 @@ namespace OneTaskBar
         internal static SolidColorBrush Brush(string value) {SolidColorBrush cached;if(brushes.TryGetValue(value,out cached))return cached;var b=(SolidColorBrush)new BrushConverter().ConvertFromString(value);b.Freeze();if(brushes.Count<128)brushes.TryAdd(value,b);return b;}
         internal const string ControlWhiteColor="#FFF4F8F5";
         internal static readonly Brush ControlWhite=Brush(ControlWhiteColor);
+        internal static readonly Brush OnLight=FixedOnLight();
+        static Brush FixedOnLight(){var brush=new SolidColorBrush(Color.FromRgb(25,34,30));brush.Freeze();return brush;}
         static readonly Brush legacyText=Brush("#FFFFFFFF"),legacyMuted=Brush("#FFDBE3DF"),legacyInk=Brush("#FF19221E");
         internal static Brush Text {get{return Glass95.Enabled?Glass95.Text:PanelMaterial.Light?PanelMaterial.LightText:legacyText;}}
         internal static Brush Muted {get{return Glass95.Enabled?Glass95.Muted:PanelMaterial.Light?PanelMaterial.LightMuted:legacyMuted;}}
@@ -303,7 +305,7 @@ namespace OneTaskBar
             Resources.Add(typeof(System.Windows.Controls.Primitives.ScrollBar),System.Windows.Markup.XamlReader.Parse(
                 "<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='ScrollBar'><Setter Property='Width' Value='4'/><Setter Property='Background' Value='Transparent'/><Setter Property='Template'><Setter.Value><ControlTemplate TargetType='ScrollBar'><Track x:Name='PART_Track' IsDirectionReversed='True' Orientation='{TemplateBinding Orientation}'><Track.Thumb><Thumb><Thumb.Template><ControlTemplate TargetType='Thumb'><Border Background='#55D5DFD9' CornerRadius='2'/></ControlTemplate></Thumb.Template></Thumb></Track.Thumb></Track></ControlTemplate></Setter.Value></Setter></Style>"));
             SourceInitialized+=(s,e)=> {
-                if(Glass95.Enabled||this is QuickWindow||this is NotificationWindow||this is DetailWindow||this is CalendarWindow||this is StartWindow||this is SearchWindow||this is DrawerWindow)Dark=Glass95.Dark;
+                if(DockSurface)Dark=Glass95.DockDark;else if(Glass95.Enabled||this is QuickWindow||this is NotificationWindow||this is DetailWindow||this is CalendarWindow||this is StartWindow||this is SearchWindow||this is DrawerWindow)Dark=Glass95.Dark;
                 var hwnd=new WindowInteropHelper(this).Handle;Native.SetWindowLong(hwnd,-20,(Native.GetWindowLong(hwnd,-20)|0x80)&~0x40000);
                 glassTint=Surface.Background;HasBlur=!OpaqueSurface&&Native.Blur(this,Radius,Dark);ApplyMaterial();
                 var source=HwndSource.FromHwnd(new WindowInteropHelper(this).Handle);if(source!=null)source.AddHook((IntPtr h,int msg,IntPtr w,IntPtr l,ref bool handled)=> {
@@ -320,20 +322,23 @@ namespace OneTaskBar
         }
         void ApplyMaterial()
         {
-            if(lens!=null){lens.Active=Glass95.Enabled&&!OpaqueSurface&&HasBlur&&Preferences.Current.Blur&&!(DockSurface&&DockAppearance.Custom);lens.InvalidateVisual();}
+            if(DockSurface)Dark=Glass95.DockDark;else if(!OpaqueSurface)Dark=Glass95.Dark;
+            if(lens!=null){lens.Active=Glass95.Enabled&&!OpaqueSurface&&HasBlur&&Preferences.Current.Blur&&!(DockSurface&&DockAppearance.Custom)&&!(this is HudWindow);lens.InvalidateVisual();}
             if(glassTint==null)return;if(DockSurface&&DockAppearance.Custom){Native.EnableBlur(this,false);Surface.Background=DockAppearance.Background;Surface.BorderBrush=Glass95.Enabled?Glass95.Rim:Brushes.Transparent;Surface.BorderThickness=new Thickness(Glass95.Enabled?.7:0);return;}
             bool enabled=HasBlur&&Preferences.Current.Blur&&!(DockSurface&&Preferences.Current.DockSolidBackground)&&(!Glass95.Enabled||Glass95.Transparent);Native.EnableBlur(this,enabled);
+            TransparentInk.Apply(Surface,enabled&&Preferences.Current.UITransparency>65&&!OpaqueSurface,!Dark);
             if(Glass95.Enabled&&!OpaqueSurface&&!(DockSurface&&Preferences.Current.DockSolidBackground)){
-                if(glassEdge==null||edgeDark!=Glass95.Dark){edgeDark=Glass95.Dark;glassEdge=Glass95.Edge(edgeDark);}Surface.BorderBrush=this is NowBar?(Brush)Brushes.Transparent:glassEdge;Surface.BorderThickness=new Thickness(0);
-                Surface.Background=this is NowBar?(enabled?glassTint:solidTint??Glass95.Solid):enabled?Glass95.Surface:Glass95.Solid;
+                if(glassEdge==null||edgeDark!=Dark){edgeDark=Dark;glassEdge=Glass95.Edge(edgeDark);}Surface.BorderBrush=this is NowBar?(Brush)Brushes.Transparent:glassEdge;Surface.BorderThickness=new Thickness(0);
+                Surface.Background=this is NowBar?(enabled?glassTint:solidTint??Glass95.Solid):enabled?PanelMaterial.Surface(Dark,true):Paint.Brush(Dark?"#FF242832":"#FFF1F4FA");
             }else{
                 if(glassEdge!=null){glassEdge=null;Surface.BorderBrush=DockSurface?Brushes.Transparent:Paint.Brush("#38FFFFFF");Surface.BorderThickness=new Thickness(DockSurface?0:.7);}
                 bool panel=this is QuickWindow||this is NotificationWindow||this is DetailWindow||this is CalendarWindow||this is StartWindow||this is SearchWindow||this is DrawerWindow;
-                if(panel){Dark=Glass95.Dark;Surface.Background=enabled?QuickPanel.Glass:PanelMaterial.Light?PanelMaterial.LightSolid:Paint.Brush("#FF29302D");}
+                if(DockSurface)Surface.Background=enabled?LightPanel.DockGlass:Dark?Paint.Brush("#FF29302D"):LightPanel.DockSolid;
+                else if(panel){Dark=Glass95.Dark;Surface.Background=enabled?QuickPanel.Glass:PanelMaterial.Light?PanelMaterial.LightSolid:Paint.Brush("#FF29302D");}
                 else Surface.Background=enabled?glassTint:solidTint??Paint.Brush(Dark?"#FF344139":"#FFE0E5E2");
             }
         }
-        internal void RefreshGlassMaterial(){ApplyMaterial();Glass95.RefreshColors(Surface);}
+        internal void RefreshGlassMaterial(){ApplyMaterial();if(DockSurface)Glass95.DockInk(Surface);else Glass95.RefreshColors(Surface);}
         internal void MoveGlassHighlight(Point point)
         {
             if(glassEdge==null||!Motion.Enabled||!Preferences.Current.Hover||!IsVisible||IsDismissing||Surface.ActualWidth<1||Surface.ActualHeight<1)return;

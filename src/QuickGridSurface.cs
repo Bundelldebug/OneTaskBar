@@ -21,7 +21,7 @@ namespace OneTaskBar
         internal QuickWidgetTile(string icon,string title,Action action,Action iconAction=null)
         {
             hasDetail=iconAction!=null;main=Paint.Button(new Border(),action,title);main.Background=Brushes.Transparent;main.Padding=new Thickness(0);main.HorizontalContentAlignment=HorizontalAlignment.Stretch;main.VerticalContentAlignment=VerticalAlignment.Stretch;Children.Add(main);
-            Icon=new Glyph(icon,25);Toggle=(QuickToggleButton)Paint.Button(Icon,iconAction??action,title,true);Toggle.Padding=new Thickness(0);Toggle.Resources["ButtonRadius"]=new CornerRadius(40);Children.Add(Toggle);
+            Icon=new Glyph(icon,25);Toggle=(QuickToggleButton)Paint.Button(Icon,iconAction??action,title,true);Toggle.Padding=new Thickness(0);Toggle.Resources["ButtonRadius"]=new CornerRadius(40);Toggle.RefreshState(false,true);Children.Add(Toggle);
             if(hasDetail){var menu=new ContextMenu();var detail=new MenuItem {Header=title+" 연결 관리"};detail.Click+=(s,e)=>action();menu.Items.Add(detail);ContextMenu=menu;AutomationProperties.SetHelpText(Toggle,"켜기·끄기. 오른쪽 클릭 또는 Shift+F10으로 연결 관리를 엽니다.");}
             name=Paint.TextBlock(title,13,Paint.Text);name.FontWeight=FontWeights.SemiBold;caption=Paint.TextBlock("",10.5,Paint.Muted);caption.Visibility=Visibility.Collapsed;name.TextTrimming=caption.TextTrimming=TextTrimming.CharacterEllipsis;words=new StackPanel {IsHitTestVisible=false,VerticalAlignment=VerticalAlignment.Center};words.Children.Add(name);words.Children.Add(caption);Children.Add(words);SizeChanged+=(s,e)=>Place();
         }

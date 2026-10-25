@@ -35,14 +35,15 @@ namespace OneTaskBar
         }
         internal static string Profile(string appId)
         {
-            string folder=String.Equals(appId,"Internet",StringComparison.OrdinalIgnoreCase)||String.Equals(appId,"Internet.exe",StringComparison.OrdinalIgnoreCase)?@"Samsung\Internet\User Data":null;if(folder==null)return null;
+            string folder=Supported(appId)?@"Samsung\Internet\User Data":null;if(folder==null)return null;
             string root=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),@"AppData\Local",folder),profile="Default",state=Path.Combine(root,"Local State");
             try{if(File.Exists(state)&&new FileInfo(state).Length<4194304){var json=new JavaScriptSerializer {MaxJsonLength=4194304}.DeserializeObject(File.ReadAllText(state)) as Dictionary<string,object>;object value;if(json!=null&&json.TryGetValue("profile",out value)){var info=value as Dictionary<string,object>;if(info!=null&&info.TryGetValue("last_used",out value)){string candidate=Convert.ToString(value);if(candidate=="Default"||Regex.IsMatch(candidate??"",@"\AProfile \d+\z"))profile=candidate;}}}}catch{}
             return Path.Combine(root,profile,"History");
         }
         internal static bool Enabled {get{return Preferences.Current.YouTubeHighResArtwork||!String.IsNullOrEmpty(Preferences.Current.YouTubeArtworkTrack);}}
         internal static string TrackKey(string appId,string title){using(var sha=SHA256.Create())return Convert.ToBase64String(sha.ComputeHash(Encoding.UTF8.GetBytes((appId??"").ToLowerInvariant()+"|"+(title??""))));}
-        internal static bool Allowed(string appId,string title){return (String.Equals(appId,"Internet",StringComparison.OrdinalIgnoreCase)||String.Equals(appId,"Internet.exe",StringComparison.OrdinalIgnoreCase))&&(Preferences.Current.YouTubeHighResArtwork||String.Equals(Preferences.Current.YouTubeArtworkTrack,TrackKey(appId,title),StringComparison.Ordinal));}
+        internal static bool Supported(string appId){return String.Equals(appId,"Internet",StringComparison.OrdinalIgnoreCase)||String.Equals(appId,"Internet.exe",StringComparison.OrdinalIgnoreCase)||String.Equals(appId,"samsunginternet",StringComparison.OrdinalIgnoreCase)||String.Equals(appId,"samsunginternet.exe",StringComparison.OrdinalIgnoreCase);}
+        internal static bool Allowed(string appId,string title){return Supported(appId)&&(Preferences.Current.YouTubeHighResArtwork||String.Equals(Preferences.Current.YouTubeArtworkTrack,TrackKey(appId,title),StringComparison.Ordinal));}
         internal static string Find(string file,string title)
         {
             LookupStatus="missing-profile-or-title";if(String.IsNullOrWhiteSpace(file)||String.IsNullOrWhiteSpace(title)||title.Length>1024||!File.Exists(file))return null;IntPtr database=IntPtr.Zero,statement=IntPtr.Zero;var clock=Stopwatch.StartNew();Progress progress=state=>clock.ElapsedMilliseconds>60?1:0;
@@ -52,7 +53,7 @@ namespace OneTaskBar
         }
         internal static byte[] Read(string appId,string title)
         {
-            string video=Find(Profile(appId),title);return video==null?null:Download(video);
+            if(!Allowed(appId,title)){LookupStatus="not-authorized";return null;}string video=Find(Profile(appId),title);return video==null?null:Download(video);
         }
         internal static byte[] Download(string id)
         {
