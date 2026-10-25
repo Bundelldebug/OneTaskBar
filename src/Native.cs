@@ -317,7 +317,7 @@ namespace OneTaskBar
         [DllImport("user32.dll")] static extern IntPtr CallNextHookEx(IntPtr hook,int code,IntPtr message,IntPtr info);
         [DllImport("kernel32.dll",CharSet=CharSet.Unicode)] static extern IntPtr GetModuleHandle(string module);
         readonly Hook callback; IntPtr handle;
-        public bool Enabled; public Func<int,bool> OnKey;internal Func<bool> InterceptStart;internal Action OnStart;
+        public bool Enabled; public Func<int,bool> OnKey;internal Func<bool> InterceptStart,InterceptAltTab;internal Action OnStart;internal readonly WindowSwitchGesture AltTabGesture=new WindowSwitchGesture();
         readonly StartKeyGesture start=new StartKeyGesture();
         int bufferedWin,nativeWins;
         [DllImport("user32.dll")]static extern short GetAsyncKeyState(int key);
@@ -328,6 +328,7 @@ namespace OneTaskBar
             if(code>=0&&Marshal.ReadInt64(info,16)==(long)SystemPanels.InputMarker)return CallNextHookEx(handle,code,message,info);
             if(code>=0) {
                 bool down=message==new IntPtr(0x100)||message==new IntPtr(0x104),up=message==new IntPtr(0x101)||message==new IntPtr(0x105);
+                if(down||up)try{uint flags=(uint)Marshal.ReadInt32(info,8);bool alt=(flags&0x20)!=0||(GetAsyncKeyState(0x12)&0x8000)!=0,ctrl=(GetAsyncKeyState(0x11)&0x8000)!=0,shift=(GetAsyncKeyState(0x10)&0x8000)!=0,win=(GetAsyncKeyState(0x5b)&0x8000)!=0||(GetAsyncKeyState(0x5c)&0x8000)!=0;if(AltTabGesture.Observe(key,down,Enabled&&InterceptAltTab!=null&&InterceptAltTab(),alt,ctrl,shift,win,(flags&0x10)!=0))return new IntPtr(1);}catch(Exception error){AppLog.Once("switcher-key",error.GetType().Name);}
                 if(down||up){bool modifiers=(GetAsyncKeyState(0x10)&0x8000)!=0||(GetAsyncKeyState(0x11)&0x8000)!=0||(GetAsyncKeyState(0x12)&0x8000)!=0;
                     bool intercept=Enabled&&InterceptStart!=null&&InterceptStart(),invoke=start.Observe(key,down,intercept,modifiers),win=key==0x5b||key==0x5c;
                     int winBit=key==0x5b?1:key==0x5c?2:0;

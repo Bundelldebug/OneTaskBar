@@ -17,6 +17,7 @@ namespace OneTaskBar
         public bool DockSolidBackground=false;
         public bool NativeStartKey=true,NativeSearch=false;
         public bool NativeStartButton=false;
+        public bool NativeAltTab=false;
         public bool QuickSliderScroll=false;
         public bool DockWindowDrop=true;
         public int QuickToggleWidthPercent=100,QuickToggleCollapsedHeight=62;
@@ -50,16 +51,11 @@ namespace OneTaskBar
         const string key=@"Software\Microsoft\Windows\CurrentVersion\Run";
         internal static bool Enabled
         {
-            get {try{using(var entry=Registry.CurrentUser.OpenSubKey(key)){string value=entry==null?"":entry.GetValue("OneTaskBar","") as string;return value!=null&&(value.IndexOf("OneTaskBar.exe",StringComparison.OrdinalIgnoreCase)>=0||value.IndexOf("OneTaskBar.Desktop_",StringComparison.OrdinalIgnoreCase)>=0);}}catch(Exception e){AppLog.Once("startup-read",e.Message);return false;}}
+            get {return LogonStartup.Enabled;}
         }
         internal static void Set(bool value)
         {
-            using(var entry=Registry.CurrentUser.CreateSubKey(key)) {
-                if(!value){if(Enabled)entry.DeleteValue("OneTaskBar",false);return;}
-                string command="\""+NotificationIdentity.PhysicalFile(Path.Combine(AppLog.Root,"OneTaskBar.exe"))+"\" --desktop --logon";
-                try{if(NotificationIdentity.IsCurrent){var family=Windows.ApplicationModel.Package.Current.Id.FamilyName;command="explorer.exe \"shell:AppsFolder\\"+family+"!OneTaskBar\"";}}catch{}
-                entry.SetValue("OneTaskBar",command,RegistryValueKind.String);
-            }
+            LogonStartup.Set(value);
         }
     }
 }

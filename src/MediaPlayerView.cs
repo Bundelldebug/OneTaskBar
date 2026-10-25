@@ -6,18 +6,18 @@ using System.Windows.Media;
 namespace OneTaskBar
 {
     // Shared by quick settings and the expanded 미디어 플레이어.
-    internal sealed class MediaPlayerView : Grid
+    internal sealed partial class MediaPlayerView : Grid
     {
         readonly TextBlock title=Paint.TextBlock("",15,Paint.Text),artist=Paint.TextBlock("",11,Paint.Muted),device=Paint.TextBlock("오디오 출력",11,Paint.Text),elapsed=Paint.TextBlock("0:00",10,Paint.Muted),duration=Paint.TextBlock("0:00",10,Paint.Muted);
         readonly Border art=new Border {Width=42,Height=42,CornerRadius=new CornerRadius(11)};
         readonly Glyph playGlyph=new Glyph("play",20){Color=Paint.Ink},deviceGlyph=new Glyph("volume",14);
-        readonly Func<double,Task<bool>> seekCommand;readonly Action<string> openApplication;ImageSource artwork;bool seeking,opening;double? pending;DateTime seekUntil;string track,applicationId;
+        readonly Func<double,Task<bool>> seekCommand;readonly Action<string> openApplication;readonly Func<string,AppEntry> sourceApplication;ImageSource artwork;bool seeking,opening;double? pending;DateTime seekUntil;string track,applicationId;
         internal readonly Button PlayButton,PreviousButton,NextButton,OutputButton,ArtworkButton;
         internal readonly PillSlider SeekBar=new PillSlider("progress") {Height=22,Light=true,DarkTrack=true,AnimateValue=false,Slim=true,ShowIcon=false};
         internal Action<ArtworkPalette> PaletteChanged;
         readonly Grid route,header;readonly DockPanel timeline;readonly StackPanel controls;readonly Button compactOutput;readonly bool condensed,dense;bool modeSet;
         readonly StackPanel words;readonly Border posterShade;double posterEdge;bool usingPoster;
-        double widgetWidth;
+        double widgetWidth,widgetHeight;
         internal bool LargeCoverVisible {get{return usingPoster;}}
         internal void SetPoster(double edge){edge=Math.Max(0,Math.Min(288,edge));if(Math.Abs(edge-posterEdge)<.1)return;posterEdge=edge;modeSet=false;}
         internal bool IsCompact {get;private set;}
@@ -26,12 +26,12 @@ namespace OneTaskBar
         internal string OutputName {get{return device.Text;}}
         bool budsOutput,deviceIconRequested;ImageSource deviceSymbol;
         internal bool OutputBudsIcon {get{return deviceGlyph.HasDeviceIcon;}}
-        internal void FitWidget(double width,double height){if(!dense)return;widgetWidth=width;double edge=Math.Min(width-28,height-86);SetPoster(edge>=120?edge:0);}
-        void FitWidgetControls(){if(!dense||widgetWidth<=0)return;bool narrow=widgetWidth<210;double side=narrow?10:14;Margin=new Thickness(side,Margin.Top,side,Margin.Bottom);PreviousButton.Width=PreviousButton.Height=NextButton.Width=NextButton.Height=narrow?26:30;PlayButton.Margin=new Thickness(narrow?6:24,0,narrow?6:24,0);title.FontSize=narrow?12:13;artist.FontSize=narrow?10:11;device.Visibility=narrow?Visibility.Collapsed:Visibility.Visible;route.ColumnDefinitions[1].Width=narrow?new GridLength(0):new GridLength(1,GridUnitType.Star);header.ColumnDefinitions[2].Width=new GridLength(IsCompact?28:0);}
+        internal void FitWidget(double width,double height){if(!dense)return;if(Modern&&(Math.Abs(widgetWidth-width)>.1||Math.Abs(widgetHeight-height)>.1))modeSet=false;widgetWidth=width;widgetHeight=height;double edge=Math.Min(width-28,height-(Modern?118:86));SetPoster(edge>=120?edge:0);}
+        void FitWidgetControls(){if(Modern){FitModernControls();return;}if(!dense||widgetWidth<=0)return;bool narrow=widgetWidth<210;double side=narrow?10:14;Margin=new Thickness(side,Margin.Top,side,Margin.Bottom);PreviousButton.Width=PreviousButton.Height=NextButton.Width=NextButton.Height=narrow?26:30;PlayButton.Margin=new Thickness(narrow?6:24,0,narrow?6:24,0);title.FontSize=narrow?12:13;artist.FontSize=narrow?10:11;device.Visibility=narrow?Visibility.Collapsed:Visibility.Visible;route.ColumnDefinitions[1].Width=narrow?new GridLength(0):new GridLength(1,GridUnitType.Star);header.ColumnDefinitions[2].Width=new GridLength(IsCompact?28:0);}
         async void LoadDeviceSymbol(){deviceIconRequested=true;try{deviceSymbol=await BackgroundWork.Run(BudsDeviceData.ShortcutIcon);deviceGlyph.SetDeviceIcon(budsOutput?deviceSymbol:null);}catch(Exception error){AppLog.Once("media-device-symbol",error.GetType().Name);}}
-        internal MediaPlayerView(Action<string> command,Func<double,Task<bool>> seek,Action output,Action collapse=null,bool condensed=false,Action<string> openApp=null,bool dense=false)
+        internal MediaPlayerView(Action<string> command,Func<double,Task<bool>> seek,Action output,Action collapse=null,bool condensed=false,Action<string> openApp=null,bool dense=false,Func<string,AppEntry> sourceApp=null)
         {
-            this.condensed=condensed;this.dense=dense;openApplication=openApp;Height=dense?106:condensed?128:164;Margin=new Thickness(14,dense?4:condensed?6:12,14,dense?4:condensed?6:12);seekCommand=seek;
+            this.condensed=condensed;this.dense=dense;openApplication=openApp;sourceApplication=sourceApp;Height=dense?106:condensed?128:164;Margin=new Thickness(14,dense?4:condensed?6:12,14,dense?4:condensed?6:12);seekCommand=seek;
             foreach(double height in dense?new[]{20.0,32,24,30}:condensed?new[]{20.0,36,34,38}:new[]{20.0,44,44,56})RowDefinitions.Add(new RowDefinition {Height=new GridLength(height)});
             route=new Grid();route.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(22)});route.ColumnDefinitions.Add(new ColumnDefinition());route.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(28)});route.Children.Add(deviceGlyph);device.TextTrimming=TextTrimming.CharacterEllipsis;device.FontWeight=FontWeights.SemiBold;Grid.SetColumn(device,1);route.Children.Add(device);OutputButton=Icon("audio-output",output,"출력 기기 변경",28,19);Grid.SetColumn(OutputButton,2);route.Children.Add(OutputButton);Children.Add(route);
             header=new Grid {Margin=new Thickness(0,2,0,0)};header.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(50)});header.ColumnDefinitions.Add(new ColumnDefinition());header.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(28)});
@@ -40,11 +40,13 @@ namespace OneTaskBar
             var shade=new LinearGradientBrush();shade.StartPoint=new Point(0,0);shade.EndPoint=new Point(0,1);shade.GradientStops.Add(new GradientStop(Colors.Transparent,0));shade.GradientStops.Add(new GradientStop(Color.FromArgb(225,0,0,0),1));shade.Freeze();posterShade=new Border {Height=96,VerticalAlignment=VerticalAlignment.Bottom,Background=shade,IsHitTestVisible=false,Visibility=Visibility.Collapsed};Grid.SetColumnSpan(posterShade,3);header.Children.Add(posterShade);words=new StackPanel {IsHitTestVisible=false,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,5,0)};title.FontWeight=FontWeights.SemiBold;title.TextTrimming=artist.TextTrimming=TextTrimming.CharacterEllipsis;words.Children.Add(title);words.Children.Add(artist);Grid.SetColumn(words,1);header.Children.Add(words);if(collapse!=null){var fold=Icon("chevron",collapse,"미디어 플레이어 접기",28,17);((Glyph)fold.Content).RenderTransform=new RotateTransform(90);((Glyph)fold.Content).RenderTransformOrigin=new Point(.5,.5);fold.VerticalAlignment=VerticalAlignment.Top;Grid.SetColumn(fold,2);header.Children.Add(fold);}compactOutput=Icon("audio-output",output,"출력 기기 변경",28,19);compactOutput.Visibility=Visibility.Collapsed;Grid.SetColumn(compactOutput,2);header.Children.Add(compactOutput);Grid.SetRow(header,1);Children.Add(header);
             timeline=new DockPanel {Margin=new Thickness(2,condensed?2:4,2,0)};var times=new Grid {Height=dense?12:condensed?14:18};SeekBar.Height=dense?10:condensed?18:22;duration.HorizontalAlignment=HorizontalAlignment.Right;times.Children.Add(elapsed);times.Children.Add(duration);DockPanel.SetDock(times,Dock.Bottom);timeline.Children.Add(times);timeline.Children.Add(SeekBar);Grid.SetRow(timeline,2);Children.Add(timeline);System.Windows.Automation.AutomationProperties.SetName(SeekBar,"미디어 재생 위치");SeekBar.Changed+=Seek;
             controls=new StackPanel {Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};PreviousButton=Icon("previous",()=>command("previous"),"이전 곡",dense?30:condensed?36:40,dense?18:20);NextButton=Icon("next",()=>command("next"),"다음 곡",dense?30:condensed?36:40,dense?18:20);PlayButton=Paint.Button(playGlyph,()=>command("play"),"재생 · 일시 정지");PlayButton.Width=PlayButton.Height=dense?30:condensed?36:44;PlayButton.Padding=new Thickness(0);PlayButton.Background=Paint.ControlWhite;PlayButton.Resources["ButtonRadius"]=new CornerRadius(dense?15:condensed?18:22);PlayButton.Margin=new Thickness(24,0,24,0);controls.Children.Add(PreviousButton);controls.Children.Add(PlayButton);controls.Children.Add(NextButton);Grid.SetRow(controls,3);Children.Add(controls);
+            if(Modern)BuildModern(command);
         }
         static Button Icon(string glyph,Action action,string hint,double size,double iconSize){var button=Paint.Button(new Glyph(glyph,iconSize),action,hint);button.Width=button.Height=size;button.Padding=new Thickness(0);button.Background=Brushes.Transparent;return button;}
-        internal void SetPalette(ArtworkPalette palette){playGlyph.Color=palette.Ink;playGlyph.InvalidateVisual();}
+        internal void SetPalette(ArtworkPalette palette){playGlyph.Color=Modern?Paint.ControlWhite:palette.Ink;playGlyph.InvalidateVisual();}
         internal void Update(MediaState media,string outputName)
         {
+            if(Modern){UpdateModern(media,outputName);return;}
             media=media??new MediaState();bool empty=!media.Available||!media.Active;bool poster=!empty&&posterEdge>=120&&media.Artwork!=null;bool modeChanged=!modeSet||empty!=IsCompact||usingPoster!=poster;
             applicationId=media.AppId;ArtworkButton.IsEnabled=!opening&&!empty&&media.Artwork!=null&&openApplication!=null&&!String.IsNullOrEmpty(applicationId);
             SeekBar.WheelAdjust=!condensed||Preferences.Current.QuickSliderScroll;

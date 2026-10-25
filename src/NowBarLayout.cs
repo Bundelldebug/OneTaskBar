@@ -1,19 +1,20 @@
-﻿using System;
+using System;
 using System.Windows;
 namespace OneTaskBar
 {
     internal sealed class NowBarLayout
     {
         internal Rect Bounds;internal double CompactY,CompactWidth,PosterEdge,PopupHeight;internal bool Raised;
-        internal static NowBarLayout Fit(double screenWidth,double screenHeight,double startX,double dockY,double textWidth,bool expanded,bool largeCover=false,double maximumWidth=0)
+        internal static NowBarLayout Fit(double screenWidth,double screenHeight,double startX,double dockY,double textWidth,bool expanded,bool largeCover=false,double maximumWidth=0,bool modern=false)
         {
             double gap=Math.Max(1,startX-24),limit=Math.Max(1,Math.Min(maximumWidth>0?maximumWidth:DockLayout.StatusSize(screenWidth),gap)),compact=limit<84?Math.Min(44,limit):Math.Min(limit,Math.Max(132,textWidth+64)),cy=Math.Max(12,dockY);
-            double popupWidth=Math.Max(1,Math.Min(400,screenWidth-24)),cover=largeCover?Math.Max(0,Math.Min(288,Math.Min(popupWidth-56,cy-168))):0;if(cover<120)cover=0;
-            double popupHeight=cover>0?cover+148:Math.Min(188,Math.Max(100,cy-20)),width=expanded?popupWidth:compact,height=expanded?popupHeight:44,y=expanded?Math.Max(12,cy-8-height):cy;
+            double popupWidth=Math.Max(1,Math.Min(400,screenWidth-24)),cover=largeCover?Math.Max(0,Math.Min(288,Math.Min(popupWidth-56,cy-(modern?198:168)))):0;if(cover<120)cover=0;
+            double popupHeight=cover>0?cover+(modern?178:148):Math.Min(modern?130:188,Math.Max(100,cy-20)),width=expanded?popupWidth:compact,height=expanded?popupHeight:44,y=expanded?Math.Max(12,cy-8-height):cy;
             return new NowBarLayout {Bounds=new Rect(12,y,width,height),CompactY=cy,CompactWidth=compact,Raised=false,PosterEdge=cover,PopupHeight=popupHeight};
         }
         internal static void Check()
         {
+            foreach(bool cover in new[]{false,true})foreach(double width in new[]{320.0,640,1440})foreach(double height in new[]{400.0,600,900}){var fit=Fit(width,height,320,height-56,180,true,cover,0,true);if(fit.Bounds.Top<12||fit.Bounds.Bottom>height-64||fit.Bounds.Right>width||(!cover&&height>=400&&fit.PopupHeight!=130))throw new Exception("UI 9 player spacing exceeds its monitor");}
             foreach(double scale in new[]{1.0,1.5,2.0})foreach(int apps in new[]{2,12,28}){
                 var physical=new System.Drawing.Rectangle(-1920,80,1920,1080);var dock=DockLayout.Compute(physical,scale,apps,58,true);
                 foreach(bool expanded in new[]{false,true}){var fit=Fit(physical.Width/scale,physical.Height/scale,dock.StartX,dock.Y,1500,expanded);var b=fit.Bounds;

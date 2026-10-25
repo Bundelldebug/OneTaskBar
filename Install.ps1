@@ -36,6 +36,26 @@ if(-not $StagingOnly){
     # Normal per-user installation never elevates, trusts certificates, or registers a package.
     $run=[Microsoft.Win32.Registry]::CurrentUser.CreateSubKey('Software\Microsoft\Windows\CurrentVersion\Run')
     try{$startupEnabled=($null -ne $run.GetValue('OneTaskBar',$null)) -or (-not $wasInstalled -and -not $NoStartup)}finally{$run.Dispose()}
+    $startupApproval=[Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run')
+    try{if($startupApproval){$startupApprovalValue=$startupApproval.GetValue('OneTaskBar',$null);if($startupApprovalValue -is [byte[]] -and $startupApprovalValue.Length -gt 0 -and $startupApprovalValue[0] -in @(3,7)){$startupEnabled=$false}}}finally{if($startupApproval){$startupApproval.Dispose()}}
+    $startupService=$null;$startupFolder=$null;$startupTask=$null
+    try{
+        $startupService=New-Object -ComObject Schedule.Service;$startupService.Connect();$startupFolder=$startupService.GetFolder('\')
+        try{$startupTask=$startupFolder.GetTask('OneTaskBar.Startup')}catch{$startupTask=$null}
+        if($startupTask){
+            $startupSettings=[Xml.XmlReaderSettings]::new();$startupSettings.DtdProcessing=[Xml.DtdProcessing]::Prohibit;$startupSettings.XmlResolver=$null
+            $startupReader=[Xml.XmlReader]::Create([IO.StringReader]::new($startupTask.Xml),$startupSettings)
+            try{$startupXml=[Xml.XmlDocument]::new();$startupXml.XmlResolver=$null;$startupXml.Load($startupReader)}finally{$startupReader.Dispose()}
+            $startupNs=[Xml.XmlNamespaceManager]::new($startupXml.NameTable);$startupNs.AddNamespace('t','http://schemas.microsoft.com/windows/2004/02/mit/task')
+            $startupSource=$startupXml.SelectSingleNode('/t:Task/t:RegistrationInfo/t:Source',$startupNs)
+            $startupCommand=$startupXml.SelectSingleNode('/t:Task/t:Actions/t:Exec/t:Command',$startupNs)
+            $startupArguments=$startupXml.SelectSingleNode('/t:Task/t:Actions/t:Exec/t:Arguments',$startupNs)
+            $startupUser=$startupXml.SelectSingleNode('/t:Task/t:Principals/t:Principal/t:UserId',$startupNs)
+            $startupLevel=$startupXml.SelectSingleNode('/t:Task/t:Principals/t:Principal/t:RunLevel',$startupNs)
+            $startupSid=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+            if($startupSource -and $startupSource.InnerText -ceq ('OneTaskBar.Logon.v1|'+$startupSid) -and $startupCommand -and $installedPaths -contains $startupCommand.InnerText -and $startupArguments -and $startupArguments.InnerText -ceq '--desktop --logon' -and $startupUser -and $startupUser.InnerText -ceq $startupSid -and (-not $startupLevel -or $startupLevel.InnerText -ceq 'LeastPrivilege') -and $startupXml.SelectNodes('/t:Task/t:Actions/*',$startupNs).Count -eq 1){$startupEnabled=[bool]$startupTask.Enabled}
+        }
+    }catch{Write-Warning 'Could not inspect the existing One TaskBar logon task; preserving the Run setting.'}finally{foreach($startupCom in @($startupTask,$startupFolder,$startupService)){if($startupCom -and [Runtime.InteropServices.Marshal]::IsComObject($startupCom)){[Runtime.InteropServices.Marshal]::FinalReleaseComObject($startupCom)|Out-Null}}}
     if($NoStartup){$startupEnabled=$false}
     elseif($EnableStartup){$startupEnabled=$true}
     # Upgrade only this product and its known personal predecessor.
@@ -103,9 +123,12 @@ if($StagingOnly){Write-Output ('Payload extracted and verified: '+$installDir);r
 $launchExe=Resolve-InstallFile $installedExe
 $launchDir=Split-Path -Parent $launchExe
 
+$startupMode=if($startupEnabled){'on'}else{'off'}
+$startupConfiguration=Start-Process -FilePath $launchExe -ArgumentList @('--configure-startup',$startupMode) -WindowStyle Hidden -PassThru
+if(-not $startupConfiguration.WaitForExit(12000)){throw 'Automatic startup configuration timed out.'}
+if($startupConfiguration.ExitCode -ne 0){throw 'Could not configure the per-user One TaskBar logon task. Existing startup settings were retained.'}
 $run=[Microsoft.Win32.Registry]::CurrentUser.CreateSubKey('Software\Microsoft\Windows\CurrentVersion\Run')
 try{
-    if($startupEnabled){$run.SetValue('OneTaskBar',('"'+$launchExe+'" --desktop --logon'),[Microsoft.Win32.RegistryValueKind]::String)}else{$run.DeleteValue('OneTaskBar',$false)}
     foreach($name in @('OneUIHome','One UI 홈')){$value=[string]$run.GetValue($name,'');if($value -match 'OneUIHome|One UI 홈'){$run.DeleteValue($name,$false)}}
 }finally{$run.Dispose()}
 $shortcutShell=New-Object -ComObject WScript.Shell

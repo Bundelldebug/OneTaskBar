@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -249,6 +249,7 @@ namespace OneTaskBar
             if(closed) return;
             if(!controller.Demo&&!autoHide&&DateTime.UtcNow>=workAreaAt){workAreaAt=DateTime.UtcNow.AddSeconds(2);double gap=Math.Max(68,(Screen.Bounds.Bottom-Native.WorkArea(Screen).Bottom)/Scale);if(Math.Abs(reservedHeight-gap)>.5){reservedHeight=gap;Rebuild();}}
             bool reserve=controller.Desktop&&(controller.Services.Media.Active||MediaBar!=null&&MediaBar.ReservesSpace);double expected=PowerDisplay.Slot(state,Preferences.Current.DesktopPowerWatts);if(expected!=powerWidth||reserve!=mediaSpace)Rebuild();
+            if(MediaBar!=null&&MediaBar.Modern!=(Preferences.Current.UIVersion>=90)){MediaBar.Close();MediaBar=null;}
             if(MediaBar==null&&controller.Services.Media.Active&&controller.Desktop)MediaBar=new NowBar(controller,Screen){DismissedOutside=HideAfterMediaDismissed};
             RefreshMedia();powerAccess.ToolTip=state.Known?"배터리 · 빠른 설정":"직접 입력한 PC 전력값 · 실시간 측정 아님";
             Battery.Update(state);clock.Text=DateTime.Now.ToString(Preferences.Current.Seconds?"tt h:mm:ss\nyyyy-MM-dd":"tt h:mm\nyyyy-MM-dd",System.Globalization.CultureInfo.GetCultureInfo("ko-KR"));
@@ -296,7 +297,7 @@ namespace OneTaskBar
     {
         readonly ShellController shell; readonly System.Windows.Controls.Primitives.UniformGrid items=new System.Windows.Controls.Primitives.UniformGrid {Columns=6,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Top};
         double cellWidth=118,cellHeight=116;
-        readonly Border searchBar;
+        readonly Border searchBar;readonly SmoothScrollViewer appScroll;
         List<AppEntry> loadedApps;double loadedWidth;bool composing,searchQueued,closed,renaming;
         List<StartTile> tiles=new List<StartTile>();string folder,preview,group;
         readonly Dictionary<string,Button> buttons=new Dictionary<string,Button>(StringComparer.OrdinalIgnoreCase);
@@ -305,7 +306,7 @@ namespace OneTaskBar
         internal readonly TextBox Search=new TextBox {FontSize=15,Foreground=Paint.Ink,Background=Brushes.Transparent,BorderThickness=new Thickness(0),Padding=new Thickness(6,8,6,8)};
         internal DrawerWindow(ShellController controller)
         {
-            shell=controller;Title="One TaskBar · 앱";Width=720;Height=680;Radius=32;Dark=true;StableSurface=true;Surface.CornerRadius=new CornerRadius(32);Surface.BorderBrush=Paint.Brush("#58FFFFFF");Surface.BorderThickness=new Thickness(.7);Surface.Background=QuickPanel.Glass;
+            shell=controller;Title="One TaskBar · 앱";Width=720;Height=680;Radius=32;Dark=true;StableSurface=true;SmoothLauncher=true;Surface.CornerRadius=new CornerRadius(32);Surface.BorderBrush=Paint.Brush("#58FFFFFF");Surface.BorderThickness=new Thickness(.7);Surface.Background=QuickPanel.Glass;
             var root=new DockPanel {Margin=new Thickness(24,20,24,16)};
             var header=new Grid {Height=42,Margin=new Thickness(12,0,12,20)};var title=Paint.TextBlock("앱",22,Paint.Text);title.FontWeight=FontWeights.SemiBold;header.Children.Add(title);
             var close=Paint.Action("닫기",()=>Hide()); close.HorizontalAlignment=HorizontalAlignment.Right; close.Height=32; header.Children.Add(close); DockPanel.SetDock(header,Dock.Top); root.Children.Add(header);
@@ -320,7 +321,7 @@ namespace OneTaskBar
             Search.TextChanged+=(s,e)=> {hint.Visibility=Search.Text.Length==0?Visibility.Visible:Visibility.Collapsed;if(!composing)QueueSearch();};
             TextCompositionManager.AddPreviewTextInputStartHandler(Search,(s,e)=>composing=true);TextCompositionManager.AddPreviewTextInputUpdateHandler(Search,(s,e)=>composing=true);Search.PreviewTextInput+=(s,e)=> {composing=false;QueueSearch();};Search.PreviewMouseLeftButtonDown+=(s,e)=> {if(Search.Text.Length==0){shell.ToggleSearch(null);e.Handled=true;}};
             var bottom=new StackPanel {HorizontalAlignment=HorizontalAlignment.Center};bottom.Children.Add(search);count.HorizontalAlignment=HorizontalAlignment.Center;count.Margin=new Thickness(0,8,0,0);bottom.Children.Add(count);DockPanel.SetDock(bottom,Dock.Bottom);root.Children.Add(bottom);
-            root.Children.Add(new SmoothScrollViewer {Content=items,VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});
+            appScroll=new SmoothScrollViewer {Content=items,VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};root.Children.Add(appScroll);
             DragReorder.DropArea(items,"drawer.apps",()=>!closed&&IsVisible,DropApp,PreviewAppDrop,true);
 
             Surface.Child=root;TransitionContent=root;PreviewTextInput+=(s,e)=> {if(!Search.IsKeyboardFocusWithin&&!folderName.IsKeyboardFocusWithin&&!String.IsNullOrEmpty(e.Text)&&(Keyboard.Modifiers&(ModifierKeys.Control|ModifierKeys.Alt))==0){Search.Text+=e.Text;QueueSearch();e.Handled=true;}};Deactivated+=(s,e)=> { if(!Program.Inspectable&&!DragReorder.Active&&IsVisible&&!IsMouseOver&&!buttons.Values.Any(b=>b.ContextMenu!=null&&b.ContextMenu.IsOpen))Hide(); };
@@ -355,8 +356,8 @@ namespace OneTaskBar
             count.Text=(folder==null?shell.Apps.Count:Current().Count)+"개 앱";
         }
         async void Launch(AppEntry app){var modifiers=Keyboard.Modifiers;if(await DismissAsync())shell.LaunchApp(app,modifiers);}
-        internal void OpenFolder(string key){if(!tiles.Any(t=>t.Key==key&&t.Folder))return;folder=key;RenderApps();if(Motion.Enabled)Motion.Fade(items,.55,1,160);}
-        internal void CloseFolder(){CommitName();folder=null;RenderApps();}
+        internal void OpenFolder(string key){if(!tiles.Any(t=>t.Key==key&&t.Folder))return;folder=key;RenderApps();LauncherMotion.Page(appScroll);}
+        internal void CloseFolder(){CommitName();folder=null;RenderApps();LauncherMotion.Page(appScroll);}
         void CommitName(){if(renaming||folder==null)return;renaming=true;try{if(shell.AppScreen.Rename(folder,folderName.Text))tiles=shell.AppScreen.Tiles(shell.Apps);var node=tiles.FirstOrDefault(t=>t.Key==folder);if(node!=null)folderName.Text=node.Name;}finally{renaming=false;}}
         internal string[] AppKeys {get{return Current().Select(t=>t.Key).ToArray();}}
         internal Button AppButton(string key){Button button;return buttons.TryGetValue(key,out button)?button:null;}

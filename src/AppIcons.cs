@@ -20,20 +20,22 @@ namespace OneTaskBar
         sealed class Plate {internal bool Needed;}
         static readonly SemaphoreSlim loaders=new SemaphoreSlim(3);
         internal static int CachedCount {get{lock(cacheLock)return cache.Count;}}
-        internal static FrameworkElement Visual(AppEntry app,double size){return app.Icon!=null?Visual(app.Icon,size):new DeferredIcon(app,size);}
+        static string Key(AppEntry app){string key=!String.IsNullOrEmpty(app.AppID)&&app.AppID.Contains("!")?app.AppID:(app.AppID??"")+"|"+(app.Target??app.Executable??"");return WebAppIcons.IsWebApp(app.AppID)?app.AppID+(app.Windows.Count>0?"|window":"|shortcut"):key;}
+        static ImageSource Ready(AppEntry app){lock(cacheLock){CachedIcon item;if(!cache.TryGetValue(Key(app),out item)||!item.Image.IsValueCreated)return null;recent.Remove(item.Position);recent.AddFirst(item.Position);return item.Image.Value;}}
+        internal static FrameworkElement Visual(AppEntry app,double size){var image=app.Icon??Ready(app);return image!=null?Visual(image,size):new DeferredIcon(app,size);}
         // Decode only icons that have entered a visible viewport, with bounded parallel work.
         sealed class DeferredIcon : Decorator
         {
-            readonly AppEntry entry;readonly double size;ScrollViewer scroll;bool requested;
-            internal DeferredIcon(AppEntry app,double pixels){entry=app;size=pixels;Width=Height=size;Child=new Glyph("window",size){Color=Paint.Text};Loaded+=(s,e)=>Observe();Unloaded+=(s,e)=>Stop();}
+            readonly AppEntry entry;readonly double size;ScrollViewer scroll;bool requested;int attempts;
+            internal DeferredIcon(AppEntry app,double pixels){entry=app;size=pixels;Width=Height=size;Child=new Glyph("window",size){Color=Paint.Text};Loaded+=(s,e)=>{if(!requested)attempts=0;Observe();};Unloaded+=(s,e)=>Stop();SizeChanged+=(s,e)=>Check();IsVisibleChanged+=(s,e)=>{if(IsVisible){if(!requested)attempts=0;Observe();}else Stop();};}
             void Stop(){if(scroll!=null)scroll.ScrollChanged-=Scrolled;scroll=null;}
             void Scrolled(object sender,ScrollChangedEventArgs args){Check();}
-            void Observe(){if(requested)return;DependencyObject parent=this;while((parent=VisualTreeHelper.GetParent(parent))!=null){scroll=parent as ScrollViewer;if(scroll!=null)break;}if(scroll!=null)scroll.ScrollChanged+=Scrolled;Check();}
+            void Observe(){if(requested||!IsLoaded)return;Stop();DependencyObject parent=this;while((parent=VisualTreeHelper.GetParent(parent))!=null){scroll=parent as ScrollViewer;if(scroll!=null)break;}if(scroll!=null)scroll.ScrollChanged+=Scrolled;Check();}
             async void Check()
             {
-                if(requested||!IsVisible)return;
+                if(requested||!IsLoaded||!IsVisible||ActualWidth<=0||ActualHeight<=0||attempts>=2)return;
                 if(scroll!=null){try{var bounds=TransformToAncestor(scroll).TransformBounds(new Rect(0,0,ActualWidth,ActualHeight));if(!bounds.IntersectsWith(new Rect(0,0,scroll.ActualWidth,scroll.ActualHeight)))return;}catch(InvalidOperationException){return;}}
-                requested=true;Stop();try{await loaders.WaitAsync();ImageSource icon;try{icon=await BackgroundWork.Run(()=>Get(entry));}finally{loaders.Release();}if(icon!=null)Child=Visual(icon,size);}catch(Exception error){AppLog.Once("icon-load",error.Message);}
+                requested=true;attempts++;Stop();try{await loaders.WaitAsync();ImageSource icon;try{icon=await BackgroundWork.Run(()=>Get(entry));}finally{loaders.Release();}if(icon!=null){LauncherMotion.InvalidateCache(this);Child=Visual(icon,size);InvalidateVisual();return;}}catch(Exception error){AppLog.Once("icon-load",error.Message);}requested=false;if(attempts<2&&IsLoaded&&IsVisible){await Task.Delay(200);Observe();}
             }
         }
         static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ImageSource,Plate> plates=new System.Runtime.CompilerServices.ConditionalWeakTable<ImageSource,Plate>();
@@ -53,10 +55,10 @@ namespace OneTaskBar
         }
         internal static ImageSource Get(AppEntry app)
         {
-            string key=!String.IsNullOrEmpty(app.AppID)&&app.AppID.Contains("!")?app.AppID:(app.AppID??"")+"|"+(app.Target??app.Executable??"");
-            if(WebAppIcons.IsWebApp(app.AppID))key=app.AppID+(app.Windows.Count>0?"|window":"|shortcut");
-            Lazy<ImageSource> image;lock(cacheLock){CachedIcon item;if(cache.TryGetValue(key,out item)){recent.Remove(item.Position);recent.AddFirst(item.Position);image=item.Image;}else {image=new Lazy<ImageSource>(()=>Load(app));cache[key]=new CachedIcon {Image=image,Position=recent.AddFirst(key)};while(cache.Count>CacheLimit){string oldest=recent.Last.Value;recent.RemoveLast();cache.Remove(oldest);}}}return image.Value;
+            string key=Key(app);
+            Lazy<ImageSource> image;lock(cacheLock){CachedIcon item;if(cache.TryGetValue(key,out item)){recent.Remove(item.Position);recent.AddFirst(item.Position);image=item.Image;}else {image=new Lazy<ImageSource>(()=>Load(app));cache[key]=new CachedIcon {Image=image,Position=recent.AddFirst(key)};while(cache.Count>CacheLimit){string oldest=recent.Last.Value;recent.RemoveLast();cache.Remove(oldest);}}}ImageSource result;try{result=image.Value;}catch{Discard(key,image);throw;}if(result==null)Discard(key,image);return result;
         }
+        static void Discard(string key,Lazy<ImageSource> image){lock(cacheLock){CachedIcon item;if(cache.TryGetValue(key,out item)&&Object.ReferenceEquals(item.Image,image)){cache.Remove(key);recent.Remove(item.Position);}}}
         static ImageSource Load(AppEntry app)
         {
             ImageSource result=WebAppIcons.Read(app);

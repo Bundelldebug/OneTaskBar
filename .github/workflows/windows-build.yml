@@ -25,7 +25,7 @@ jobs:
       - name: Validate both quick settings interfaces
         shell: pwsh
         run: |
-          foreach ($probe in @('quick9-probe','quick-size-probe','nowbar-probe','memory-lifecycle-probe')) {
+          foreach ($probe in @('quick9-probe','quick-size-probe','start-size-probe','media9-probe','launcher-motion-probe','launcher-keyboard-probe','deferred-icon-probe','settings-visibility-probe','window-switcher-probe','window-activation-probe','startup-probe','nowbar9-probe','nowbar-probe','memory-lifecycle-probe')) {
             $env:ONE_TASKBAR_DATA = Join-Path $env:RUNNER_TEMP ('OneTaskBar-'+$probe)
             New-Item -ItemType Directory -Path $env:ONE_TASKBAR_DATA -Force | Out-Null
             $test = Start-Process -FilePath ./dist/OneTaskBar.exe -ArgumentList ('--'+$probe) -WindowStyle Hidden -PassThru
@@ -41,6 +41,16 @@ jobs:
             ${{ runner.temp }}/OneTaskBar-quick9-probe/quick9-probe.json
             ${{ runner.temp }}/OneTaskBar-quick-size-probe/quick-size-probe.json
             ${{ runner.temp }}/OneTaskBar-nowbar-probe/nowbar-probe.json
+            ${{ runner.temp }}/OneTaskBar-nowbar9-probe/nowbar9-probe.json
+            ${{ runner.temp }}/OneTaskBar-media9-probe/media9-probe.json
+            ${{ runner.temp }}/OneTaskBar-start-size-probe/start-size-probe.json
+            ${{ runner.temp }}/OneTaskBar-launcher-motion-probe/launcher-motion-probe.json
+            ${{ runner.temp }}/OneTaskBar-launcher-keyboard-probe/launcher-keyboard-probe.json
+            ${{ runner.temp }}/OneTaskBar-deferred-icon-probe/deferred-icon-probe.json
+            ${{ runner.temp }}/OneTaskBar-settings-visibility-probe/settings-visibility-probe.json
+            ${{ runner.temp }}/OneTaskBar-window-switcher-probe/window-switcher-probe.json
+            ${{ runner.temp }}/OneTaskBar-window-activation-probe/window-activation-probe.json
+            ${{ runner.temp }}/OneTaskBar-startup-probe/startup-probe.json
             ${{ runner.temp }}/OneTaskBar-memory-lifecycle-probe/memory-lifecycle-probe.json
           if-no-files-found: warn
           retention-days: 14

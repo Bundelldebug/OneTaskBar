@@ -19,7 +19,7 @@ namespace OneTaskBar
         internal static bool IsCurrent {get{try{var id=Windows.ApplicationModel.Package.Current.Id;return id.Name==Name&&String.Equals(id.Publisher,Publisher,StringComparison.OrdinalIgnoreCase);}catch{return false;}}}
         internal static IdentityResult Find()
         {
-            try {var package=new PackageManager().FindPackagesForUser("").FirstOrDefault(p=>p.Id.Name==Name&&String.Equals(p.Id.Publisher,Publisher,StringComparison.OrdinalIgnoreCase)&&String.Equals(p.EffectiveExternalPath.TrimEnd(Path.DirectorySeparatorChar),Path.GetDirectoryName(PhysicalFile(Path.Combine(AppLog.Root,"OneTaskBar.exe"))),StringComparison.OrdinalIgnoreCase));return package==null?new IdentityResult():new IdentityResult {Registered=true,AppId=package.Id.FamilyName+"!OneTaskBar"};}
+            try {var package=new PackageManager().FindPackagesForUser("",Name,Publisher).FirstOrDefault(p=>p.Id.Name==Name&&String.Equals(p.Id.Publisher,Publisher,StringComparison.OrdinalIgnoreCase)&&String.Equals(p.EffectiveExternalPath.TrimEnd(Path.DirectorySeparatorChar),Path.GetDirectoryName(PhysicalFile(Path.Combine(AppLog.Root,"OneTaskBar.exe"))),StringComparison.OrdinalIgnoreCase));return package==null?new IdentityResult():new IdentityResult {Registered=true,AppId=package.Id.FamilyName+"!OneTaskBar"};}
             catch(Exception error){return new IdentityResult {Error=error.Message,ErrorCode=error.HResult};}
         }
         internal static bool Bootstrap(string[] args)

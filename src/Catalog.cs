@@ -41,6 +41,10 @@ namespace OneTaskBar
     }
     internal static class Catalog
     {
+        internal static List<AppEntry> ReadCached()
+        {
+            try{string file=Path.Combine(AppLog.Data,"apps.json");if(!File.Exists(file)||new FileInfo(file).Length>8388608)return new List<AppEntry>();var rows=new JavaScriptSerializer {MaxJsonLength=8388608}.Deserialize<List<AppEntry>>(File.ReadAllText(file,Encoding.UTF8));return rows==null?new List<AppEntry>():rows.Where(a=>a!=null&&!String.IsNullOrEmpty(a.Name)&&!String.IsNullOrEmpty(a.Key)).Take(4096).ToList();}catch{return new List<AppEntry>();}
+        }
         public static List<AppEntry> Read(bool loadIcons=true)
         {
             Directory.CreateDirectory(AppLog.Data);string cache=Path.Combine(AppLog.Data,"apps.json");
@@ -114,15 +118,16 @@ namespace OneTaskBar
             }
             return result;
         }
-        internal static List<AppEntry> ReadPins(List<AppEntry> installed,List<TaskbarItem> mirror,List<AppEntry> running)
+        internal static List<AppEntry> ReadPins(List<AppEntry> installed,List<TaskbarItem> mirror,List<AppEntry> running,bool loadIcons=true,bool resolveLinks=true)
         {
             var result=new List<AppEntry>();
             string dir=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),"Microsoft","Internet Explorer","Quick Launch","User Pinned","TaskBar");
             if(Directory.Exists(dir)) foreach(string file in Directory.GetFiles(dir,"*.lnk")) {
-                string target=Native.ShortcutTarget(file); var item=new AppEntry {Name=Path.GetFileNameWithoutExtension(file),Target=file,Executable=target,Pinned=true};
+                string target=resolveLinks?Native.ShortcutTarget(file):null; var item=new AppEntry {Name=Path.GetFileNameWithoutExtension(file),Target=file,Executable=target,Pinned=true};
+                if(!resolveLinks){var cached=installed.FirstOrDefault(a=>String.Equals(a.Name,item.Name,StringComparison.CurrentCultureIgnoreCase));if(cached!=null){item.AppID=cached.AppID;item.Executable=cached.Executable;}}
                 if(String.IsNullOrEmpty(target)&&(item.Name=="File Explorer"||item.Name=="파일 탐색기")) {target=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),"explorer.exe");item.Executable=target;item.AppID="Microsoft.Windows.Explorer";}
                 item.AppID=item.AppID??installed.Where(a=>!String.IsNullOrEmpty(target)&&(String.Equals(a.AppID,target,StringComparison.OrdinalIgnoreCase)||String.Equals(a.Name,item.Name,StringComparison.CurrentCultureIgnoreCase))).Select(a=>a.AppID).FirstOrDefault();
-                item.LoadIcon(); result.Add(item);
+                if(loadIcons)item.LoadIcon(); result.Add(item);
             }
             // Explorer supplies the real taskbar order and packaged-app identity. Keep shortcut pins as fallback.
             var ordered=new List<AppEntry>();
@@ -133,7 +138,7 @@ namespace OneTaskBar
                 if(pin==null&&!button.Pinned)continue;
                 string display=button.Name.Replace(" 고정됨","").Replace(" Pinned","");int split=display.IndexOf(" - ",StringComparison.Ordinal);if(split>0)display=display.Substring(0,split);
                 var item=pin??(known!=null?known.Copy():new AppEntry {Name=display,AppID=button.Id});
-                item.AppID=button.Id;item.ExplorerItem=button;item.Pinned=true;item.LoadIcon();ordered.Add(item);
+                item.AppID=button.Id;item.ExplorerItem=button;item.Pinned=true;if(loadIcons)item.LoadIcon();ordered.Add(item);
             }
             foreach(var pin in result) if(!ordered.Any(a=>Same(a,pin))) ordered.Add(pin);
             string custom=Path.Combine(AppLog.Data,"dock-pins.json");
@@ -143,10 +148,10 @@ namespace OneTaskBar
                 foreach(var preference in preferences.Where(p=>!p.Hidden)) if(!ordered.Any(a=>String.Equals(a.Key,preference.Key,StringComparison.OrdinalIgnoreCase))) {
                     var found=installed.FirstOrDefault(a=>String.Equals(a.Key,preference.Key,StringComparison.OrdinalIgnoreCase));
                     var entry=found!=null ? found.Copy() : ResolveInstalled(new AppEntry {Name=preference.Name,Target=preference.Target,AppID=preference.AppID,Executable=preference.Executable,StoredKey=preference.Key},installed);
-                    entry.Pinned=true; entry.LoadIcon(); ordered.Add(entry);
+                    entry.Pinned=true; if(loadIcons)entry.LoadIcon(); ordered.Add(entry);
                 }
             }} catch(Exception e) {AppLog.Write("pins",e.Message);}
-            for(int i=0;i<ordered.Count;i++){ordered[i]=ResolveInstalled(ordered[i],installed);ordered[i].LoadIcon();}return ordered;
+            for(int i=0;i<ordered.Count;i++){ordered[i]=ResolveInstalled(ordered[i],installed);if(loadIcons)ordered[i].LoadIcon();}return ordered;
         }
         internal static void SetPinned(AppEntry entry,bool pinned)
         {

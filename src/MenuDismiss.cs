@@ -20,10 +20,13 @@ namespace OneTaskBar
         static void Start(){if(hook==IntPtr.Zero)hook=SetWindowsHookEx(14,callback,GetModuleHandle(null),0);}
         static void StopIfUnused(){if(menus.Count==0&&watchers.Count==0&&hook!=IntPtr.Zero){UnhookWindowsHookEx(hook);hook=IntPtr.Zero;}}
         static readonly List<ContextMenu> menus=new List<ContextMenu>();static readonly MouseHook callback=Mouse;static IntPtr hook;
+        static int pointerFixtures;
+        internal static IDisposable WithSyntheticPointerForFixture(){if(!Program.Inspectable)throw new InvalidOperationException("Pointer fixture requires inspectable mode");return new PointerFixture();}
+        sealed class PointerFixture : IDisposable {bool disposed;internal PointerFixture(){pointerFixtures++;}public void Dispose(){if(disposed)return;disposed=true;pointerFixtures--;}}
         internal static bool Active {get{return hook!=IntPtr.Zero;}}
         internal static void Open(ContextMenu menu){menu.StaysOpen=false;if(!menus.Contains(menu))menus.Add(menu);Start();if(hook==IntPtr.Zero)AppLog.Once("menu-outside","Windows mouse observer unavailable; using WPF menu dismissal.");}
         internal static void Close(ContextMenu menu){menus.Remove(menu);StopIfUnused();}
-        static IntPtr Mouse(int code,IntPtr message,IntPtr data){int kind=message.ToInt32();if(code>=0&&(kind==0x201||kind==0x204||kind==0x207)){var point=(Native.PointI)Marshal.PtrToStructure(data,typeof(Native.PointI));var app=Application.Current;if(app!=null&&!app.Dispatcher.HasShutdownStarted)app.Dispatcher.BeginInvoke(new Action(()=>PointerPressed(point)),DispatcherPriority.Input);}return CallNextHookEx(hook,code,message,data);}
+        static IntPtr Mouse(int code,IntPtr message,IntPtr data){int kind=message.ToInt32();if(pointerFixtures==0&&code>=0&&(kind==0x201||kind==0x204||kind==0x207)){var point=(Native.PointI)Marshal.PtrToStructure(data,typeof(Native.PointI));var app=Application.Current;if(app!=null&&!app.Dispatcher.HasShutdownStarted)app.Dispatcher.BeginInvoke(new Action(()=>PointerPressed(point)),DispatcherPriority.Input);}return CallNextHookEx(hook,code,message,data);}
         internal static void PointerPressed(Native.PointI point)
         {
             foreach(var watcher in watchers.ToArray())if(!watcher.Contains(point))watcher.Dismiss();

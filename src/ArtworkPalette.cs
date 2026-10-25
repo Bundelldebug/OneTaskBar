@@ -8,11 +8,11 @@ namespace OneTaskBar
     {
         static readonly ConditionalWeakTable<BitmapSource,ArtworkPalette> cache=new ConditionalWeakTable<BitmapSource,ArtworkPalette>();
         static readonly ConditionalWeakTable<BitmapSource,Brush> playerSurfaces=new ConditionalWeakTable<BitmapSource,Brush>();
-        internal readonly Color Dominant,Background;internal readonly Brush Glass,Solid,Ink;internal readonly double MinimumContrast;
+        internal readonly Color Dominant,Background,ProgressColor;internal readonly Brush Glass,Solid,Ink;internal readonly double MinimumContrast;
         static readonly Color text=Color.FromRgb(244,248,245);const byte alpha=220;
         ArtworkPalette(Color dominant)
         {
-            Dominant=dominant;Color tone=Shade(dominant,.45);for(int i=0;i<32&&Contrast(text,OnWhite(tone,alpha))<5.4;i++)tone=Shade(tone,.90);Background=tone;MinimumContrast=Contrast(text,OnWhite(tone,alpha));
+            Dominant=dominant;ProgressColor=ProgressTint(dominant);Color tone=Shade(dominant,.45);for(int i=0;i<32&&Contrast(text,OnWhite(tone,alpha))<5.4;i++)tone=Shade(tone,.90);Background=tone;MinimumContrast=Contrast(text,OnWhite(tone,alpha));
             var glass=new LinearGradientBrush {StartPoint=new System.Windows.Point(0,0),EndPoint=new System.Windows.Point(0,1)};glass.GradientStops.Add(new GradientStop(Color.FromArgb(alpha,tone.R,tone.G,tone.B),0));var lower=Shade(tone,.78);glass.GradientStops.Add(new GradientStop(Color.FromArgb(alpha,lower.R,lower.G,lower.B),1));glass.Freeze();Glass=glass;var solid=new SolidColorBrush(tone);solid.Freeze();Solid=solid;Ink=solid;
         }
         internal static readonly ArtworkPalette Neutral=new ArtworkPalette(Color.FromRgb(104,115,110));
@@ -44,6 +44,7 @@ namespace OneTaskBar
             }catch(Exception error){AppLog.Once("artwork-palette",error.Message);return Neutral;}
         }
         static Color Shade(Color c,double factor){return Color.FromRgb((byte)Math.Round(c.R*factor),(byte)Math.Round(c.G*factor),(byte)Math.Round(c.B*factor));}
+        static Color ProgressTint(Color c){double low=Math.Min(c.R,Math.Min(c.G,c.B)),high=Math.Max(c.R,Math.Max(c.G,c.B));if(high-low<24)return Color.FromRgb(99,83,255);return Color.FromRgb((byte)(32+223*(c.R-low)/(high-low)),(byte)(32+223*(c.G-low)/(high-low)),(byte)(32+223*(c.B-low)/(high-low)));}
         static Color OnWhite(Color c,byte opacity){double a=opacity/255.0*.955;return Color.FromRgb((byte)Math.Round(c.R*a+255*(1-a)),(byte)Math.Round(c.G*a+255*(1-a)),(byte)Math.Round(c.B*a+255*(1-a)));}
         static double Channel(byte c){double x=c/255.0;return x<=.04045?x/12.92:Math.Pow((x+.055)/1.055,2.4);}
         static double Luminance(Color c){return .2126*Channel(c.R)+.7152*Channel(c.G)+.0722*Channel(c.B);}

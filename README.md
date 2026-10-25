@@ -1,5 +1,7 @@
 # One TaskBar
 
+In taskbar replacement mode, Alt+Tab opens a top-centered glass panel with native live window previews and app icons, including when only one window is available. Hold Alt and use Tab or Shift+Tab, then release Alt to switch. Arrow keys, Home/End, Enter/Escape, preview clicks and the mouse wheel are supported. Larger window lists page with the selection. Settings → Start and search → Alt+Tab switching can restore the Windows default.
+
 <img src="assets/OneTaskBar.png" width="96" alt="One TaskBar logo">
 
 A per-user Windows dock, app launcher, and control center with live backdrop blur. Written in C# and WPF, with an independent recovery watchdog. [한국어](README-ko.md)
@@ -19,7 +21,7 @@ Download **OneTaskBar-Setup.exe** from [Releases](https://github.com/Bundelldebu
 - Separate app and status capsules; original Windows/app icons, Windows system font, seconds on the clock, running indicators, and drag-to-reorder pins.
 - Rounded, antialiased surfaces using layered WPF alpha and a matching DirectComposition clip. Blur stays steady while app/search contents animate.
 - Compact app drawer and launcher search, capped at 720 × 680 DIP: apps, Windows settings, local files/images, Korean initial consonants, and removable recent searches. Type directly in the app drawer; active IME composition finishes before the transition.
-- A One Taskbar Start menu precedes the app drawer: search, paged pinned apps, recent files, user/document folders, settings and lock/sleep/shutdown/restart. Start pins and their drag order are saved separately from dock pins; app context menus offer both choices. Dragged tiles follow the pointer while neighbors animate into place. “All apps” opens the existing drawer. The Start page is capped at 940 × 620 DIP and uses the same glass as quick settings.
+- A One Taskbar Start menu precedes the app drawer: search, paged pinned apps, recent files, user/document folders, settings and lock/sleep/shutdown/restart. Start pins and their drag order are saved separately from dock pins; app context menus offer both choices. Dragged tiles follow the pointer while neighbors animate into place. “All apps” opens the existing drawer. The Start page grows for four recent-item rows and the pinned apps, is clamped to the selected monitor's work area and DPI, and scrolls on smaller displays. It uses the same glass as quick settings.
 - Start and All apps each support app folders, folder renaming and child drag order; use tile centers to group and edges to reorder. Folder extraction preserves apps. Start, drawer and dock layouts are saved separately. The Phone Link pane uses the installed native Start companion card and collapses on narrow displays.
 - In custom Start-key mode, a solo physical Windows press stays out of the native shell from key-down, avoiding the native dim/undim transition. Windows chords are replayed in modifier/key order; native Start-key mode remains available.
 - Independent choices for Windows/custom quick settings, notifications, keyboard Start, and search. Windows shortcuts continue to work with the solo Start-key option.
@@ -87,6 +89,10 @@ Code and the original One TaskBar icon are under the [MIT license](LICENSE). [Th
 ## Code signing policy
 
 Production signing is not active. The maintainer reported on 2026-10-24 that SignPath Foundation declined the application; no usable certificate was issued. See the [Code signing policy and privacy details](docs/CODE_SIGNING.md). Unsigned development artifacts are not production-signed releases.
+
+## 9.0.1 (unsigned stable release)
+
+Custom Alt+Tab now works with one window and reuses unchanged previews. This release also includes cross-process window activation, a current-user logon task and deferred startup discovery, the UI 9 centered media/wave design, responsive four-row Start recents, expanded toggle spacing, low-battery fill corrections and launcher/icon/settings fixes. See [9.0.1 notes](docs/RELEASE_NOTES_9.0.1.md) and [validation](VALIDATION.md). No code-signing certificate is available; Windows may block execution. The total-memory target below 150 MiB remains unmet.
 
 ## 9.0.0 (unsigned stable release)
 

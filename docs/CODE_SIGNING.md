@@ -6,6 +6,8 @@ The [SignPath Foundation](https://signpath.org/) application is declined. The pr
 
 On 2026-10-24 the maintainer explicitly authorized **9.0.0 only** to be published as an unsigned stable release, with the unsigned status and possible Windows blocking disclosed. Its exact locally validated main/helper, installer and portable archive are identified by checksums and Defender reports. This exception does not claim a trusted publisher, change Windows protection, authorize future unsigned versions, or disable the normal signed-publication gate.
 
+On 2026-10-25, after reporting the unavailable signing environment and approving the unsigned 9.0.0 release, the maintainer separately requested the single-window Alt+Tab fix, optimization and publication as **9.0.1**. That version is distributed with an explicit unsigned notice and the same possible Windows-blocking disclosure. The release uses the locally validated 9.0.1 files, exact payload/checksum comparisons, normal installation, Defender checks and hosted source CI. This version-specific release request does not activate signing, alter Windows trust or grant blanket approval to future unsigned versions; the signed publication tool remains signed-only.
+
 ## Roles and approval
 
 Project maintainer, reviewer and signing approver: [Bundelldebug](https://github.com/Bundelldebug). External contributions must be reviewed before signing. Repository and signing-service access must use MFA. Each signing request needs maintainer approval under the provider's rules. Keys stay with the signing provider; no private key or certificate trust is installed by this program.

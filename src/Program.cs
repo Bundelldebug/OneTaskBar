@@ -29,6 +29,7 @@ namespace OneTaskBar
         [STAThread] static int Main(string[] args){int code=Run(args);Environment.Exit(code);return code;}
         static int Run(string[] args)
         {
+            StartupTrace.Mark("entry");
             Native.SetProcessDpiAwarenessContext(new IntPtr(-4));
             Inspectable=args.Contains("--qa")||File.Exists(Path.Combine(AppLog.Data,"ui-inspection.flag"));
             if(args.Length>0 && args[0]=="--guard") { Guard(args); return 0; }
@@ -57,6 +58,17 @@ namespace OneTaskBar
             if(args.Contains("--admin-targets-probe"))return AdminLaunch.Probe();
             if(args.Contains("--window-drop-probe"))return WindowDropChecks.Run();
             if(args.Contains("--quick9-probe"))return QuickWidgetChecks.Run();
+            if(args.Contains("--media9-probe"))return MediaModernChecks.Run();
+            if(args.Contains("--launcher-motion-probe"))return LauncherMotionChecks.Run();
+            if(args.Contains("--deferred-icon-probe"))return DeferredIconChecks.Run();
+            if(args.Contains("--settings-visibility-probe"))return SettingsVisibilityChecks.Run();
+            if(args.Contains("--window-switcher-probe"))return WindowSwitcherChecks.Run(args.Contains("--inspect"));
+            if(args.Contains("--window-activation-probe"))return WindowActivationChecks.Run();
+            if(args.Contains("--startup-probe"))return StartupChecks.Run();
+            if(args.Contains("--startup-registration-probe"))return LogonStartup.ProbeRegistration();
+            if(args.Length==2&&args[0]=="--configure-startup"&&(args[1]=="on"||args[1]=="off")){try{LogonStartup.Set(args[1]=="on");return 0;}catch(Exception error){AppLog.Write("startup-configure",error.ToString());return 1;}}
+            if(args.Length==2&&args[0]=="--window-focus-source")return WindowActivationChecks.Source(args[1]);
+            if(args.Contains("--start-size-probe"))return StartSizeChecks.Run();
             if(args.Contains("--app-metadata-live"))return AppMetadataChecks.Live();
             if(args.Contains("--feature-857-probe"))return Feature857Checks.Run();
             if(args.Contains("--feature-857-live"))return Feature857Checks.Live();
@@ -84,6 +96,7 @@ namespace OneTaskBar
             if(args.Contains("--power-menu-probe"))return SystemPower.Probe();
             if(args.Contains("--quick-feature-probe"))return QuickFeatureChecks.Run();
             if(args.Contains("--nowbar-probe"))return NowBarChecks.Run();
+            if(args.Contains("--nowbar9-probe"))return NowBarChecks.Run(true);
             if(args.Contains("--media-activation-probe"))return MediaActivationChecks.Run();
             if(args.Contains("--energy-probe"))return EnergyChecks.Run();
             if(args.Contains("--panel-transition-probe"))return PanelTransitionChecks.Run();
@@ -107,10 +120,11 @@ namespace OneTaskBar
             if(args.Contains("--recover")) {int index=Array.IndexOf(args,"--session");DesktopLease.Recover(index>=0&&index+1<args.Length?args[index+1]:null);NativeOsdGate.Recover();NativeToastGate.Recover();NativeNotificationRoute.Recover();return 0;}
             if(args.Contains("--guard-fixture")){Thread.Sleep(Timeout.Infinite);return 0;}
             if(args.Contains("--render")) return Render(args);
+            if(args.Contains("--logon")&&DesktopInstanceRunning())return 0;
             if(NotificationIdentity.Bootstrap(args))return 0;
             bool created;
             using(var mutex=new Mutex(true,@"Local\OneTaskBar.Desktop",out created)) {
-                if(!created) { Signal(args.Contains("--connect-notifications")?"ConnectNotifications":"Show"); return 0; }
+                if(!created) { if(!args.Contains("--logon"))Signal(args.Contains("--connect-notifications")?"ConnectNotifications":"Show"); return 0; }
                 ShellController shell=null;
                 try {
                     var app=new Application { ShutdownMode=ShutdownMode.OnExplicitShutdown };
@@ -125,6 +139,10 @@ namespace OneTaskBar
             }
         }
         internal static void Signal(string name) { try { using(var handle=EventWaitHandle.OpenExisting(@"Local\OneTaskBar."+name)) handle.Set(); } catch(WaitHandleCannotBeOpenedException) { } }
+        static bool DesktopInstanceRunning()
+        {
+            try{using(var mutex=Mutex.OpenExisting(@"Local\OneTaskBar.Desktop")){bool acquired=false;try{try{acquired=mutex.WaitOne(0);}catch(AbandonedMutexException){acquired=true;}return !acquired;}finally{if(acquired)mutex.ReleaseMutex();}}}catch(WaitHandleCannotBeOpenedException){return false;}catch(UnauthorizedAccessException){return false;}
+        }
         static void Guard(string[] args)
         {
             int pid; long started;
@@ -137,6 +155,7 @@ namespace OneTaskBar
         {
             var checks=new List<string>();
             try {
+                WindowSwitchGesture.Check();checks.Add("alt-tab-shortcuts-window-filter-monitor-layout");StartMenuLayout.Check();checks.Add("responsive-start-work-area");MediaWave.Check();checks.Add("bounded-media-waves");BatteryPill.Check();checks.Add("low-battery-red-excludes-charging");
                 EfficiencyChecks.Validate(checks);RuntimeCadence.Check(checks);RuntimeDockOrder.Check();checks.Add("stable-launch-order");LauncherLayout.Check();checks.Add("compact-launcher-layout");NowBarLayout.Check();checks.Add("nowbar-monitor-layout");ArtworkPalette.Check();checks.Add("artwork-color-contrast");MediaArtwork.Check(checks);StartDataChecks.Validate(checks);NotificationAssetChecks.Validate(checks);NotificationStackChecks.Validate(checks);QuickSizeChecks.Validate(checks);SamsungPerformanceChecks.Validate(checks);NetworkRouteInfo.Validate(checks);LauncherInputChecks.Validate(checks);DesktopBehaviorChecks.Validate(checks);TaskbarLogoChecks.Validate(checks);Feature856Checks.Validate(checks);Feature857Checks.Validate(checks);QuickWidgetChecks.Validate(checks);AppMetadataChecks.Validate(checks);
                 foreach(double width in new double[] { 1,200,288,344,600 }) foreach(double value in new double[] { -20,0,1,33,99,100,120 }) {
                     double f=PillSlider.FillWidth(width,value);

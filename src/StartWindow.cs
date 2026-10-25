@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -26,6 +26,9 @@ namespace OneTaskBar
         readonly Grid pinHeading,folderHeading;readonly TextBox folderName;readonly Grid recentHeading;
         readonly Button recentMore;bool moreRecent;
         readonly StackPanel body=new StackPanel(),pagination;readonly SmoothScrollViewer bodyScroll;
+        readonly DockPanel launcherRoot;System.Windows.Forms.Screen autoScreen;double autoScale=1,preferredHomeHeight=620;bool fitting;
+        internal SmoothScrollViewer ContentScroll {get{return bodyScroll;}}
+        internal UniformGrid RecentItems {get{return recent;}}
         internal Button RecentMoreButton {get{return recentMore;}}
         internal bool RecentPage {get{return moreRecent;}}
         readonly Dictionary<string,Button> pinButtons=new Dictionary<string,Button>(StringComparer.OrdinalIgnoreCase);string dragPreview,groupTarget,openFolder;bool renaming;
@@ -38,10 +41,11 @@ namespace OneTaskBar
         internal string LastPinDrop;
         internal StartWindow(ShellController owner)
         {
-            shell=owner;Title="One TaskBar · 시작";Width=940;Height=620;Radius=32;Dark=true;StableSurface=true;
+            shell=owner;Title="One TaskBar · 시작";Width=940;Height=620;Radius=32;Dark=true;StableSurface=true;SmoothLauncher=true;
             Resources[SystemParameters.VerticalScrollBarWidthKey]=4.0;
             Surface.CornerRadius=new CornerRadius(Radius);Surface.Background=QuickPanel.Glass;Surface.BorderBrush=Paint.Brush("#58FFFFFF");Surface.BorderThickness=new Thickness(.7);
             var root=new DockPanel {Margin=new Thickness(24,23,24,16)};
+            launcherRoot=root;
             var searchBox=new Border {Background=Paint.ControlWhite,CornerRadius=new CornerRadius(23),Padding=new Thickness(16,2,16,2),Margin=new Thickness(0,0,0,22)};
             var field=new Grid();field.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(26)});field.ColumnDefinitions.Add(new ColumnDefinition());
             field.Children.Add(new Glyph("search",19){Color=Paint.Ink});Grid.SetColumn(Search,1);field.Children.Add(Search);
@@ -69,8 +73,8 @@ namespace OneTaskBar
             pins.Margin=new Thickness(0,7,0,0);body.Children.Add(pins);
             DragReorder.DropArea(pins,"start.pins",()=>!closed&&IsVisible,DropPin,PreviewPinDrop,true);
             pagination=new StackPanel {Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Center,Height=28};
-            previous=Tool("back","이전 고정 앱",()=> {pinPage--;RenderPins();});previous.Width=28;previous.Height=26;
-            next=Tool("chevron","다음 고정 앱",()=> {pinPage++;RenderPins();});next.Width=28;next.Height=26;pagination.Children.Add(previous);page.Margin=new Thickness(7,0,7,0);pagination.Children.Add(page);pagination.Children.Add(next);body.Children.Add(pagination);
+            previous=Tool("back","이전 고정 앱",()=> {pinPage--;RenderPins();LauncherMotion.Page(bodyScroll);});previous.Width=28;previous.Height=26;
+            next=Tool("chevron","다음 고정 앱",()=> {pinPage++;RenderPins();LauncherMotion.Page(bodyScroll);});next.Width=28;next.Height=26;pagination.Children.Add(previous);page.Margin=new Thickness(7,0,7,0);pagination.Children.Add(page);pagination.Children.Add(next);body.Children.Add(pagination);
             recentHeading=Heading("최근 항목");recentHeading.Margin=new Thickness(8,14,8,9);recentMore=Paint.Action("더 보기  ›",()=>ShowRecentPage(!moreRecent));recentMore.HorizontalAlignment=HorizontalAlignment.Right;recentMore.FontSize=11;recentMore.Height=31;recentHeading.Children.Add(recentMore);body.Children.Add(recentHeading);
             recent.Margin=new Thickness(0,0,0,3);body.Children.Add(recent);
             bodyScroll=new SmoothScrollViewer {Content=body,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};root.Children.Add(bodyScroll);
@@ -89,14 +93,26 @@ namespace OneTaskBar
             Search.Text="";openFolder=null;pinPage=0;moreRecent=false;RefreshPins();
             if(!StartRecentFeed.Enabled()){cachedRecent=null;recentUntil=DateTime.MinValue;}RenderRecent(cachedRecent??new List<StartRecent>());LoadRecent();if(Phone.Visibility==Visibility.Visible)LoadPhone();
         }
-        internal void ShowRecentPage(bool value){moreRecent=value;UpdateRecentPage();RenderRecent(cachedRecent??new List<StartRecent>());bodyScroll.ScrollToTop();if(IsVisible&&Motion.Enabled)Motion.Fade(body,.65,1,170);}
-        void UpdateRecentPage(){pins.Visibility=pagination.Visibility=moreRecent?Visibility.Collapsed:Visibility.Visible;pinHeading.Visibility=!moreRecent&&openFolder==null?Visibility.Visible:Visibility.Collapsed;folderHeading.Visibility=!moreRecent&&openFolder!=null?Visibility.Visible:Visibility.Collapsed;recentHeading.Visibility=recent.Visibility=openFolder==null?Visibility.Visible:Visibility.Collapsed;recentHeading.Margin=new Thickness(8,moreRecent?0:14,8,9);}
+        internal void ShowRecentPage(bool value){moreRecent=value;UpdateRecentPage();RenderRecent(cachedRecent??new List<StartRecent>());bodyScroll.ScrollToTop();LauncherMotion.Page(bodyScroll);}
+        void UpdateRecentPage(){pins.Visibility=moreRecent?Visibility.Collapsed:Visibility.Visible;pagination.Visibility=!moreRecent&&CurrentTiles().Count>18?Visibility.Visible:Visibility.Collapsed;pinHeading.Visibility=!moreRecent&&openFolder==null?Visibility.Visible:Visibility.Collapsed;folderHeading.Visibility=!moreRecent&&openFolder!=null?Visibility.Visible:Visibility.Collapsed;recentHeading.Visibility=recent.Visibility=openFolder==null?Visibility.Visible:Visibility.Collapsed;recentHeading.Margin=new Thickness(8,moreRecent?0:14,8,9);}
         protected override void OnPreviewKeyDown(KeyEventArgs e){if(e.Key==Key.Escape&&moreRecent){ShowRecentPage(false);e.Handled=true;return;}base.OnPreviewKeyDown(e);}
         internal void Configure(double width,double height){Width=width;Height=height;bool wide=width>=830;phoneColumn.Width=new GridLength(wide?278:0);Phone.Visibility=wide?Visibility.Visible:Visibility.Collapsed;UpdatePinColumns();}
+        internal double PreferredHomeHeight()
+        {
+            if(moreRecent||openFolder!=null)return preferredHomeHeight;
+            launcherRoot.Measure(new Size(Math.Max(1,Width-phoneColumn.Width.Value-Surface.BorderThickness.Left-Surface.BorderThickness.Right),Double.PositiveInfinity));
+            double fourRows=4*(56+3)+recent.Margin.Top+recent.Margin.Bottom;preferredHomeHeight=Math.Max(620,Math.Ceiling(launcherRoot.DesiredSize.Height+Math.Max(0,fourRows-recent.DesiredSize.Height)+Surface.BorderThickness.Top+Surface.BorderThickness.Bottom));launcherRoot.InvalidateMeasure();return preferredHomeHeight;
+        }
+        internal void ShowForMonitor(System.Windows.Forms.Screen screen,double scale){autoScreen=screen;autoScale=scale;FitWindow(true);}
+        void FitWindow(bool show)
+        {
+            if(fitting||closed||autoScreen==null)return;fitting=true;try{double oldWidth=Width,oldHeight=Height;var work=Native.WorkArea(autoScreen);var limits=StartMenuLayout.Fit(autoScreen.Bounds,work,autoScale,620);Configure(limits.Width,Height);var fit=StartMenuLayout.Fit(autoScreen.Bounds,work,autoScale,PreferredHomeHeight());if(show||Math.Abs(oldWidth-fit.Width)>.1||Math.Abs(oldHeight-fit.Height)>.1){Configure(fit.Width,fit.Height);ShowAt(autoScreen.Bounds,fit.X,fit.Y,fit.Width,fit.Height);}}finally{fitting=false;}
+        }
+        void FitVisible(){if(IsVisible&&!IsDismissing&&!moreRecent&&openFolder==null)FitWindow(false);}
         async void LoadPhone(bool force=false)
         {
             if(closed||phoneBusy)return;if(!force&&phoneSnapshot!=null&&DateTime.UtcNow<phoneUntil){Phone.Update(phoneSnapshot);return;}phoneBusy=true;
-            try{var state=await BackgroundWork.Run(()=>PhoneCompanion.Read(force));if(closed)return;phoneSnapshot=state;phoneUntil=DateTime.UtcNow.AddSeconds(30);if(IsVisible)Phone.Update(state);}catch(Exception error){AppLog.Once("start-phone",error.GetType().Name);}finally{phoneBusy=false;}
+            try{var state=await BackgroundWork.Run(()=>PhoneCompanion.Read(force));if(closed)return;await LauncherMotion.WhenIdle(TransitionContent);if(closed)return;phoneSnapshot=state;phoneUntil=DateTime.UtcNow.AddSeconds(30);if(IsVisible)Phone.Update(state);}catch(Exception error){AppLog.Once("start-phone",error.GetType().Name);}finally{phoneBusy=false;}
         }
         async void OpenPhone(string uri){if(await DismissAsync())Native.Open(uri);}
         internal void FixturePhone(PhoneSnapshot snapshot){phoneSnapshot=snapshot;phoneUntil=DateTime.UtcNow.AddHours(1);Phone.Update(snapshot);}
@@ -117,11 +133,12 @@ namespace OneTaskBar
             if(current.Count==0){var empty=Paint.TextBlock("앱을 우클릭해 시작 화면에 고정해 보세요.",12,Paint.Muted);empty.TextWrapping=TextWrapping.Wrap;pins.Children.Add(empty);}
             page.Text=pages>1?(pinPage+1)+" / "+pages:"";previous.Visibility=next.Visibility=pages>1?Visibility.Visible:Visibility.Collapsed;previous.IsEnabled=pinPage>0;next.IsEnabled=pinPage<pages-1;
             UpdateRecentPage();
+            FitVisible();
         }
         internal Button PinButton(string key){Button button;return pinButtons.TryGetValue(key,out button)?button:null;}
         internal string[] PinnedKeys {get{return CurrentTiles().Select(p=>p.Key).ToArray();}}
         internal bool MovePin(string source,string target,bool after){return openFolder==null?shell.StartPins.Move(source,target,after):shell.StartPins.MoveWithin(openFolder,source,target,after);}
-        internal void OpenPinFolder(string key){if(!pinned.Any(p=>p.Folder&&p.Key==key))return;openFolder=key;pinPage=0;RenderPins();if(Motion.Enabled)Motion.Fade(pins,.55,1,160);}
+        internal void OpenPinFolder(string key){if(!pinned.Any(p=>p.Folder&&p.Key==key))return;openFolder=key;pinPage=0;RenderPins();LauncherMotion.Page(bodyScroll);}
         internal void ClosePinFolder(){CommitFolderName();openFolder=null;pinPage=0;RenderPins();}
         void CommitFolderName(){if(renaming||openFolder==null)return;renaming=true;try{if(shell.StartPins.Rename(openFolder,folderName.Text))pinned=shell.StartPins.Tiles(shell.Apps);var tile=pinned.FirstOrDefault(p=>p.Key==openFolder);if(tile!=null)folderName.Text=tile.Name;}finally{renaming=false;}}
         internal static FrameworkElement FolderIcon(StartTile tile)
@@ -173,7 +190,7 @@ namespace OneTaskBar
         async void LoadRecent()
         {
             if(recentBusy||DateTime.UtcNow<recentUntil)return;recentBusy=true;int request=++load;
-            try {var items=await BackgroundWork.Run(StartRecentFeed.Read);if(closed||request!=load)return;cachedRecent=items;recentUntil=DateTime.UtcNow.AddSeconds(5);if(IsVisible)RenderRecent(items);}
+            try {var items=await BackgroundWork.Run(StartRecentFeed.Read);await LauncherMotion.WhenIdle(TransitionContent);if(closed||request!=load)return;cachedRecent=items;recentUntil=DateTime.UtcNow.AddSeconds(5);if(IsVisible)RenderRecent(items);}
             catch(Exception error){AppLog.Once("start-recent",error.Message);}finally{recentBusy=false;}
         }
         void RenderRecent(List<StartRecent> entries)
@@ -184,6 +201,7 @@ namespace OneTaskBar
                 var button=Paint.Button(row,()=>Launch(app),app.Name);button.Background=Brushes.Transparent;button.HorizontalContentAlignment=HorizontalAlignment.Stretch;button.Margin=new Thickness(1,1,1,2);button.Padding=new Thickness(9);button.Height=56;recent.Children.Add(button);
             }
             if(entries.Count==0){var empty=Paint.TextBlock("Windows에서 기록한 최근 항목이 여기에 표시됩니다.",12,Paint.Muted);empty.TextWrapping=TextWrapping.Wrap;empty.Margin=new Thickness(9,12,9,15);recent.Children.Add(empty);}
+            FitVisible();
         }
         internal void FixtureRecent(List<StartRecent> entries){cachedRecent=entries;recentUntil=DateTime.UtcNow.AddHours(1);RenderRecent(entries);}
         async void Launch(AppEntry entry){var modifiers=Keyboard.Modifiers;if(await DismissAsync())shell.LaunchApp(entry,modifiers);}

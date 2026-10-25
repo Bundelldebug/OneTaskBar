@@ -15,7 +15,7 @@ namespace OneTaskBar
     internal sealed class MediaState
     {
         internal string Title="재생 중인 미디어 없음",Artist="음악이나 동영상을 재생해 보세요",AppId;
-        internal bool Available,Active,Playing,CanPlay,CanNext,CanPrevious,CanSeek;
+        internal bool Available,Active,Playing,CanPlay,CanNext,CanPrevious,CanSeek,CanShuffle,Shuffling;
         internal double Position,Duration;internal DateTime SampledUtc=DateTime.UtcNow;
         internal double CurrentPosition(DateTime now){return Math.Max(0,Math.Min(Duration,Position+(Playing?Math.Max(0,(now-SampledUtc).TotalSeconds):0)));}
         internal BitmapSource Artwork;
@@ -97,7 +97,7 @@ namespace OneTaskBar
                 var info=session.GetPlaybackInfo();var previous=Media;
                 var state=new MediaState {Available=true,Title=previous.Title,Artist=previous.Artist,AppId=session.SourceAppUserModelId,
                     Playing=info.PlaybackStatus==GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing,Active=info.PlaybackStatus==GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing||info.PlaybackStatus==GlobalSystemMediaTransportControlsSessionPlaybackStatus.Paused,
-                    CanPlay=info.Controls.IsPlayPauseToggleEnabled,CanNext=info.Controls.IsNextEnabled,CanPrevious=info.Controls.IsPreviousEnabled,Artwork=highArtwork.Image??artwork.Image};
+                    CanPlay=info.Controls.IsPlayPauseToggleEnabled,CanNext=info.Controls.IsNextEnabled,CanPrevious=info.Controls.IsPreviousEnabled,CanShuffle=info.Controls.IsShuffleEnabled,Shuffling=info.IsShuffleActive??false,Artwork=highArtwork.Image??artwork.Image};
                 try {var timeline=session.GetTimelineProperties();state.Duration=Math.Max(0,(timeline.EndTime-timeline.StartTime).TotalSeconds);state.Position=Math.Max(0,(timeline.Position-timeline.StartTime).TotalSeconds);state.SampledUtc=timeline.LastUpdatedTime.UtcDateTime;if(Math.Abs((DateTime.UtcNow-state.SampledUtc).TotalDays)>1)state.SampledUtc=DateTime.UtcNow;state.CanSeek=info.Controls.IsPlaybackPositionEnabled&&state.Duration>0;}catch{}
                 // Track changes arrive as events; retain a slow fallback for incomplete media providers.
                 if(Interlocked.Exchange(ref propertiesDirty,0)!=0||DateTime.UtcNow>=metadataAt||artwork.Due(DateTime.UtcNow)) {
@@ -142,6 +142,7 @@ namespace OneTaskBar
                 if(command=="play")await Wait(session.TryTogglePlayPauseAsync());
                 else if(command=="next")await Wait(session.TrySkipNextAsync());
                 else if(command=="previous")await Wait(session.TrySkipPreviousAsync());
+                else if(command=="shuffle"){var info=session.GetPlaybackInfo();if(info.Controls.IsShuffleEnabled)await Wait(session.TryChangeShuffleActiveAsync(!(info.IsShuffleActive??false)));}
             } catch(Exception e) {AppLog.Write("media-control",e.Message);}
         }
     }
