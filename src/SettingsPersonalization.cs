@@ -17,15 +17,6 @@ namespace OneTaskBar
             Row(rows,"작업표시줄 색 모드 분리","독의 색 모드를 패널·시작 메뉴와 다르게 설정합니다",Preferences.Current.SeparateDockTheme,v=>{Preferences.Set(p=>p.SeparateDockTheme=v);dockRow.Visibility=v?Visibility.Visible:Visibility.Collapsed;});
             for(int i=0;i<3;i++){int value=i;dockButtons[i]=Paint.Action(new[]{"Windows 따르기","라이트","다크"}[i],()=>{Preferences.Set(p=>p.DockTheme=value);dockRefresh();});dockButtons[i].MinHeight=38;dockButtons[i].Margin=new Thickness(2);dockChoices.Children.Add(dockButtons[i]);}dockRefresh();dockRow.Children.Add(dockChoices);rows.Children.Add(dockRow);
         }
-        void TransparencySetting(StackPanel rows)
-        {
-            var row=new StackPanel {Margin=new Thickness(15,14,15,14)};var header=new DockPanel();var value=Paint.TextBlock("",14,AppSettingsPalette.Muted);DockPanel.SetDock(value,Dock.Right);header.Children.Add(value);header.Children.Add(Paint.TextBlock("패널 투명도",15,AppSettingsPalette.Text));row.Children.Add(header);
-            var slider=new Slider {Minimum=0,Maximum=100,Value=Math.Max(0,Math.Min(100,Preferences.Current.UITransparency)),TickFrequency=1,IsSnapToTickEnabled=true,SmallChange=1,LargeChange=10,Height=30,Margin=new Thickness(0,8,0,0),Foreground=AppSettingsPalette.Accent};
-            System.Windows.Automation.AutomationProperties.SetName(slider,"패널 투명도");value.Text=((int)slider.Value)+"%";
-            var save=new System.Windows.Threading.DispatcherTimer {Interval=TimeSpan.FromMilliseconds(180)};save.Tick+=(s,e)=>{save.Stop();Preferences.Save();};
-            slider.ValueChanged+=(s,e)=>{value.Text=((int)slider.Value)+"%";Preferences.Transparency((int)slider.Value);save.Stop();save.Start();};Closed+=(s,e)=>{if(save.IsEnabled){save.Stop();Preferences.Save();}};
-            row.Children.Add(slider);var hint=Paint.TextBlock("높일수록 뒤의 화면이 더 비칩니다. 글자와 아이콘의 불투명도는 유지됩니다.",12.5,AppSettingsPalette.Muted);hint.TextWrapping=TextWrapping.Wrap;row.Children.Add(hint);rows.Children.Add(row);
-        }
         void PersonalizeDock(StackPanel rows)
         {
             var placement=new StackPanel {Margin=new Thickness(15,14,15,14)};placement.Children.Add(Paint.TextBlock("작업표시줄 위치",15,AppSettingsPalette.Text));var positions=new System.Windows.Controls.Primitives.UniformGrid {Columns=4,Margin=new Thickness(0,10,0,0)};var positionButtons=new Button[4];
