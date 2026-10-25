@@ -16,6 +16,8 @@ namespace OneTaskBar
         public int UIVersion=85;
         public int UITransparency=45;
         public int UITheme=0;
+        public bool SeparateDockTheme=false;
+        public int DockTheme=0;
         public bool DockSolidBackground=false;
         public int DockBackgroundKind=0,DockEdge=3;
         public string DockBackgroundColor="#FFBAC1C7",DockBackgroundImage;
@@ -41,7 +43,7 @@ namespace OneTaskBar
         internal static event Action Changed;
         internal static event Action MaterialChanged;
         internal static void Transparency(int value){Current.UITransparency=Math.Max(0,Math.Min(100,value));var changed=MaterialChanged;if(changed!=null)changed();}
-        internal static PreferenceData Normalize(PreferenceData value){if(!ReleaseFeatures.GlassUI&&value.UIVersion>=95)value.UIVersion=90;value.UITheme=Math.Max(0,Math.Min(2,value.UITheme));return value;}
+        internal static PreferenceData Normalize(PreferenceData value){if(!ReleaseFeatures.GlassUI&&value.UIVersion>=95)value.UIVersion=90;value.UITheme=Math.Max(0,Math.Min(2,value.UITheme));value.DockTheme=Math.Max(0,Math.Min(2,value.DockTheme));return value;}
         static PreferenceData Load(){try{if(File.Exists(file))return Normalize(new JavaScriptSerializer().Deserialize<PreferenceData>(File.ReadAllText(file))??new PreferenceData());}catch(Exception e){AppLog.Once("settings-read",e.Message);}return Normalize(new PreferenceData());}
         internal static void Set(Action<PreferenceData> change)
         {

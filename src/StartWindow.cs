@@ -32,7 +32,7 @@ namespace OneTaskBar
         internal Button RecentMoreButton {get{return recentMore;}}
         internal bool RecentPage {get{return moreRecent;}}
         readonly Dictionary<string,Button> pinButtons=new Dictionary<string,Button>(StringComparer.OrdinalIgnoreCase);string dragPreview,groupTarget,openFolder;bool renaming;
-        DateTime recentUntil;bool recentBusy,composing,queued,closed;int pinPage,load;
+        DateTime recentUntil;bool recentBusy,composing,queued,closed,outsideFixture;int pinPage,load;IDisposable outsideClick;
         internal int PinnedCount {get{return pinButtons.Count;}}
         internal int RecentCount {get{return recent.Children.Count;}}
         internal int FolderCount {get{return shell.StartPins.FolderCount;}}
@@ -80,8 +80,12 @@ namespace OneTaskBar
             SizeChanged+=(s,e)=>UpdatePinColumns();
             PreviewTextInput+=(s,e)=> {if(!Search.IsKeyboardFocusWithin&&!folderName.IsKeyboardFocusWithin&&!String.IsNullOrEmpty(e.Text)&&(Keyboard.Modifiers&(ModifierKeys.Control|ModifierKeys.Alt))==0){Search.Text+=e.Text;QueueSearch();e.Handled=true;}};
             Deactivated+=(s,e)=> {if(!Program.Inspectable&&!DragReorder.Active&&IsVisible&&!IsMouseOver&&!(power.ContextMenu!=null&&power.ContextMenu.IsOpen)&&!pinButtons.Values.Any(b=>b.ContextMenu!=null&&b.ContextMenu.IsOpen))Hide();};
-            DragReorder.Finished+=FinishPinDrag;Closed+=(s,e)=> {closed=true;++load;DragReorder.Finished-=FinishPinDrag;};
+            IsVisibleChanged+=(s,e)=>SyncOutsideClick();DragReorder.Finished+=FinishPinDrag;Closed+=(s,e)=> {closed=true;++load;StopOutsideClick();DragReorder.Finished-=FinishPinDrag;};
         }
+        void StopOutsideClick(){if(outsideClick!=null){outsideClick.Dispose();outsideClick=null;}}
+        void SyncOutsideClick(){StopOutsideClick();if(IsVisible&&!closed&&(!Program.Inspectable||outsideFixture))outsideClick=MenuDismiss.Watch(ContainsStartPoint,()=>{if(IsVisible&&!IsDismissing)Hide();});}
+        bool ContainsStartPoint(Native.PointI point){if(!IsVisible||IsDismissing||DragReorder.Active||MenuDismiss.ContainsMenu(point))return true;Native.RectI bounds;return Native.GetWindowRect(new System.Windows.Interop.WindowInteropHelper(this).Handle,out bounds)&&point.X>=bounds.Left&&point.X<bounds.Right&&point.Y>=bounds.Top&&point.Y<bounds.Bottom;}
+        internal void ObserveOutsideForFixture(){if(!Program.Inspectable)throw new InvalidOperationException("Start outside-click fixture only");outsideFixture=true;SyncOutsideClick();}
         static Button Tool(string glyph,string label,Action action){var button=Paint.Button(new Glyph(glyph,20),action,label);button.Background=Brushes.Transparent;button.Padding=new Thickness(9);button.Width=button.Height=40;return button;}
         static Grid Heading(string text){var row=new Grid {Height=34,Margin=new Thickness(8,0,8,0)};var title=Paint.TextBlock(text,16,Paint.Text);title.FontWeight=FontWeights.SemiBold;row.Children.Add(title);return row;}
         void QueueSearch(){if(queued||Search.Text.Length==0)return;queued=true;Dispatcher.BeginInvoke(new Action(()=> {queued=false;if(!composing&&IsVisible&&!String.IsNullOrWhiteSpace(Search.Text))shell.ToggleSearch(null,Search.Text);}),System.Windows.Threading.DispatcherPriority.Background);}

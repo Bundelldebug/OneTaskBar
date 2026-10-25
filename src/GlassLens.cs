@@ -13,7 +13,7 @@ namespace OneTaskBar
         internal void Move(Point point){light=point;InvalidateVisual();}
         protected override void OnRender(DrawingContext dc)
         {
-            double w=AdornedElement.RenderSize.Width,h=AdornedElement.RenderSize.Height;if(!Active||w<2||h<2)return;bool dark=Glass95.Dark;double radius=window.Surface.CornerRadius.TopLeft;
+            double w=AdornedElement.RenderSize.Width,h=AdornedElement.RenderSize.Height;if(!Active||w<2||h<2)return;bool dark=window.Dark;double radius=window.Surface.CornerRadius.TopLeft;
             var bounds=new Rect(.55,.55,Math.Max(0,w-1.1),Math.Max(0,h-1.1));var shape=new RectangleGeometry(bounds,radius,radius);dc.PushClip(shape);
             var glow=new RadialGradientBrush {Center=new Point(light.X*.6+.12,light.Y*.35),GradientOrigin=new Point(light.X*.6+.12,light.Y*.35),RadiusX=.9,RadiusY=.55};glow.GradientStops.Add(new GradientStop(Color.FromArgb(dark?(byte)15:(byte)26,255,255,255),0));glow.GradientStops.Add(new GradientStop(Colors.Transparent,1));dc.DrawRectangle(glow,null,bounds);
             // A single fading inner contour avoids the bright double outline on compact media cards.

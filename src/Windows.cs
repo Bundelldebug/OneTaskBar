@@ -21,10 +21,10 @@ namespace OneTaskBar
         internal double Scale;
         internal readonly GlassWindow Start=new GlassWindow(),Apps=new GlassWindow(),Status=new GlassWindow();
         internal readonly BatteryPill Battery=new BatteryPill();
-        readonly TextBlock clock=Paint.TextBlock("",12,Paint.Ink);
-        readonly Glyph wifiStatus=new Glyph("wifi",22){Color=Paint.Ink},volumeStatus=new Glyph("volume",19){Color=Paint.Ink};
+        readonly TextBlock clock=Paint.TextBlock("",12,Glass95.DockForeground);
+        readonly Glyph wifiStatus=new Glyph("wifi",22){Color=Glass95.DockForeground},volumeStatus=new Glyph("volume",19){Color=Glass95.DockForeground};
         readonly Button quickAccess,trayAccess;
-        readonly Button startButton;readonly Glyph startGlyph=new Glyph("apps",23){Color=Paint.Ink};
+        readonly Button startButton;readonly Glyph startGlyph=new Glyph("apps",23){Color=Glass95.DockForeground};
         internal readonly Button TaskViewButton;
         internal readonly Button OverflowButton;internal readonly DockOverflow Overflow;internal readonly DockDragController DragApps;
         readonly Button powerAccess;readonly ColumnDefinition powerColumn;double powerWidth=58;
@@ -58,9 +58,9 @@ namespace OneTaskBar
             controller=shell; Screen=screen;Edge=DockGeometry.Edge;
             hideDelay.Tick+=(s,e)=>CompleteAutoHide(InUse());
             pinDivider.RenderTransform=dividerOffset;Canvas.SetTop(pinDivider,9);Panel.SetZIndex(pinDivider,2);appCanvas.Children.Add(pinDivider);DragApps=new DockDragController(this,shell,appCanvas,PreviewAt,DropAt,PreviewHome);DragReorder.Finished+=EndDragPreview;
-            var search=Paint.Button(new Glyph("search",20){Color=Paint.Ink},()=>controller.ToggleSearch(this),"검색");search.Padding=new Thickness(0);search.Background=Brushes.Transparent;search.Width=42;search.Height=42;Canvas.SetLeft(search,10);appCanvas.Children.Add(search);Apps.Surface.Child=appCanvas;
-            var desktops=Paint.Button(new Glyph("desktops",19){Color=Paint.Ink},()=>controller.OpenTaskView(),"데스크톱 전환 · 작업 보기");TaskViewButton=desktops;desktops.Padding=new Thickness(0);desktops.Background=Brushes.Transparent;desktops.Width=desktops.Height=42;Canvas.SetLeft(desktops,52);appCanvas.Children.Add(desktops);
-            OverflowButton=Paint.Button(new Glyph("more",23){Color=Paint.Ink},()=>Overflow.Toggle(),"숨겨진 앱");OverflowButton.Width=46;OverflowButton.Height=42;OverflowButton.Padding=new Thickness(0);OverflowButton.Background=Brushes.Transparent;OverflowButton.Visibility=Visibility.Collapsed;Panel.SetZIndex(OverflowButton,3);appCanvas.Children.Add(OverflowButton);Overflow=new DockOverflow(shell,this,OverflowButton,QueueHide);
+            var search=Paint.Button(new Glyph("search",20){Color=Glass95.DockForeground},()=>controller.ToggleSearch(this),"검색");search.Padding=new Thickness(0);search.Background=Brushes.Transparent;search.Width=42;search.Height=42;Canvas.SetLeft(search,10);appCanvas.Children.Add(search);Apps.Surface.Child=appCanvas;
+            var desktops=Paint.Button(new Glyph("desktops",19){Color=Glass95.DockForeground},()=>controller.OpenTaskView(),"데스크톱 전환 · 작업 보기");TaskViewButton=desktops;desktops.Padding=new Thickness(0);desktops.Background=Brushes.Transparent;desktops.Width=desktops.Height=42;Canvas.SetLeft(desktops,52);appCanvas.Children.Add(desktops);
+            OverflowButton=Paint.Button(new Glyph("more",23){Color=Glass95.DockForeground},()=>Overflow.Toggle(),"숨겨진 앱");OverflowButton.Width=46;OverflowButton.Height=42;OverflowButton.Padding=new Thickness(0);OverflowButton.Background=Brushes.Transparent;OverflowButton.Visibility=Visibility.Collapsed;Panel.SetZIndex(OverflowButton,3);appCanvas.Children.Add(OverflowButton);Overflow=new DockOverflow(shell,this,OverflowButton,QueueHide);
             resizeTimer.Tick+=(sender,args)=>ResizeFrame();
             visibilityTimer.Tick+=(sender,args)=>VisibilityFrame();
 
@@ -84,7 +84,7 @@ namespace OneTaskBar
             status.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(1,GridUnitType.Star)});
             powerColumn=new ColumnDefinition {Width=new GridLength(58)};status.ColumnDefinitions.Add(powerColumn);
             status.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(94)});
-            var native=Paint.Button(new Glyph("up",15) {Color=Paint.Ink},()=>controller.ShowNative("tray",this),"Windows 숨겨진 아이콘 · 트레이");
+            var native=Paint.Button(new Glyph("up",15) {Color=Glass95.DockForeground},()=>controller.ShowNative("tray",this),"Windows 숨겨진 아이콘 · 트레이");
             trayAccess=native;
             native.Padding=new Thickness(0); native.Background=Brushes.Transparent; status.Children.Add(native);
             var qsContent=new StackPanel {Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Center};
@@ -98,7 +98,7 @@ namespace OneTaskBar
             Grid.SetColumn(battery,2);Panel.SetZIndex(battery,10);status.Children.Add(battery);
             var time=Paint.Button(clock,()=>controller.ToggleNotifications(this),"알림센터");time.Padding=new Thickness(0);time.Background=Brushes.Transparent;time.BorderBrush=Brushes.Transparent;time.BorderThickness=new Thickness(0);
             Grid.SetColumn(time,3); status.Children.Add(time); Status.Surface.Child=status;
-            var menu=new ContextMenu(); var settings=new MenuItem {Header="One TaskBar 설정",Icon=new Glyph("home",18){Color=Paint.Ink}};settings.Click+=(s,e)=>controller.ShowWelcome();menu.Items.Add(settings);
+            var menu=new ContextMenu(); var settings=new MenuItem {Header="One TaskBar 설정",Icon=new Glyph("home",18){Color=Glass95.DockForeground}};settings.Click+=(s,e)=>controller.ShowWelcome();menu.Items.Add(settings);
             var resetOrder=new MenuItem {Header="앱 순서 초기화"};resetOrder.Click+=(s,e)=>controller.ResetDockOrder();menu.Items.Add(resetOrder);
             var restore=new MenuItem {Header="Windows 작업표시줄로 돌아가기"};restore.Click+=(s,e)=>controller.SetDesktop(false);menu.Items.Add(restore);Start.ContextMenu=menu;
             ConfigureEdge();Rebuild();
@@ -118,7 +118,7 @@ namespace OneTaskBar
         {
             if(closed||DragReorder.Active)return;if(Scale<=0)Scale=1;
             foreach(var surface in new[]{Start,Apps,Status}){surface.SetMaterial(LightPanel.DockGlass,LightPanel.DockSolid);Glass95.DockInk(surface.Surface);}pinDivider.Background=Glass95.DockForeground;
-            startGlyph.Kind=Preferences.Current.NativeStartButton?"windows-start":"apps";startGlyph.Color=Preferences.Current.NativeStartButton?Paint.Brush("#FF1975DD"):Paint.Ink;startGlyph.InvalidateVisual();startButton.ToolTip=Preferences.Current.NativeStartButton?"Windows 시작":"앱 목록";System.Windows.Automation.AutomationProperties.SetName(startButton,(string)startButton.ToolTip);
+            startGlyph.Kind=Preferences.Current.NativeStartButton?"windows-start":"apps";startGlyph.Color=Preferences.Current.NativeStartButton?Paint.Brush("#FF1975DD"):Glass95.DockForeground;startGlyph.InvalidateVisual();startButton.ToolTip=Preferences.Current.NativeStartButton?"Windows 시작":"앱 목록";System.Windows.Automation.AutomationProperties.SetName(startButton,(string)startButton.ToolTip);
             var entries=controller.DockApps();powerWidth=PowerDisplay.Slot(controller.Power,Preferences.Current.DesktopPowerWatts);powerColumn.Width=new GridLength(powerWidth);powerAccess.Visibility=powerWidth>0?Visibility.Visible:Visibility.Collapsed;Battery.Width=powerWidth==78?70:52;
             mediaSpace=controller.Desktop&&(controller.Services.Media.Active||MediaBar!=null&&MediaBar.ReservesSpace);
             var layout=DockLayout.Compute(Screen.Bounds,Scale,Math.Max(1,entries.Count),powerWidth,mediaSpace,autoHide?68:reservedHeight,Edge);bool overflow=entries.Count>layout.Capacity;int slots=Math.Max(0,layout.Capacity-(overflow?1:0));var shown=entries.Take(slots).ToArray();Overflow.Update(entries.Skip(slots));OverflowButton.Visibility=overflow?Visibility.Visible:Visibility.Collapsed;OverflowButton.ToolTip="숨겨진 앱 "+Overflow.Count+"개 · 마우스를 올려 펼치기";var keys=new HashSet<string>(shown.Select(e=>e.Key),StringComparer.OrdinalIgnoreCase);bool animate=placed&&visible&&Apps.IsVisible&&Motion.Enabled;
@@ -131,7 +131,7 @@ namespace OneTaskBar
             }
             indicators.Clear();
             for(int i=0;i<shown.Length;i++){
-                var entry=shown[i];DockCell cell;bool added=!cells.TryGetValue(entry.Key,out cell);if(added){cell=CreateCell(entry);cells.Add(entry.Key,cell);appCanvas.Children.Add(cell.Button);}else{cell.Entry=entry;if(!Object.ReferenceEquals(cell.IconSource,entry.Icon)){cell.IconSource=entry.Icon;cell.Icon.Child=entry.Icon!=null?AppIcons.Visual(entry.Icon,30):new Glyph("window",30){Color=Paint.Ink};}if((string)cell.Button.ToolTip!=entry.Name){cell.Button.ToolTip=entry.Name;System.Windows.Automation.AutomationProperties.SetName(cell.Button,entry.Name);}}
+                var entry=shown[i];DockCell cell;bool added=!cells.TryGetValue(entry.Key,out cell);if(added){cell=CreateCell(entry);cells.Add(entry.Key,cell);appCanvas.Children.Add(cell.Button);}else{cell.Entry=entry;if(!Object.ReferenceEquals(cell.IconSource,entry.Icon)){cell.IconSource=entry.Icon;cell.Icon.Child=entry.Icon!=null?AppIcons.Visual(entry.Icon,30):new Glyph("window",30){Color=Glass95.DockForeground};}if((string)cell.Button.ToolTip!=entry.Name){cell.Button.ToolTip=entry.Name;System.Windows.Automation.AutomationProperties.SetName(cell.Button,entry.Name);}}
                 bool returning=cell.Leaving;cell.Leaving=false;cell.Token++;cell.Button.IsHitTestVisible=true;
                 double x=DockLayout.AppOffset+i*46+(i>=pinned?12:0),oldX=Double.IsNaN(cell.X)?x+16:cell.X+cell.Offset.X;
                 if(added||returning||resetPreview||Math.Abs(cell.X-x)>.01){cell.X=x;Canvas.SetLeft(cell.Button,x);cell.Offset.BeginAnimation(TranslateTransform.XProperty,null);cell.Offset.X=0;cell.Offset.BeginAnimation(TranslateTransform.YProperty,null);cell.Offset.Y=0;
@@ -142,8 +142,8 @@ namespace OneTaskBar
         }
         DockCell CreateCell(AppEntry entry)
         {
-            var cell=new DockCell {Entry=entry,IconSource=entry.Icon};var content=new Grid {Width=44,Height=42};cell.Icon=new Border {Width=30,Height=30,Child=entry.Icon!=null?AppIcons.Visual(entry.Icon,30):new Glyph("window",30){Color=Paint.Ink}};cell.Icon.VerticalAlignment=VerticalAlignment.Top;cell.Icon.Margin=new Thickness(0,4,0,0);RenderOptions.SetBitmapScalingMode(cell.Icon,BitmapScalingMode.HighQuality);content.Children.Add(cell.Icon);
-            cell.Dot=new Border {Width=4,Height=4,CornerRadius=new CornerRadius(2),Background=Paint.Ink,VerticalAlignment=VerticalAlignment.Bottom,HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(0,0,0,2)};content.Children.Add(cell.Dot);
+            var cell=new DockCell {Entry=entry,IconSource=entry.Icon};var content=new Grid {Width=44,Height=42};cell.Icon=new Border {Width=30,Height=30,Child=entry.Icon!=null?AppIcons.Visual(entry.Icon,30):new Glyph("window",30){Color=Glass95.DockForeground}};cell.Icon.VerticalAlignment=VerticalAlignment.Top;cell.Icon.Margin=new Thickness(0,4,0,0);RenderOptions.SetBitmapScalingMode(cell.Icon,BitmapScalingMode.HighQuality);content.Children.Add(cell.Icon);
+            cell.Dot=new Border {Width=4,Height=4,CornerRadius=new CornerRadius(2),Background=Glass95.DockForeground,VerticalAlignment=VerticalAlignment.Bottom,HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(0,0,0,2)};content.Children.Add(cell.Dot);
             cell.Button=Paint.Button(content,()=>{controller.Previews.Close();var before=pressedForeground;pressedForeground=IntPtr.Zero;controller.ActivateApp(cell.Entry,cell.Button,before);},entry.Name);cell.Button.Width=46;cell.Button.Height=42;cell.Button.Padding=new Thickness(0);cell.Button.Background=Brushes.Transparent;cell.Button.RenderTransform=cell.Offset;
             cell.Button.MouseEnter+=(s,e)=>{ToolTipService.SetIsEnabled(cell.Button,cell.Entry.Windows.Count==0);controller.Previews.Enter(cell.Entry,cell.Button,this);};cell.Button.MouseLeave+=(s,e)=>{controller.Previews.Leave();ToolTipService.SetIsEnabled(cell.Button,true);};cell.Button.PreviewMouseLeftButtonDown+=(s,e)=>controller.Previews.Close();cell.Button.ContextMenuOpening+=(s,e)=>controller.Previews.Close();
             cell.Button.ContextMenuOpening+=(sender,args)=>cell.Button.ContextMenu=WindowPicker.Menu(cell.Entry,controller);cell.Button.ContextMenu=WindowPicker.Menu(entry,controller);Motion.Dock(cell.Button,cell.Icon);DragApps.Attach(cell.Button,()=>cell.Entry);return cell;
@@ -201,7 +201,7 @@ namespace OneTaskBar
         internal string[] ShownKeys {get{return cells.Values.Where(c=>!c.Leaving).OrderBy(c=>c.X).Select(c=>c.Entry.Key).ToArray();}}
         internal Button AppButton(string key){DockCell cell;return cells.TryGetValue(key,out cell)?cell.Button:null;}
         internal double PinBoundary {get{return dividerX;}}
-        internal void UpdateActive(IntPtr active) {Border selected;indicators.TryGetValue(active,out selected);foreach(var dot in indicators.Values.Distinct()){bool current=dot==selected;dot.Width=current?12:4;dot.Background=Glass95.Enabled?(current?Glass95.DockForeground:Glass95.Muted):current?Brushes.Black:Paint.Brush("#AF262C2A");}}
+        internal void UpdateActive(IntPtr active) {Border selected;indicators.TryGetValue(active,out selected);foreach(var dot in indicators.Values.Distinct()){bool current=dot==selected;dot.Width=current?12:4;dot.Background=Glass95.DockForeground;dot.Opacity=current?1:.55;}}
         internal void SetVisible(bool value)
         {
             if(!value&&Overflow!=null)Overflow.Hide();
@@ -286,7 +286,7 @@ namespace OneTaskBar
         internal double DisplayHeight {get{return Modern?QuickWidgetBoard.ControlHeight:62;}}
         internal PillSlider Slider {get{return slider;}}
         internal HudWindow() { Title="One TaskBar · 밝기 및 음량"; Width=286; Height=DisplayHeight; Radius=DisplayHeight/2;Dark=Modern;UnifiedFade=true;Surface.Background=Modern?HudGlass:GrayPanel.Glass; Surface.CornerRadius=new CornerRadius(Radius); Surface.Child=slider; ShowActivated=false;
-            if(Glass95.Enabled)slider.GlassStandalone=false;if(Modern){slider.Margin=new Thickness(0);slider.Height=Double.NaN;slider.MinWidth=0;slider.NoTrackBorder=true;slider.LinearFill=true;Surface.BorderThickness=new Thickness(0);Surface.BorderBrush=Brushes.Transparent;}
+            if(Glass95.Enabled)slider.GlassStandalone=true;if(Modern){slider.Margin=new Thickness(0);slider.Height=Double.NaN;slider.MinWidth=0;slider.NoTrackBorder=true;slider.LinearFill=true;Surface.BorderThickness=new Thickness(0);Surface.BorderBrush=Brushes.Transparent;}
             SourceInitialized+=(s,e)=> { var h=new WindowInteropHelper(this).Handle; Native.SetWindowLong(h,-20,Native.GetWindowLong(h,-20)|0x80|0x08000000);HwndSource.FromHwnd(h).CompositionTarget.RenderMode=RenderMode.SoftwareOnly; };
         }
         internal void Reveal(){Show();Surface.InvalidateVisual();Native.SetWindowPos(new WindowInteropHelper(this).Handle,new IntPtr(-1),0,0,0,0,0x53);}

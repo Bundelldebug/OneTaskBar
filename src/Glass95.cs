@@ -24,6 +24,7 @@ namespace OneTaskBar
         static bool? fixtureDark;
         internal static bool Enabled {get{return ReleaseFeatures.GlassUI&&Preferences.Current.UIVersion>=95;}}
         internal static bool Dark {get{return fixtureDark??AppTheme.Dark;}}
+        internal static bool DockDark {get{return fixtureDark??AppTheme.DockDark;}}
         static Palette Current {get{return Dark?dark:light;}}
         internal static bool Transparent {get{return Preferences.Current.Blur&&!SystemParameters.HighContrast;}}
         internal static Brush Surface {get{return PanelMaterial.Surface(Dark,true);}}
@@ -34,13 +35,13 @@ namespace OneTaskBar
         internal static Brush Rail {get{return Current.Rail;}}
         internal static Brush Toggle {get{return Current.Toggle;}}
         internal static Brush Rim {get{return Current.Rim;}}
-        internal static readonly Brush Accent=Paint.Brush("#FF3478FD"),Selected=Paint.Brush("#ED3478FD");
+        internal static readonly Brush Accent=Paint.Brush("#FF3478FD"),Selected=Paint.ControlWhite;
         static Brush Film(bool dark)
         {
             var film=new LinearGradientBrush {StartPoint=new Point(0,0),EndPoint=new Point(.25,1)};film.GradientStops.Add(new GradientStop(dark?Color.FromArgb(42,255,255,255):Color.FromArgb(112,255,255,255),0));film.GradientStops.Add(new GradientStop(dark?Color.FromArgb(19,224,235,255):Color.FromArgb(48,218,230,247),.46));film.GradientStops.Add(new GradientStop(dark?Color.FromArgb(22,255,255,255):Color.FromArgb(52,165,183,208),1));film.Freeze();return film;
         }
-        internal static Brush ToggleInk(bool value){return Enabled?(value?Paint.ControlWhite:Text):value?Paint.Ink:Paint.ControlWhite;}
-        internal static Brush DockForeground {get{return DockAppearance.Custom?DockAppearance.Foreground:Paint.Ink;}}
+        internal static Brush ToggleInk(bool value){return value?Paint.OnLight:Paint.Text;}
+        internal static Brush DockForeground {get{return DockAppearance.Custom?DockAppearance.Foreground:DockDark?Paint.ControlWhite:Paint.OnLight;}}
         internal static LinearGradientBrush Edge(bool isDark,bool freeze=false)
         {
             var edge=new LinearGradientBrush {StartPoint=new Point(.12,0),EndPoint=new Point(.84,1)};

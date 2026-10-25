@@ -11,6 +11,8 @@ namespace OneTaskBar
         internal static int Mode {get{return Preferences.Current.UITheme>=0&&Preferences.Current.UITheme<=2?Preferences.Current.UITheme:0;}}
         internal static bool Resolve(int mode,bool windowsDark){return mode==2||mode!=1&&windowsDark;}
         internal static bool Dark {get{return Resolve(Mode,WindowsTheme.Read().Dark);}}
+        internal static bool ResolveDock(bool separate,int dockMode,bool panelsDark,bool windowsDark){return separate?Resolve(dockMode,windowsDark):panelsDark;}
+        internal static bool DockDark {get{return ResolveDock(Preferences.Current.SeparateDockTheme,Preferences.Current.DockTheme,Dark,WindowsTheme.Read().Dark);}}
         internal static AppThemeState Read(){return Glass95.Dark?dark:light;}
         internal static void Toggle(){Preferences.Set(p=>p.UITheme=Dark?1:2);}
     }

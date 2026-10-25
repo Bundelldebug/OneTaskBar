@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -33,13 +33,14 @@ namespace OneTaskBar
         {
             try{return Task.Run(async()=> {
                 var manager=await SystemServices.Wait(Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager.RequestAsync());
-                var session=manager.GetSessions().FirstOrDefault(s=>String.Equals(s.SourceAppUserModelId,"Internet",StringComparison.OrdinalIgnoreCase));
+                var session=manager.GetCurrentSession();
+                if(session!=null&&!YouTubeArtwork.Supported(session.SourceAppUserModelId))session=null;
                 if(session==null){AppLog.Json("media-source-probe.json",new {browserSessionAvailable=false});return 1;}
                 var properties=await SystemServices.Wait(session.TryGetMediaPropertiesAsync());if(properties.Thumbnail==null)return 1;
                 using(var stream=await SystemServices.Wait(properties.Thumbnail.OpenReadAsync()))using(var reader=new Windows.Storage.Streams.DataReader(stream)){
                     if(stream.Size>8388608)return 1;await SystemServices.Wait(reader.LoadAsync((uint)stream.Size));var bytes=new byte[(int)stream.Size];reader.ReadBytes(bytes);
                     using(var data=new MemoryStream(bytes)){
-                        var image=BitmapDecode.Frozen(data,1280);var video=YouTubeArtwork.Find(YouTubeArtwork.Profile("Internet"),properties.Title);byte[] high=video!=null?YouTubeArtwork.Download(video):null;BitmapSource sharp=null;if(high!=null)using(var highStream=new MemoryStream(high))sharp=BitmapDecode.Frozen(highStream,1280);
+                        var image=BitmapDecode.Frozen(data,1280);var video=YouTubeArtwork.Allowed(session.SourceAppUserModelId,properties.Title)?YouTubeArtwork.Find(YouTubeArtwork.Profile(session.SourceAppUserModelId),properties.Title):null;byte[] high=video!=null?YouTubeArtwork.Download(video):null;BitmapSource sharp=null;if(high!=null)using(var highStream=new MemoryStream(high))sharp=BitmapDecode.Frozen(highStream,1280);
                         var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(sharp??image));Directory.CreateDirectory(AppLog.Data);using(var file=File.Create(Path.Combine(AppLog.Data,"received-media-cover.png")))encoder.Save(file);
                         AppLog.Json("media-source-probe.json",new {source="Internet",receivedBytes=bytes.Length,decodedWidth=image.PixelWidth,decodedHeight=image.PixelHeight,consentKey=video!=null?YouTubeArtwork.TrackKey("Internet",properties.Title):null,lookup=YouTubeArtwork.LookupStatus,exactPlayingVideoMatched=video!=null,highWidth=sharp!=null?sharp.PixelWidth:0,highHeight=sharp!=null?sharp.PixelHeight:0});return sharp!=null?0:1;
                     }

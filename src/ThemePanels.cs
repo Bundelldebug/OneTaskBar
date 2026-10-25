@@ -6,13 +6,13 @@ namespace OneTaskBar
 {
     internal sealed partial class ShellController
     {
-        bool renderedPanelDark=Glass95.Dark,themeRefreshQueued;DispatcherTimer themeRefresh;
+        bool renderedPanelDark=Glass95.Dark,renderedDockDark=Glass95.DockDark,themeRefreshQueued;DispatcherTimer themeRefresh;
         void QueuePanelTheme(){if(themeRefreshQueued)return;themeRefreshQueued=true;Application.Current.Dispatcher.BeginInvoke(new Action(()=>{themeRefreshQueued=false;if(!disposed)RefreshPanelTheme();}),DispatcherPriority.Background);}
         internal void RefreshPanelTheme()
         {
-            if(disposed||renderedPanelDark==Glass95.Dark)return;
+            if(disposed)return;if(renderedPanelDark==Glass95.Dark){if(renderedDockDark!=Glass95.DockDark){renderedDockDark=Glass95.DockDark;foreach(var dock in docks)dock.Rebuild();}return;}
             if(DragReorder.Active||Detail!=null&&!Detail.CanRelease){if(themeRefresh==null){themeRefresh=new DispatcherTimer {Interval=TimeSpan.FromMilliseconds(200)};themeRefresh.Tick+=(s,e)=>{if(disposed){themeRefresh.Stop();return;}RefreshPanelTheme();};}themeRefresh.Start();return;}
-            if(themeRefresh!=null)themeRefresh.Stop();renderedPanelDark=Glass95.Dark;Previews.Close();Switcher.Cancel();
+            if(themeRefresh!=null)themeRefresh.Stop();renderedPanelDark=Glass95.Dark;renderedDockDark=Glass95.DockDark;Previews.Close();Switcher.Cancel();
             Quick=SwapTheme(Quick,()=>new QuickWindow(this),w=>w.Refresh(Power,Brightness,Audio.Value,Audio.Muted,Audio.Available,Brightness>=0));
             Center=SwapTheme(Center,()=>new NotificationWindow(this),w=>w.Refresh());string detailPage=Detail!=null?Detail.PageKey:null;
             Detail=SwapTheme(Detail,()=>new DetailWindow(this,detailPage),null);Calendar=SwapTheme(Calendar,()=>new CalendarWindow(),null);
