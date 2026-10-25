@@ -326,7 +326,6 @@ namespace OneTaskBar
             if(lens!=null){lens.Active=Glass95.Enabled&&!OpaqueSurface&&HasBlur&&Preferences.Current.Blur&&!(DockSurface&&DockAppearance.Custom)&&!(this is HudWindow);lens.InvalidateVisual();}
             if(glassTint==null)return;if(DockSurface&&DockAppearance.Custom){Native.EnableBlur(this,false);Surface.Background=DockAppearance.Background;Surface.BorderBrush=Glass95.Enabled?Glass95.Rim:Brushes.Transparent;Surface.BorderThickness=new Thickness(Glass95.Enabled?.7:0);return;}
             bool enabled=HasBlur&&Preferences.Current.Blur&&!(DockSurface&&Preferences.Current.DockSolidBackground)&&(!Glass95.Enabled||Glass95.Transparent);Native.EnableBlur(this,enabled);
-            TransparentInk.Apply(Surface,enabled&&Preferences.Current.UITransparency>65&&!OpaqueSurface,!Dark);
             if(Glass95.Enabled&&!OpaqueSurface&&!(DockSurface&&Preferences.Current.DockSolidBackground)){
                 if(glassEdge==null||edgeDark!=Dark){edgeDark=Dark;glassEdge=Glass95.Edge(edgeDark);}Surface.BorderBrush=this is NowBar?(Brush)Brushes.Transparent:glassEdge;Surface.BorderThickness=new Thickness(0);
                 Surface.Background=this is NowBar?(enabled?glassTint:solidTint??Glass95.Solid):enabled?PanelMaterial.Surface(Dark,true):Paint.Brush(Dark?"#FF242832":"#FFF1F4FA");

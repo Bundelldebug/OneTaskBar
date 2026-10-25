@@ -14,6 +14,7 @@ namespace OneTaskBar
         static void Require(bool value,string message){if(!value)throw new InvalidOperationException(message);}
         internal static void Validate(List<string> checks)
         {
+            YouTubeArtworkChecks.Validate(checks);
             foreach(bool windows in new[]{false,true})foreach(bool panels in new[]{false,true}){
                 Require(AppTheme.ResolveDock(false,2,panels,windows)==panels,"Linked dock follows panels");
                 Require(!AppTheme.ResolveDock(true,1,panels,windows)&&AppTheme.ResolveDock(true,2,panels,windows)&&AppTheme.ResolveDock(true,0,panels,windows)==windows,"Independent dock palette never alters panels");
@@ -26,6 +27,7 @@ namespace OneTaskBar
             checks.Add("Independent dock palettes, high transparency, bounded delayed artwork retries and exact-track privacy pass");
         }
         static IEnumerable<T> Children<T>(DependencyObject root) where T:DependencyObject{var own=root as T;if(own!=null)yield return own;foreach(object item in LogicalTreeHelper.GetChildren(root)){var child=item as DependencyObject;if(child!=null)foreach(var node in Children<T>(child))yield return node;}}
+        static IEnumerable<TextBlock> VisibleLabels(DependencyObject root){var label=root as TextBlock;if(label!=null&&label.IsVisible)yield return label;for(int i=0;i<VisualTreeHelper.GetChildrenCount(root);i++)foreach(var text in VisibleLabels(VisualTreeHelper.GetChild(root,i)))yield return text;}
         internal static async Task Run(ShellController shell)
         {
             int ui=Preferences.Current.UIVersion;try{
@@ -37,7 +39,9 @@ namespace OneTaskBar
                     settings.State(true,true);LightPanel.Apply(settings);Glass95.RefreshColors(settings);Require(settings.Icon.Color==Paint.OnLight,"Selected circles retain dark ink after palette recoloring");
                 }
             }finally{Preferences.Current.UIVersion=ui;}
-            var picker=shell.Welcome.VersionPicker;picker.IsDropDownOpen=true;await Task.Delay(80);Require(picker.IsDropDownOpen&&picker.ItemContainerGenerator.ContainerFromIndex(0) is ComboBoxItem,"Version list opens and generates selectable entries");var popup=picker.Template.FindName("PART_Popup",picker) as Popup;Require(popup!=null&&popup.IsOpen&&popup.Child is Border&&((Border)popup.Child).Background!=null,"Version list uses a themed opaque popup");picker.IsDropDownOpen=false;
+            var picker=shell.Welcome.VersionPicker;picker.UpdateLayout();Require(VisibleLabels(picker).Any(t=>t.Text==((UIVersionChoice)picker.SelectedItem).Label)&&!VisibleLabels(picker).Any(t=>t.Text.Contains("OneTaskBar.UIVersionChoice")),"Closed version list displays the selected version label");picker.IsDropDownOpen=true;await Task.Delay(80);Require(picker.IsDropDownOpen&&picker.ItemContainerGenerator.ContainerFromIndex(0) is ComboBoxItem,"Version list opens and generates selectable entries");var popup=picker.Template.FindName("PART_Popup",picker) as Popup;Require(popup!=null&&popup.IsOpen&&popup.Child is Border&&((Border)popup.Child).Background!=null,"Version list uses a themed opaque popup");picker.IsDropDownOpen=false;
+            int transparency=Preferences.Current.UITransparency;try{Preferences.Current.UITransparency=100;shell.Quick.RefreshGlassMaterial();Require(Children<TextBlock>(shell.Quick).All(t=>t.Effect==null)&&Children<Glyph>(shell.Quick).All(g=>g.Effect==null),"High transparency has no per-label glow effects");}finally{Preferences.Current.UITransparency=transparency;shell.Quick.RefreshGlassMaterial();}
+            var scroller=Children<ScrollViewer>(shell.Welcome).OrderByDescending(s=>s.ScrollableHeight).First();scroller.ScrollToVerticalOffset(scroller.ScrollableHeight/2);await Task.Delay(40);if(scroller.ScrollableHeight>1){var fade=scroller.OpacityMask as LinearGradientBrush;Require(fade!=null,"Settings scroll edge retains its gradual fade");var layer=System.Windows.Documents.AdornerLayer.GetAdornerLayer(scroller);Require(layer==null||layer.GetAdorners(scroller)==null||layer.GetAdorners(scroller).Length==0,"Scroll edges do not duplicate and blur the full settings content");}scroller.ScrollToTop();await Task.Delay(40);Program.Save(shell.Welcome.Surface,760,720,System.IO.Path.Combine(AppLog.Data,"ui-version-selector.png"));
             var previousQuick=shell.Quick;var previousStart=shell.StartMenu;shell.StartMenu=null;try{using(MenuDismiss.WithSyntheticPointerForFixture()){
                 shell.ToggleStart(null);await Task.Delay(140);var start=shell.StartMenu;Require(start!=null&&start.IsVisible,"Keyboard route opens custom Start");start.ObserveOutsideForFixture();Native.RectI bounds;Native.GetWindowRect(new WindowInteropHelper(start).Handle,out bounds);MenuDismiss.PointerPressed(new Native.PointI {X=bounds.Left+30,Y=bounds.Top+30});Require(start.IsVisible&&!start.IsDismissing,"Inside clicks preserve Start");
                 MenuDismiss.PointerPressed(new Native.PointI {X=bounds.Right+80,Y=bounds.Top+10});await Task.Delay(300);Require(!start.IsVisible&&!MenuDismiss.Active,"Outside click dismisses keyboard Start and releases its observer");
