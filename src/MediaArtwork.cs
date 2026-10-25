@@ -34,7 +34,7 @@ namespace OneTaskBar
             try{return Task.Run(async()=> {
                 var manager=await SystemServices.Wait(Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager.RequestAsync());
                 var session=manager.GetCurrentSession();
-                if(session!=null&&!YouTubeArtwork.Supported(session.SourceAppUserModelId))session=null;
+                if(session!=null&&!YouTubeArtwork.Supported(session.SourceAppUserModelId)){AppLog.Json("media-source-probe.json",new {browserSessionAvailable=false,currentApp=session.SourceAppUserModelId,sessionApps=manager.GetSessions().Select(s=>s.SourceAppUserModelId).ToArray()});return 1;}
                 if(session==null){AppLog.Json("media-source-probe.json",new {browserSessionAvailable=false});return 1;}
                 var properties=await SystemServices.Wait(session.TryGetMediaPropertiesAsync());if(properties.Thumbnail==null)return 1;
                 using(var stream=await SystemServices.Wait(properties.Thumbnail.OpenReadAsync()))using(var reader=new Windows.Storage.Streams.DataReader(stream)){
@@ -42,7 +42,7 @@ namespace OneTaskBar
                     using(var data=new MemoryStream(bytes)){
                         var image=BitmapDecode.Frozen(data,1280);var video=YouTubeArtwork.Allowed(session.SourceAppUserModelId,properties.Title)?YouTubeArtwork.Find(YouTubeArtwork.Profile(session.SourceAppUserModelId),properties.Title):null;byte[] high=video!=null?YouTubeArtwork.Download(video):null;BitmapSource sharp=null;if(high!=null)using(var highStream=new MemoryStream(high))sharp=BitmapDecode.Frozen(highStream,1280);
                         var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(sharp??image));Directory.CreateDirectory(AppLog.Data);using(var file=File.Create(Path.Combine(AppLog.Data,"received-media-cover.png")))encoder.Save(file);
-                        AppLog.Json("media-source-probe.json",new {source="Internet",receivedBytes=bytes.Length,decodedWidth=image.PixelWidth,decodedHeight=image.PixelHeight,consentKey=video!=null?YouTubeArtwork.TrackKey("Internet",properties.Title):null,lookup=YouTubeArtwork.LookupStatus,exactPlayingVideoMatched=video!=null,highWidth=sharp!=null?sharp.PixelWidth:0,highHeight=sharp!=null?sharp.PixelHeight:0});return sharp!=null?0:1;
+                        AppLog.Json("media-source-probe.json",new {source=session.SourceAppUserModelId,titleLength=(properties.Title??"").Length,authorized=YouTubeArtwork.Allowed(session.SourceAppUserModelId,properties.Title),profileAvailable=File.Exists(YouTubeArtwork.Profile(session.SourceAppUserModelId)),profilePath=YouTubeArtwork.Profile(session.SourceAppUserModelId),receivedBytes=bytes.Length,decodedWidth=image.PixelWidth,decodedHeight=image.PixelHeight,consentKey=video!=null?YouTubeArtwork.TrackKey(session.SourceAppUserModelId,properties.Title):null,lookup=YouTubeArtwork.LookupStatus,exactPlayingVideoMatched=video!=null,highWidth=sharp!=null?sharp.PixelWidth:0,highHeight=sharp!=null?sharp.PixelHeight:0});return sharp!=null?0:1;
                     }
                 }
             }).GetAwaiter().GetResult();}

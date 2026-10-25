@@ -46,8 +46,24 @@ namespace OneTaskBar
         internal static bool Allowed(string appId,string title){return Supported(appId)&&(Preferences.Current.YouTubeHighResArtwork||String.Equals(Preferences.Current.YouTubeArtworkTrack,TrackKey(appId,title),StringComparison.Ordinal));}
         internal static string Find(string file,string title)
         {
+            string id=Query(file,title,false);if(id!=null||!(LookupStatus=="sqlite-prepare=5"||LookupStatus=="sqlite-open=5"||LookupStatus!=null&&LookupStatus.StartsWith("sqlite=5;",StringComparison.Ordinal)))return id;
+            // Chromium can retain an exclusive SQLite advisory lock between writes.
+            // Read only a stable rollback-mode file, never write it or copy its history.
+            string before=StableStamp(file);if(before==null){LookupStatus="browser-writing";return null;}id=Query(file,title,true);string after=StableStamp(file);if(after!=before){LookupStatus="browser-changed";return null;}LookupStatus="readonly-stable;"+LookupStatus;return id;
+        }
+        static string StableStamp(string file)
+        {
+            try{
+                var wal=new FileInfo(file+"-wal");if(wal.Exists&&wal.Length>0)return null;
+                var journal=new FileInfo(file+"-journal");if(journal.Exists&&journal.Length>0){var prefix=new byte[8];using(var stream=new FileStream(journal.FullName,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete)){if(stream.Read(prefix,0,8)!=8)return null;}foreach(byte value in prefix)if(value!=0)return null;}
+                var header=new byte[100];long length;using(var stream=new FileStream(file,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete)){if(stream.Read(header,0,100)!=100||header[18]!=1||header[19]!=1)return null;length=stream.Length;}
+                var info=new FileInfo(file);return length+"|"+info.Length+"|"+info.LastWriteTimeUtc.Ticks+"|"+Convert.ToBase64String(header);
+            }catch{return null;}
+        }
+        static string Query(string file,string title,bool unlocked)
+        {
             LookupStatus="missing-profile-or-title";if(String.IsNullOrWhiteSpace(file)||String.IsNullOrWhiteSpace(title)||title.Length>1024||!File.Exists(file))return null;IntPtr database=IntPtr.Zero,statement=IntPtr.Zero;var clock=Stopwatch.StartNew();Progress progress=state=>clock.ElapsedMilliseconds>60?1:0;
-            try{if(sqlite3_open_v2(Encoding.UTF8.GetBytes(file+"\0"),out database,1,IntPtr.Zero)!=0)return null;sqlite3_busy_timeout(database,20);sqlite3_progress_handler(database,2000,progress,IntPtr.Zero);string sql="SELECT url FROM urls WHERE title=?1 OR title=?2 ORDER BY last_visit_time DESC LIMIT 9";if(sqlite3_prepare_v2(database,Encoding.UTF8.GetBytes(sql+"\0"),-1,out statement,IntPtr.Zero)!=0)return null;
+            try{string path=unlocked?new Uri(Path.GetFullPath(file)).AbsoluteUri+"?mode=ro&nolock=1":file;int opened=sqlite3_open_v2(Encoding.UTF8.GetBytes(path+"\0"),out database,unlocked?65:1,IntPtr.Zero);if(opened!=0){LookupStatus="sqlite-open="+opened;return null;}sqlite3_busy_timeout(database,20);sqlite3_progress_handler(database,2000,progress,IntPtr.Zero);string sql="SELECT url FROM urls WHERE title=?1 OR title=?2 ORDER BY last_visit_time DESC LIMIT 9";int prepared=sqlite3_prepare_v2(database,Encoding.UTF8.GetBytes(sql+"\0"),-1,out statement,IntPtr.Zero);if(prepared!=0){LookupStatus="sqlite-prepare="+prepared;return null;}
                 for(int i=1;i<=2;i++){var bytes=Encoding.UTF8.GetBytes(i==1?title:title+" - YouTube");sqlite3_bind_text(statement,i,bytes,bytes.Length,new IntPtr(-1));}var ids=new HashSet<string>(StringComparer.Ordinal);int status,rows=0;clock.Restart();while((status=sqlite3_step(statement))==100){rows++;int size=sqlite3_column_bytes(statement,0);if(size<=0||size>8192)continue;var bytes=new byte[size];Marshal.Copy(sqlite3_column_text(statement,0),bytes,0,size);string id=VideoId(Encoding.UTF8.GetString(bytes));if(id!=null)ids.Add(id);}LookupStatus="sqlite="+status+";exactRows="+rows+";videoIds="+ids.Count;if(status!=101||rows>8||ids.Count!=1)return null;foreach(var id in ids)return id;
             }catch(Exception error){AppLog.Once("media-browser-cover",error.GetType().Name);}finally{if(statement!=IntPtr.Zero)sqlite3_finalize(statement);if(database!=IntPtr.Zero)sqlite3_close(database);GC.KeepAlive(progress);}return null;
         }
