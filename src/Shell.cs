@@ -30,7 +30,6 @@ namespace OneTaskBar
         {
             bool vertical=DockGeometry.Vertical(edge);double width=(vertical?screen.Height:screen.Width)/scale;
             double status=vertical?154:StatusSize(width,powerWidth),statusX=width-status-12;
-            if(vertical)media=false;
             double mediaMinimum=media?Math.Min(44,Math.Max(1,statusX-204)):0;
             double minimumX=media?mediaMinimum+76:66;
             double available=Math.Max(FixedWidth,statusX-minimumX-12);

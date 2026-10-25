@@ -26,9 +26,10 @@ namespace OneTaskBar
         internal static bool Dark {get{return fixtureDark??AppTheme.Dark;}}
         internal static bool DockDark {get{return fixtureDark??AppTheme.DockDark;}}
         static Palette Current {get{return Dark?dark:light;}}
+        internal static bool CardBrush(Brush brush){return brush!=null&&(brush==light.Card||brush==dark.Card);}
         internal static bool Transparent {get{return Preferences.Current.Blur&&!SystemParameters.HighContrast;}}
         internal static Brush Surface {get{return PanelMaterial.Surface(Dark,true);}}
-        internal static Brush Card {get{return Current.Card;}}
+        internal static Brush Card {get{return PanelMaterial.ProtectContrast?PanelMaterial.ReadableCard(Dark):Current.Card;}}
         internal static Brush Solid {get{return SystemParameters.HighContrast?SystemColors.WindowBrush:Current.Solid;}}
         internal static Brush Text {get{return SystemParameters.HighContrast?SystemColors.WindowTextBrush:Current.Text;}}
         internal static Brush Muted {get{return SystemParameters.HighContrast?SystemColors.WindowTextBrush:Current.Muted;}}

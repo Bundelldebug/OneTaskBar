@@ -7,6 +7,11 @@ namespace OneTaskBar
         internal Rect Bounds;internal double CompactY,CompactWidth,PosterEdge,PopupHeight;internal bool Raised;
         internal static NowBarLayout Fit(double screenWidth,double screenHeight,double startX,double dockY,double textWidth,bool expanded,bool largeCover=false,double maximumWidth=0,bool modern=false,int edge=3)
         {
+            if(DockGeometry.Vertical(edge)){
+                double sideY=Math.Max(12,Math.Min(screenHeight-56,dockY)),sideWidth=Math.Max(1,Math.Min(400,screenWidth-104)),sideCover=largeCover?Math.Max(0,Math.Min(288,Math.Min(sideWidth-56,screenHeight-24-(modern?178:148)))):0;if(sideCover<120)sideCover=0;
+                double sideHeight=sideCover>0?sideCover+(modern?178:148):Math.Min(modern?130:188,screenHeight-24),sideX=expanded?(edge==0?80:screenWidth-80-sideWidth):(edge==0?12:screenWidth-56);
+                return new NowBarLayout {Bounds=new Rect(sideX,expanded?Math.Max(12,Math.Min(screenHeight-sideHeight-12,sideY+22-sideHeight/2)):sideY,expanded?sideWidth:44,expanded?sideHeight:44),CompactY=sideY,CompactWidth=44,PosterEdge=sideCover,PopupHeight=sideHeight};
+            }
             double gap=Math.Max(1,startX-24),limit=Math.Max(1,Math.Min(maximumWidth>0?maximumWidth:DockLayout.StatusSize(screenWidth),gap)),compact=limit<84?Math.Min(44,limit):Math.Min(limit,Math.Max(132,textWidth+64)),cy=Math.Max(12,dockY);
             double popupWidth=Math.Max(1,Math.Min(400,screenWidth-24)),cover=largeCover?Math.Max(0,Math.Min(288,Math.Min(popupWidth-56,cy-(modern?198:168)))):0;if(cover<120)cover=0;
             double popupHeight=cover>0?cover+(modern?178:148):Math.Min(modern?130:188,Math.Max(100,cy-20)),width=expanded?popupWidth:compact,height=expanded?popupHeight:44,y=expanded?Math.Max(12,cy-8-height):cy;
@@ -15,6 +20,10 @@ namespace OneTaskBar
         }
         internal static void Check()
         {
+            foreach(int edge in new[]{0,2})foreach(double scale in new[]{1.0,1.25,1.5,1.75,2.0,2.5})foreach(bool modern in new[]{false,true})foreach(bool large in new[]{false,true})foreach(int count in new[]{0,4,40}){
+                var monitor=new System.Drawing.Rectangle(-2560,-600,1920,1080);var dock=DockLayout.Compute(monitor,scale,count,58,true,68,edge);double w=monitor.Width/scale,h=monitor.Height/scale;var folded=Fit(w,h,dock.StartX,Math.Max(12,dock.StartX-56),1500,false,large,0,modern,edge);var opened=Fit(w,h,dock.StartX,Math.Max(12,dock.StartX-56),1500,true,large,0,modern,edge);var bounds=new Rect(0,0,w,h);
+                if(folded.Bounds.Width!=44||folded.Bounds.Height!=44||!bounds.Contains(folded.Bounds)||!bounds.Contains(opened.Bounds)||folded.Bounds.Bottom>dock.StartX-11.99||(edge==0?Math.Abs(folded.Bounds.Left-12)>.01||opened.Bounds.Left<76:Math.Abs(w-folded.Bounds.Right-12)>.01||opened.Bounds.Right>w-76))throw new Exception("Side dock media must share its edge and expand inward");
+            }
             foreach(bool cover in new[]{false,true})foreach(double width in new[]{320.0,640,1440})foreach(double height in new[]{400.0,600,900}){var fit=Fit(width,height,320,height-56,180,true,cover,0,true);if(fit.Bounds.Top<12||fit.Bounds.Bottom>height-64||fit.Bounds.Right>width||(!cover&&height>=400&&fit.PopupHeight!=130))throw new Exception("UI 9 player spacing exceeds its monitor");}
             foreach(double scale in new[]{1.0,1.5,2.0})foreach(int apps in new[]{2,12,28}){
                 var physical=new System.Drawing.Rectangle(-1920,80,1920,1080);var dock=DockLayout.Compute(physical,scale,apps,58,true);
@@ -25,7 +34,7 @@ namespace OneTaskBar
                 }
             }
             if(Fit(1440,900,400,844,25,false).Bounds.Width>=Fit(1440,900,400,844,180,false).Bounds.Width)throw new Exception("미디어 플레이어 must fit the title width");
-            foreach(double width in new[]{480.0,640,800,1024,1280,1920})foreach(double scale in new[]{1.0,1.25,1.5,2.0,2.5})foreach(int count in new[]{0,3,15,40})foreach(double power in new[]{0.0,58,78}){
+            foreach(double width in new[]{480.0,640,800,1024,1280,1920})foreach(double scale in new[]{1.0,1.25,1.5,1.75,2.0,2.5})foreach(int count in new[]{0,3,15,40})foreach(double power in new[]{0.0,58,78}){
                 var area=new System.Drawing.Rectangle(-2560,-600,(int)(width*scale),1080);var dock=DockLayout.Compute(area,scale,count,power,true);var fit=Fit(width,area.Height/scale,dock.StartX,dock.Y,1500,false,false,dock.StatusWidth);
                 if(fit.Raised||Math.Abs(fit.Bounds.Y-dock.Y)>.01||fit.Bounds.Right>dock.StartX-11.99||dock.AppX+dock.AppWidth+12>dock.StatusX+.01||fit.Bounds.Width>dock.StatusWidth+.01)throw new Exception("Small/mixed-DPI monitor media allocation");
             }
