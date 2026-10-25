@@ -14,7 +14,11 @@ namespace OneTaskBar
         public bool BudsConnectionPopups=true;
         public bool QuickGalaxyBuds=false;
         public int UIVersion=85;
+        public int UITransparency=45;
+        public int UITheme=0;
         public bool DockSolidBackground=false;
+        public int DockBackgroundKind=0,DockEdge=3;
+        public string DockBackgroundColor="#FFBAC1C7",DockBackgroundImage;
         public bool NativeStartKey=true,NativeSearch=false;
         public bool NativeStartButton=false;
         public bool NativeAltTab=false;
@@ -35,10 +39,13 @@ namespace OneTaskBar
         static readonly string file=Path.Combine(AppLog.Data,"settings.json");
         internal static readonly PreferenceData Current=Load();
         internal static event Action Changed;
-        static PreferenceData Load(){try{if(File.Exists(file))return new JavaScriptSerializer().Deserialize<PreferenceData>(File.ReadAllText(file))??new PreferenceData();}catch(Exception e){AppLog.Once("settings-read",e.Message);}return new PreferenceData();}
+        internal static event Action MaterialChanged;
+        internal static void Transparency(int value){Current.UITransparency=Math.Max(0,Math.Min(100,value));var changed=MaterialChanged;if(changed!=null)changed();}
+        internal static PreferenceData Normalize(PreferenceData value){if(!ReleaseFeatures.GlassUI&&value.UIVersion>=95)value.UIVersion=90;value.UITheme=Math.Max(0,Math.Min(2,value.UITheme));return value;}
+        static PreferenceData Load(){try{if(File.Exists(file))return Normalize(new JavaScriptSerializer().Deserialize<PreferenceData>(File.ReadAllText(file))??new PreferenceData());}catch(Exception e){AppLog.Once("settings-read",e.Message);}return Normalize(new PreferenceData());}
         internal static void Set(Action<PreferenceData> change)
         {
-            change(Current);Save();var notify=Changed;if(notify!=null)notify();
+            change(Current);Normalize(Current);Save();var notify=Changed;if(notify!=null)notify();
         }
         internal static void Save()
         {

@@ -42,12 +42,12 @@ namespace OneTaskBar
             // The right edge stays attached to the real icon. Only the capsule geometry changes.
             var rect=new Rect(ActualWidth-width,(ActualHeight-height)/2,width,height);
             var outline=new RectangleGeometry(rect,height/2,height/2);
-            if(!State.Known){int watts=PowerDisplay.Clamp(Preferences.Current.DesktopPowerWatts);if(watts>0){dc.DrawRoundedRectangle(Paint.Ink,null,rect,height/2,height/2);Digits(dc,watts+" W",rect,Paint.Text,false);}return;}
+            if(!State.Known){int watts=PowerDisplay.Clamp(Preferences.Current.DesktopPowerWatts);if(watts>0){dc.DrawRoundedRectangle(Paint.Brush("#FF19221E"),null,rect,height/2,height/2);Digits(dc,watts+" W",rect,Paint.ControlWhite,false);}return;}
             double fillWidth=width*Math.Max(0,State.Level)/100*(Celebration?Reveal:1);
             string label=State.Level>=0?State.Level.ToString():"–";bool bolt=State.Connected||Celebration;
             bool low=IsLow(State,Celebration);dc.PushClip(outline);dc.DrawRectangle(Paint.Brush(Celebration?"#FF5F7470":"#667B8581"),null,rect);
-            if(fillWidth>0)dc.DrawRectangle(Celebration?ChargeBrush():low?Paint.Brush("#FFB92835"):Paint.Ink,null,new Rect(rect.X,rect.Y,fillWidth,height));
-            Digits(dc,label,rect,Paint.Text,bolt);
+            if(fillWidth>0)dc.DrawRectangle(Celebration?ChargeBrush():low?Paint.Brush("#FFB92835"):Paint.Brush("#FF19221E"),null,new Rect(rect.X,rect.Y,fillWidth,height));
+            Digits(dc,label,rect,Paint.ControlWhite,bolt);
             dc.Pop();
         }
         internal static void Check(){foreach(int level in new[]{-1,0,1,19,20,21,100}){var state=new PowerState {Known=true,Level=level};if(IsLow(state)!=(level>=0&&level<=20))throw new InvalidOperationException("Low battery threshold");state.Connected=true;if(IsLow(state))throw new InvalidOperationException("AC must keep the charging presentation");state.Connected=false;state.Charging=true;if(IsLow(state))throw new InvalidOperationException("Charging must keep its existing icon");state.Charging=false;state.Known=false;if(IsLow(state))throw new InvalidOperationException("Unknown battery cannot be low");}if(IsLow(new PowerState {Known=true,Level=19},true))throw new InvalidOperationException("Charging animation cannot turn red");}

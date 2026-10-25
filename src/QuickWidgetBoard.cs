@@ -17,6 +17,7 @@ namespace OneTaskBar
         internal readonly Thumb Mover;
         internal readonly QuickResizeGrip Resize=new QuickResizeGrip();
         readonly Border outline;
+        readonly GlassTileShadow glassShadow;
         readonly Button remove;
         internal readonly Button ContentEditor;
         readonly Action<QuickWidgetSlot> shape;
@@ -24,7 +25,8 @@ namespace OneTaskBar
         internal QuickWidgetFrame(QuickWidgetBoard board,string key,string title,UIElement content,Action<QuickWidgetSlot> resized)
         {
             Key=key;shape=resized;Background=Brushes.Transparent;RenderTransform=new TranslateTransform();
-            Body=new Border {Child=content,Background=QuickWidgetLayout.Slider(key)?Brushes.Transparent:QuickPanel.Card,CornerRadius=new CornerRadius(32)};Children.Add(Body);
+            if(Glass95.Enabled){glassShadow=new GlassTileShadow();Children.Add(glassShadow);}
+            Body=new GlassTileBorder {Child=content,Optical=!QuickWidgetLayout.Slider(key)&&key!="media",Background=QuickWidgetLayout.Slider(key)?Brushes.Transparent:QuickPanel.Card,CornerRadius=new CornerRadius(32)};Children.Add(Body);
             outline=new Border {BorderThickness=new Thickness(2),BorderBrush=Paint.Brush("#88FFFFFF"),IsHitTestVisible=false,Visibility=Visibility.Collapsed};Children.Add(outline);
             var template=new FrameworkElementFactory(typeof(Border));template.SetValue(Border.BackgroundProperty,Brushes.Transparent);
             Mover=new Thumb {Template=new ControlTemplate(typeof(Thumb)){VisualTree=template},Cursor=Cursors.SizeAll,Focusable=true,FocusVisualStyle=null,Visibility=Visibility.Collapsed};Children.Add(Mover);
@@ -38,7 +40,7 @@ namespace OneTaskBar
             Body.SizeChanged+=(s,e)=>Curvature();
         }
         internal void Editing(bool editing){Body.IsHitTestVisible=!editing;Body.Opacity=editing?.72:1;Mover.Visibility=Resize.Visibility=remove.Visibility=outline.Visibility=editing?Visibility.Visible:Visibility.Collapsed;if(ContentEditor!=null)ContentEditor.Visibility=editing?Visibility.Visible:Visibility.Collapsed;}
-        void Curvature(){double width=Body.ActualWidth,height=Body.ActualHeight,radius=columns==1||rows==1?Math.Min(width,height)/2:Math.Min(32,Math.Min(width,height)/2);Body.CornerRadius=outline.CornerRadius=new CornerRadius(radius);Body.Clip=new RectangleGeometry(new Rect(0,0,Math.Max(0,width),Math.Max(0,height)),radius,radius);}
+        void Curvature(){double width=Body.ActualWidth,height=Body.ActualHeight,radius=columns==1||rows==1?Math.Min(width,height)/2:Math.Min(32,Math.Min(width,height)/2);Body.CornerRadius=outline.CornerRadius=new CornerRadius(radius);Body.Clip=new RectangleGeometry(new Rect(0,0,Math.Max(0,width),Math.Max(0,height)),radius,radius);if(glassShadow!=null){glassShadow.Radius=radius;glassShadow.InvalidateVisual();}}
         internal void AnimateSize(Size previous,bool animate){int token=++sizeMotion;Body.BeginAnimation(WidthProperty,null);Body.BeginAnimation(HeightProperty,null);Body.Width=Body.Height=Double.NaN;Body.HorizontalAlignment=HorizontalAlignment.Stretch;Body.VerticalAlignment=VerticalAlignment.Stretch;if(!animate||!Motion.Enabled||!IsVisible)return;Body.Width=ActualWidth;Body.Height=ActualHeight;Body.HorizontalAlignment=HorizontalAlignment.Left;Body.VerticalAlignment=VerticalAlignment.Top;var height=Motion.Tween(previous.Height,ActualHeight,170);height.Completed+=(s,e)=>{if(token==sizeMotion){Body.BeginAnimation(WidthProperty,null);Body.BeginAnimation(HeightProperty,null);Body.Width=Body.Height=Double.NaN;Body.HorizontalAlignment=HorizontalAlignment.Stretch;Body.VerticalAlignment=VerticalAlignment.Stretch;}};Body.BeginAnimation(WidthProperty,Motion.Tween(previous.Width,ActualWidth,170));Body.BeginAnimation(HeightProperty,height);}
         internal void Shape(QuickWidgetSlot slot){if(columns==slot.Columns&&rows==slot.Rows)return;columns=slot.Columns;rows=slot.Rows;shape(slot);Curvature();AutomationProperties.SetItemStatus(Resize,columns+"열 "+rows+"행");}
         internal void Stop(){if(Mover.IsDragging)Mover.CancelDrag();if(Resize.IsDragging)Resize.CancelDrag();}

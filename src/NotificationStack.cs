@@ -31,7 +31,7 @@ namespace OneTaskBar
     // original per-notification actions and runs only a short layout transition.
     internal sealed class NotificationStackView : Grid
     {
-        readonly Border front=new Border();
+        readonly Border front=new GlassTileBorder();
         readonly StackPanel content=new StackPanel(),items=new StackPanel();
         readonly Grid header=new Grid();
         readonly TextBlock label=Paint.TextBlock("",11,Paint.Muted);

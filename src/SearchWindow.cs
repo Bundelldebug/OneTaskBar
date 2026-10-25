@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -32,13 +32,9 @@ namespace OneTaskBar
             var root=new DockPanel {Margin=new Thickness(24,20,24,16)};
             var header=new Grid {Height=36,Margin=new Thickness(4,0,4,12)};var title=Paint.TextBlock("검색",19,Paint.Text);title.FontWeight=FontWeights.SemiBold;header.Children.Add(title);
             var back=Paint.Action("앱 화면",()=>shell.ToggleDrawer(null));back.HorizontalAlignment=HorizontalAlignment.Right;back.Margin=new Thickness(0,0,62,0);header.Children.Add(back);var close=Paint.Button(new Glyph("close",19),()=>Hide(),"검색 닫기");close.HorizontalAlignment=HorizontalAlignment.Right;close.Width=40;close.Padding=new Thickness(8);header.Children.Add(close);DockPanel.SetDock(header,Dock.Top);root.Children.Add(header);
-            var search=new Grid {Margin=new Thickness(20,3,12,3)};search.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(29)});search.ColumnDefinitions.Add(new ColumnDefinition());search.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(36)});
-            search.Children.Add(new Glyph("search",20){Color=Paint.Ink,VerticalAlignment=VerticalAlignment.Center});
-            var input=new Grid();input.Children.Add(Query);placeholder.IsHitTestVisible=false;input.Children.Add(placeholder);Grid.SetColumn(input,1);search.Children.Add(input);
-            var clear=Paint.Button(new Glyph("close",17){Color=Paint.Ink},()=> {Query.Clear();Query.Focus();},"검색어 지우기");clear.Width=clear.Height=30;clear.Padding=new Thickness(6);clear.Background=Paint.Brush("#14000000");Grid.SetColumn(clear,2);search.Children.Add(clear);
-            field=new Border {CornerRadius=new CornerRadius(29),Height=56,Width=620,Background=new LinearGradientBrush(Color.FromArgb(240,232,236,255),Color.FromArgb(240,218,251,247),0),Child=search,HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(0,15,0,0)};DockPanel.SetDock(field,Dock.Bottom);root.Children.Add(field);
+            field=LauncherSearchField.Create(Query,()=>{Query.Clear();Query.Focus();});field.Margin=new Thickness(0,10,0,0);DockPanel.SetDock(field,Dock.Bottom);root.Children.Add(field);
             scroll=new SmoothScrollViewer {Content=cards,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};root.Children.Add(scroll);Surface.Child=root;TransitionContent=root;
-            Query.TextChanged+=(s,e)=> {placeholder.Visibility=Query.Text.Length==0?Visibility.Visible:Visibility.Collapsed;QueueReload();};
+            Query.TextChanged+=(s,e)=> {QueueReload();};
 
             PreviewKeyDown+=(s,e)=>{if(Navigation!=null&&!Navigation.Composing&&(e.Key==Key.Enter||e.Key==Key.Down||e.Key==Key.Up||e.Key==Key.Left||e.Key==Key.Right))FlushReload();};Navigation=new SearchNavigation(this,Query);
             debounce.Tick+=async(s,e)=> {debounce.Stop();await FindFiles();};

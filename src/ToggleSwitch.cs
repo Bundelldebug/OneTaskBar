@@ -27,7 +27,7 @@ namespace OneTaskBar
         protected override void OnRender(DrawingContext dc)
         {
             double progress=(double)GetValue(ProgressProperty);
-            dc.DrawRoundedRectangle(Paint.Brush(Checked?"#FF4085F4":"#FF718078"),null,new Rect(0,1,48,26),13,13);
+            dc.DrawRoundedRectangle(Paint.Brush(Checked?"#FF3478FD":"#FF9E9EA6"),null,new Rect(0,1,48,26),13,13);
             dc.DrawEllipse(Brushes.White,null,new Point(14+20*progress,14),10,10);
             if(IsKeyboardFocused)dc.DrawRoundedRectangle(null,new Pen(Paint.Brush("#FFE0EDFF"),1),new Rect(-2,-1,52,30),15,15);
         }

@@ -41,6 +41,7 @@ namespace OneTaskBar
         int width,height,corner,popupX=Int32.MinValue,popupY=Int32.MinValue;
         Native.RectI placedBounds;bool shown,enabled=true;double opacity=1;Rect? lastClip;
         Native.RectI? inputClip;
+        internal bool Realtime {get{return blur!=null&&blur.Brush is CompositionBackdropBrush;}}
         internal LiveBackdrop(Window window,double radius)
         {
             this.window=window;this.radius=radius;

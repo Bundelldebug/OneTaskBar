@@ -29,6 +29,7 @@ namespace OneTaskBar
             ShuffleButton=Icon("shuffle",()=>command("shuffle"),"셔플 재생",26,18);ShuffleButton.HorizontalAlignment=HorizontalAlignment.Left;transport.Children.Add(ShuffleButton);Grid.SetRow(transport,3);Children.Add(transport);
             foreach(var button in new[]{PreviousButton,PlayButton,NextButton}){button.Background=controlGlass;button.Resources["ButtonRadius"]=new CornerRadius(40);}
             SeekBar.WaveMode=true;SeekBar.MinWidth=0;SeekBar.WaveProgress=CurrentWavePosition;playGlyph.Color=Paint.ControlWhite;
+            if(Glass95.Enabled)Glass95.MediaInk(this);
             header.SizeChanged+=(s,e)=>FitModernControls();IsVisibleChanged+=(s,e)=>{if(IsVisible&&modernState!=null)LoadSourceLogo(modernState.AppId);};Unloaded+=(s,e)=>{logoRequest++;logoApp=null;sourceIcon.Source=null;};
         }
         double CurrentWavePosition()

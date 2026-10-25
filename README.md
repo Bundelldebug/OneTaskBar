@@ -90,6 +90,10 @@ Code and the original One TaskBar icon are under the [MIT license](LICENSE). [Th
 
 Production signing is not active. The maintainer reported on 2026-10-24 that SignPath Foundation declined the application; no usable certificate was issued. See the [Code signing policy and privacy details](docs/CODE_SIGNING.md). Unsigned development artifacts are not production-signed releases.
 
+## 9.0.2 and 9.5.0 beta
+
+Stable 9.0.2 includes the shared settings, app-only themes, recent thumbnails, dock placement/work-area and window-activation improvements. UI 9.5 glass materials are available only in the separate 9.5.0 beta. See [stable notes](docs/RELEASE_NOTES_9.0.2.md) and [beta notes](docs/9.5-BETA.md). Both remain unsigned; Windows may block execution.
+
 ## 9.0.1 (unsigned stable release)
 
 Custom Alt+Tab now works with one window and reuses unchanged previews. This release also includes cross-process window activation, a current-user logon task and deferred startup discovery, the UI 9 centered media/wave design, responsive four-row Start recents, expanded toggle spacing, low-battery fill corrections and launcher/icon/settings fixes. See [9.0.1 notes](docs/RELEASE_NOTES_9.0.1.md) and [validation](VALIDATION.md). No code-signing certificate is available; Windows may block execution. The total-memory target below 150 MiB remains unmet.

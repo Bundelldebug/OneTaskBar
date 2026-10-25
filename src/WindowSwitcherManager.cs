@@ -25,7 +25,7 @@ namespace OneTaskBar
         }
         internal void Update(IEnumerable<AppEntry> apps){if(disposed)return;metadata=apps.ToArray();if(Preferences.Current.NativeAltTab||!fixture&&!shell.Desktop){snapshot.Clear();return;}try{snapshot=fixture?fixtureRead():SwitchWindows.Read(metadata);}catch(Exception error){AppLog.Once("switcher-list",error.GetType().Name);snapshot.Clear();}}
         internal void PreferenceChanged(){bool next=Preferences.Current.NativeAltTab;if(next==preferNative)return;preferNative=next;if(next){Cancel();snapshot.Clear();}else Update(metadata);}
-        internal void AltReleased(){var source=original!=IntPtr.Zero?original:lastSource;Application.Current.Dispatcher.BeginInvoke(new Action(()=>{if(source!=IntPtr.Zero&&Native.IsWindow(source))PostMessage(source,0x1F,IntPtr.Zero,IntPtr.Zero);}),DispatcherPriority.Input);}
+        internal void AltReleased(){if(!Active)WindowActivation.CancelMenu(Native.GetForegroundWindow());}
         internal bool Cycle(bool reverse)
         {
             if(!Enabled)return false;if(!Active&&snapshot.Count==0)return false;if(!Active){pending=true;original=Native.GetForegroundWindow();pointer=Forms.Cursor.Position;}commands.Add(reverse?-1:1);Queue();return true;
@@ -56,7 +56,7 @@ namespace OneTaskBar
         }
         void End(bool commit)
         {
-            var selected=session==null?null:session.Current;var source=original;if(source!=IntPtr.Zero)lastSource=source;commands.Clear();pending=false;session=null;finish=null;original=IntPtr.Zero;pulse.Stop();if(outside!=null){outside.Dispose();outside=null;}if(view!=null){var closing=view;view=null;if(!closing.IsClosed)closing.Close();}if(source!=IntPtr.Zero&&Native.IsWindow(source))PostMessage(source,0x1F,IntPtr.Zero,IntPtr.Zero);if(commit&&selected!=null&&Native.IsWindow(selected.Window))activate(selected.Window);
+            var selected=session==null?null:session.Current;var source=original;if(source!=IntPtr.Zero)lastSource=source;commands.Clear();pending=false;session=null;finish=null;original=IntPtr.Zero;pulse.Stop();if(outside!=null){outside.Dispose();outside=null;}if(view!=null){var closing=view;view=null;if(!closing.IsClosed)closing.Close();}WindowActivation.CancelMenu(source);if(commit&&selected!=null&&Native.IsWindow(selected.Window))activate(selected.Window);
         }
         internal void Cancel(){End(false);}
         public void Dispose(){if(disposed)return;disposed=true;End(false);snapshot.Clear();metadata=new AppEntry[0];}

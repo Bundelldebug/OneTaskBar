@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -22,6 +22,7 @@ namespace OneTaskBar
         [DllImport("user32.dll")]static extern bool PostMessage(IntPtr window,int message,IntPtr wp,IntPtr lp);
         [DllImport("user32.dll")]static extern bool IsZoomed(IntPtr window);
         [DllImport("user32.dll")]static extern IntPtr GetActiveWindow();
+        [DllImport("user32.dll")]static extern bool EnableWindow(IntPtr window,bool enabled);
         static void Require(bool value,string text){if(!value)throw new InvalidOperationException(text);}
         static async Task Wait(Func<bool> ready,int timeout=2000){var watch=Stopwatch.StartNew();while(!ready()){if(watch.ElapsedMilliseconds>=timeout)throw new TimeoutException("Window activation fixture deadline");await Task.Delay(15);}}
         static bool Above(IntPtr first,IntPtr second){var found=new List<IntPtr>();Native.EnumWindows((h,l)=>{if(h==first||h==second)found.Add(h);return true;},IntPtr.Zero);return found.Count==2&&found[0]==first;}
@@ -29,7 +30,7 @@ namespace OneTaskBar
         internal static int Source(string name)
         {
             if(name!="a"&&name!="b")return 2;var app=new Application {ShutdownMode=ShutdownMode.OnExplicitShutdown};var window=new Window {Title="One Taskbar 전환 검사 "+name.ToUpperInvariant(),Width=470,Height=300,Left=name=="a"?40:550,Top=320,Background=name=="a"?Brushes.SteelBlue:Brushes.SeaGreen,Content=new TextBox {Text="다른 프로세스의 실제 창",FontSize=26,Margin=new Thickness(24),VerticalContentAlignment=VerticalAlignment.Center}};
-            window.SourceInitialized+=(s,e)=>{var handle=new WindowInteropHelper(window).Handle;HwndSource.FromHwnd(handle).AddHook((IntPtr h,int message,IntPtr wp,IntPtr lp,ref bool handled)=>{if(message!=Command)return IntPtr.Zero;handled=true;int state=wp.ToInt32();if(state==100)Thread.Sleep(500);else if(state==0||state==2||state==1)window.WindowState=state==2?WindowState.Maximized:state==1?WindowState.Minimized:WindowState.Normal;return IntPtr.Zero;});};
+            Window popup=null;window.SourceInitialized+=(s,e)=>{var handle=new WindowInteropHelper(window).Handle;HwndSource.FromHwnd(handle).AddHook((IntPtr h,int message,IntPtr wp,IntPtr lp,ref bool handled)=>{if(message!=Command)return IntPtr.Zero;handled=true;int state=wp.ToInt32();if(state==100)Thread.Sleep(500);else if(state==3){popup=new Window {Owner=window,Title="One Taskbar 전환 검사 모달",Width=280,Height=160,Content=new TextBox {Text="소유 창 전환 확인"}};popup.Show();new WindowInteropHelper(popup).Owner=handle;EnableWindow(handle,false);File.WriteAllText(Path.Combine(AppLog.Data,"focus-popup-"+name+".txt"),new WindowInteropHelper(popup).Handle.ToInt64().ToString());}else if(state==4){EnableWindow(handle,true);if(popup!=null){popup.Close();popup=null;}}else if(state==0||state==2||state==1)window.WindowState=state==2?WindowState.Maximized:state==1?WindowState.Minimized:WindowState.Normal;return IntPtr.Zero;});};
             window.Loaded+=(s,e)=>{var handle=new WindowInteropHelper(window).Handle;File.WriteAllText(Path.Combine(AppLog.Data,"focus-source-"+name+".txt"),handle.ToInt64().ToString());};window.Closed+=(s,e)=>app.Shutdown();window.Show();return app.Run();
         }
         // Arrange only these two owned fixture processes, without a synthetic OS key/click.
@@ -51,6 +52,7 @@ namespace OneTaskBar
                 }
                 int topmost=Native.GetWindowLong(b,-20)&8;Require(Native.GetForegroundWindow()==b,"Already active target remains foreground");Require(WindowActivation.TryActivate(b)&&WindowActivation.TryActivate(b),"Re-select the already active target");await Wait(()=>Above(b,a));Require((Native.GetWindowLong(b,-20)&8)==topmost,"Window activation must not change always-on-top policy");Detached();
                 var stalls=new List<long>();foreach(var busy in new[]{b,a}){Prepare(a);await Wait(()=>Native.GetForegroundWindow()==a);PostMessage(busy,Command,new IntPtr(100),IntPtr.Zero);await Task.Delay(35);var watch=Stopwatch.StartNew();WindowActivation.TryActivate(b);stalls.Add(watch.ElapsedMilliseconds);Require(watch.ElapsedMilliseconds<300,"Unresponsive applications must not stall the switcher");Detached();await Task.Delay(550);}
+                PostMessage(b,Command,new IntPtr(3),IntPtr.Zero);string popupFile=Path.Combine(AppLog.Data,"focus-popup-b.txt");await Wait(()=>File.Exists(popupFile)&&new FileInfo(popupFile).Length>0);var modal=new IntPtr(Int64.Parse(File.ReadAllText(popupFile)));Prepare(a);await Wait(()=>Native.GetForegroundWindow()==a);Require(WindowActivation.Target(b)==modal&&WindowActivation.TryActivate(b),"Disabled root resolves to its visible active modal: root="+b+" modal="+modal+" resolved="+WindowActivation.Target(b)+" rootStyle="+Native.GetWindowLong(b,-16)+" modalOwner="+Native.GetAncestor(modal,3));await Wait(()=>Native.GetForegroundWindow()==modal);Detached();PostMessage(b,Command,new IntPtr(4),IntPtr.Zero);await Wait(()=>!Native.IsWindow(modal));
                 Prepare(a);await Wait(()=>Native.GetForegroundWindow()==a);manager.Cycle(false);await Task.Delay(100);manager.Finish(false);await Task.Delay(80);Require(Native.GetForegroundWindow()==a,"Cancellation keeps the previous external foreground");
                 Require(!manager.TimerActive&&manager.View==null&&!application.Windows.OfType<SwitchThumbnail>().Any(),"Cross-process switch cleans up the chooser");AppLog.Json("window-activation-probe.json",new {passed=true,cases=cases,separateProcessTargets=true,actualForegroundAndZOrderVerified=true,normalAndMaximizedRaised=true,minimizedRestored=true,alreadyActiveWindowRaised=true,topmostPolicyUnchanged=true,inputQueuesDetached=true,unresponsiveProbeMilliseconds=stalls,cancelPreservesForeground=true,osInputSent=false,onlyFixtureWindowsUsed=true});result=0;
             }catch(Exception error){AppLog.Json("window-activation-probe.json",new {passed=false,error=error.ToString(),cases=cases});}finally{

@@ -12,7 +12,7 @@ namespace OneTaskBar
     {
         static readonly DependencyProperty OffsetProperty=DependencyProperty.Register("Offset",typeof(double),typeof(SmoothScrollViewer),new PropertyMetadata(0.0,(s,e)=>((SmoothScrollViewer)s).ScrollToVerticalOffset((double)e.NewValue)));
         double target;bool animating;long lastPrecision;
-        internal SmoothScrollViewer(){PanningMode=PanningMode.VerticalFirst;PanningDeceleration=.001;PanningRatio=1;CanContentScroll=false;Unloaded+=(s,e)=>Stop();PreviewTouchDown+=(s,e)=>Stop();PreviewMouseDown+=(s,e)=>Stop();}
+        internal SmoothScrollViewer(){ScrollEdges.Attach(this);PanningMode=PanningMode.VerticalFirst;PanningDeceleration=.001;PanningRatio=1;CanContentScroll=false;Unloaded+=(s,e)=>Stop();PreviewTouchDown+=(s,e)=>Stop();PreviewMouseDown+=(s,e)=>Stop();}
         internal static double Distance(int delta,int lines,double viewport) {return -delta/120.0*(lines<0?viewport:Math.Max(0,lines)*16);}
         double Clamp(double offset){return Math.Max(0,Math.Min(ScrollableHeight,offset));}
         void Stop(){double current=VerticalOffset;if(animating){BeginAnimation(OffsetProperty,null);SetValue(OffsetProperty,current);}target=current;animating=false;lastPrecision=0;}

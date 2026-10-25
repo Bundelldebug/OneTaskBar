@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.IO;
 using System.Collections.Generic;
@@ -87,7 +87,7 @@ namespace OneTaskBar
             if(Preferences.Current.UIVersion>=90){gridUI=new QuickGridSurface(this,shell);Surface.Child=gridUI.Root;Deactivated+=(s,e)=>{if(!Program.Inspectable&&IsVisible&&!IsMouseOver&&!gridUI.Board.GestureActive)Hide();};return;}
             var root=new DockPanel {Margin=new Thickness(18,19,18,14)};
             var header=new Grid {Height=47,Margin=new Thickness(4,0,2,12)};
-            var heading=new StackPanel();time.FontWeight=FontWeights.SemiBold;heading.Children.Add(time);heading.Children.Add(date);header.Children.Add(heading);
+            var heading=new StackPanel();time.FontWeight=FontWeights.SemiBold;heading.Children.Add(time);heading.Children.Add(date);var calendar=Paint.Button(heading,()=>shell.ToggleCalendar(this),"달력 열기");calendar.Background=Brushes.Transparent;calendar.Padding=new Thickness(0);calendar.HorizontalAlignment=HorizontalAlignment.Left;header.Children.Add(calendar);
             var tools=new StackPanel {Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Center};
             samsungSettings=Paint.Button(samsungIcon!=null?AppIcons.Visual(samsungIcon,24):(UIElement)new Glyph("settings",22),()=>shell.OpenSamsungSettings(),"삼성 설정");samsungSettings.Width=samsungSettings.Height=34;samsungSettings.Padding=new Thickness(0);samsungSettings.Background=Brushes.Transparent;tools.Children.Add(samsungSettings);
             tools.Children.Add(topPower=IconButton("power",()=>ShowPowerMenu(topPower),"전원",34));
@@ -133,7 +133,7 @@ namespace OneTaskBar
             resizeGrip.DragStarted+=(s,e)=>{BeginToggleResize();resizeOrigin=Mouse.GetPosition(Surface);};resizeGrip.DragDelta+=(s,e)=>{var point=Mouse.GetPosition(Surface);ResizeToggleBy(point.X-resizeOrigin.X,point.Y-resizeOrigin.Y);};resizeGrip.DragCompleted+=(s,e)=>FinishToggleResize(e.Canceled);
             resizeGrip.KeyDown+=(s,e)=>{if(resizeGrip.IsDragging)return;int x=e.Key==Key.Left?-1:e.Key==Key.Right?1:0,y=e.Key==Key.Up?-1:e.Key==Key.Down?1:0;if(x==0&&y==0)return;SetCollapsedGrid(QuickToggleSize.Columns(Preferences.Current)+x,QuickToggleSize.Rows(Preferences.Current)+y);e.Handled=true;};
             AddSection("actions",actionFrame);sectionFrames["actions"].SizeChanged+=(s,e)=>ApplyActionWidth(false);
-            themeToggle=Paint.Button(themeGlyph,()=>ToggleTheme(),"Windows 다크 모드 전환");themeToggle.Width=themeToggle.Height=44;themeToggle.Padding=new Thickness(0);themeToggle.Background=Brushes.Transparent;themeToggle.Resources["ButtonRadius"]=new CornerRadius(22);
+            themeToggle=Paint.Button(themeGlyph,()=>ToggleTheme(),"One TaskBar 다크 모드 전환");themeToggle.Width=themeToggle.Height=44;themeToggle.Padding=new Thickness(0);themeToggle.Background=Brushes.Transparent;themeToggle.Resources["ButtonRadius"]=new CornerRadius(22);
             themeCircle=new Border {Width=44,Height=44,CornerRadius=new CornerRadius(22),Background=Paint.Brush(QuickPanel.Inactive),Child=themeToggle};AddSection("brightness",SliderRow(brightness,themeCircle));
             mute=IconButton("volume",()=>shell.Mute(),"음소거 전환",44);soundGlyphs.Add((Glyph)mute.Content);muteCircle=new Border {Width=44,Height=44,CornerRadius=new CornerRadius(22),Background=Paint.Brush(QuickPanel.Inactive),Child=mute};
             AddSection("volume",SliderRow(volume,muteCircle,()=>shell.ShowDetail("sound")));
@@ -253,7 +253,7 @@ namespace OneTaskBar
             if(pendingToggles.Contains(key))return;pendingToggles.Add(key);if(key=="theme")themeBusy=true;Refresh(shell.Power,shell.Brightness,shell.Audio.Value,shell.Audio.Muted,shell.Audio.Available,shell.Brightness>=0);
             try {
                 if(key=="mute"){bool before=shell.Audio.Muted;shell.Mute();shell.Audio.Read();if(shell.Audio.Muted==before)throw new InvalidOperationException("Windows 음소거 상태를 변경하지 못했습니다.");}
-                else if(key=="theme"){var before=WindowsTheme.Read(true);if(!before.Available)throw new InvalidOperationException("Windows 색 모드를 읽지 못했습니다.");await Task.Run(()=>WindowsTheme.SetDark(!before.Dark));WindowsTheme.Invalidate();}
+                else if(key=="theme")AppTheme.Toggle();
                 else if(key=="efficiency")shell.Toggles.ToggleEfficiency();
                 else if(key=="dnd")await shell.Toggles.Disturb.Toggle();
                 else if(key=="awake")shell.Toggles.SetAwake(!shell.Toggles.Awake);
@@ -329,13 +329,13 @@ namespace OneTaskBar
             brightness.Value=Math.Max(0,bright);brightness.IsEnabled=brightAvailable;brightness.ToolTip=brightAvailable?"밝기":"연결된 디스플레이는 Windows 밝기 조절을 지원하지 않습니다";
             string soundKind=SoundIcon.For(sound,muted,audioAvailable);if(volume.Kind!=soundKind){volume.Kind=soundKind;volume.InvalidateVisual();}volume.Value=muted?0:sound;volume.IsEnabled=audioAvailable;
             foreach(var glyph in soundGlyphs)if(glyph.Kind!=soundKind){glyph.Kind=soundKind;glyph.InvalidateVisual();Motion.Fade(glyph,.45,1,150);}Motion.Background(muteCircle,soundKind=="mute"?QuickPanel.Inactive:Paint.ControlWhiteColor);
-            var muteGlyph=(Glyph)mute.Content;muteGlyph.Update(muteGlyph.Kind,soundKind=="mute"?Paint.ControlWhite:Paint.Ink);
-            var theme=WindowsTheme.Read();themeToggle.IsEnabled=theme.Available&&!themeBusy;themeToggle.ToolTip=theme.Available?(theme.Dark?"다크 모드 켜짐 · 라이트 모드로 전환":"다크 모드 꺼짐 · 다크 모드로 전환"):"Windows 색 모드를 읽지 못했습니다";AutomationProperties.SetItemStatus(themeToggle,theme.Dark?"켜짐":"꺼짐");
+            var muteGlyph=(Glyph)mute.Content;muteGlyph.Update(muteGlyph.Kind,soundKind=="mute"?Paint.Text:Paint.Ink);
+            var theme=AppTheme.Read();themeToggle.IsEnabled=!themeBusy;themeToggle.ToolTip=theme.Dark?"One TaskBar · 라이트 모드로 전환":"One TaskBar · 다크 모드로 전환";AutomationProperties.SetItemStatus(themeToggle,theme.Dark?"켜짐":"꺼짐");
             if(darkMode!=theme.Dark){darkMode=theme.Dark;themeGlyph.Kind=theme.Dark?"moon":"brightness";themeGlyph.InvalidateVisual();Motion.Background(themeCircle,theme.Dark?Paint.ControlWhiteColor:QuickPanel.Inactive);Motion.Fade(themeGlyph,.35,1,180);}
-            themeGlyph.Update(themeGlyph.Kind,theme.Dark?Paint.Ink:Paint.ControlWhite);
+            themeGlyph.Update(themeGlyph.Kind,theme.Dark?Paint.Ink:Paint.Text);
             bool wifi=shell.Services.WifiOn??shell.Wifi!=null,bluetooth=shell.Services.BluetoothOn??false;
             Motion.Background(wifiCircle,wifi?Paint.ControlWhiteColor:QuickPanel.Inactive);Motion.Background(bluetoothCircle,bluetooth?Paint.ControlWhiteColor:QuickPanel.Inactive);
-            wifiGlyph.Update(wifiGlyph.Kind,wifi?Paint.Ink:Paint.ControlWhite);bluetoothGlyph.Update(bluetoothGlyph.Kind,bluetooth?Paint.Ink:Paint.ControlWhite);
+            wifiGlyph.Update(wifiGlyph.Kind,wifi?Paint.Ink:Paint.Text);bluetoothGlyph.Update(bluetoothGlyph.Kind,bluetooth?Paint.Ink:Paint.Text);
             wifiGlyph.Opacity=wifi?1:.5;bluetoothGlyph.Opacity=bluetooth?1:.5;wifiName.Text=shell.Wifi??(wifi?"연결 안 됨":"꺼짐");bluetoothState.Text=shell.Services.BluetoothOn.HasValue?(bluetooth?(shell.Buds.ConnectedCaption??"연결 안 됨"):"꺼짐"):"연결 설정";bluetoothState.ToolTip=bluetoothState.Text;
             var efficiency=shell.Toggles.Power();var disturb=shell.Toggles.Disturb.State;
             foreach(var pair in toggleButtons){string key=pair.Key;bool value=key=="mute"?muted:key=="theme"?theme.Dark:key=="dnd"?disturb.Enabled:key=="efficiency"?efficiency.Selected==QuickActions.EfficientMode:key=="awake"?shell.Toggles.Awake:key=="wifi"?wifi:key=="bluetooth"?bluetooth:key=="animations"?Preferences.Current.Animations:key=="slider-scroll"?Preferences.Current.QuickSliderScroll:shell.Toggles.Startup;

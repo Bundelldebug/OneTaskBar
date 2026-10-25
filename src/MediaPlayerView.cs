@@ -46,6 +46,7 @@ namespace OneTaskBar
         internal void SetPalette(ArtworkPalette palette){playGlyph.Color=Modern?Paint.ControlWhite:palette.Ink;playGlyph.InvalidateVisual();}
         internal void Update(MediaState media,string outputName)
         {
+            bool active=media!=null&&media.Available&&media.Active;var ink=active?Paint.ControlWhite:Paint.Text;foreach(var text in new[]{title,device,elapsed,duration})text.Foreground=ink;artist.Foreground=active?Paint.Brush("#FFE0E7E4"):Paint.Muted;deviceGlyph.Color=ink;deviceGlyph.InvalidateVisual();foreach(var button in new[]{PreviousButton,NextButton,OutputButton,compactOutput}){var glyph=button.Content as Glyph;if(glyph!=null){glyph.Color=ink;glyph.InvalidateVisual();}}
             if(Modern){UpdateModern(media,outputName);return;}
             media=media??new MediaState();bool empty=!media.Available||!media.Active;bool poster=!empty&&posterEdge>=120&&media.Artwork!=null;bool modeChanged=!modeSet||empty!=IsCompact||usingPoster!=poster;
             applicationId=media.AppId;ArtworkButton.IsEnabled=!opening&&!empty&&media.Artwork!=null&&openApplication!=null&&!String.IsNullOrEmpty(applicationId);

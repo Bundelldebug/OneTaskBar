@@ -15,13 +15,15 @@ namespace OneTaskBar
         static void Opened(object sender,RoutedEventArgs args)
         {
             var menu=sender as ContextMenu;if(menu==null)return;MenuDismiss.Open(menu);
-            var window=menu.PlacementTarget==null?null:Window.GetWindow(menu.PlacementTarget);bool dark=window is QuickWindow||window is DetailWindow||window is NotificationWindow||window is DrawerWindow||window is SearchWindow,gray=false;
-            menu.Background=Preferences.Current.Blur?(dark?QuickPanel.Glass:gray?GrayPanel.Glass:LightPanel.Glass):Paint.Brush(dark?"#FF343936":gray?"#FFBEC6C1":"#FFD4DDD6");
-            menu.Foreground=dark?Paint.ControlWhite:Paint.Ink;if(dark||gray)foreach(object entry in menu.Items){var item=entry as MenuItem;if(item!=null){item.Foreground=menu.Foreground;var icon=item.Icon as Glyph;if(icon!=null)icon.Color=menu.Foreground;}}
-            if(!dark)LightPanel.Apply(menu);
+            bool dark=Glass95.Dark,gray=false;
+            menu.Background=Preferences.Current.Blur?QuickPanel.Glass:Paint.Brush(dark?"#FF343936":"#FFE4E9ED");
+            menu.Resources["MenuRadius"]=new CornerRadius(Glass95.Enabled?24:18);
+            if(Glass95.Enabled){menu.Background=Glass95.Transparent?Glass95.Surface:Glass95.Solid;menu.BorderBrush=Glass95.Rim;menu.BorderThickness=new Thickness(.6);}
+            menu.Foreground=dark?Paint.ControlWhite:PanelMaterial.LightText;foreach(object entry in menu.Items){var item=entry as MenuItem;if(item!=null){item.Foreground=menu.Foreground;var icon=item.Icon as Glyph;if(icon!=null)icon.Color=menu.Foreground;}}
+            if(Glass95.Enabled){menu.Foreground=Glass95.Text;foreach(object entry in menu.Items){var item=entry as MenuItem;if(item!=null){item.Foreground=Glass95.Text;var icon=item.Icon as Glyph;if(icon!=null)icon.Color=Glass95.Text;}}}
             menu.Dispatcher.BeginInvoke(new Action(()=> {
-                if(!menu.IsOpen||!Preferences.Current.Blur)return;
-                try {LiveBackdrop previous;if(backdrops.TryGetValue(menu,out previous)){previous.Dispose();backdrops.Remove(menu);}var blur=new LiveBackdrop(menu,18);backdrops.Add(menu,blur);}
+                if(!menu.IsOpen||!Preferences.Current.Blur||Glass95.Enabled&&!Glass95.Transparent)return;
+                try {LiveBackdrop previous;if(backdrops.TryGetValue(menu,out previous)){previous.Dispose();backdrops.Remove(menu);}var blur=new LiveBackdrop(menu,Glass95.Enabled?24:18);backdrops.Add(menu,blur);}
                 catch(Exception e){menu.Background=Paint.Brush(dark?"#FF343936":gray?"#FFBEC6C1":"#FFD4DDD6");AppLog.Once("menu-blur",e.Message);}
             }),DispatcherPriority.Loaded);
         }
@@ -40,7 +42,7 @@ namespace OneTaskBar
   <Setter Property='MinWidth' Value='214'/><Setter Property='MaxWidth' Value='400'/>
   <Setter Property='HasDropShadow' Value='False'/><Setter Property='OverridesDefaultStyle' Value='True'/>
   <Setter Property='Template'><Setter.Value><ControlTemplate TargetType='ContextMenu'>
-   <Border Margin='10' Background='{TemplateBinding Background}' BorderBrush='{TemplateBinding BorderBrush}' BorderThickness='{TemplateBinding BorderThickness}' CornerRadius='18' Padding='{TemplateBinding Padding}'>
+   <Border Margin='10' Background='{TemplateBinding Background}' BorderBrush='{TemplateBinding BorderBrush}' BorderThickness='{TemplateBinding BorderThickness}' CornerRadius='{DynamicResource MenuRadius}' Padding='{TemplateBinding Padding}'>
     <Border.Effect><DropShadowEffect Color='#000000' BlurRadius='18' ShadowDepth='3' Opacity='0.24'/></Border.Effect>
     <StackPanel IsItemsHost='True' KeyboardNavigation.DirectionalNavigation='Cycle'/>
    </Border>

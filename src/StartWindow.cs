@@ -46,11 +46,8 @@ namespace OneTaskBar
             Surface.CornerRadius=new CornerRadius(Radius);Surface.Background=QuickPanel.Glass;Surface.BorderBrush=Paint.Brush("#58FFFFFF");Surface.BorderThickness=new Thickness(.7);
             var root=new DockPanel {Margin=new Thickness(24,23,24,16)};
             launcherRoot=root;
-            var searchBox=new Border {Background=Paint.ControlWhite,CornerRadius=new CornerRadius(23),Padding=new Thickness(16,2,16,2),Margin=new Thickness(0,0,0,22)};
-            var field=new Grid();field.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(26)});field.ColumnDefinitions.Add(new ColumnDefinition());
-            field.Children.Add(new Glyph("search",19){Color=Paint.Ink});Grid.SetColumn(Search,1);field.Children.Add(Search);
-            var hint=Paint.TextBlock("앱, 설정 및 파일 검색",14,LightPanel.Muted);hint.Margin=new Thickness(6,0,0,0);hint.IsHitTestVisible=false;Grid.SetColumn(hint,1);field.Children.Add(hint);searchBox.Child=field;
-            Search.TextChanged+=(s,e)=> {hint.Visibility=Search.Text.Length==0?Visibility.Visible:Visibility.Collapsed;if(!composing)QueueSearch();};
+            var searchBox=LauncherSearchField.Create(Search,()=>{Search.Clear();Search.Focus();});searchBox.Margin=new Thickness(0,0,0,22);
+            Search.TextChanged+=(s,e)=> {if(!composing)QueueSearch();};
             TextCompositionManager.AddPreviewTextInputStartHandler(Search,(s,e)=>composing=true);TextCompositionManager.AddPreviewTextInputUpdateHandler(Search,(s,e)=>composing=true);Search.PreviewTextInput+=(s,e)=> {composing=false;QueueSearch();};
             Search.PreviewMouseLeftButtonDown+=(s,e)=> {if(Search.Text.Length==0){shell.ToggleSearch(null);e.Handled=true;}};
             DockPanel.SetDock(searchBox,Dock.Top);root.Children.Add(searchBox);
@@ -196,7 +193,7 @@ namespace OneTaskBar
         void RenderRecent(List<StartRecent> entries)
         {
             recentMore.Content=Paint.TextBlock(moreRecent?"‹  뒤로":"더 보기  ›",11,Paint.Text);recentMore.ToolTip=moreRecent?"시작 화면으로 돌아가기":"최근 항목 화면 열기";recentMore.IsEnabled=moreRecent||entries.Count>8;recentMore.Opacity=recentMore.IsEnabled?1:.45;
-            recent.Children.Clear();foreach(var value in entries.Take(moreRecent?24:8)){var item=value;var app=item.App;var row=new Grid();row.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(41)});row.ColumnDefinitions.Add(new ColumnDefinition());row.Children.Add(AppIcons.Visual(app,32));
+            recent.Children.Clear();foreach(var value in entries.Take(moreRecent?24:8)){var item=value;var app=item.App;var row=new Grid();row.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(58)});row.ColumnDefinitions.Add(new ColumnDefinition());row.Children.Add(new RecentThumbnail(app));
                 var words=new StackPanel {VerticalAlignment=VerticalAlignment.Center};var name=Paint.TextBlock(app.Name,12,Paint.Text);name.TextTrimming=TextTrimming.CharacterEllipsis;words.Children.Add(name);words.Children.Add(Paint.TextBlock("최근 열람 · "+item.Time.ToString("M월 d일  H:mm"),10,Paint.Muted));Grid.SetColumn(words,1);row.Children.Add(words);
                 var button=Paint.Button(row,()=>Launch(app),app.Name);button.Background=Brushes.Transparent;button.HorizontalContentAlignment=HorizontalAlignment.Stretch;button.Margin=new Thickness(1,1,1,2);button.Padding=new Thickness(9);button.Height=56;recent.Children.Add(button);
             }

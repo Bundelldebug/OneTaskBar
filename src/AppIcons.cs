@@ -17,7 +17,6 @@ namespace OneTaskBar
         static readonly Dictionary<string,CachedIcon> cache=new Dictionary<string,CachedIcon>(StringComparer.OrdinalIgnoreCase);
         static readonly LinkedList<string> recent=new LinkedList<string>();
         internal const int CacheLimit=48;
-        sealed class Plate {internal bool Needed;}
         static readonly SemaphoreSlim loaders=new SemaphoreSlim(3);
         internal static int CachedCount {get{lock(cacheLock)return cache.Count;}}
         static string Key(AppEntry app){string key=!String.IsNullOrEmpty(app.AppID)&&app.AppID.Contains("!")?app.AppID:(app.AppID??"")+"|"+(app.Target??app.Executable??"");return WebAppIcons.IsWebApp(app.AppID)?app.AppID+(app.Windows.Count>0?"|window":"|shortcut"):key;}
@@ -38,20 +37,10 @@ namespace OneTaskBar
                 requested=true;attempts++;Stop();try{await loaders.WaitAsync();ImageSource icon;try{icon=await BackgroundWork.Run(()=>Get(entry));}finally{loaders.Release();}if(icon!=null){LauncherMotion.InvalidateCache(this);Child=Visual(icon,size);InvalidateVisual();return;}}catch(Exception error){AppLog.Once("icon-load",error.Message);}requested=false;if(attempts<2&&IsLoaded&&IsVisible){await Task.Delay(200);Observe();}
             }
         }
-        static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ImageSource,Plate> plates=new System.Runtime.CompilerServices.ConditionalWeakTable<ImageSource,Plate>();
         internal static FrameworkElement Visual(ImageSource source,double size)
         {
             var image=new Image {Source=source,Width=size,Height=size,Stretch=Stretch.Uniform};RenderOptions.SetBitmapScalingMode(image,BitmapScalingMode.HighQuality);
-            if(!plates.GetValue(source,key=>new Plate {Needed=NeedsPlate(key)}).Needed)return image;
-            return new Border {Width=size,Height=size,CornerRadius=new CornerRadius(size*.26),Background=Paint.Brush("#E62C3832"),Padding=new Thickness(size*.08),Child=new Image {Source=source,Stretch=Stretch.Uniform}};
-        }
-        static bool NeedsPlate(ImageSource source)
-        {
-            var bitmap=source as BitmapSource;if(bitmap==null)return false;
-            try {var image=new FormatConvertedBitmap(bitmap,PixelFormats.Bgra32,null,0);int stride=image.PixelWidth*4;var pixels=new byte[stride*image.PixelHeight];image.CopyPixels(pixels,stride,0);int solid=0,light=0;
-                for(int i=0;i<pixels.Length;i+=4)if(pixels[i+3]>80){solid++;if(pixels[i]>205&&pixels[i+1]>205&&pixels[i+2]>205)light++;}
-                return solid>0&&light/(double)solid>.88;
-            }catch{return false;}
+            return image;
         }
         internal static ImageSource Get(AppEntry app)
         {

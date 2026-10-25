@@ -17,13 +17,18 @@ namespace OneTaskBar
     internal static class QuickPanel
     {
         // Black tint over the live host backdrop keeps background color without a milky layer.
-        internal static readonly Brush Glass=LightPanel.Tint("#A0000000","#94000000","#9E000000"),Card=Paint.Brush("#18FFFFFF");
+        static readonly Brush legacyGlass=LightPanel.Tint("#A0000000","#94000000","#9E000000"),legacyCard=Paint.Brush("#18FFFFFF");
+        internal static Brush Glass {get{return Glass95.Enabled?Glass95.Surface:PanelMaterial.Surface(Glass95.Dark,false);}}
+        internal static Brush Card {get{return Glass95.Enabled?Glass95.Card:PanelMaterial.Light?PanelMaterial.LightCard:legacyCard;}}
         internal const string Inactive="#2A000000";
     }
     internal static class GrayPanel
     {
         // Neutral frosted glass retains live background color with readable dark content.
-        internal static readonly Brush Glass=LightPanel.Tint("#8F858E87","#75747F77","#887F8981"),Card=Paint.Brush("#55ADB5AE"),Muted=LightPanel.Muted;
+        static readonly Brush legacyGlass=LightPanel.Tint("#8F858E87","#75747F77","#887F8981"),legacyCard=Paint.Brush("#55ADB5AE");
+        internal static Brush Glass {get{return Glass95.Enabled?Glass95.Surface:PanelMaterial.Surface(Glass95.Dark,false);}}
+        internal static Brush Card {get{return QuickPanel.Card;}}
+        internal static Brush Muted {get{return LightPanel.Muted;}}
         internal static void Apply(DependencyObject root)
         {
             LightPanel.Apply(root);
@@ -31,7 +36,12 @@ namespace OneTaskBar
     }
     internal static class LightPanel
     {
-        internal static readonly Brush Glass=Tint("#9BE5EBE7","#7BC5D0C9","#8FD8E2DB"),DockGlass=Tint("#AADFE7E2","#82C3D0C7","#96D5E1D9"),DockSolid=Paint.Brush("#FFBAC1C7"),Muted=Paint.Brush("#FF4C5B52"),Card=Paint.Brush("#24FFFFFF");
+        static readonly Brush legacyGlass=Tint("#9BE5EBE7","#7BC5D0C9","#8FD8E2DB"),legacyDock=Tint("#AADFE7E2","#82C3D0C7","#96D5E1D9"),legacyMuted=Paint.Brush("#FF4C5B52"),legacyCard=Paint.Brush("#24FFFFFF");
+        internal static readonly Brush DockSolid=Paint.Brush("#FFBAC1C7");
+        internal static Brush Glass {get{return Glass95.Enabled?Glass95.Surface:PanelMaterial.Surface(Glass95.Dark,false);}}
+        internal static Brush DockGlass {get{return Glass95.Enabled?Glass95.Surface:legacyDock;}}
+        internal static Brush Muted {get{return Glass95.Enabled?Glass95.Muted:PanelMaterial.Light?legacyMuted:Paint.Muted;}}
+        internal static Brush Card {get{return Glass95.Enabled?Glass95.Card:PanelMaterial.Light?PanelMaterial.LightCard:legacyCard;}}
         internal static Brush Tint(string top,string middle,string bottom)
         {
             var brush=new LinearGradientBrush();brush.StartPoint=new Point(0,0);brush.EndPoint=new Point(0,1);
@@ -39,6 +49,7 @@ namespace OneTaskBar
         }
         internal static void Apply(DependencyObject root)
         {
+            if(!Glass95.Enabled&&!PanelMaterial.Light){var label=root as TextBlock;if(label!=null&&label.Foreground==Paint.Ink)label.Foreground=Paint.Text;var target=root as Control;if(target!=null&&target.Foreground==Paint.Ink)target.Foreground=Paint.Text;var icon=root as Glyph;if(icon!=null&&icon.Color==Paint.Ink)icon.Color=Paint.Text;foreach(object item in LogicalTreeHelper.GetChildren(root)){var element=item as DependencyObject;if(element!=null)Apply(element);}return;}
             var text=root as TextBlock;if(text!=null){if(text.Foreground==Paint.Text)text.Foreground=Paint.Ink;else if(text.Foreground==Paint.Muted)text.Foreground=Muted;}
             var control=root as Control;if(control!=null&&control.Foreground==Paint.Text)control.Foreground=Paint.Ink;
             var glyph=root as Glyph;if(glyph!=null){if(glyph.Color==Paint.Text)glyph.Color=Paint.Ink;else if(glyph.Color==Paint.Muted)glyph.Color=Muted;}
@@ -64,7 +75,10 @@ namespace OneTaskBar
         internal static SolidColorBrush Brush(string value) {SolidColorBrush cached;if(brushes.TryGetValue(value,out cached))return cached;var b=(SolidColorBrush)new BrushConverter().ConvertFromString(value);b.Freeze();if(brushes.Count<128)brushes.TryAdd(value,b);return b;}
         internal const string ControlWhiteColor="#FFF4F8F5";
         internal static readonly Brush ControlWhite=Brush(ControlWhiteColor);
-        internal static readonly Brush Text=Brush("#FFFFFFFF"), Muted=Brush("#FFDBE3DF"), Ink=Brush("#FF19221E");
+        static readonly Brush legacyText=Brush("#FFFFFFFF"),legacyMuted=Brush("#FFDBE3DF"),legacyInk=Brush("#FF19221E");
+        internal static Brush Text {get{return Glass95.Enabled?Glass95.Text:PanelMaterial.Light?PanelMaterial.LightText:legacyText;}}
+        internal static Brush Muted {get{return Glass95.Enabled?Glass95.Muted:PanelMaterial.Light?PanelMaterial.LightMuted:legacyMuted;}}
+        internal static Brush Ink {get{return Glass95.Enabled?Glass95.Text:legacyInk;}}
         internal static void Label(DrawingContext dc,string text,double size,Brush color,Point point,FontWeight weight)
         {
             var f=new FormattedText(text,CultureInfo.GetCultureInfo("ko-KR"),FlowDirection.LeftToRight,
@@ -137,6 +151,8 @@ namespace OneTaskBar
             else if(kind=="person") { dc.DrawEllipse(brush,null,new Point(12,4),2.5,2.5); line(3,9,21,9); line(12,7,12,15); line(12,15,7,23); line(12,15,17,23); }
             else if(kind=="settings") dc.DrawGeometry(brush,null,gear);
             else if(kind=="home") dc.DrawGeometry(null,pen,Geometry.Parse("M2,11 L12,2 22,11 M5,9 L5,21 10,21 10,14 14,14 14,21 19,21 19,9"));
+            else if(kind=="notification") {dc.DrawGeometry(null,pen,Geometry.Parse("M4,17 L6,14 6,9 A6,6 0 0 1 18,9 L18,14 20,17 Z M10,21 Q12,23 14,21 M12,1 L12,3"));}
+            else if(kind=="motion") {dc.DrawGeometry(null,pen,Geometry.Parse("M3,7 L14,7 M3,12 L10,12 M3,17 L14,17 M14,4 L22,12 14,20"));}
             else if(kind=="windows-settings") dc.DrawGeometry(brush,null,windowsGear);
             else if(kind=="window") { dc.DrawRoundedRectangle(null,pen,new Rect(2,3,20,18),2,2); line(2,8,22,8); }
             else if(kind=="desktops") {dc.DrawGeometry(null,pen,Geometry.Parse("M8,5 L8,3 Q8,2 10,2 L21,2 Q23,2 23,4 L23,15 Q23,17 21,17 L19,17"));dc.DrawRoundedRectangle(null,pen,new Rect(1,7,17,15),2,2);}
@@ -161,13 +177,18 @@ namespace OneTaskBar
         {
             Button b=toggle?(Button)new QuickToggleButton():new Button();b.Content=content;b.Foreground=Text;b.Background=Brush("#1CFFFFFF");b.BorderThickness=new Thickness(0);b.Padding=new Thickness(12,8,12,8);b.Cursor=Cursors.Hand;b.ToolTip=hint;b.HorizontalContentAlignment=HorizontalAlignment.Center;
             b.Resources["ButtonRadius"]=new CornerRadius(18);
+            if(Glass95.Enabled&&content is TextBlock){b.Background=Glass95.Card;b.BorderBrush=Glass95.Rim;b.BorderThickness=new Thickness(.65);b.Resources["ButtonRadius"]=new CornerRadius(24);}
             if(buttonTemplate==null)buttonTemplate=(ControlTemplate)System.Windows.Markup.XamlReader.Parse(
                 "<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Button'><Border x:Name='p' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' Background='{TemplateBinding Background}' BorderBrush='{TemplateBinding BorderBrush}' BorderThickness='{TemplateBinding BorderThickness}' CornerRadius='{DynamicResource ButtonRadius}' Padding='{TemplateBinding Padding}'><ContentPresenter HorizontalAlignment='{TemplateBinding HorizontalContentAlignment}' VerticalAlignment='{TemplateBinding VerticalContentAlignment}'/></Border></ControlTemplate>");
             b.Template=buttonTemplate;b.FocusVisualStyle=null;AutomationProperties.SetName(b,hint); b.Click+=(s,e)=>action();Motion.Button(b);return b;
         }
         internal static TextBlock TextBlock(string text,double size,Brush color)
         {return new TextBlock {Text=text,FontFamily=SystemFonts.MessageFontFamily,FontSize=size,Foreground=color,VerticalAlignment=VerticalAlignment.Center};}
-        internal static Button Action(string text,Action action) { return Button(TextBlock(text,13,Text),action,text); }
+        internal static Button Action(string text,Action action)
+        {
+            var button=Button(TextBlock(text,13,Text),action,text);button.VerticalContentAlignment=VerticalAlignment.Center;
+            button.SizeChanged+=(s,e)=>button.Resources["ButtonRadius"]=new CornerRadius(Math.Max(0,Math.Min(button.ActualWidth,button.ActualHeight)/2));return button;
+        }
     }
     internal sealed class Glyph : FrameworkElement
     {
@@ -210,6 +231,7 @@ namespace OneTaskBar
         {
             double w=ActualWidth,h=ActualHeight; if(w<=0 || h<=0) return;
             if(WaveMode){DrawWave(dc,w,h);return;}
+            if(Glass95.Enabled&&Tablet&&!Slim){DrawGlass(dc,w,h);return;}
             double shown=(double)GetValue(DisplayValueProperty);string iconKind=Kind.StartsWith("volume",StringComparison.Ordinal)?SoundIcon.For(value,false,IsEnabled):Kind;
             double axis=Vertical?h:w,cross=Vertical?w:h;bool capsule=Tablet&&ShowIcon&&!Slim&&!LinearFill;double thickness=Slim?6:cross,top=(cross-thickness)/2;var track=Vertical?new Rect(top,0,thickness,h):new Rect(0,top,w,thickness);var logical=capsule?CapsuleFillBounds(axis,cross,shown):new Rect(0,top,FillWidth(axis,shown),thickness);var filled=Vertical?new Rect(logical.Y,h-logical.Right,logical.Height,logical.Width):logical;double fillRadius=Math.Min(filled.Width,filled.Height)/2;var fill=new RectangleGeometry(filled,fillRadius,fillRadius);
             dc.DrawRoundedRectangle(Paint.Brush(DarkTrack?"#26000000":IsEnabled ? "#3C77817F" : "#286E7775"),NoTrackBorder?null:new Pen(Paint.Brush("#288B9692"),.7),track,thickness/2,thickness/2);
@@ -250,10 +272,14 @@ namespace OneTaskBar
     }
     internal class GlassWindow : Window
     {
-        int motion;bool closed,hiding;Brush glassTint,solidTint;TaskCompletionSource<bool> dismissal;
+        int motion;bool closed,hiding;Brush glassTint,solidTint;LinearGradientBrush glassEdge;bool edgeDark;Point glassPointer;TaskCompletionSource<bool> dismissal;
+        internal readonly int InterfaceVersion=Preferences.Current.UIVersion;
+        internal bool GlassMaterial {get{return glassEdge!=null;}}
+        internal Point GlassHighlight {get{return glassEdge==null?new Point():glassEdge.StartPoint;}}
         public readonly Border Surface;
         public double Radius=28; public bool Dark=true; public bool HasBlur;internal bool SoftCorners=true,OpaqueSurface,DockSurface;
         internal bool StableSurface=true,UnifiedFade,SmoothLauncher;internal FrameworkElement TransitionContent;
+        GlassLens lens;
         static readonly DependencyProperty SurfaceFadeProperty=DependencyProperty.Register("SurfaceFade",typeof(double),typeof(GlassWindow),new PropertyMetadata(1.0,(d,e)=>{var window=(GlassWindow)d;if(window.Surface!=null)window.Surface.Opacity=(double)e.NewValue;Native.BlurOpacity(window,(double)e.NewValue);}));
         void ResetFade(){BeginAnimation(SurfaceFadeProperty,null);SetValue(SurfaceFadeProperty,1.0);Surface.Opacity=1;Native.BlurOpacity(this,1);}
         internal Rect? BackdropClip;
@@ -277,6 +303,7 @@ namespace OneTaskBar
             Resources.Add(typeof(System.Windows.Controls.Primitives.ScrollBar),System.Windows.Markup.XamlReader.Parse(
                 "<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='ScrollBar'><Setter Property='Width' Value='4'/><Setter Property='Background' Value='Transparent'/><Setter Property='Template'><Setter.Value><ControlTemplate TargetType='ScrollBar'><Track x:Name='PART_Track' IsDirectionReversed='True' Orientation='{TemplateBinding Orientation}'><Track.Thumb><Thumb><Thumb.Template><ControlTemplate TargetType='Thumb'><Border Background='#55D5DFD9' CornerRadius='2'/></ControlTemplate></Thumb.Template></Thumb></Track.Thumb></Track></ControlTemplate></Setter.Value></Setter></Style>"));
             SourceInitialized+=(s,e)=> {
+                if(Glass95.Enabled||this is QuickWindow||this is NotificationWindow||this is DetailWindow||this is CalendarWindow||this is StartWindow||this is SearchWindow||this is DrawerWindow)Dark=Glass95.Dark;
                 var hwnd=new WindowInteropHelper(this).Handle;Native.SetWindowLong(hwnd,-20,(Native.GetWindowLong(hwnd,-20)|0x80)&~0x40000);
                 glassTint=Surface.Background;HasBlur=!OpaqueSurface&&Native.Blur(this,Radius,Dark);ApplyMaterial();
                 var source=HwndSource.FromHwnd(new WindowInteropHelper(this).Handle);if(source!=null)source.AddHook((IntPtr h,int msg,IntPtr w,IntPtr l,ref bool handled)=> {
@@ -284,15 +311,35 @@ namespace OneTaskBar
                 });
             };
             SizeChanged+=(s,e)=> { if(new WindowInteropHelper(this).Handle!=IntPtr.Zero) Native.Round(this,Radius); };
-            Preferences.Changed+=ApplyMaterial;
+            Preferences.Changed+=ApplyMaterial;Preferences.MaterialChanged+=ApplyMaterial;
+            MouseMove+=(s,e)=>MoveGlassHighlight(e.GetPosition(Surface));MouseLeave+=(s,e)=>MoveGlassHighlight(new Point(Surface.ActualWidth/2,Surface.ActualHeight/2));
+            Loaded+=(s,e)=>{if(lens==null){var layer=AdornerLayer.GetAdornerLayer(Surface);if(layer!=null){lens=new GlassLens(this);layer.Add(lens);}}ApplyMaterial();};
             IsVisibleChanged+=(s,e)=> {if(!IsVisible)HiddenSince=DateTime.UtcNow;};
-            Closed+=(s,e)=> {closed=true;++motion;LauncherMotion.Cancel(TransitionContent);CompleteDismissal(false);Preferences.Changed-=ApplyMaterial;};
+            Closed+=(s,e)=> {closed=true;++motion;LauncherMotion.Cancel(TransitionContent);CompleteDismissal(false);Preferences.Changed-=ApplyMaterial;Preferences.MaterialChanged-=ApplyMaterial;};
             PreviewKeyDown+=(s,e)=> { if(e.Key==Key.Escape&&!DragReorder.Active) { Hide(); e.Handled=true; } };
         }
         void ApplyMaterial()
         {
-            if(glassTint==null)return;
-            bool enabled=HasBlur&&Preferences.Current.Blur&&!(DockSurface&&Preferences.Current.DockSolidBackground);Native.EnableBlur(this,enabled);Surface.Background=enabled?glassTint:solidTint??Paint.Brush(Dark?"#FF344139":"#FFE0E5E2");
+            if(lens!=null){lens.Active=Glass95.Enabled&&!OpaqueSurface&&HasBlur&&Preferences.Current.Blur&&!(DockSurface&&DockAppearance.Custom);lens.InvalidateVisual();}
+            if(glassTint==null)return;if(DockSurface&&DockAppearance.Custom){Native.EnableBlur(this,false);Surface.Background=DockAppearance.Background;Surface.BorderBrush=Glass95.Enabled?Glass95.Rim:Brushes.Transparent;Surface.BorderThickness=new Thickness(Glass95.Enabled?.7:0);return;}
+            bool enabled=HasBlur&&Preferences.Current.Blur&&!(DockSurface&&Preferences.Current.DockSolidBackground)&&(!Glass95.Enabled||Glass95.Transparent);Native.EnableBlur(this,enabled);
+            if(Glass95.Enabled&&!OpaqueSurface&&!(DockSurface&&Preferences.Current.DockSolidBackground)){
+                if(glassEdge==null||edgeDark!=Glass95.Dark){edgeDark=Glass95.Dark;glassEdge=Glass95.Edge(edgeDark);}Surface.BorderBrush=this is NowBar?(Brush)Brushes.Transparent:glassEdge;Surface.BorderThickness=new Thickness(0);
+                Surface.Background=this is NowBar?(enabled?glassTint:solidTint??Glass95.Solid):enabled?Glass95.Surface:Glass95.Solid;
+            }else{
+                if(glassEdge!=null){glassEdge=null;Surface.BorderBrush=DockSurface?Brushes.Transparent:Paint.Brush("#38FFFFFF");Surface.BorderThickness=new Thickness(DockSurface?0:.7);}
+                bool panel=this is QuickWindow||this is NotificationWindow||this is DetailWindow||this is CalendarWindow||this is StartWindow||this is SearchWindow||this is DrawerWindow;
+                if(panel){Dark=Glass95.Dark;Surface.Background=enabled?QuickPanel.Glass:PanelMaterial.Light?PanelMaterial.LightSolid:Paint.Brush("#FF29302D");}
+                else Surface.Background=enabled?glassTint:solidTint??Paint.Brush(Dark?"#FF344139":"#FFE0E5E2");
+            }
+        }
+        internal void RefreshGlassMaterial(){ApplyMaterial();Glass95.RefreshColors(Surface);}
+        internal void MoveGlassHighlight(Point point)
+        {
+            if(glassEdge==null||!Motion.Enabled||!Preferences.Current.Hover||!IsVisible||IsDismissing||Surface.ActualWidth<1||Surface.ActualHeight<1)return;
+            var next=new Point(Math.Max(0,Math.Min(1,point.X/Surface.ActualWidth)),Math.Max(0,Math.Min(1,point.Y/Surface.ActualHeight)));if(Math.Abs(next.X-glassPointer.X)+Math.Abs(next.Y-glassPointer.Y)<.03)return;glassPointer=next;
+            glassEdge.StartPoint=new Point(next.X*.55,next.Y*.25);glassEdge.EndPoint=new Point(.55+next.X*.45,.75+next.Y*.25);
+            if(lens!=null)lens.Move(next);
         }
         internal void SetMaterial(Brush tint,Brush solid){glassTint=tint;solidTint=solid;if(new WindowInteropHelper(this).Handle==IntPtr.Zero)Surface.Background=tint;else ApplyMaterial();}
         public void ShowAt(System.Drawing.Rectangle screen,double x,double y,double width,double height)

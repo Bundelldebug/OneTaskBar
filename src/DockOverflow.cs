@@ -34,7 +34,7 @@ namespace OneTaskBar
         {
             openDelay.Stop();closeDelay.Stop();if(disposed||entries.Count==0||!anchor.IsVisible||!dock.DockVisible)return;shell.Previews.Close();if(IsOpen)return;
             popup=new GlassWindow {Title="One TaskBar · 숨겨진 앱",ShowActivated=false,Dark=false,Radius=24};popup.Surface.CornerRadius=new CornerRadius(24);popup.Surface.Background=LightPanel.DockGlass;popup.Surface.BorderThickness=new Thickness(0);popup.MouseEnter+=(s,e)=>closeDelay.Stop();popup.MouseLeave+=(s,e)=>ScheduleClose();popup.PreviewKeyDown+=(s,e)=>{if(e.Key==System.Windows.Input.Key.Escape){e.Handled=true;Hide();}};Native.PrepareMonitor(popup,dock.Screen.Bounds);Fill();
-            var screen=dock.Screen.Bounds;Point point=anchor.PointToScreen(new Point(anchor.ActualWidth/2,0));double scale=dock.Scale;double x=Math.Max(12,Math.Min(screen.Width/scale-popup.Width-12,(point.X-screen.Left)/scale-popup.Width/2)),y=Math.Max(12,(point.Y-screen.Top)/scale-popup.Height-10);popup.ShowAt(screen,x,y,popup.Width,popup.Height);popup.Pop();outside=MenuDismiss.Watch(Contains,Hide);if(changed!=null)changed();
+            var screen=dock.Screen.Bounds;double scale=dock.Scale;var physical=DockGeometry.ScreenRect(anchor);var reference=new Rect((physical.X-screen.Left)/scale,(physical.Y-screen.Top)/scale,physical.Width/scale,physical.Height/scale);var place=DockGeometry.Beside(reference,new Size(popup.Width,popup.Height),new Rect(0,0,screen.Width/scale,screen.Height/scale),dock.Edge);popup.ShowAt(screen,place.X,place.Y,popup.Width,popup.Height);popup.Pop();outside=MenuDismiss.Watch(Contains,Hide);if(changed!=null)changed();
         }
         void Fill()
         {

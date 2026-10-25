@@ -14,6 +14,7 @@ namespace OneTaskBar
     internal sealed class DetailWindow : GlassWindow
     {
         readonly ShellController shell;readonly string page;
+        internal string PageKey {get{return page;}}
         readonly StackPanel body=new StackPanel();readonly TextBlock status=Paint.TextBlock("",12,Paint.Muted);
         readonly DispatcherTimer ticker=new DispatcherTimer {Interval=TimeSpan.FromSeconds(1)};
         readonly ScanIndicator scanIndicator=new ScanIndicator();readonly Button refreshButton;
@@ -34,9 +35,9 @@ namespace OneTaskBar
             shell=controller;page=kind;scanLoader=loader;Title="One TaskBar · "+PageName(kind);Width=380;Height=540;Radius=30;Dark=true;Surface.CornerRadius=new CornerRadius(30);Surface.Background=QuickPanel.Glass;Surface.BorderBrush=Paint.Brush("#48FFFFFF");Surface.BorderThickness=new Thickness(.7);
             var root=new DockPanel {Margin=new Thickness(20)};
             var header=new Grid {Height=44,Margin=new Thickness(0,0,0,12)};
-            var back=Paint.Action("‹",()=> {Hide();shell.ToggleQuick(null);});back.Width=34;back.Background=Brushes.Transparent;back.Padding=new Thickness(0);back.HorizontalAlignment=HorizontalAlignment.Left;header.Children.Add(back);
+            var back=Paint.Button(new Glyph("back",18),()=> {Hide();shell.ToggleQuick(null);},"빠른 설정으로 돌아가기");back.Width=back.Height=34;back.VerticalAlignment=VerticalAlignment.Center;back.Background=Brushes.Transparent;back.Padding=new Thickness(0);back.HorizontalAlignment=HorizontalAlignment.Left;header.Children.Add(back);
             var title=Paint.TextBlock(PageName(kind),21,Paint.Text);title.FontWeight=FontWeights.SemiBold;title.Margin=new Thickness(40,0,30,0);header.Children.Add(title);
-            refreshButton=Paint.Button(scanIndicator,()=>{Reload();if(page=="power")CheckSamsungAccess(true);},"다시 검색");refreshButton.Width=30;refreshButton.Background=Brushes.Transparent;refreshButton.Padding=new Thickness(0);refreshButton.HorizontalAlignment=HorizontalAlignment.Right;header.Children.Add(refreshButton);DockPanel.SetDock(header,Dock.Top);root.Children.Add(header);
+            refreshButton=Paint.Button(scanIndicator,()=>{Reload();if(page=="power")CheckSamsungAccess(true);},"다시 검색");refreshButton.Width=refreshButton.Height=34;refreshButton.VerticalAlignment=VerticalAlignment.Center;refreshButton.Background=Brushes.Transparent;refreshButton.Padding=new Thickness(0);refreshButton.HorizontalAlignment=HorizontalAlignment.Right;header.Children.Add(refreshButton);DockPanel.SetDock(header,Dock.Top);root.Children.Add(header);
             status.TextWrapping=TextWrapping.Wrap;status.Margin=new Thickness(5,10,5,0);DockPanel.SetDock(status,Dock.Bottom);root.Children.Add(status);
             root.Children.Add(new SmoothScrollViewer {Content=body,VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});Surface.Child=root;
             Closed+=(s,e)=> {closed=true;ticker.Stop();CancelScan();};Deactivated+=(s,e)=> {if(deviceActions==0&&!Program.Inspectable&&IsVisible&&!IsMouseOver)Hide();};if(!Wireless)Reload();

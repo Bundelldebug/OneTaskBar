@@ -99,6 +99,7 @@ namespace OneTaskBar
         // repaint here duplicates that work on every media morph frame.
         internal static bool ClipWindow(IntPtr window,RectI bounds){var region=CreateRectRgn(bounds.Left,bounds.Top,bounds.Right,bounds.Bottom);if(SetWindowRgn(window,region,false)!=0)return true;DeleteObject(region);return false;}
         internal static void EnableBlur(Window window,bool enabled){RegionState state;if(regions.TryGetValue(window,out state)&&state.Backdrop!=null)state.Backdrop.Enable(enabled);}
+        internal static bool RealtimeBackdrop(Window window){RegionState state;return regions.TryGetValue(window,out state)&&state.Backdrop!=null&&state.Backdrop.Realtime;}
         internal static void BlurOpacity(Window window,double value){RegionState state;if(regions.TryGetValue(window,out state)&&state.Backdrop!=null)state.Backdrop.SetOpacity(value);}
         internal static double BlurOpacity(Window window){RegionState state;return regions.TryGetValue(window,out state)&&state.Backdrop!=null?state.Backdrop.Opacity:0;}
         internal static double PrepareMonitor(Window window,System.Drawing.Rectangle screen)

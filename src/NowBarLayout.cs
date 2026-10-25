@@ -5,12 +5,13 @@ namespace OneTaskBar
     internal sealed class NowBarLayout
     {
         internal Rect Bounds;internal double CompactY,CompactWidth,PosterEdge,PopupHeight;internal bool Raised;
-        internal static NowBarLayout Fit(double screenWidth,double screenHeight,double startX,double dockY,double textWidth,bool expanded,bool largeCover=false,double maximumWidth=0,bool modern=false)
+        internal static NowBarLayout Fit(double screenWidth,double screenHeight,double startX,double dockY,double textWidth,bool expanded,bool largeCover=false,double maximumWidth=0,bool modern=false,int edge=3)
         {
             double gap=Math.Max(1,startX-24),limit=Math.Max(1,Math.Min(maximumWidth>0?maximumWidth:DockLayout.StatusSize(screenWidth),gap)),compact=limit<84?Math.Min(44,limit):Math.Min(limit,Math.Max(132,textWidth+64)),cy=Math.Max(12,dockY);
             double popupWidth=Math.Max(1,Math.Min(400,screenWidth-24)),cover=largeCover?Math.Max(0,Math.Min(288,Math.Min(popupWidth-56,cy-(modern?198:168)))):0;if(cover<120)cover=0;
             double popupHeight=cover>0?cover+(modern?178:148):Math.Min(modern?130:188,Math.Max(100,cy-20)),width=expanded?popupWidth:compact,height=expanded?popupHeight:44,y=expanded?Math.Max(12,cy-8-height):cy;
-            return new NowBarLayout {Bounds=new Rect(12,y,width,height),CompactY=cy,CompactWidth=compact,Raised=false,PosterEdge=cover,PopupHeight=popupHeight};
+            double left=edge==0?80:12;if(edge==1)y=screenHeight-y-height;if(DockGeometry.Vertical(edge))width=Math.Min(width,Math.Max(1,screenWidth-92));
+            return new NowBarLayout {Bounds=new Rect(left,y,width,height),CompactY=cy,CompactWidth=compact,Raised=false,PosterEdge=cover,PopupHeight=popupHeight};
         }
         internal static void Check()
         {
