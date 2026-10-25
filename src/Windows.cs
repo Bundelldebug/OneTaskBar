@@ -265,7 +265,7 @@ namespace OneTaskBar
             if(generation>0)quickAccess.ToolTip="Wi-Fi "+generation+" · "+quickAccess.ToolTip;
             if(Battery.ActualWidth>0){double right=Battery.TranslatePoint(new Point(Battery.ActualWidth,0),Status.Surface).X;Battery.ExpandedWidth=Math.Max(Battery.ActualWidth,Math.Min(164,right-12));}
         }
-        void RefreshMedia(){if(MediaBar!=null){double start=DockGeometry.Vertical(Edge)?Screen.Bounds.Width/Scale-(Edge==2?80:12):currentStartX,y=DockGeometry.Vertical(Edge)?Screen.Bounds.Height/Scale-56:currentY;y+=(1-reveal)*8;MediaBar.ConstrainDock(start,y);MediaBar.Update(controller.Services.Media,Scale,start,y,(visible||visibilityTimer.IsEnabled)&&controller.Desktop&&controller.DisplayAwake&&start-24>=44);MediaBar.Opacity=reveal;Native.BlurOpacity(MediaBar,reveal);}}
+        void RefreshMedia(){if(MediaBar!=null){double start=currentStartX,y=DockGeometry.Vertical(Edge)?Math.Max(12,currentStartX-56):currentY;y+=(1-reveal)*8;MediaBar.ConstrainDock(start,y);MediaBar.Update(controller.Services.Media,Scale,start,y,(visible||visibilityTimer.IsEnabled)&&controller.Desktop&&controller.DisplayAwake&&start-24>=44);MediaBar.Opacity=reveal;Native.BlurOpacity(MediaBar,reveal);}}
         internal Point BatteryCenter()
         {
             var p=Battery.PointToScreen(new Point(Battery.ActualWidth/2,Battery.ActualHeight/2)); return p;

@@ -19,7 +19,7 @@ namespace OneTaskBar
         // Black tint over the live host backdrop keeps background color without a milky layer.
         static readonly Brush legacyGlass=LightPanel.Tint("#A0000000","#94000000","#9E000000"),legacyCard=Paint.Brush("#18FFFFFF");
         internal static Brush Glass {get{return Glass95.Enabled?Glass95.Surface:PanelMaterial.Surface(Glass95.Dark,false);}}
-        internal static Brush Card {get{return Glass95.Enabled?Glass95.Card:PanelMaterial.Light?PanelMaterial.LightCard:legacyCard;}}
+        internal static Brush Card {get{return PanelMaterial.ProtectContrast?PanelMaterial.ReadableCard(Glass95.Dark):Glass95.Enabled?Glass95.Card:PanelMaterial.Light?PanelMaterial.LightCard:legacyCard;}}
         internal const string Inactive="#2A000000";
     }
     internal static class GrayPanel
@@ -328,14 +328,15 @@ namespace OneTaskBar
             bool enabled=HasBlur&&Preferences.Current.Blur&&!(DockSurface&&Preferences.Current.DockSolidBackground)&&(!Glass95.Enabled||Glass95.Transparent);Native.EnableBlur(this,enabled);
             if(Glass95.Enabled&&!OpaqueSurface&&!(DockSurface&&Preferences.Current.DockSolidBackground)){
                 if(glassEdge==null||edgeDark!=Dark){edgeDark=Dark;glassEdge=Glass95.Edge(edgeDark);}Surface.BorderBrush=this is NowBar?(Brush)Brushes.Transparent:glassEdge;Surface.BorderThickness=new Thickness(0);
-                Surface.Background=this is NowBar?(enabled?glassTint:solidTint??Glass95.Solid):enabled?PanelMaterial.Surface(Dark,true):Paint.Brush(Dark?"#FF242832":"#FFF1F4FA");
+                Surface.Background=this is NowBar?(enabled?glassTint:solidTint??Glass95.Solid):enabled?PanelMaterial.ReadableSurface(Dark,true,DockSurface||this is StartWindow||this is DrawerWindow||this is CalendarWindow):Paint.Brush(Dark?"#FF242832":"#FFF1F4FA");
             }else{
                 if(glassEdge!=null){glassEdge=null;Surface.BorderBrush=DockSurface?Brushes.Transparent:Paint.Brush("#38FFFFFF");Surface.BorderThickness=new Thickness(DockSurface?0:.7);}
                 bool panel=this is QuickWindow||this is NotificationWindow||this is DetailWindow||this is CalendarWindow||this is StartWindow||this is SearchWindow||this is DrawerWindow;
-                if(DockSurface)Surface.Background=enabled?LightPanel.DockGlass:Dark?Paint.Brush("#FF29302D"):LightPanel.DockSolid;
-                else if(panel){Dark=Glass95.Dark;Surface.Background=enabled?QuickPanel.Glass:PanelMaterial.Light?PanelMaterial.LightSolid:Paint.Brush("#FF29302D");}
+                if(DockSurface)Surface.Background=enabled?(PanelMaterial.ProtectContrast?PanelMaterial.ReadableCard(Dark):LightPanel.DockGlass):Dark?Paint.Brush("#FF29302D"):LightPanel.DockSolid;
+                else if(panel){Dark=Glass95.Dark;Surface.Background=enabled?PanelMaterial.ReadableSurface(Dark,false,this is StartWindow||this is DrawerWindow||this is CalendarWindow):PanelMaterial.Light?PanelMaterial.LightSolid:Paint.Brush("#FF29302D");}
                 else Surface.Background=enabled?glassTint:solidTint??Paint.Brush(Dark?"#FF344139":"#FFE0E5E2");
             }
+            if(!OpaqueSurface&&!(this is NowBar)&&!DockSurface)PanelMaterial.RefreshCards(Surface);
         }
         internal void RefreshGlassMaterial(){ApplyMaterial();if(DockSurface)Glass95.DockInk(Surface);else Glass95.RefreshColors(Surface);}
         internal void MoveGlassHighlight(Point point)
