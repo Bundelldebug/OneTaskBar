@@ -106,7 +106,7 @@ namespace OneTaskBar
         {
             var popup=Popup;Popup=null;expiry.Stop();if(popup==null)return;if(animate)await popup.Disappear();if(!popup.ClosedFlag)popup.Close();
         }
-        void Stop(){generation++;baseline=false;tracker.Clear();devices.Clear();ConnectedCaption=null;var current=watcher;watcher=null;if(current==null)return;current.Added-=Added;current.Updated-=Updated;current.Removed-=Removed;current.EnumerationCompleted-=Complete;current.Stopped-=Stopped;try{if(current.Status==DeviceWatcherStatus.Started||current.Status==DeviceWatcherStatus.EnumerationCompleted)current.Stop();}catch{}}
+        void Stop(){generation++;baseline=false;tracker.Clear();devices.Clear();ConnectedCaption=null;HasConnectedBuds=false;BudsCaption=null;var current=watcher;watcher=null;if(current==null)return;current.Added-=Added;current.Updated-=Updated;current.Removed-=Removed;current.EnumerationCompleted-=Complete;current.Stopped-=Stopped;try{if(current.Status==DeviceWatcherStatus.Started||current.Status==DeviceWatcherStatus.EnumerationCompleted)current.Stop();}catch{}}
         public void Dispose(){if(disposed)return;disposed=true;Stop();Hide(false);}
     }
 }

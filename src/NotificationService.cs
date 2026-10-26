@@ -32,7 +32,9 @@ namespace OneTaskBar
         internal int SnapshotReads;internal bool Interactive;internal Action Updated;internal Action<List<NotificationEntry>> SnapshotReady;
         internal Func<List<AppEntry>> AppCatalog;List<AppEntry> iconCatalog;
         void Changed(UserNotificationListener sender,UserNotificationChangedEventArgs args){Interlocked.Exchange(ref dirty,1);var updated=Updated;if(!disposed&&updated!=null)updated();}
-        public void Dispose(){disposed=true;if(subscribed&&listener!=null)try{listener.NotificationChanged-=Changed;}catch{}subscribed=false;}
+        public void Dispose(){disposed=true;if(subscribed&&listener!=null)try{listener.NotificationChanged-=Changed;}catch{}subscribed=false;ClearSnapshot();iconCatalog=null;AppCatalog=null;Updated=null;SnapshotReady=null;}
+        void ClearSnapshot(){Items.Clear();icons.Clear();activators.Clear();assetReads.Clear();}
+        internal static void TrimCache<T>(Dictionary<string,T> cache,HashSet<string> activeApps){foreach(var key in cache.Keys.Where(k=>!activeApps.Contains(k)).ToArray())cache.Remove(key);}
         internal void Invalidate(){Interlocked.Exchange(ref dirty,1);}
         internal void Check()
         {
@@ -51,10 +53,10 @@ namespace OneTaskBar
         {
             var app=System.Windows.Application.Current;
             if(app!=null&&!app.Dispatcher.CheckAccess()) {if(app.Dispatcher.HasShutdownStarted)return;await app.Dispatcher.InvokeAsync(new Func<Task>(Refresh)).Task.Unwrap();return;}
-            if(reading||disposed)return;if(Interlocked.Exchange(ref dirty,0)==0&&DateTime.UtcNow<nextRead)return;nextRead=DateTime.UtcNow.AddSeconds(Interactive?3:30);Check();if(!Allowed){if(Items.Count>0)Items=new List<NotificationEntry>();return;}reading=true;
+            if(reading||disposed)return;if(Interlocked.Exchange(ref dirty,0)==0&&DateTime.UtcNow<nextRead)return;nextRead=DateTime.UtcNow.AddSeconds(Interactive?3:30);Check();if(!Allowed){ClearSnapshot();return;}reading=true;
             try {
-                var entries=await SystemServices.Wait(listener.GetNotificationsAsync(NotificationKinds.Toast));SnapshotReads++;
-                if(!Preferences.Current.NotificationIntegration||listener.GetAccessStatus()!=UserNotificationListenerAccessStatus.Allowed){Allowed=false;Items=new List<NotificationEntry>();return;}
+                var entries=await SystemServices.Wait(listener.GetNotificationsAsync(NotificationKinds.Toast));if(disposed)return;SnapshotReads++;
+                if(!Preferences.Current.NotificationIntegration||listener.GetAccessStatus()!=UserNotificationListenerAccessStatus.Allowed){Allowed=false;ClearSnapshot();return;}
                 var result=new List<NotificationEntry>();var catalog=AppCatalog!=null?AppCatalog():new List<AppEntry>();if(iconCatalog!=catalog){foreach(var key in icons.Where(p=>p.Value==null).Select(p=>p.Key).ToArray())icons.Remove(key);iconCatalog=catalog;}
                 foreach(var item in entries) {
                     try {
@@ -70,7 +72,8 @@ namespace OneTaskBar
                     result.Add(new NotificationEntry {Id=item.Id,App=item.AppInfo.DisplayInfo.DisplayName,AppId=appId,Icon=overrideIcon??icon,Artwork=artwork,Created=item.CreationTime,Title=text.FirstOrDefault()??"알림",Body=String.Join("\n",text.Skip(1)),Payload=payload,Activator=activator,NativeWindow=previous!=null?previous.NativeWindow:IntPtr.Zero,NativeSignature=previous!=null?previous.NativeSignature:null});
                     }catch(Exception error){AppLog.Once("notification-item",error.Message);}
                 }
-                Items=result.OrderByDescending(n=>n.Created).ToList();
+                if(disposed){ClearSnapshot();return;}
+                Items=result.OrderByDescending(n=>n.Created).ToList();var activeApps=new HashSet<string>(Items.Select(n=>n.AppId),StringComparer.OrdinalIgnoreCase);TrimCache(icons,activeApps);TrimCache(activators,activeApps);
                 var assetKeys=new HashSet<string>(Items.Select(n=>n.AppId+"|"+n.Id+"|"+n.Created.UtcDateTime.Ticks),StringComparer.Ordinal);foreach(var key in assetReads.Keys.Where(k=>!assetKeys.Contains(k)).ToArray())assetReads.Remove(key);
                 var ready=SnapshotReady;if(!disposed&&ready!=null)ready(Items);
             }catch(Exception e){Allowed=false;AppLog.Once("notification-read",e.Message);Status="Windows 알림을 읽지 못했습니다";}finally{reading=false;}

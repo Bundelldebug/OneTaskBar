@@ -9,136 +9,482 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 namespace OneTaskBar
 {
-    internal sealed class QuickWidgetTile : Grid
+    internal sealed partial class QuickGridSurface
     {
-        internal readonly Glyph Icon;
-        internal readonly QuickToggleButton Toggle;
-        readonly Button main;
-        readonly StackPanel words;
-        readonly TextBlock name,caption;
-        readonly bool hasDetail;
-        QuickWidgetSlot slot;
-        internal QuickWidgetTile(string icon,string title,Action action,Action iconAction=null)
+        readonly SmoothScrollViewer actionScroll=new SmoothScrollViewer
         {
-            hasDetail=iconAction!=null;main=Paint.Button(new Border(),action,title);main.Background=Brushes.Transparent;main.Padding=new Thickness(0);main.HorizontalContentAlignment=HorizontalAlignment.Stretch;main.VerticalContentAlignment=VerticalAlignment.Stretch;Children.Add(main);
-            Icon=new Glyph(icon,25);Toggle=(QuickToggleButton)Paint.Button(Icon,iconAction??action,title,true);Toggle.Padding=new Thickness(0);Toggle.Resources["ButtonRadius"]=new CornerRadius(40);Toggle.RefreshState(false,true);Children.Add(Toggle);
-            if(hasDetail){var menu=new ContextMenu();var detail=new MenuItem {Header=title+" 연결 관리"};detail.Click+=(s,e)=>action();menu.Items.Add(detail);ContextMenu=menu;AutomationProperties.SetHelpText(Toggle,"켜기·끄기. 오른쪽 클릭 또는 Shift+F10으로 연결 관리를 엽니다.");}
-            name=Paint.TextBlock(title,13,Paint.Text);name.FontWeight=FontWeights.SemiBold;caption=Paint.TextBlock("",10.5,Paint.Muted);caption.Visibility=Visibility.Collapsed;name.TextTrimming=caption.TextTrimming=TextTrimming.CharacterEllipsis;words=new StackPanel {IsHitTestVisible=false,VerticalAlignment=VerticalAlignment.Center};words.Children.Add(name);words.Children.Add(caption);Children.Add(words);SizeChanged+=(s,e)=>Place();
-        }
-        internal string Caption {get{return caption.Text;}}
-        internal string Title {get{return name.Text;}}
-        internal TextBlock NameLabel {get{return name;}}
-        internal bool CaptionVisible {get{return caption.Visibility==Visibility.Visible;}}
-        internal void Text(string title,string subtitle){name.Text=title;caption.Text=subtitle??"";caption.Visibility=String.IsNullOrWhiteSpace(subtitle)?Visibility.Collapsed:Visibility.Visible;main.ToolTip=title+(String.IsNullOrWhiteSpace(subtitle)?"":" · "+subtitle);Toggle.ToolTip=hasDetail?main.ToolTip+" · 오른쪽 클릭: 연결 관리":main.ToolTip;AutomationProperties.SetName(main,title);}
-        internal void State(bool enabled,bool available){Toggle.RefreshState(enabled,available);main.IsEnabled=available;main.Opacity=available?1:.45;}
-        internal void Shape(QuickWidgetSlot value){slot=value.Copy();Place();}
-        void Place()
+            VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,VerticalContentAlignment=VerticalAlignment.Stretch
+        };
+        internal ScrollViewer ActionScroller
         {
-            if(slot==null)return;bool solo=slot.Columns==1&&slot.Rows==1,tall=slot.Rows>1;double size=solo?Math.Max(28,Math.Min(ActualWidth,ActualHeight)-2):Math.Min(42,Math.Max(28,Math.Min(ActualWidth-12,ActualHeight-10)));Toggle.Width=Toggle.Height=size;Toggle.HorizontalAlignment=solo?HorizontalAlignment.Center:HorizontalAlignment.Left;Toggle.VerticalAlignment=tall?VerticalAlignment.Top:VerticalAlignment.Center;Toggle.Margin=solo?new Thickness(0):new Thickness(tall?5:7,tall?7:0,0,0);Icon.Width=Icon.Height=solo?25:22;
-            words.Visibility=solo?Visibility.Collapsed:Visibility.Visible;words.VerticalAlignment=tall?VerticalAlignment.Bottom:VerticalAlignment.Center;words.Margin=tall?new Thickness(10,0,10,14):new Thickness(size+18,0,8,0);name.TextAlignment=caption.TextAlignment=tall?TextAlignment.Right:TextAlignment.Left;
+            get
+            {
+                return actionScroll;
+            }
         }
-    }
-    internal sealed class QuickGridSurface
-    {
-        readonly SmoothScrollViewer actionScroll=new SmoothScrollViewer {VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,VerticalContentAlignment=VerticalAlignment.Stretch};
-        internal ScrollViewer ActionScroller {get{return actionScroll;}}
-        readonly QuickWindow host;readonly ShellController shell;
+        readonly QuickWindow host;
+        readonly ShellController shell;
         internal readonly QuickWidgetBoard Board;
         internal readonly QuickToggleOrder ActionOrder=new QuickToggleOrder(Path.Combine(AppLog.Data,"quick-toggle-order-9.json"));
-        internal readonly DockPanel Root=new DockPanel {Margin=new Thickness(18,19,18,14)};
-        internal readonly PillSlider Brightness=new PillSlider("brightness") {Height=Double.NaN,MinWidth=0,Light=true,NoTrackBorder=true,LinearFill=true},Volume=new PillSlider("volume") {Height=Double.NaN,MinWidth=0,Light=true,NoTrackBorder=true,LinearFill=true};
+        internal readonly DockPanel Root=new DockPanel
+        {
+            Margin=new Thickness(18,19,18,14)
+        };
+        internal readonly PillSlider Brightness=new PillSlider("brightness")
+        {
+            Height=Double.NaN,MinWidth=0,Light=true,NoTrackBorder=true,LinearFill=true
+        },Volume=new PillSlider("volume")
+        {
+            Height=Double.NaN,MinWidth=0,Light=true,NoTrackBorder=true,LinearFill=true
+        };
         internal readonly Dictionary<string,QuickToggleButton> Toggles=new Dictionary<string,QuickToggleButton>();
         readonly Dictionary<string,QuickWidgetTile> tiles=new Dictionary<string,QuickWidgetTile>();
-        readonly BatteryPill battery=new BatteryPill {Width=62,Height=25};
+        readonly BatteryPill battery=new BatteryPill
+        {
+            Width=62,Height=25
+        };
         readonly TextBlock time=Paint.TextBlock("",23,Paint.Text),date=Paint.TextBlock("",11,Paint.Muted),notice=Paint.TextBlock("",11,Paint.Muted);
-        readonly Button batteryButton,samsung;internal readonly Button EditButton;
-        readonly Border hint;readonly Button groupMore;
-        readonly Border groupBar=new Border {Width=27,Height=2.5,CornerRadius=new CornerRadius(1.25),Background=Paint.Brush("#88FFFFFF")};
+        readonly Button batteryButton,samsung;
+        internal readonly Button EditButton;
+        readonly Border hint;
+        readonly Button groupMore;
+        readonly Border groupBar=new Border
+        {
+            Width=27,Height=2.5,CornerRadius=new CornerRadius(1.25),Background=Paint.Brush("#88FFFFFF")
+        };
         readonly TextBlock groupBack=Paint.TextBlock("크기 조절로 돌아가기",11,Paint.Text);
         readonly UniformGrid actionGrid=new UniformGrid();
         readonly List<StackPanel> actionItems=new List<StackPanel>();
         readonly Dictionary<string,ContextMenu> insideMenus=new Dictionary<string,ContextMenu>(),outsideMenus=new Dictionary<string,ContextMenu>();
         readonly TextBlock emptyActions=Paint.TextBlock("단독 토글에서 ‘그룹에 넣기’를 선택하세요",11,Paint.Muted);
         readonly MediaPlayerView media;
-        readonly Grid mediaBody=new Grid(),miniMedia=new Grid();readonly Border richMedia;
-        readonly Border mediaGlow=new Border {IsHitTestVisible=false};
-        readonly Border miniArt=new Border {Width=36,Height=36,CornerRadius=new CornerRadius(10)};
+        readonly Grid mediaBody=new Grid(),miniMedia=new Grid();
+        readonly Border richMedia;
+        readonly Border mediaGlow=new Border
+        {
+            IsHitTestVisible=false
+        };
+        readonly Border miniArt=new Border
+        {
+            Width=36,Height=36,CornerRadius=new CornerRadius(10)
+        };
         readonly Button miniArtwork,miniPlay,miniOutput;
         readonly Glyph miniPlayGlyph=new Glyph("play",22);
         readonly Glyph missingArt=new Glyph("volume",22);
         readonly TextBlock miniTitle=Paint.TextBlock("재생 중인 미디어 없음",12,Paint.Text);
-        ContextMenu addMenu;bool closed,budsRequested,miniArtReady,presentedExpanded,presentedContents,mediaIdle;ImageSource budsSymbol,samsungIcon,miniArtSource;string samsungKey;long clock=-1,day=-1;int mediaColumns=4,mediaRows=2,presentedColumns,presentedRows;
-        internal string BluetoothCaption {get{return tiles["bluetooth"].Caption;}}
-        internal string DevicesLabel {get{return tiles["devices"].Title;}}
-        internal bool BudsIconLoaded {get{return tiles["buds"].Icon.HasDeviceIcon;}}
-        internal bool SamsungIconLoaded {get{return samsungIcon!=null;}}
-        internal bool MediaBudsIcon {get{return media.OutputBudsIcon;}}
-        internal bool MediaBackdropVisible {get{return mediaGlow.Visibility==Visibility.Visible&&mediaGlow.Background!=null;}}
-        internal bool MediaPosterVisible {get{return media.LargeCoverVisible;}}
-        internal bool MediaControlsFit {get{return media.PlayButton.ActualWidth+media.PlayButton.Margin.Left+media.PlayButton.Margin.Right+media.PreviousButton.ActualWidth+media.NextButton.ActualWidth<=Math.Max(0,media.ActualWidth)+.5;}}
-        internal bool Expanded {get{return Board.Expanded;}}
-        internal int VisibleActions {get{return actionItems.Count(i=>i.Visibility==Visibility.Visible);}}
-        internal string[] VisibleActionKeys {get{return actionGrid.Children.OfType<StackPanel>().Select(i=>(string)i.Tag).ToArray();}}
-        internal FrameworkElement ActionItem(string key){return actionItems.First(i=>(string)i.Tag==key);}
+        ContextMenu addMenu;
+        bool closed,budsRequested,miniArtReady,presentedExpanded,presentedContents,mediaIdle;
+        ImageSource budsSymbol,samsungIcon,miniArtSource;
+        string samsungKey;
+        long clock=-1,day=-1;
+        int mediaColumns=4,mediaRows=2,presentedColumns,presentedRows;
+        internal string BluetoothCaption
+        {
+            get
+            {
+                return tiles["bluetooth"].Caption;
+            }
+        }
+        internal string DevicesLabel
+        {
+            get
+            {
+                return tiles["devices"].Title;
+            }
+        }
+        internal bool BudsIconLoaded
+        {
+            get
+            {
+                return tiles["buds"].Icon.HasDeviceIcon;
+            }
+        }
+        internal bool SamsungIconLoaded
+        {
+            get
+            {
+                return samsungIcon!=null;
+            }
+        }
+        internal bool MediaBudsIcon
+        {
+            get
+            {
+                return media.OutputBudsIcon;
+            }
+        }
+        internal bool MediaBackdropVisible
+        {
+            get
+            {
+                return mediaGlow.Visibility==Visibility.Visible&&mediaGlow.Background!=null;
+            }
+        }
+        internal bool MediaPosterVisible
+        {
+            get
+            {
+                return media.LargeCoverVisible;
+            }
+        }
+        internal bool MediaControlsFit
+        {
+            get
+            {
+                return media.PlayButton.ActualWidth+media.PlayButton.Margin.Left+media.PlayButton.Margin.Right+media.PreviousButton.ActualWidth+media.NextButton.ActualWidth<=Math.Max(0,media.ActualWidth)+.5;
+            }
+        }
+        internal bool Expanded
+        {
+            get
+            {
+                return Board.Expanded;
+            }
+        }
+        internal int VisibleActions
+        {
+            get
+            {
+                return actionItems.Count(i=>i.Visibility==Visibility.Visible);
+            }
+        }
+        internal string[] VisibleActionKeys
+        {
+            get
+            {
+                return actionGrid.Children.OfType<StackPanel>().Select(i=>(string)i.Tag).ToArray();
+            }
+        }
+        internal FrameworkElement ActionItem(string key)
+        {
+            return actionItems.First(i=>(string)i.Tag==key);
+        }
         internal QuickGridSurface(QuickWindow window,ShellController controller)
         {
-            host=window;shell=controller;Board=new QuickWidgetBoard(new QuickWidgetLayout(Path.Combine(AppLog.Data,"quick-layout-9.json")));Board.Changed+=()=>Feedback("배치를 저장하지 못했습니다. 다시 시도해 주세요.");Board.EditContents=()=>EditActions(true);
-            var header=new Grid {Height=47,Margin=new Thickness(4,0,2,12)};var clockText=new StackPanel();time.FontWeight=FontWeights.SemiBold;clockText.Children.Add(time);clockText.Children.Add(date);var calendar=Paint.Button(clockText,()=>shell.ToggleCalendar(host),"달력 열기");calendar.Background=Brushes.Transparent;calendar.Padding=new Thickness(0);calendar.HorizontalAlignment=HorizontalAlignment.Left;header.Children.Add(calendar);var tools=new StackPanel {Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Center};
-            samsung=Tool("settings","삼성 설정",shell.OpenSamsungSettings);tools.Children.Add(samsung);var power=Tool("power","전원",()=>{});power.Click+=(s,e)=>host.BuildPowerMenu(power).IsOpen=true;tools.Children.Add(power);tools.Children.Add(Tool("home","One TaskBar 설정",shell.OpenHomeSettings));header.Children.Add(tools);DockPanel.SetDock(header,Dock.Top);Root.Children.Add(header);
-            var footer=new Grid {Height=31,Margin=new Thickness(3,9,3,0)};batteryButton=Paint.Button(battery,()=>shell.ShowDetail("power"),"배터리 및 전원");batteryButton.Background=Brushes.Transparent;batteryButton.Padding=new Thickness(0);batteryButton.HorizontalAlignment=HorizontalAlignment.Left;footer.Children.Add(batteryButton);EditButton=Paint.Action("배치 편집",()=>SetEditing(!Board.Editing));EditButton.HorizontalAlignment=HorizontalAlignment.Center;EditButton.Padding=new Thickness(10,3,10,3);((TextBlock)EditButton.Content).FontSize=11;footer.Children.Add(EditButton);var notifications=Paint.Action("알림  ›",()=>shell.ToggleNotifications(null));notifications.HorizontalAlignment=HorizontalAlignment.Right;notifications.Background=Brushes.Transparent;notifications.Padding=new Thickness(8,3,0,3);footer.Children.Add(notifications);DockPanel.SetDock(footer,Dock.Bottom);Root.Children.Add(footer);
-            var scrolled=new DockPanel();notice.TextWrapping=TextWrapping.Wrap;notice.Visibility=Visibility.Collapsed;notice.Margin=new Thickness(4,3,4,9);DockPanel.SetDock(notice,Dock.Top);scrolled.Children.Add(notice);
-            var editor=new StackPanel {Margin=new Thickness(3,2,3,10)};var instructions=Paint.TextBlock("메뉴 드래그 · 모서리로 크기 조절 · 기능 토글 안의 편집",10.5,Paint.Muted);instructions.TextWrapping=TextWrapping.Wrap;editor.Children.Add(instructions);var editTools=new StackPanel {Orientation=Orientation.Horizontal,Margin=new Thickness(0,6,0,0)};editTools.Children.Add(Paint.Action("항목 추가",ShowAdd));var reset=Paint.Action("배치 초기화",()=>{if(Board.ContentsEditing)EditActions(false);Board.Reset();});reset.Margin=new Thickness(6,0,0,0);editTools.Children.Add(reset);editor.Children.Add(editTools);hint=new Border {Child=editor,Visibility=Visibility.Collapsed};DockPanel.SetDock(hint,Dock.Top);scrolled.Children.Add(hint);
-            var viewer=new SmoothScrollViewer {Content=Board,VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,CanContentScroll=false};Board.Scroller=viewer;scrolled.Children.Add(viewer);Root.Children.Add(scrolled);
-            AddTile("wifi","wifi","Wi-Fi",()=>shell.ShowDetail("wifi"),()=>host.InvokeToggle("wifi"));AddTile("bluetooth","bluetooth","블루투스",()=>shell.ShowDetail("bluetooth"),()=>host.InvokeToggle("bluetooth"));
-            AddTile("theme","moon","다크 모드",()=>host.InvokeToggle("theme"));AddTile("mute","volume","음소거",()=>host.InvokeToggle("mute"));
-            AddTile("devices","devices","주변 기기 연결",()=>shell.OpenQuickDevices(false));AddTile("buds","bluetooth","Galaxy Buds",()=>shell.OpenQuickDevices(true));AddTile("windows","windows-settings","Windows 설정",shell.OpenWindowsSettings);AddTile("capture","screenshot","화면 캡처",shell.OpenScreenCapture);AddTile("manager","task-manager","작업 관리자",shell.OpenTaskManager);
-            foreach(var spec in new[]{new[]{"dnd","dnd","방해 금지"},new[]{"efficiency","leaf","전력 절약"},new[]{"awake","window","화면 유지"},new[]{"animations","play","독 애니메이션"},new[]{"startup","startup","자동 실행"},new[]{"slider-scroll","scroll","스크롤 조절"}}){string key=spec[0];AddTile(key,spec[1],spec[2],()=>host.InvokeToggle(key));}
-            foreach(var setting in QuickSettingCatalog.All){var spec=setting;AddTile(spec.Key,spec.Icon,spec.Title,()=>host.InvokeToggle(spec.Key));}
-            var grouped=new Grid();actionScroll.Content=actionGrid;grouped.Children.Add(actionScroll);emptyActions.TextWrapping=TextWrapping.Wrap;emptyActions.HorizontalAlignment=HorizontalAlignment.Center;emptyActions.VerticalAlignment=VerticalAlignment.Center;emptyActions.Margin=new Thickness(10);emptyActions.Visibility=Visibility.Collapsed;grouped.Children.Add(emptyActions);groupMore=Paint.Button(groupBar,()=>{if(Board.ContentsEditing)EditActions(false);else ExpandToggles(!Expanded);},"기능 토글 펼치기");groupMore.Width=52;groupMore.Height=13;groupMore.Padding=new Thickness(0);groupMore.Background=Brushes.Transparent;groupMore.HorizontalAlignment=HorizontalAlignment.Center;groupMore.VerticalAlignment=VerticalAlignment.Bottom;grouped.Children.Add(groupMore);actionGrid.SizeChanged+=(s,e)=>SizeActions();
-            foreach(var item in QuickActionCatalog.Specs){string key=item[0];var content=new StackPanel {VerticalAlignment=VerticalAlignment.Center,Tag=key,Background=Brushes.Transparent,FocusVisualStyle=null};var button=(QuickToggleButton)Paint.Button(new Glyph(item[1],24),()=>host.InvokeToggle(key),item[2],true);button.Width=button.Height=48;button.Padding=new Thickness(0);button.HorizontalAlignment=HorizontalAlignment.Center;button.Resources["ButtonRadius"]=new CornerRadius(24);Toggles[key]=button;content.Children.Add(button);var label=Paint.TextBlock(item[2],11,Paint.Muted);label.HorizontalAlignment=HorizontalAlignment.Center;label.TextTrimming=TextTrimming.CharacterEllipsis;content.Children.Add(label);actionItems.Add(content);DragReorder.Attach(content,content,"quick9.actions",key,Orientation.Horizontal,()=>Board.ContentsEditing,(source,target,after)=>MoveAction(source,target,after));content.KeyDown+=(s,e)=>{if(!Board.ContentsEditing)return;int delta=e.Key==System.Windows.Input.Key.Left?-1:e.Key==System.Windows.Input.Key.Right?1:e.Key==System.Windows.Input.Key.Up?-4:e.Key==System.Windows.Input.Key.Down?4:0;if(delta==0)return;var members=ActionOrder.Members;int index=Array.IndexOf(members,key),next=Math.Max(0,Math.Min(members.Length-1,index+delta));if(index>=0&&next!=index)MoveAction(key,members[next],delta>0);e.Handled=true;};AutomationProperties.SetName(content,item[2]+" 순서 변경");AutomationProperties.SetHelpText(content,"드래그 또는 방향키로 순서를 변경합니다.");}
+            host=window;
+            shell=controller;
+            Board=new QuickWidgetBoard(new QuickWidgetLayout(Path.Combine(AppLog.Data,"quick-layout-9.json")));
+            Board.Changed+=()=>Feedback("배치를 저장하지 못했습니다. 다시 시도해 주세요.");
+            Board.EditContents=()=>EditActions(true);
+            var header=new Grid
+            {
+                Height=47,Margin=new Thickness(4,0,2,12)
+            };
+            var clockText=new StackPanel();
+            time.FontWeight=FontWeights.SemiBold;
+            clockText.Children.Add(time);
+            clockText.Children.Add(date);
+            var calendar=Paint.Button(clockText,()=>shell.ToggleCalendar(host),"달력 열기");
+            calendar.Background=Brushes.Transparent;
+            calendar.Padding=new Thickness(0);
+            calendar.HorizontalAlignment=HorizontalAlignment.Left;
+            header.Children.Add(calendar);
+            var tools=new StackPanel
+            {
+                Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Center
+            };
+            samsung=Tool("settings","삼성 설정",shell.OpenSamsungSettings);
+            tools.Children.Add(samsung);
+            var power=Tool("power","전원",()=>
+            {
+            });
+            power.Click+=(s,e)=>host.BuildPowerMenu(power).IsOpen=true;
+            tools.Children.Add(power);
+            tools.Children.Add(Tool("home","One TaskBar 설정",shell.OpenHomeSettings));
+            header.Children.Add(tools);
+            DockPanel.SetDock(header,Dock.Top);
+            Root.Children.Add(header);
+            var footer=new Grid
+            {
+                Height=31,Margin=new Thickness(3,9,3,0)
+            };
+            batteryButton=Paint.Button(battery,()=>shell.ShowDetail("power"),"배터리 및 전원");
+            batteryButton.Background=Brushes.Transparent;
+            batteryButton.Padding=new Thickness(0);
+            batteryButton.HorizontalAlignment=HorizontalAlignment.Left;
+            footer.Children.Add(batteryButton);
+            EditButton=Paint.Action("배치 편집",()=>SetEditing(!Board.Editing));
+            EditButton.HorizontalAlignment=HorizontalAlignment.Center;
+            EditButton.Padding=new Thickness(10,3,10,3);
+            ((TextBlock)EditButton.Content).FontSize=11;
+            footer.Children.Add(EditButton);
+            var notifications=Paint.Action("알림  ›",()=>shell.ToggleNotifications(null));
+            notifications.HorizontalAlignment=HorizontalAlignment.Right;
+            notifications.Background=Brushes.Transparent;
+            notifications.Padding=new Thickness(8,3,0,3);
+            footer.Children.Add(notifications);
+            DockPanel.SetDock(footer,Dock.Bottom);
+            Root.Children.Add(footer);
+            var scrolled=new DockPanel();
+            notice.TextWrapping=TextWrapping.Wrap;
+            notice.Visibility=Visibility.Collapsed;
+            notice.Margin=new Thickness(4,3,4,9);
+            DockPanel.SetDock(notice,Dock.Top);
+            scrolled.Children.Add(notice);
+            var editor=new StackPanel
+            {
+                Margin=new Thickness(3,2,3,10)
+            };
+            var instructions=Paint.TextBlock("메뉴 드래그 · 모서리로 크기 조절 · 기능 토글 안의 편집",10.5,Paint.Muted);
+            instructions.TextWrapping=TextWrapping.Wrap;
+            editor.Children.Add(instructions);
+            var editTools=new StackPanel
+            {
+                Orientation=Orientation.Horizontal,Margin=new Thickness(0,6,0,0)
+            };
+            editTools.Children.Add(Paint.Action("항목 추가",ShowAdd));
+            var reset=Paint.Action("배치 초기화",()=>
+            {
+                if(Board.ContentsEditing)EditActions(false);Board.Reset();
+            });
+            reset.Margin=new Thickness(6,0,0,0);
+            editTools.Children.Add(reset);
+            editor.Children.Add(editTools);
+            hint=new Border
+            {
+                Child=editor,Visibility=Visibility.Collapsed
+            };
+            DockPanel.SetDock(hint,Dock.Top);
+            scrolled.Children.Add(hint);
+            var viewer=new SmoothScrollViewer
+            {
+                Content=Board,VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,CanContentScroll=false
+            };
+            Board.Scroller=viewer;
+            scrolled.Children.Add(viewer);
+            Root.Children.Add(scrolled);
+            AddTile("wifi","wifi","Wi-Fi",()=>shell.ShowDetail("wifi"),()=>host.InvokeToggle("wifi"));
+            AddTile("bluetooth","bluetooth","블루투스",()=>shell.ShowDetail("bluetooth"),()=>host.InvokeToggle("bluetooth"));
+            AddTile("theme","moon","다크 모드",()=>host.InvokeToggle("theme"));
+            AddTile("mute","volume","음소거",()=>host.InvokeToggle("mute"));
+            AddTile("devices","devices","주변 기기 연결",()=>shell.OpenQuickDevices(false));
+            AddTile("buds","bluetooth","Galaxy Buds",()=>shell.OpenQuickDevices(true));
+            AddTile("windows","windows-settings","Windows 설정",shell.OpenWindowsSettings);
+            AddTile("capture","screenshot","화면 캡처",shell.OpenScreenCapture);
+            AddTile("manager","task-manager","작업 관리자",shell.OpenTaskManager);
+            foreach(var spec in new[]
+            {
+                new[]
+                {
+                    "dnd","dnd","방해 금지"
+                },new[]
+                {
+                    "efficiency","leaf","전력 절약"
+                },new[]
+                {
+                    "awake","window","화면 유지"
+                },new[]
+                {
+                    "animations","play","독 애니메이션"
+                },new[]
+                {
+                    "startup","startup","자동 실행"
+                },new[]
+                {
+                    "slider-scroll","scroll","스크롤 조절"
+                }
+            })
+            {
+                string key=spec[0];
+                AddTile(key,spec[1],spec[2],()=>host.InvokeToggle(key));
+            }
+            foreach(var setting in QuickSettingCatalog.All)
+            {
+                var spec=setting;
+                AddTile(spec.Key,spec.Icon,spec.Title,()=>host.InvokeToggle(spec.Key));
+            }
+            var grouped=new Grid();
+            actionScroll.Content=actionGrid;
+            grouped.Children.Add(actionScroll);
+            emptyActions.TextWrapping=TextWrapping.Wrap;
+            emptyActions.HorizontalAlignment=HorizontalAlignment.Center;
+            emptyActions.VerticalAlignment=VerticalAlignment.Center;
+            emptyActions.Margin=new Thickness(10);
+            emptyActions.Visibility=Visibility.Collapsed;
+            grouped.Children.Add(emptyActions);
+            groupMore=Paint.Button(groupBar,()=>
+            {
+                if(Board.ContentsEditing)EditActions(false);else ExpandToggles(!Expanded);
+            },"기능 토글 펼치기");
+            groupMore.Width=52;
+            groupMore.Height=13;
+            groupMore.Padding=new Thickness(0);
+            groupMore.Background=Brushes.Transparent;
+            groupMore.HorizontalAlignment=HorizontalAlignment.Center;
+            groupMore.VerticalAlignment=VerticalAlignment.Bottom;
+            grouped.Children.Add(groupMore);
+            actionGrid.SizeChanged+=(s,e)=>SizeActions();
+            foreach(var item in QuickActionCatalog.Specs)
+            {
+                string key=item[0];
+                var content=new StackPanel
+                {
+                    VerticalAlignment=VerticalAlignment.Center,Tag=key,Background=Brushes.Transparent,FocusVisualStyle=null
+                };
+                var button=(QuickToggleButton)Paint.Button(new Glyph(item[1],24),()=>host.InvokeToggle(key),item[2],true);
+                button.Width=button.Height=48;
+                button.Padding=new Thickness(0);
+                button.HorizontalAlignment=HorizontalAlignment.Center;
+                button.Resources["ButtonRadius"]=new CornerRadius(24);
+                Toggles[key]=button;
+                content.Children.Add(button);
+                var label=Paint.TextBlock(item[2],11,Paint.Muted);
+                label.HorizontalAlignment=HorizontalAlignment.Center;
+                label.TextTrimming=TextTrimming.CharacterEllipsis;
+                content.Children.Add(label);
+                actionItems.Add(content);
+                DragReorder.Attach(content,content,"quick9.actions",key,Orientation.Horizontal,()=>Board.ContentsEditing,(source,target,after)=>MoveAction(source,target,after));
+                content.KeyDown+=(s,e)=>
+                {
+                    if(!Board.ContentsEditing)return;
+                    int delta=e.Key==System.Windows.Input.Key.Left?-1:e.Key==System.Windows.Input.Key.Right?1:e.Key==System.Windows.Input.Key.Up?-4:e.Key==System.Windows.Input.Key.Down?4:0;
+                    if(delta==0)return;
+                    var members=ActionOrder.Members;
+                    int index=Array.IndexOf(members,key),next=Math.Max(0,Math.Min(members.Length-1,index+delta));
+                    if(index>=0&&next!=index)MoveAction(key,members[next],delta>0);
+                    e.Handled=true;
+                };
+                AutomationProperties.SetName(content,item[2]+" 순서 변경");
+                AutomationProperties.SetHelpText(content,"드래그 또는 방향키로 순서를 변경합니다.");
+            }
             Board.Add("toggles","기능 토글",grouped,PresentToggles);
-            Board.Add("brightness","밝기",Brightness,slot=>{Brightness.Vertical=slot.Rows>1;Brightness.InvalidateVisual();});Board.Add("volume","음량",Volume.WithOutputAction(()=>shell.ShowDetail("sound")),slot=>{Volume.Vertical=slot.Rows>1;Volume.InvalidateVisual();});Brightness.Changed+=shell.Bright;Volume.Changed+=shell.Volume;
-            media=new MediaPlayerView(shell.Media,shell.SeekMedia,()=>shell.ShowDetail("sound"),condensed:true,openApp:shell.OpenMediaApplication,dense:true,sourceApp:id=>MediaApplication.Resolve(id,shell.Running.Concat(shell.Apps)));media.HorizontalAlignment=HorizontalAlignment.Stretch;media.VerticalAlignment=VerticalAlignment.Center;mediaBody.Children.Add(mediaGlow);richMedia=new Border {Child=media};mediaBody.Children.Add(richMedia);media.PaletteChanged=palette=>{mediaGlow.Background=media.IsCompact?null:media.MediaBackground;mediaGlow.Visibility=media.IsCompact||shell.Services.Media==null||shell.Services.Media.Artwork==null?Visibility.Collapsed:Visibility.Visible;};mediaBody.SizeChanged+=(s,e)=>RefreshMediaLayout();
-            miniMedia.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(46)});miniMedia.ColumnDefinitions.Add(new ColumnDefinition());miniMedia.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(35)});miniMedia.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(28)});miniMedia.Margin=new Thickness(10,5,8,5);miniArtwork=Paint.Button(miniArt,()=>shell.OpenMediaApplication(shell.Services.Media.AppId),"현재 재생 앱 열기");miniArtwork.Padding=new Thickness(0);miniArtwork.Background=Brushes.Transparent;miniMedia.Children.Add(miniArtwork);miniTitle.TextTrimming=TextTrimming.CharacterEllipsis;miniTitle.VerticalAlignment=VerticalAlignment.Center;Grid.SetColumn(miniTitle,1);miniMedia.Children.Add(miniTitle);miniPlay=Paint.Button(miniPlayGlyph,()=>shell.Media("play"),"재생 · 일시 정지");miniPlay.Padding=new Thickness(0);miniPlay.Background=Brushes.Transparent;Grid.SetColumn(miniPlay,2);miniMedia.Children.Add(miniPlay);miniOutput=Tool("audio-output","출력 기기 변경",()=>shell.ShowDetail("sound"));Grid.SetColumn(miniOutput,3);miniMedia.Children.Add(miniOutput);mediaBody.Children.Add(miniMedia);
-            Board.Add("media","미디어 플레이어",mediaBody,slot=>{mediaColumns=slot.Columns;mediaRows=slot.Rows;MediaShape();});
-            foreach(string name in QuickToggleOrder.Defaults){string key=name;var inside=new ContextMenu();var extract=new MenuItem {Header="단독 토글로 빼기"};extract.Click+=(s,e)=>ExtractAction(key,null);inside.Items.Add(extract);insideMenus[key]=inside;var outside=new ContextMenu();var regroup=new MenuItem {Header="기능 토글 그룹에 넣기"};regroup.Click+=(s,e)=>RegroupAction(key);outside.Items.Add(regroup);outsideMenus[key]=outside;}
-            DragReorder.DropArea(Board,"quick9.actions",()=>Board.ContentsEditing,(key,point)=>{var frame=Board.Frames["toggles"];var start=frame.TranslatePoint(new Point(),Board);if(new Rect(start,new Size(frame.ActualWidth,frame.ActualHeight)).Contains(point))return false;return ExtractAction(key,point);});
-            host.IsVisibleChanged+=(s,e)=>{if(!host.IsVisible){Board.Cancel();ExpandToggles(false,false);SetEditing(false);CloseMenus();}};host.Closed+=(s,e)=>{closed=true;Board.Cancel();ExpandToggles(false,false);CloseMenus();mediaGlow.Background=null;};
+            Board.Add("brightness","밝기",Brightness,slot=>
+            {
+                Brightness.Vertical=slot.Rows>1;Brightness.InvalidateVisual();
+            });
+            Board.Add("volume","음량",Volume.WithOutputAction(()=>shell.ShowDetail("sound")),slot=>
+            {
+                Volume.Vertical=slot.Rows>1;Volume.InvalidateVisual();
+            });
+            Brightness.Changed+=shell.Bright;
+            Volume.Changed+=shell.Volume;
+            media=new MediaPlayerView(shell.Media,shell.SeekMedia,()=>shell.ShowDetail("sound"),condensed:true,openApp:shell.OpenMediaApplication,dense:true,sourceApp:id=>MediaApplication.Resolve(id,shell.Running.Concat(shell.Apps)));
+            media.HorizontalAlignment=HorizontalAlignment.Stretch;
+            media.VerticalAlignment=VerticalAlignment.Center;
+            mediaBody.Children.Add(mediaGlow);
+            richMedia=new Border
+            {
+                Child=media
+            };
+            mediaBody.Children.Add(richMedia);
+            media.PaletteChanged=palette=>
+            {
+                mediaGlow.Background=media.IsCompact?null:media.MediaBackground;
+                mediaGlow.Visibility=media.IsCompact||shell.Services.Media==null||shell.Services.Media.Artwork==null?Visibility.Collapsed:Visibility.Visible;
+            };
+            mediaBody.SizeChanged+=(s,e)=>RefreshMediaLayout();
+            miniMedia.ColumnDefinitions.Add(new ColumnDefinition
+            {
+                Width=new GridLength(46)
+            });
+            miniMedia.ColumnDefinitions.Add(new ColumnDefinition());
+            miniMedia.ColumnDefinitions.Add(new ColumnDefinition
+            {
+                Width=new GridLength(35)
+            });
+            miniMedia.ColumnDefinitions.Add(new ColumnDefinition
+            {
+                Width=new GridLength(28)
+            });
+            miniMedia.Margin=new Thickness(10,5,8,5);
+            miniArtwork=Paint.Button(miniArt,()=>shell.OpenMediaApplication(shell.Services.Media.AppId),"현재 재생 앱 열기");
+            miniArtwork.Padding=new Thickness(0);
+            miniArtwork.Background=Brushes.Transparent;
+            miniMedia.Children.Add(miniArtwork);
+            miniTitle.TextTrimming=TextTrimming.CharacterEllipsis;
+            miniTitle.VerticalAlignment=VerticalAlignment.Center;
+            Grid.SetColumn(miniTitle,1);
+            miniMedia.Children.Add(miniTitle);
+            miniPlay=Paint.Button(miniPlayGlyph,()=>shell.Media("play"),"재생 · 일시 정지");
+            miniPlay.Padding=new Thickness(0);
+            miniPlay.Background=Brushes.Transparent;
+            Grid.SetColumn(miniPlay,2);
+            miniMedia.Children.Add(miniPlay);
+            miniOutput=Tool("audio-output","출력 기기 변경",()=>shell.ShowDetail("sound"));
+            Grid.SetColumn(miniOutput,3);
+            miniMedia.Children.Add(miniOutput);
+            mediaBody.Children.Add(miniMedia);
+            Board.Add("media","미디어 플레이어",mediaBody,slot=>
+            {
+                mediaColumns=slot.Columns;mediaRows=slot.Rows;MediaShape();
+            });
+            foreach(string name in QuickToggleOrder.Defaults)
+            {
+                string key=name;
+                var inside=new ContextMenu();
+                var extract=new MenuItem
+                {
+                    Header="단독 토글로 빼기"
+                };
+                extract.Click+=(s,e)=>ExtractAction(key,null);
+                inside.Items.Add(extract);
+                insideMenus[key]=inside;
+                var outside=new ContextMenu();
+                var regroup=new MenuItem
+                {
+                    Header="기능 토글 그룹에 넣기"
+                };
+                regroup.Click+=(s,e)=>RegroupAction(key);
+                outside.Items.Add(regroup);
+                outsideMenus[key]=outside;
+            }
+            DragReorder.DropArea(Board,"quick9.actions",()=>Board.ContentsEditing,(key,point)=>
+            {
+                var frame=Board.Frames["toggles"];var start=frame.TranslatePoint(new Point(),Board);if(new Rect(start,new Size(frame.ActualWidth,frame.ActualHeight)).Contains(point))return false;return ExtractAction(key,point);
+            });
+            host.IsVisibleChanged+=(s,e)=>
+            {
+                if(!host.IsVisible)
+                {
+                    Board.Cancel();
+                    ExpandToggles(false,false);
+                    SetEditing(false);
+                    CloseMenus();
+                }
+            };
+            host.Closed+=(s,e)=>
+            {
+                closed=true;
+                Board.Cancel();
+                ExpandToggles(false,false);
+                CloseMenus();
+                mediaGlow.Background=null;
+            };
         }
-        static Button Tool(string icon,string label,Action action){var button=Paint.Button(new Glyph(icon,21),action,label);button.Width=button.Height=32;button.Padding=new Thickness(0);button.Background=Brushes.Transparent;return button;}
-        void AddTile(string key,string icon,string title,Action action,Action circle=null){var tile=new QuickWidgetTile(icon,title,action,circle);tiles[key]=tile;if(key=="wifi"||key=="bluetooth"||key=="theme"||key=="mute")Toggles[key]=tile.Toggle;Board.Add(key,title,tile,tile.Shape);}
-        void MediaShape(){bool rich=mediaRows>1&&mediaColumns>1;richMedia.Visibility=rich?Visibility.Visible:Visibility.Collapsed;miniMedia.Visibility=rich?Visibility.Collapsed:Visibility.Visible;bool single=mediaColumns==1;miniArtwork.Visibility=miniTitle.Visibility=single?Visibility.Collapsed:Visibility.Visible;miniOutput.Visibility=mediaColumns>=3?Visibility.Visible:Visibility.Collapsed;miniPlay.Visibility=mediaIdle?Visibility.Collapsed:Visibility.Visible;miniMedia.ColumnDefinitions[0].Width=new GridLength(single?0:46);miniMedia.ColumnDefinitions[2].Width=mediaIdle?new GridLength(0):single?new GridLength(1,GridUnitType.Star):new GridLength(35);Grid.SetColumn(miniPlay,single?1:2);miniMedia.ColumnDefinitions[3].Width=new GridLength(mediaColumns>=3?28:0);}
-        void RefreshMediaLayout(){if(media==null)return;media.FitWidget(mediaBody.ActualWidth,mediaBody.ActualHeight);media.Update(shell.Services.Media,shell.Services.OutputName);}
-        internal void SetEditing(bool value){if(Board.ContentsEditing)EditActions(false);if(value&&Expanded)ExpandToggles(false,false);Board.SetEditing(value);foreach(var pair in outsideMenus)Board.Frames[pair.Key].ContextMenu=value?pair.Value:null;((TextBlock)EditButton.Content).Text=value?"완료":"배치 편집";hint.Visibility=value?Visibility.Visible:Visibility.Collapsed;}
-        internal void EditActions(bool value){if(value&&!Board.Editing)return;Board.SetContentsEditing(value);ExpandToggles(value,false);if(value){Board.Frames["toggles"].BringIntoView();string first=ActionOrder.Members.FirstOrDefault();if(first!=null)ActionItem(first).Focus();}}
-        internal QuickWidgetPicker CreatePicker(Action close){return new QuickWidgetPicker(Board.Layout.Items.Where(i=>i.Hidden).ToArray(),Title,key=>{if(ActionOrder.Contains(key))ExtractAction(key,null);else Board.AddWidget(key);close();});}
-        void ShowAdd()
+        static Button Tool(string icon,string label,Action action)
         {
-            if(addMenu!=null)addMenu.IsOpen=false;var menu=new ContextMenu {PlacementTarget=EditButton};addMenu=menu;var presenter=new FrameworkElementFactory(typeof(ContentPresenter));presenter.SetValue(ContentPresenter.ContentSourceProperty,"Header");var item=new MenuItem {Header=CreatePicker(()=>menu.IsOpen=false),StaysOpenOnClick=true,Focusable=false,Padding=new Thickness(0),Template=new ControlTemplate(typeof(MenuItem)){VisualTree=presenter}};menu.Items.Add(item);menu.IsOpen=true;
+            var button=Paint.Button(new Glyph(icon,21),action,label);
+            button.Width=button.Height=32;
+            button.Padding=new Thickness(0);
+            button.Background=Brushes.Transparent;
+            return button;
         }
-        void CloseMenus(){if(addMenu!=null)addMenu.IsOpen=false;foreach(var tile in tiles.Values)if(tile.ContextMenu!=null)tile.ContextMenu.IsOpen=false;foreach(var menu in insideMenus.Values.Concat(outsideMenus.Values))menu.IsOpen=false;}
-        string Title(string key){return tiles.ContainsKey(key)?tiles[key].Title:key=="brightness"?"밝기":key=="volume"?"음량":key=="media"?"미디어 플레이어":"기능 토글";}
-        void PresentToggles(QuickWidgetSlot slot){if(presentedColumns==slot.Columns&&presentedRows==slot.Rows&&presentedExpanded==Expanded&&presentedContents==Board.ContentsEditing)return;presentedColumns=slot.Columns;presentedRows=slot.Rows;presentedExpanded=Expanded;presentedContents=Board.ContentsEditing;actionGrid.Children.Clear();var members=ActionOrder.Members;actionScroll.VerticalScrollBarVisibility=Expanded?ScrollBarVisibility.Hidden:ScrollBarVisibility.Disabled;actionGrid.MinHeight=Expanded&&members.Length>16?Math.Ceiling(members.Length/4.0)*86:0;actionGrid.Columns=slot.Rows==1?Math.Max(1,Math.Min(slot.Columns,members.Length)):slot.Columns;actionGrid.Rows=Expanded?Math.Max(1,(members.Length+3)/4):slot.Rows;double inset=slot.Rows==1?0:7;actionGrid.Margin=Expanded?new Thickness(10,12,10,Board.ContentsEditing?28:22):new Thickness(3,inset,3,inset);foreach(var item in actionItems){item.Visibility=Visibility.Collapsed;item.ContextMenu=null;}int count=0;foreach(string key in members){var item=actionItems.First(i=>(string)i.Tag==key);bool visible=count++<slot.Columns*slot.Rows||Expanded;item.Visibility=visible?Visibility.Visible:Visibility.Collapsed;if(visible)actionGrid.Children.Add(item);item.Focusable=Board.ContentsEditing;ContextMenu menu;item.ContextMenu=Board.ContentsEditing&&insideMenus.TryGetValue(key,out menu)?menu:tiles.ContainsKey(key)?tiles[key].ContextMenu:null;Toggles[key].IsHitTestVisible=Toggles[key].Focusable=!Board.ContentsEditing;((TextBlock)item.Children[1]).Visibility=Expanded||slot.Rows>1?Visibility.Visible:Visibility.Collapsed;((TextBlock)item.Children[1]).Margin=new Thickness(0,Expanded?6:0,0,0);}emptyActions.Visibility=members.Length==0?Visibility.Visible:Visibility.Collapsed;groupMore.Content=Board.ContentsEditing?(UIElement)groupBack:groupBar;groupMore.Width=Board.ContentsEditing?160:52;groupMore.Height=Board.ContentsEditing?23:13;groupMore.ToolTip=Board.ContentsEditing?"크기 조절로 돌아가기":Expanded?"기능 토글 접기":"기능 토글 펼치기";AutomationProperties.SetName(groupMore,(string)groupMore.ToolTip);SizeActions();}
-        internal bool ExtractAction(string key,Point? destination){if(!ActionOrder.Extract(key))return false;bool wasHidden=Board.Layout.Find(key).Hidden;if(Board.ContentsEditing)EditActions(false);Board.Layout.SetHidden(key,false);if(wasHidden){Board.Layout.Resize(key,1,1,false);Board.Layout.PlaceFirst(key);}if(destination.HasValue){var group=Board.Layout.Find("toggles");Point cell=destination.HasValue?Board.CellAt(destination.Value):new Point(group.X,group.Y+group.Rows);Board.Layout.Move(key,(int)cell.X,(int)cell.Y);}presentedColumns=0;Board.Save();Board.Reflow(true);PresentToggles(Board.DisplayLayout.Find("toggles"));Board.Frames[key].BringIntoView();return true;}
-        internal bool RegroupAction(string key){if(!QuickToggleOrder.Defaults.Contains(key))return false;if(!ActionOrder.Contains(key)&&!ActionOrder.Regroup(key))return false;if(Board.ContentsEditing)EditActions(false);Board.Layout.SetHidden(key,true);Board.Layout.SetHidden("toggles",false);presentedColumns=0;Board.Save();Board.Reflow(true);PresentToggles(Board.DisplayLayout.Find("toggles"));Board.Frames["toggles"].BringIntoView();return true;}
-        void SizeActions(){if(actionGrid.Columns<1||actionGrid.Rows<1)return;bool labels=Expanded||actionGrid.Rows>1;double size=Math.Max(28,Math.Min(48,Math.Min(actionGrid.ActualWidth/actionGrid.Columns-4,actionGrid.ActualHeight/actionGrid.Rows-(labels?(Expanded?22:16):0)-2)));foreach(var button in Toggles.Values){button.Width=button.Height=size;button.Resources["ButtonRadius"]=new CornerRadius(size/2);var glyph=button.Content as Glyph;if(glyph!=null)glyph.Width=glyph.Height=size*.5;}}
-        internal bool MoveAction(string source,string target,bool after){var old=actionGrid.Children.OfType<FrameworkElement>().ToDictionary(i=>(string)i.Tag,i=>i.TranslatePoint(new Point(),actionGrid));if(!ActionOrder.Move(source,target,after))return false;presentedColumns=0;PresentToggles(Board.DisplayLayout.Find("toggles"));actionGrid.UpdateLayout();foreach(FrameworkElement item in actionGrid.Children){Point from;if(!old.TryGetValue((string)item.Tag,out from))continue;Point to=item.TranslatePoint(new Point(),actionGrid);var previous=item.RenderTransform as TranslateTransform;double x=from.X-to.X+(previous==null?0:previous.X),y=from.Y-to.Y+(previous==null?0:previous.Y);var move=new TranslateTransform();item.RenderTransform=move;if(Motion.Enabled&&host.IsVisible){move.BeginAnimation(TranslateTransform.XProperty,Motion.Tween(x,0,170));move.BeginAnimation(TranslateTransform.YProperty,Motion.Tween(y,0,170));}}if(Board.ContentsEditing)ActionItem(source).Focus();return true;}
-        internal void ExpandToggles(bool value,bool animate=true){Board.ExpandedToggleRows=Math.Max(2,Math.Min(5,(ActionOrder.Members.Length+3)/4+1));Board.SetExpanded(value,animate);PresentToggles(Board.DisplayLayout.Find("toggles"));if(animate&&host.IsVisible)Motion.Fade(actionGrid,.7,1,170);}
-        internal void Feedback(string text){notice.Text=text;notice.Visibility=Visibility.Visible;}
-        async void LoadBuds(){budsRequested=true;try{var symbol=await BackgroundWork.Run(BudsDeviceData.ShortcutIcon);if(!closed){budsSymbol=symbol;ApplyBuds();}}catch(Exception e){AppLog.Once("quick9-buds-symbol",e.GetType().Name);}}
-        internal bool BudsSelected {get{return tiles["buds"].Toggle.Checked;}}
-        void ApplyBuds(){tiles["buds"].Icon.SetDeviceIcon(budsSymbol);QuickToggleButton grouped;if(Toggles.TryGetValue("buds",out grouped))((Glyph)grouped.Content).SetDeviceIcon(budsSymbol);Volume.SetDeviceIcon(Volume.IsEnabled&&BudsInfo.IsBuds(shell.Services.OutputName)?budsSymbol:null);}
-        async void SamsungIcon(AppEntry app){try{var image=app.Icon??await BackgroundWork.Run(()=>AppIcons.Get(app));if(!closed&&app.Key==samsungKey){samsungIcon=image;if(image!=null)samsung.Content=AppIcons.Visual(image,24);}}catch{}}
-        internal void Refresh(PowerState power,int bright,double sound,bool muted,bool audioAvailable,bool brightAvailable)
+        void AddTile(string key,string icon,string title,Action action,Action circle=null)
         {
-            var now=DateTime.Now;if(now.Ticks/TimeSpan.TicksPerSecond!=clock){clock=now.Ticks/TimeSpan.TicksPerSecond;time.Text=now.ToString("H:mm:ss");}if(day!=now.Date.Ticks){day=now.Date.Ticks;date.Text=now.ToString("M월 d일 dddd");}battery.Update(power);batteryButton.Visibility=PowerDisplay.Slot(power,Preferences.Current.DesktopPowerWatts)>0?Visibility.Visible:Visibility.Collapsed;
-            Brightness.IsEnabled=brightAvailable;Brightness.Value=bright<0?0:bright;Volume.IsEnabled=audioAvailable;Volume.Value=muted?0:sound;Volume.Kind=SoundIcon.For(sound,muted,audioAvailable);Volume.InvalidateVisual();Brightness.WheelAdjust=Volume.WheelAdjust=Preferences.Current.QuickSliderScroll;
-            bool wifi=shell.Services.WifiOn??shell.Wifi!=null,bluetooth=shell.Services.BluetoothOn??false;tiles["wifi"].Text("Wi-Fi",shell.Wifi??(wifi?"연결 안 됨":"꺼짐"));tiles["bluetooth"].Text("블루투스",shell.Services.BluetoothOn.HasValue?(bluetooth?(shell.Buds.ConnectedCaption??"연결 안 됨"):"꺼짐"):"연결 설정");
-            var theme=AppTheme.Read();tiles["theme"].Text("다크 모드",theme.Dark?"켜짐":"꺼짐");tiles["mute"].Text("음소거",muted?"켜짐":"꺼짐");tiles["mute"].Icon.Update(SoundIcon.For(sound,muted,audioAvailable),Glass95.ToggleInk(tiles["mute"].Toggle.Checked));((Glyph)Toggles["mute"].Content).Update(SoundIcon.For(sound,muted,audioAvailable),Glass95.ToggleInk(Toggles["mute"].Checked));
-            var efficiency=shell.Toggles.Power();var disturb=shell.Toggles.Disturb.State;foreach(var pair in Toggles){string key=pair.Key;var setting=QuickSettingCatalog.Find(key);if(setting!=null){bool selected=setting.Read(Preferences.Current);pair.Value.RefreshState(selected,true);tiles[key].State(selected,true);tiles[key].Text(setting.Title,selected?"켜짐":"꺼짐");continue;}if(QuickActionCatalog.Commands.Contains(key)){pair.Value.RefreshState(key=="buds"&&(shell.Buds.HasConnectedBuds||BudsInfo.IsBuds(shell.Services.OutputName)),QuickActionCatalog.Available(key,shell));continue;}bool on=key=="wifi"?wifi:key=="bluetooth"?bluetooth:key=="theme"?theme.Dark:key=="mute"?muted:key=="efficiency"?efficiency.Selected==QuickActions.EfficientMode:key=="dnd"?disturb.Enabled:key=="awake"?shell.Toggles.Awake:key=="animations"?Preferences.Current.Animations:key=="startup"?shell.Toggles.Startup:Preferences.Current.QuickSliderScroll;bool available=!host.TogglePending(key)&&(key=="wifi"?shell.Services.WifiPresent!=false:key=="bluetooth"?shell.Services.BluetoothPresent!=false:key=="theme"?theme.Available:key=="mute"?audioAvailable:key=="efficiency"?efficiency.Available:key=="dnd"?disturb.Available:true);if(tiles.ContainsKey(key)){tiles[key].State(on,available);if(key!="wifi"&&key!="bluetooth"&&key!="theme"&&key!="mute")tiles[key].Text(tiles[key].Title,available?(on?"켜짐":"꺼짐"):"사용할 수 없음");}pair.Value.RefreshState(on,available);}
-            tiles["devices"].Text("주변 기기 연결","");tiles["devices"].State(false,shell.SamsungDevices()!=null);bool budsConnected=shell.Buds.HasConnectedBuds||BudsInfo.IsBuds(shell.Services.OutputName);tiles["buds"].Text("Galaxy Buds",budsConnected?shell.Buds.BudsCaption??"연결됨":"연결 안 됨");tiles["buds"].State(budsConnected,shell.GalaxyBuds()!=null);if(!budsRequested&&(shell.GalaxyBuds()!=null||BudsInfo.IsBuds(shell.Services.OutputName)))LoadBuds();ApplyBuds();
-            var app=shell.SamsungSettings();samsung.Visibility=app!=null?Visibility.Visible:Visibility.Collapsed;if(app!=null&&samsungKey!=app.Key){samsungKey=app.Key;SamsungIcon(app);}media.Update(shell.Services.Media,shell.Services.OutputName);var state=shell.Services.Media??new MediaState();miniTitle.Text=state.Active?state.Title:"재생 중인 미디어 없음";miniPlayGlyph.Update(state.Playing?"pause":"play",Paint.Text);miniPlay.IsEnabled=state.Available&&state.CanPlay;miniArtwork.IsEnabled=state.Active&&state.Artwork!=null&&!String.IsNullOrEmpty(state.AppId);if(!miniArtReady||miniArtSource!=state.Artwork){miniArtReady=true;miniArtSource=state.Artwork;miniArt.Background=state.Artwork==null?(Brush)Brushes.Transparent:new ImageBrush(state.Artwork){Stretch=Stretch.UniformToFill};miniArt.Child=state.Artwork==null?missingArt:null;}bool changed=mediaIdle!=!state.Active;mediaIdle=!state.Active;Board.SetMediaIdle(mediaIdle);if(changed)MediaShape();
+            var tile=new QuickWidgetTile(icon,title,action,circle);
+            tiles[key]=tile;
+            if(key=="wifi"||key=="bluetooth"||key=="theme"||key=="mute")Toggles[key]=tile.Toggle;
+            Board.Add(key,title,tile,tile.Shape);
         }
-        internal object Snapshot(){return new {ui="9.0",editing=Board.Editing,expanded=Expanded,inlineToggles=true,controlHeight=QuickWidgetBoard.ControlHeight,gestureActive=Board.GestureActive,noOverlap=Board.DisplayLayout.Fits(),separateSliderButtons=true,borderlessSliders=Brightness.NoTrackBorder&&Volume.NoTrackBorder,items=Board.Layout.Items.Select(i=>new {key=i.Key,x=i.X,y=i.Y,columns=i.Columns,rows=i.Rows,hidden=i.Hidden}).ToArray()};}
+        void MediaShape()
+        {
+            bool rich=mediaRows>1&&mediaColumns>1;
+            richMedia.Visibility=rich?Visibility.Visible:Visibility.Collapsed;
+            miniMedia.Visibility=rich?Visibility.Collapsed:Visibility.Visible;
+            bool single=mediaColumns==1;
+            miniArtwork.Visibility=miniTitle.Visibility=single?Visibility.Collapsed:Visibility.Visible;
+            miniOutput.Visibility=mediaColumns>=3?Visibility.Visible:Visibility.Collapsed;
+            miniPlay.Visibility=mediaIdle?Visibility.Collapsed:Visibility.Visible;
+            miniMedia.ColumnDefinitions[0].Width=new GridLength(single?0:46);
+            miniMedia.ColumnDefinitions[2].Width=mediaIdle?new GridLength(0):single?new GridLength(1,GridUnitType.Star):new GridLength(35);
+            Grid.SetColumn(miniPlay,single?1:2);
+            miniMedia.ColumnDefinitions[3].Width=new GridLength(mediaColumns>=3?28:0);
+        }
+        void RefreshMediaLayout()
+        {
+            if(media==null)return;
+            media.FitWidget(mediaBody.ActualWidth,mediaBody.ActualHeight);
+            media.Update(shell.Services.Media,shell.Services.OutputName);
+        }
     }
 }

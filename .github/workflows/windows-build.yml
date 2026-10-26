@@ -14,28 +14,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Compile and validate
+      - name: Compile
         shell: pwsh
-        run: |
-          ./Build.ps1 -SkipTests
-          $env:ONE_TASKBAR_DATA = Join-Path $env:RUNNER_TEMP 'OneTaskBar-self-test'
-          New-Item -ItemType Directory -Path $env:ONE_TASKBAR_DATA -Force | Out-Null
-          $test = Start-Process -FilePath ./dist/OneTaskBar.exe -ArgumentList '--self-test' -WindowStyle Hidden -Wait -PassThru
-          if ($test.ExitCode -ne 0) { Get-Content (Join-Path $env:ONE_TASKBAR_DATA 'self-test.json'); throw 'Self-test failed' }
-      - name: Validate UI and lifecycle fixtures
+        run: ./Build.ps1 -SkipTests
+      - name: Validate isolated UI and lifecycle fixtures
         shell: pwsh
-        run: |
-          $probes = @('panel-theme-probe','notification-ui-probe','update950-probe','beta-feedback-probe','quick9-probe','quick-size-probe','start-size-probe','media9-probe','launcher-motion-probe','launcher-keyboard-probe','deferred-icon-probe','settings-visibility-probe','window-switcher-probe','window-activation-probe','window-preview-probe','popup-probe','startup-probe','nowbar9-probe','nowbar-probe','memory-lifecycle-probe')
-          $info = [Diagnostics.FileVersionInfo]::GetVersionInfo((Resolve-Path ./dist/OneTaskBar.exe))
-          if ([Version]$info.FileVersion -ge [Version]'9.5.0.0') { $probes += 'glass95-probe' }
-          foreach ($probe in $probes) {
-            $env:ONE_TASKBAR_DATA = Join-Path $env:RUNNER_TEMP ('OneTaskBar-'+$probe)
-            New-Item -ItemType Directory -Path $env:ONE_TASKBAR_DATA -Force | Out-Null
-            $test = Start-Process -FilePath ./dist/OneTaskBar.exe -ArgumentList ('--'+$probe) -WindowStyle Hidden -PassThru
-            if (-not $test.WaitForExit(90000)) { Stop-Process -Id $test.Id; throw ('UI fixture timed out: '+$probe) }
-            if ($test.ExitCode -ne 0) { Get-ChildItem $env:ONE_TASKBAR_DATA -Filter '*.json' | Get-Content; throw ('UI fixture failed: '+$probe) }
-            Write-Output ($probe+': passed')
-          }
+        run: ./tools/Test-UI.ps1 -Area All -OutputDirectory (Join-Path $env:RUNNER_TEMP 'OneTaskBar-tests')
       - name: Package unsigned candidate
         shell: pwsh
         run: |
@@ -53,27 +37,8 @@ jobs:
         with:
           name: windows-test-report
           path: |
-            ${{ runner.temp }}/OneTaskBar-panel-theme-probe/panel-theme-probe.json
-            ${{ runner.temp }}/OneTaskBar-notification-ui-probe/notification-ui-probe.json
-            ${{ runner.temp }}/OneTaskBar-update950-probe/update950-probe.json
-            ${{ runner.temp }}/OneTaskBar-beta-feedback-probe/beta-feedback-probe.json
-            ${{ runner.temp }}/OneTaskBar-glass95-probe/glass95-probe.json
-            ${{ runner.temp }}/OneTaskBar-window-preview-probe/window-preview-probe.json
-            ${{ runner.temp }}/OneTaskBar-popup-probe/popup-probe.json
-            ${{ runner.temp }}/OneTaskBar-self-test/self-test.json
-            ${{ runner.temp }}/OneTaskBar-quick9-probe/quick9-probe.json
-            ${{ runner.temp }}/OneTaskBar-quick-size-probe/quick-size-probe.json
-            ${{ runner.temp }}/OneTaskBar-nowbar-probe/nowbar-probe.json
-            ${{ runner.temp }}/OneTaskBar-nowbar9-probe/nowbar9-probe.json
-            ${{ runner.temp }}/OneTaskBar-media9-probe/media9-probe.json
-            ${{ runner.temp }}/OneTaskBar-start-size-probe/start-size-probe.json
-            ${{ runner.temp }}/OneTaskBar-launcher-motion-probe/launcher-motion-probe.json
-            ${{ runner.temp }}/OneTaskBar-launcher-keyboard-probe/launcher-keyboard-probe.json
-            ${{ runner.temp }}/OneTaskBar-deferred-icon-probe/deferred-icon-probe.json
-            ${{ runner.temp }}/OneTaskBar-settings-visibility-probe/settings-visibility-probe.json
-            ${{ runner.temp }}/OneTaskBar-window-switcher-probe/window-switcher-probe.json
-            ${{ runner.temp }}/OneTaskBar-window-activation-probe/window-activation-probe.json
-            ${{ runner.temp }}/OneTaskBar-startup-probe/startup-probe.json
-            ${{ runner.temp }}/OneTaskBar-memory-lifecycle-probe/memory-lifecycle-probe.json
+            ${{ runner.temp }}/OneTaskBar-tests/summary.json
+            ${{ runner.temp }}/OneTaskBar-tests/*/*-probe.json
+            ${{ runner.temp }}/OneTaskBar-tests/self-test/self-test.json
           if-no-files-found: warn
           retention-days: 14
