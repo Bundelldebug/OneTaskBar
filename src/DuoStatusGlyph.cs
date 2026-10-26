@@ -14,7 +14,7 @@ namespace OneTaskBar
         static readonly Geometry track=Gauge(1);
         static readonly Brush warningInk=Paint.Brush("#FFDA3345"),lightCharge=Paint.Brush("#FF15875A"),darkCharge=Paint.Brush("#FF74E5B0");
         int level=-1,steps,signal=-1;bool known,low,powered,chargeRunning;string network="wifi-off";Brush ink=Paint.ControlWhite;Geometry batteryFill=Geometry.Empty;
-        FormattedText label;string labelText;Brush labelInk;double labelDpi;
+        FormattedText label;string labelText;Brush labelInk;double labelDpi;MatrixTransform labelTransform;Rect labelBounds;
         internal int VolumeDots {get{return steps;}}
         internal bool BatteryVisible {get{return known;}}
         internal bool ChargeAnimating {get{return chargeRunning;}}
@@ -48,8 +48,9 @@ namespace OneTaskBar
         static Pen Stroke(Brush color){var pen=new Pen(color,1.9){StartLineCap=PenLineCap.Round,EndLineCap=PenLineCap.Round};pen.Freeze();return pen;}
         void DrawNumber(DrawingContext dc,Brush color)
         {
-            string text=BatteryNumberText;double dpi=VisualTreeHelper.GetDpi(this).PixelsPerDip;if(label==null||labelText!=text||labelInk!=color||labelDpi!=dpi){labelText=text;labelInk=color;labelDpi=dpi;label=new FormattedText(text,CultureInfo.InvariantCulture,FlowDirection.LeftToRight,new Typeface(SystemFonts.MessageFontFamily,FontStyles.Normal,FontWeights.Bold,FontStretches.Normal),8.5,color,dpi);}
-            var origin=new Point(16-label.Width/2,5.3-label.Height/2);BatteryNumberBounds=new Rect(origin,new Size(label.Width,label.Height));dc.DrawText(label,origin);
+            string text=BatteryNumberText;double dpi=VisualTreeHelper.GetDpi(this).PixelsPerDip;if(label==null||labelText!=text||labelInk!=color||labelDpi!=dpi){labelText=text;labelInk=color;labelDpi=dpi;label=new FormattedText(text,CultureInfo.InvariantCulture,FlowDirection.LeftToRight,new Typeface(SystemFonts.MessageFontFamily,FontStyles.Normal,FontWeights.Bold,FontStretches.Normal),8.5,color,dpi);
+                double scale=Math.Min(1,Math.Min(16/Math.Max(1,label.Width),10.4/Math.Max(1,label.Height))),width=label.Width*scale,height=label.Height*scale;labelBounds=new Rect(16-width/2,5.3-height/2,width,height);labelTransform=new MatrixTransform(scale,0,0,scale,labelBounds.X,labelBounds.Y);labelTransform.Freeze();}
+            BatteryNumberBounds=labelBounds;dc.PushTransform(labelTransform);dc.DrawText(label,new Point());dc.Pop();
         }
         protected override void OnRender(DrawingContext dc)
         {
