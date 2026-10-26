@@ -227,7 +227,7 @@ namespace OneTaskBar
         public static Rect CapsuleFillBounds(double width,double height,double value) {width=Math.Max(0,width);height=Math.Max(0,height);double p=Clamp(value),diameter=Math.Min(width,height);if(p<10){double size=diameter*p/10;return new Rect((diameter-size)/2,(height-size)/2,size,size);}return new Rect(0,(height-diameter)/2,diameter+(width-diameter)*(p-10)/90,diameter);}
         public static double CapsuleFillWidth(double width,double height,double value) {return CapsuleFillBounds(width,height,value).Width;}
         public PillSlider(string kind) { Kind=kind; Height=44; MinWidth=90; Focusable=true; Cursor=Cursors.Hand; SnapsToDevicePixels=true;
-            AutomationProperties.SetName(this,kind=="brightness" ? "밝기" : "음량"); }
+            AutomationProperties.SetName(this,kind=="brightness" ? "밝기" : "음량");Loaded+=(s,e)=>ObserveValueOption(true);Unloaded+=(s,e)=>ObserveValueOption(false); }
         protected override AutomationPeer OnCreateAutomationPeer() { return new PillPeer(this); }
         protected override void OnRender(DrawingContext dc)
         {
@@ -239,10 +239,11 @@ namespace OneTaskBar
             dc.DrawRoundedRectangle(Paint.Brush(DarkTrack?"#26000000":IsEnabled ? "#3C77817F" : "#286E7775"),NoTrackBorder?null:new Pen(Paint.Brush("#288B9692"),.7),track,thickness/2,thickness/2);
             bool clipTrack=LinearFill&&!Slim;if(clipTrack)dc.PushClip(new RectangleGeometry(track,thickness/2,thickness/2));
             double fillOpacity=1;if(shown>0)dc.DrawGeometry(Tablet?Paint.ControlWhite:Brushes.Black,null,fill);
-            var c=Vertical?new Point(w/2,h-cross*(Tablet&&ShowIcon&&!Slim?.5:.70)):new Point(cross*(Tablet&&ShowIcon&&!Slim?.5:.70),h/2); double icon=cross*.44;
+            var c=ValueIconCenter(w,h,Vertical?new Point(w/2,h-cross*(Tablet&&ShowIcon&&!Slim?.5:.70)):new Point(cross*(Tablet&&ShowIcon&&!Slim?.5:.70),h/2)); double icon=cross*.44;
             if(ShowIcon)DrawIcon(dc,iconKind,DarkTrack?Paint.ControlWhite:Tablet&&!Light?Paint.Brush("#D8E8EDEA"):Paint.Brush("#FF303A36"),c,icon);
             if(ShowIcon&&shown>0) {dc.PushOpacity(fillOpacity);dc.PushClip(fill);DrawIcon(dc,iconKind,Tablet?Paint.Brush(!Light&&Kind=="brightness"?"#FFEC7D4E":"#FF35413B"):Paint.Brush("#FFF5F5F1"),c,icon);dc.Pop();dc.Pop();}
             if(clipTrack)dc.Pop();
+            DrawValueNumber(dc,fill,ValueNumberInk??(DarkTrack?Paint.ControlWhite:Paint.Text),Tablet?Paint.OnLight:Paint.ControlWhite);
             if(Slim&&IsEnabled)dc.DrawEllipse(Paint.ControlWhite,null,Vertical?new Point(w/2,h-FillWidth(Math.Max(0,h-10),shown)-5):new Point(FillWidth(Math.Max(0,w-10),shown)+5,h/2),4.5,4.5);
             if(IsKeyboardFocused) dc.DrawRoundedRectangle(null,new Pen(Paint.Brush("#9ED4F0E5"),1.5),new Rect(1,1,Math.Max(0,w-2),Math.Max(0,h-2)),Math.Min(w,h)/2,Math.Min(w,h)/2);
         }

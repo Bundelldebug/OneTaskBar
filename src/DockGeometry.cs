@@ -9,6 +9,9 @@ namespace OneTaskBar
     {
         internal static int Edge {get{return Preferences.Current.DockEdge>=0&&Preferences.Current.DockEdge<=3?Preferences.Current.DockEdge:3;}}
         internal static bool Vertical(int edge){return edge==0||edge==2;}
+        internal const double SideStatusWidth=44;
+        internal static double SideStatusLength(double powerWidth){return powerWidth>0?128:106;}
+        internal static string ClockLabel(DateTime time,bool seconds,bool vertical){return time.ToString(vertical?seconds?"tt\nh:mm:ss\nMM-dd":"tt\nh:mm\nMM-dd":seconds?"tt h:mm:ss\nyyyy-MM-dd":"tt h:mm\nyyyy-MM-dd",System.Globalization.CultureInfo.GetCultureInfo("ko-KR"));}
         internal static Rect Rect(System.Drawing.Rectangle screen,double scale,int edge,Rect logical)
         {
             double width=screen.Width/scale,height=screen.Height/scale;
@@ -47,9 +50,9 @@ namespace OneTaskBar
         static readonly RotateTransform upright=new RotateTransform(-90);
         void ConfigureEdge()
         {
-            if(!DockGeometry.Vertical(Edge))return;appCanvas.LayoutTransform=new RotateTransform(90);var status=(Grid)Status.Surface.Child;status.Margin=new Thickness(6,3,6,3);status.ColumnDefinitions.Clear();status.RowDefinitions.Clear();
-            foreach(double height in new[]{28.0,34,32,54})status.RowDefinitions.Add(new RowDefinition {Height=new GridLength(height)});
-            int index=0;foreach(FrameworkElement child in status.Children){Grid.SetColumn(child,0);Grid.SetRow(child,index++);child.HorizontalAlignment=HorizontalAlignment.Center;child.VerticalAlignment=VerticalAlignment.Center;child.Height=status.RowDefinitions[index-1].Height.Value;child.Width=52;}clock.FontSize=9;clock.TextAlignment=TextAlignment.Center;
+            if(!DockGeometry.Vertical(Edge))return;appCanvas.LayoutTransform=new RotateTransform(90);var status=(Grid)Status.Surface.Child;status.Margin=new Thickness(3,3,3,3);status.ColumnDefinitions.Clear();status.ColumnDefinitions.Add(new ColumnDefinition());status.RowDefinitions.Clear();
+            foreach(double height in new[]{22.0,38,22,40})status.RowDefinitions.Add(new RowDefinition {Height=new GridLength(height)});
+            int index=0;foreach(FrameworkElement child in status.Children){Grid.SetColumn(child,0);Grid.SetRow(child,index++);child.HorizontalAlignment=HorizontalAlignment.Center;child.VerticalAlignment=VerticalAlignment.Center;child.Height=status.RowDefinitions[index-1].Height.Value;child.Width=38;}clock.FontSize=8.5;clock.TextAlignment=TextAlignment.Center;
         }
         void OrientIcons()
         {
@@ -62,7 +65,7 @@ namespace OneTaskBar
         void PlaceStatus(DockLayout layout,bool show,double y=Double.NaN)
         {
             if(Double.IsNaN(y))y=layout.Y;Rect rect;
-            if(DockGeometry.Vertical(Edge)){var position=DockGeometry.Rect(Screen.Bounds,Scale,Edge,new Rect(layout.StatusX,y-10,layout.StatusWidth,64));rect=new Rect(position.X,position.Y,64,layout.StatusWidth);}
+            if(DockGeometry.Vertical(Edge)){var position=DockGeometry.Rect(Screen.Bounds,Scale,Edge,new Rect(layout.StatusX,y,layout.StatusWidth,DockGeometry.SideStatusWidth));rect=new Rect(position.X,position.Y,DockGeometry.SideStatusWidth,layout.StatusWidth);}
             else rect=DockGeometry.Rect(Screen.Bounds,Scale,Edge,new Rect(layout.StatusX,y,layout.StatusWidth,44));
             Status.Width=rect.Width;Status.Height=rect.Height;if(show)Status.ShowAt(Screen.Bounds,rect.X,rect.Y,rect.Width,rect.Height);else Native.Place(Status,Screen.Bounds,rect.X,rect.Y,rect.Width,rect.Height);
         }

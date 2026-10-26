@@ -19,9 +19,10 @@ namespace OneTaskBar
             if(shown>0)dc.DrawGeometry(Paint.ControlWhite,null,fill);
             if(GlassStandalone)GlassOptics.Draw(dc,width,height,cross/2,false);
             string kind=Kind.StartsWith("volume",StringComparison.Ordinal)?SoundIcon.For(value,false,IsEnabled):Kind;
-            var center=Vertical?new Point(width/2,height-cross*.5):new Point(cross*.5,height/2);
+            var center=ValueIconCenter(width,height,Vertical?new Point(width/2,height-cross*.5):new Point(cross*.5,height/2));
             if(ShowIcon){DrawIcon(dc,kind,Glass95.Text,center,cross*.44);if(shown>0){dc.PushClip(fill);DrawIcon(dc,kind,Paint.Brush("#FF35413B"),center,cross*.44);dc.Pop();}}
             if(clipped)dc.Pop();
+            DrawValueNumber(dc,fill,Glass95.Text,Paint.OnLight);
             if(IsKeyboardFocused)dc.DrawRoundedRectangle(null,new Pen(Glass95.Accent,1.5),new Rect(1,1,Math.Max(0,width-2),Math.Max(0,height-2)),cross/2,cross/2);
         }
     }
