@@ -330,6 +330,7 @@ namespace OneTaskBar
             bool enabled=HasBlur&&Preferences.Current.Blur&&!(DockSurface&&Preferences.Current.DockSolidBackground)&&(!Glass95.Enabled||Glass95.Transparent);Native.EnableBlur(this,enabled);
             bool panel=PanelMaterial.ReadablePanel(this),popup=PanelMaterial.NotificationPopup(this);
             var detail=this as DetailWindow;if(detail!=null&&detail.PageKey=="sound"){Dark=true;if(lens!=null)lens.Active=false;Surface.Background=enabled?AudioOutputView.Glass:AudioOutputView.Solid;Surface.BorderBrush=Brushes.Transparent;Surface.BorderThickness=new Thickness(0);return;}
+            if(this is HudWindow&&Glass95.Enabled){Surface.Background=enabled?HudWindow.ContrastGlass:HudWindow.ContrastSolid;Surface.BorderBrush=Paint.Brush("#60FFFFFF");Surface.BorderThickness=new Thickness(.7);return;}
             if(Glass95.Enabled&&!OpaqueSurface&&!(DockSurface&&Preferences.Current.DockSolidBackground)){
                 bool rimDark=panel||popup||Dark;if(glassEdge==null||edgeDark!=rimDark){edgeDark=rimDark;glassEdge=Glass95.Edge(edgeDark);}Surface.BorderBrush=this is NowBar?(Brush)Brushes.Transparent:glassEdge;Surface.BorderThickness=new Thickness(0);
                 Surface.Background=this is NowBar?(enabled?glassTint:solidTint??Glass95.Solid):popup?(enabled?PanelMaterial.PopupSurface(Dark):PanelMaterial.Solid(Dark)):panel?(enabled?PanelMaterial.PanelSurface(Dark,true):PanelMaterial.Solid(Dark)):enabled?PanelMaterial.Surface(Dark,true):Paint.Brush(Dark?"#FF242832":"#FFF1F4FA");
