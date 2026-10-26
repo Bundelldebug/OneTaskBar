@@ -50,7 +50,7 @@ namespace OneTaskBar
         internal IEnumerable<Rect> PreviewBounds {get{return tiles.Select(t=>new Rect(t.Image.TranslatePoint(new Point(),this),t.Image.RenderSize));}}
         internal WindowSwitcherView(Action<int,bool> select,Action<int> navigate)
         {
-            choose=select;move=navigate;Title="One TaskBar · 창 전환";ShowActivated=false;Radius=28;Dark=false;Surface.CornerRadius=new CornerRadius(28);Surface.BorderThickness=new Thickness(.7);SetMaterial(LightPanel.Glass,LightPanel.DockSolid);Surface.Child=row;
+            choose=select;move=navigate;Title="One TaskBar · 창 전환";ShowActivated=false;Radius=28;Dark=Glass95.Dark;Surface.CornerRadius=new CornerRadius(28);Surface.BorderThickness=new Thickness(.7);SetMaterial(QuickPanel.Glass,PanelMaterial.Solid(Dark));Surface.Child=row;
             SourceInitialized+=(s,e)=>{var handle=new WindowInteropHelper(this).Handle;Native.SetWindowLong(handle,-20,(Native.GetWindowLong(handle,-20)|0x80|0x08000000)&~0x40000);HwndSource.FromHwnd(handle).AddHook((IntPtr window,int message,IntPtr wp,IntPtr lp,ref bool handled)=>{if(message==0x21){handled=true;return new IntPtr(3);}return IntPtr.Zero;});};
             SizeChanged+=(s,e)=>PlacePreviews();LocationChanged+=(s,e)=>PlacePreviews();MouseWheel+=(s,e)=>{if(session==null)return;navigate(e.Delta>0?0x25:0x27);e.Handled=true;};Closed+=(s,e)=>{closed=true;ReleasePreviews();};
         }
