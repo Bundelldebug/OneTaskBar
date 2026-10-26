@@ -22,9 +22,11 @@ namespace OneTaskBar
         internal readonly Button ContentEditor;
         readonly Action<QuickWidgetSlot> shape;
         int columns,rows,sizeMotion;
+        internal readonly TranslateTransform Offset=new TranslateTransform();
+        internal readonly ScaleTransform SizeScale=new ScaleTransform(1,1);
         internal QuickWidgetFrame(QuickWidgetBoard board,string key,string title,UIElement content,Action<QuickWidgetSlot> resized)
         {
-            Key=key;shape=resized;Background=Brushes.Transparent;RenderTransform=new TranslateTransform();
+            Key=key;shape=resized;Background=Brushes.Transparent;var transform=new TransformGroup();transform.Children.Add(SizeScale);transform.Children.Add(Offset);RenderTransform=transform;
             if(Glass95.Enabled){glassShadow=new GlassTileShadow();Children.Add(glassShadow);}
             Body=new GlassTileBorder {Child=content,Optical=!QuickWidgetLayout.Slider(key)&&key!="media",Background=QuickWidgetLayout.Slider(key)?Brushes.Transparent:QuickPanel.Card,CornerRadius=new CornerRadius(32)};Children.Add(Body);
             outline=new Border {BorderThickness=new Thickness(2),BorderBrush=Paint.Brush("#88FFFFFF"),IsHitTestVisible=false,Visibility=Visibility.Collapsed};Children.Add(outline);
@@ -41,7 +43,11 @@ namespace OneTaskBar
         }
         internal void Editing(bool editing){Body.IsHitTestVisible=!editing;Body.Opacity=editing?.72:1;Mover.Visibility=Resize.Visibility=remove.Visibility=outline.Visibility=editing?Visibility.Visible:Visibility.Collapsed;if(ContentEditor!=null)ContentEditor.Visibility=editing?Visibility.Visible:Visibility.Collapsed;}
         void Curvature(){double width=Body.ActualWidth,height=Body.ActualHeight,radius=columns==1||rows==1?Math.Min(width,height)/2:Math.Min(32,Math.Min(width,height)/2);Body.CornerRadius=outline.CornerRadius=new CornerRadius(radius);Body.Clip=new RectangleGeometry(new Rect(0,0,Math.Max(0,width),Math.Max(0,height)),radius,radius);if(glassShadow!=null){glassShadow.Radius=radius;glassShadow.InvalidateVisual();}}
-        internal void AnimateSize(Size previous,bool animate){int token=++sizeMotion;Body.BeginAnimation(WidthProperty,null);Body.BeginAnimation(HeightProperty,null);Body.Width=Body.Height=Double.NaN;Body.HorizontalAlignment=HorizontalAlignment.Stretch;Body.VerticalAlignment=VerticalAlignment.Stretch;if(!animate||!Motion.Enabled||!IsVisible)return;Body.Width=ActualWidth;Body.Height=ActualHeight;Body.HorizontalAlignment=HorizontalAlignment.Left;Body.VerticalAlignment=VerticalAlignment.Top;var height=Motion.Tween(previous.Height,ActualHeight,170);height.Completed+=(s,e)=>{if(token==sizeMotion){Body.BeginAnimation(WidthProperty,null);Body.BeginAnimation(HeightProperty,null);Body.Width=Body.Height=Double.NaN;Body.HorizontalAlignment=HorizontalAlignment.Stretch;Body.VerticalAlignment=VerticalAlignment.Stretch;}};Body.BeginAnimation(WidthProperty,Motion.Tween(previous.Width,ActualWidth,170));Body.BeginAnimation(HeightProperty,height);}
+        internal void AnimateSize(Size previous,bool animate)
+        {
+            int token=++sizeMotion;SizeScale.BeginAnimation(ScaleTransform.ScaleXProperty,null);SizeScale.BeginAnimation(ScaleTransform.ScaleYProperty,null);SizeScale.ScaleX=SizeScale.ScaleY=1;if(!animate||!Motion.Enabled||!IsVisible||ActualWidth<=0||ActualHeight<=0)return;
+            var height=Motion.Tween(previous.Height/ActualHeight,1,180);height.Completed+=(s,e)=>{if(token!=sizeMotion)return;SizeScale.BeginAnimation(ScaleTransform.ScaleXProperty,null);SizeScale.BeginAnimation(ScaleTransform.ScaleYProperty,null);};SizeScale.BeginAnimation(ScaleTransform.ScaleXProperty,Motion.Tween(previous.Width/ActualWidth,1,180));SizeScale.BeginAnimation(ScaleTransform.ScaleYProperty,height);
+        }
         internal void Shape(QuickWidgetSlot slot){if(columns==slot.Columns&&rows==slot.Rows)return;columns=slot.Columns;rows=slot.Rows;shape(slot);Curvature();AutomationProperties.SetItemStatus(Resize,columns+"열 "+rows+"행");}
         internal void Stop(){if(Mover.IsDragging)Mover.CancelDrag();if(Resize.IsDragging)Resize.CancelDrag();}
     }
@@ -78,8 +84,8 @@ namespace OneTaskBar
         internal void Reset(){Cancel();Layout.Reset(false);Save();Reflow(true);}
         internal void Save(){if(!Layout.Save()&&Changed!=null)Changed();}
         internal Point CellAt(Point point){return new Point(Math.Max(0,Math.Floor(point.X/step)),Math.Max(0,Math.Floor(point.Y/rowStep)));}
-        internal void SetExpanded(bool value,bool animate=true){var frame=Frames["toggles"];Size previous=new Size(frame.Body.ActualWidth,frame.Body.ActualHeight);frame.AnimateSize(previous,false);Expanded=value;Reflow(animate);frame.AnimateSize(previous,animate);}
-        internal void SetMediaIdle(bool value){if(mediaIdle==value)return;mediaIdle=value;var frame=Frames["media"];Size previous=new Size(frame.Body.ActualWidth,frame.Body.ActualHeight);frame.AnimateSize(previous,false);Reflow(true);frame.AnimateSize(previous,true);}
+        internal void SetExpanded(bool value,bool animate=true){Expanded=value;Reflow(animate);}
+        internal void SetMediaIdle(bool value){if(mediaIdle==value)return;mediaIdle=value;Reflow(true);}
         void PresentLayout(){var media=Layout.Find("media");bool compact=mediaIdle&&!Editing&&!media.Hidden&&media.Columns==4&&media.Rows==2;if(!Expanded&&!compact){presentationLayout=null;return;}presentationLayout=new QuickWidgetLayout(null,true);presentationLayout.Restore(Layout.Copy());if(compact){presentationLayout.Resize("media",4,1,false);foreach(var item in presentationLayout.Items)if(item.Y>=media.Y+2)item.Y--;}if(Expanded)presentationLayout.Resize("toggles",4,ExpandedToggleRows,false);}
         internal void Begin(string key,bool sizing,bool autoScroll=true)
         {
@@ -112,8 +118,10 @@ namespace OneTaskBar
         }
         internal void Reflow(bool animate)
         {
-            var positions=Frames.Values.Where(f=>f.IsVisible).ToDictionary(f=>f.Key,f=>f.TranslatePoint(new Point(),this));PresentLayout();InvalidateMeasure();InvalidateArrange();UpdateLayout();
-            foreach(var frame in Frames.Values){Point old;if(!positions.TryGetValue(frame.Key,out old)||!frame.IsVisible)continue;Point now=frame.TranslatePoint(new Point(),this);var transform=(TranslateTransform)frame.RenderTransform;double dx=old.X-now.X+transform.X,dy=old.Y-now.Y+transform.Y;transform.BeginAnimation(TranslateTransform.XProperty,null);transform.BeginAnimation(TranslateTransform.YProperty,null);transform.X=transform.Y=0;if(animate&&Motion.Enabled&&IsVisible){transform.BeginAnimation(TranslateTransform.XProperty,Motion.Tween(dx,0,170));transform.BeginAnimation(TranslateTransform.YProperty,Motion.Tween(dy,0,170));}}
+            var positions=Frames.Values.Where(f=>f.IsVisible).ToDictionary(f=>f.Key,f=>f.TranslatePoint(new Point(),this));var sizes=Frames.Values.Where(f=>f.IsVisible).ToDictionary(f=>f.Key,f=>new Size(f.ActualWidth*f.SizeScale.ScaleX,f.ActualHeight*f.SizeScale.ScaleY));
+            foreach(var frame in Frames.Values){frame.AnimateSize(new Size(),false);frame.Offset.BeginAnimation(TranslateTransform.XProperty,null);frame.Offset.BeginAnimation(TranslateTransform.YProperty,null);frame.Offset.X=frame.Offset.Y=0;}
+            PresentLayout();InvalidateMeasure();InvalidateArrange();UpdateLayout();
+            foreach(var frame in Frames.Values){Point old;if(!positions.TryGetValue(frame.Key,out old)||!frame.IsVisible)continue;Point now=frame.TranslatePoint(new Point(),this);if(animate&&Motion.Enabled&&IsVisible){frame.Offset.BeginAnimation(TranslateTransform.XProperty,Motion.Tween(old.X-now.X,0,180));frame.Offset.BeginAnimation(TranslateTransform.YProperty,Motion.Tween(old.Y-now.Y,0,180));Size previous;if(sizes.TryGetValue(frame.Key,out previous)&&(Math.Abs(previous.Width-frame.ActualWidth)>.5||Math.Abs(previous.Height-frame.ActualHeight)>.5))frame.AnimateSize(previous,true);}}
         }
         protected override Size MeasureOverride(Size available)
         {
