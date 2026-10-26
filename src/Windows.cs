@@ -207,16 +207,17 @@ namespace OneTaskBar
         internal void SetVisible(bool value)
         {
             if(!value&&Overflow!=null)Overflow.Hide();
-            if(closed||visible==value&&!visibilityTimer.IsEnabled)return;visibilityTimer.Stop();visible=value;reveal=value?1:0;
+            if(closed)return;if(visible==value&&!visibilityTimer.IsEnabled){if(value)EnsureVisibleWindows();return;}visibilityTimer.Stop();visible=value;reveal=value?1:0;
             // Fullscreen/capture can reverse before a popup fade finishes.
             foreach(var w in new[]{Start,Apps,Status}){w.Opacity=1;Native.BlurOpacity(w,1);if(value)w.Show();else w.HideImmediately();}if(ready)PlaceFrame();RefreshMedia();
         }
         void AnimateAutoHide(bool value)
         {
-            if(closed)return;if(!Motion.Enabled){SetVisible(value);if(!value&&revealEdge!=null)revealEdge.Show(true);return;}if(visible==value&&!visibilityTimer.IsEnabled)return;
+            if(closed)return;if(!Motion.Enabled){SetVisible(value);if(!value&&revealEdge!=null)revealEdge.Show(true);return;}if(visible==value&&!visibilityTimer.IsEnabled){if(value)EnsureVisibleWindows();return;}
             bool hidden=!Apps.IsVisible;visible=value;if(hidden){reveal=0;foreach(var w in new[]{Start,Apps,Status}){w.Opacity=0;Native.BlurOpacity(w,0);w.Show();}}
             revealFrom=reveal;revealTarget=value?1:0;revealDuration=value?230:160;visibilityWatch.Restart();visibilityTimer.Start();ApplyReveal();
         }
+        void EnsureVisibleWindows(){foreach(var window in new[]{Start,Apps,Status})Native.EnsureDockVisible(window);}
         void ApplyReveal()
         {
             foreach(var w in new[]{Start,Apps,Status}){w.Opacity=reveal;w.Surface.IsHitTestVisible=visible&&reveal>.1;Native.BlurOpacity(w,reveal);}PlaceFrame();
@@ -246,7 +247,7 @@ namespace OneTaskBar
             if(fullScreen){hideDelay.Stop();SetVisible(false);if(revealEdge!=null)revealEdge.Show(false);return;}
             if(!autoHide){hideDelay.Stop();SetVisible(true);return;}
             if(revealEdge==null)revealEdge=new DockRevealEdge(Screen.Bounds,Reveal,Edge);
-            revealEdge.Show(!visible);QueueHide();
+            if(visible&&!visibilityTimer.IsEnabled)EnsureVisibleWindows();revealEdge.Show(!visible);QueueHide();
         }
         internal void Refresh(PowerState state)
         {

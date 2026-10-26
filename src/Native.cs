@@ -103,6 +103,16 @@ namespace OneTaskBar
         internal static bool RealtimeBackdrop(Window window){RegionState state;return regions.TryGetValue(window,out state)&&state.Backdrop!=null&&state.Backdrop.Realtime;}
         internal static void BlurOpacity(Window window,double value){RegionState state;if(regions.TryGetValue(window,out state)&&state.Backdrop!=null)state.Backdrop.SetOpacity(value);}
         internal static double BlurOpacity(Window window){RegionState state;return regions.TryGetValue(window,out state)&&state.Backdrop!=null?state.Backdrop.Opacity:0;}
+        internal static void EnsureDockVisible(Window window)
+        {
+            // Explorer can hide or minimize an HWND without changing WPF Visibility.
+            // Restore only a dock that its controller already intends to display.
+            var handle=new WindowInteropHelper(window).Handle;if(handle==IntPtr.Zero)return;
+            if(!window.IsVisible)window.Show();
+            if(!IsWindowVisible(handle)||IsIconic(handle))ShowWindow(handle,4);
+            if((GetWindowLong(handle,-20)&8)==0)SetWindowPos(handle,new IntPtr(-1),0,0,0,0,0x53);
+            RegionState state;if(regions.TryGetValue(window,out state)&&state.Backdrop!=null)state.Backdrop.EnsureDockVisible();
+        }
         internal static double PrepareMonitor(Window window,System.Drawing.Rectangle screen)
         {
             var handle=new WindowInteropHelper(window).EnsureHandle();var monitor=MonitorFromPoint(new PointI {X=screen.Left+screen.Width/2,Y=screen.Top+screen.Height/2},2);

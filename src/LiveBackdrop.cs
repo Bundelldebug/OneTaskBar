@@ -98,6 +98,11 @@ namespace OneTaskBar
             if(!force&&shown&&bounds.Left==placedBounds.Left&&bounds.Top==placedBounds.Top&&bounds.Right==placedBounds.Right&&bounds.Bottom==placedBounds.Bottom)return;
             Native.SetWindowPos(background,overlay,bounds.Left,bounds.Top,bounds.Right-bounds.Left,bounds.Bottom-bounds.Top,0x10|0x40);placedBounds=bounds;shown=true;
         }
+        internal void EnsureDockVisible()
+        {
+            if(background==IntPtr.Zero||!Visible)return;
+            if(!Native.IsWindowVisible(background)||Native.IsIconic(background)||(Native.GetWindowLong(background,-20)&8)==0){Native.ShowWindow(background,4);Native.SetWindowPos(background,new IntPtr(-1),0,0,0,0,0x53);Sync(true);}
+        }
         internal double Opacity {get{return root!=null?root.Opacity:0;}}
         internal void Enable(bool value){enabled=value;ApplyOpacity();}
         internal void SetOpacity(double value){opacity=Math.Max(0,Math.Min(1,value));ApplyOpacity();}
