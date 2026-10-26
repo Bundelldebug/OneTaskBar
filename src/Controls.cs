@@ -129,6 +129,8 @@ namespace OneTaskBar
             else if(kind=="grip") {for(int i=0;i<6;i++)dc.DrawEllipse(brush,null,new Point(8+(i%2)*8,5+(i/2)*7),1.6,1.6);}
             else if(kind=="edit") {dc.DrawGeometry(null,pen,Geometry.Parse("M4,16 L16,4 20,8 8,20 3,21 Z M14,6 L18,10"));}
             else if(kind=="search") { dc.DrawEllipse(null,pen,new Point(10,10),6.5,6.5); line(15,15,22,22); }
+            else if(kind=="dock-search") {var ring=new Pen(brush,1.9){StartLineCap=PenLineCap.Round,EndLineCap=PenLineCap.Round};dc.DrawEllipse(null,ring,new Point(10.3,10.3),6.8,6.8);dc.DrawLine(ring,new Point(15.3,15.3),new Point(21,21));}
+            else if(kind=="dock-desktops") {dc.DrawRoundedRectangle(null,pen,new Rect(7,3,15,18),3,3);dc.DrawRoundedRectangle(null,pen,new Rect(2,6,2,12),1,1);}
             else if(kind=="screenshot") {dc.DrawGeometry(null,pen,Geometry.Parse("M8,3 L3,3 3,8 M16,3 L21,3 21,8 M21,16 L21,21 16,21 M8,21 L3,21 3,16"));dc.DrawRoundedRectangle(null,pen,new Rect(7,7,10,10),2,2);}
             else if(kind=="task-manager") {dc.DrawRoundedRectangle(null,pen,new Rect(2,2,20,20),3,3);dc.DrawRoundedRectangle(brush,null,new Rect(6,12,2.5,6),.6,.6);dc.DrawRoundedRectangle(brush,null,new Rect(10.8,6,2.5,12),.6,.6);dc.DrawRoundedRectangle(brush,null,new Rect(15.5,9,2.5,9),.6,.6);}
             else if(kind=="audio-output") {dc.DrawGeometry(brush,null,Geometry.Parse("M3,6 L12,12 3,18 Z"));dc.DrawGeometry(null,pen,Geometry.Parse("M14,6 A7,7 0 0 1 14,18 M17,2 A11,11 0 0 1 17,22"));}
