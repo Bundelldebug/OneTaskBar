@@ -24,12 +24,12 @@ namespace OneTaskBar
         internal const double AppOffset=94,FixedWidth=116;
         internal double StartX,AppX,AppWidth,StatusX,StatusWidth,Y;
         internal int Capacity;
-        internal static double StatusSize(double screenWidth,double powerWidth=58){return Math.Min(282,Math.Max(226,screenWidth*.25))+powerWidth-58;}
+        internal static double StatusSize(double screenWidth,double powerWidth=58,bool duo=false){return duo?172:Math.Min(282,Math.Max(226,screenWidth*.25))+powerWidth-58;}
         internal static double BalancedY(double height,double reserved){return height-(Math.Max(68,reserved)+44)/2;}
-        internal static DockLayout Compute(System.Drawing.Rectangle screen,double scale,int count,double powerWidth=58,bool media=false,double reserved=68,int edge=3)
+        internal static DockLayout Compute(System.Drawing.Rectangle screen,double scale,int count,double powerWidth=58,bool media=false,double reserved=68,int edge=3,bool duo=false)
         {
             bool vertical=DockGeometry.Vertical(edge);double width=(vertical?screen.Height:screen.Width)/scale;
-            double status=vertical?DockGeometry.SideStatusLength(powerWidth):StatusSize(width,powerWidth),statusX=width-status-12;
+            double status=vertical?DockGeometry.SideStatusLength(powerWidth):StatusSize(width,powerWidth,duo),statusX=width-status-12;
             double mediaMinimum=media?Math.Min(44,Math.Max(1,statusX-204)):0;
             double minimumX=media?mediaMinimum+76:66;
             double available=Math.Max(FixedWidth,statusX-minimumX-12);
@@ -248,7 +248,7 @@ namespace OneTaskBar
             foreach(var reservation in reservations) reservation.Dispose(); reservations.Clear();
             foreach(var dock in docks) dock.Close(); docks.Clear();
             SyncAutoHide(true);
-            foreach(var screen in Forms.Screen.AllScreens) { var dock=new DockHost(this,screen);docks.Add(dock);dock.Show();reservations.Add(new AppBarReservation(screen,dock.Scale,DockAutoHide,TaskbarOptionsChanged));dock.UpdateVisibility(Native.IsFullScreen(screen),DockAutoHide);}
+            var fullscreenWindows=FullscreenVisibility.Capture();foreach(var screen in Forms.Screen.AllScreens) { var dock=new DockHost(this,screen);docks.Add(dock);dock.Show();reservations.Add(new AppBarReservation(screen,dock.Scale,DockAutoHide,TaskbarOptionsChanged));dock.UpdateVisibility(FullscreenVisibility.IsFullScreen(screen.Bounds,fullscreenWindows),DockAutoHide);}
             trayDock=trayMonitor==null?null:docks.FirstOrDefault(d=>d.Screen.DeviceName==trayMonitor)??docks.FirstOrDefault();
             if(StartMenu!=null)StartMenu.HideImmediately();if(Quick!=null) Quick.Hide(); if(Drawer!=null) Drawer.Hide();if(Finder!=null)Finder.HideImmediately();if(Center!=null)Center.Hide();if(Detail!=null)Detail.Hide();
         }
@@ -546,7 +546,7 @@ namespace OneTaskBar
             var foreground=Native.GetForegroundWindow(); uint foregroundPid; Native.GetWindowThreadProcessId(foreground,out foregroundPid);
             if(foregroundPid!=ownPid) LastApplication=foreground;
             if(foregroundPid!=ownPid)RememberForeground(foreground);if(Desktop&&foreground!=lastForeground)Switcher.Update(Running);
-            if(Desktop){browserFullscreen.Update(foreground);SyncAutoHide(false);foreach(var dock in docks){dock.UpdateVisibility(Native.IsFullScreen(dock.Screen),DockAutoHide);if(foreground!=lastForeground)dock.UpdateActive(LastApplication);}}
+            if(Desktop){browserFullscreen.Update(foreground);SyncAutoHide(false);var fullscreenWindows=FullscreenVisibility.Capture();foreach(var dock in docks){dock.UpdateVisibility(FullscreenVisibility.IsFullScreen(dock.Screen.Bounds,fullscreenWindows),DockAutoHide);if(foreground!=lastForeground)dock.UpdateActive(LastApplication);}}
             lastForeground=foreground;
             bool battery=Power.Known&&!Power.Connected;double cadence=RuntimeCadence.Pulse(Desktop,battery,interactive,docks.Count>0&&docks.All(d=>!d.Apps.IsVisible),true);if(timer.Interval.TotalMilliseconds!=cadence)timer.Interval=TimeSpan.FromMilliseconds(cadence);
             if(Welcome!=null&&Welcome.IsVisible)Welcome.PreviewBattery.Update(Power);
@@ -618,7 +618,7 @@ namespace OneTaskBar
             int revision=++autoHideRevision;autoHideChanging=true;
             try{Native.SetTaskbarAutoHide(value);for(int i=0;i<20&&Native.TaskbarAutoHide()!=value;i++)await Task.Delay(50);if(revision!=autoHideRevision||disposed)return;if(Native.TaskbarAutoHide()!=value&&Welcome!=null)Welcome.Feedback("Windows 자동 숨김 변경을 확인하지 못했습니다. 다시 시도해 주세요.");}
             catch(Exception error){AppLog.Write("taskbar-autohide",error.Message);if(Welcome!=null)Welcome.Feedback(error.Message);}
-            finally{if(revision==autoHideRevision){autoHideChanging=false;if(!disposed){SyncAutoHide(true);foreach(var dock in docks)dock.UpdateVisibility(Native.IsFullScreen(dock.Screen),DockAutoHide);}}}
+            finally{if(revision==autoHideRevision){autoHideChanging=false;if(!disposed){SyncAutoHide(true);var fullscreenWindows=FullscreenVisibility.Capture();foreach(var dock in docks)dock.UpdateVisibility(FullscreenVisibility.IsFullScreen(dock.Screen.Bounds,fullscreenWindows),DockAutoHide);}}}
         }
         internal bool DockInUse(DockHost dock)
         {

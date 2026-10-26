@@ -17,6 +17,7 @@ namespace OneTaskBar
     {
         [ThreadStatic]internal static string LookupStatus;
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]delegate int Progress(IntPtr state);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]delegate void SqlFunction(IntPtr context,int count,IntPtr values);
         [DllImport("winsqlite3.dll",CallingConvention=CallingConvention.Cdecl)]static extern int sqlite3_open_v2(byte[] file,out IntPtr database,int flags,IntPtr vfs);
         [DllImport("winsqlite3.dll",CallingConvention=CallingConvention.Cdecl)]static extern int sqlite3_close(IntPtr database);
         [DllImport("winsqlite3.dll",CallingConvention=CallingConvention.Cdecl)]static extern int sqlite3_busy_timeout(IntPtr database,int milliseconds);
@@ -27,6 +28,15 @@ namespace OneTaskBar
         [DllImport("winsqlite3.dll",CallingConvention=CallingConvention.Cdecl)]static extern int sqlite3_column_bytes(IntPtr statement,int column);
         [DllImport("winsqlite3.dll",CallingConvention=CallingConvention.Cdecl)]static extern IntPtr sqlite3_column_text(IntPtr statement,int column);
         [DllImport("winsqlite3.dll",CallingConvention=CallingConvention.Cdecl)]static extern int sqlite3_finalize(IntPtr statement);
+        [DllImport("winsqlite3.dll",CallingConvention=CallingConvention.Cdecl)]static extern int sqlite3_create_function_v2(IntPtr database,byte[] name,int count,int encoding,IntPtr state,SqlFunction function,IntPtr step,IntPtr final,IntPtr destroy);
+        [DllImport("winsqlite3.dll",CallingConvention=CallingConvention.Cdecl)]static extern IntPtr sqlite3_value_text(IntPtr value);
+        [DllImport("winsqlite3.dll",CallingConvention=CallingConvention.Cdecl)]static extern int sqlite3_value_bytes(IntPtr value);
+        [DllImport("winsqlite3.dll",CallingConvention=CallingConvention.Cdecl)]static extern void sqlite3_result_null(IntPtr context);
+        [DllImport("winsqlite3.dll",CallingConvention=CallingConvention.Cdecl)]static extern void sqlite3_result_text(IntPtr context,byte[] text,int bytes,IntPtr destructor);
+        static void VideoKey(IntPtr context,int count,IntPtr values)
+        {
+            try{if(count==1&&values!=IntPtr.Zero){var value=Marshal.ReadIntPtr(values);var text=sqlite3_value_text(value);int size=sqlite3_value_bytes(value);if(text!=IntPtr.Zero&&size>0&&size<=8192){var bytes=new byte[size];Marshal.Copy(text,bytes,0,size);string id=VideoId(Encoding.UTF8.GetString(bytes));if(id!=null){bytes=Encoding.UTF8.GetBytes(id);sqlite3_result_text(context,bytes,bytes.Length,new IntPtr(-1));return;}}}}catch{}sqlite3_result_null(context);
+        }
         internal static string VideoId(string address)
         {
             Uri uri;if(!Uri.TryCreate(address,UriKind.Absolute,out uri)||uri.Scheme!="https")return null;string value=null;if(uri.Host.Equals("youtu.be",StringComparison.OrdinalIgnoreCase))value=uri.AbsolutePath.Trim('/');
@@ -62,10 +72,13 @@ namespace OneTaskBar
         }
         static string Query(string file,string title,bool unlocked)
         {
-            LookupStatus="missing-profile-or-title";if(String.IsNullOrWhiteSpace(file)||String.IsNullOrWhiteSpace(title)||title.Length>1024||!File.Exists(file))return null;IntPtr database=IntPtr.Zero,statement=IntPtr.Zero;var clock=Stopwatch.StartNew();Progress progress=state=>clock.ElapsedMilliseconds>60?1:0;
-            try{string path=unlocked?new Uri(Path.GetFullPath(file)).AbsoluteUri+"?mode=ro&nolock=1":file;int opened=sqlite3_open_v2(Encoding.UTF8.GetBytes(path+"\0"),out database,unlocked?65:1,IntPtr.Zero);if(opened!=0){LookupStatus="sqlite-open="+opened;return null;}sqlite3_busy_timeout(database,20);sqlite3_progress_handler(database,2000,progress,IntPtr.Zero);string sql="SELECT url FROM urls WHERE title=?1 OR title=?2 ORDER BY last_visit_time DESC LIMIT 9";int prepared=sqlite3_prepare_v2(database,Encoding.UTF8.GetBytes(sql+"\0"),-1,out statement,IntPtr.Zero);if(prepared!=0){LookupStatus="sqlite-prepare="+prepared;return null;}
-                for(int i=1;i<=2;i++){var bytes=Encoding.UTF8.GetBytes(i==1?title:title+" - YouTube");sqlite3_bind_text(statement,i,bytes,bytes.Length,new IntPtr(-1));}var ids=new HashSet<string>(StringComparer.Ordinal);int status,rows=0;clock.Restart();while((status=sqlite3_step(statement))==100){rows++;int size=sqlite3_column_bytes(statement,0);if(size<=0||size>8192)continue;var bytes=new byte[size];Marshal.Copy(sqlite3_column_text(statement,0),bytes,0,size);string id=VideoId(Encoding.UTF8.GetString(bytes));if(id!=null)ids.Add(id);}LookupStatus="sqlite="+status+";exactRows="+rows+";videoIds="+ids.Count;if(status!=101||rows>8||ids.Count!=1)return null;foreach(var id in ids)return id;
-            }catch(Exception error){AppLog.Once("media-browser-cover",error.GetType().Name);}finally{if(statement!=IntPtr.Zero)sqlite3_finalize(statement);if(database!=IntPtr.Zero)sqlite3_close(database);GC.KeepAlive(progress);}return null;
+            LookupStatus="missing-profile-or-title";if(String.IsNullOrWhiteSpace(file)||String.IsNullOrWhiteSpace(title)||title.Length>1024||!File.Exists(file))return null;IntPtr database=IntPtr.Zero,statement=IntPtr.Zero;var clock=Stopwatch.StartNew();Progress progress=state=>clock.ElapsedMilliseconds>60?1:0;SqlFunction videoKey=VideoKey;
+            try{string path=unlocked?new Uri(Path.GetFullPath(file)).AbsoluteUri+"?mode=ro&nolock=1":file;int opened=sqlite3_open_v2(Encoding.UTF8.GetBytes(path+"\0"),out database,unlocked?65:1,IntPtr.Zero);if(opened!=0){LookupStatus="sqlite-open="+opened;return null;}sqlite3_busy_timeout(database,20);sqlite3_progress_handler(database,2000,progress,IntPtr.Zero);int registered=sqlite3_create_function_v2(database,Encoding.UTF8.GetBytes("one_taskbar_video\0"),1,2049,IntPtr.Zero,videoKey,IntPtr.Zero,IntPtr.Zero,IntPtr.Zero);if(registered!=0){LookupStatus="sqlite-function="+registered;return null;}
+                // Deduplicate playlist/index/seek URLs by validated video ID before limiting results.
+                // The title predicate remains exact; two distinct videos still fail closed.
+                string sql="SELECT DISTINCT one_taskbar_video(url) AS video FROM urls WHERE (title=?1 OR title=?2) AND one_taskbar_video(url) IS NOT NULL LIMIT 2";int prepared=sqlite3_prepare_v2(database,Encoding.UTF8.GetBytes(sql+"\0"),-1,out statement,IntPtr.Zero);if(prepared!=0){LookupStatus="sqlite-prepare="+prepared;return null;}
+                for(int i=1;i<=2;i++){var bytes=Encoding.UTF8.GetBytes(i==1?title:title+" - YouTube");sqlite3_bind_text(statement,i,bytes,bytes.Length,new IntPtr(-1));}int status,rows=0;string video=null;clock.Restart();while((status=sqlite3_step(statement))==100){rows++;int size=sqlite3_column_bytes(statement,0);if(size!=11)continue;var bytes=new byte[size];Marshal.Copy(sqlite3_column_text(statement,0),bytes,0,size);video=Encoding.UTF8.GetString(bytes);}LookupStatus="sqlite="+status+";exactVideoIds="+rows;return status==101&&rows==1?video:null;
+            }catch(Exception error){AppLog.Once("media-browser-cover",error.GetType().Name);}finally{if(statement!=IntPtr.Zero)sqlite3_finalize(statement);if(database!=IntPtr.Zero)sqlite3_close(database);GC.KeepAlive(progress);GC.KeepAlive(videoKey);}return null;
         }
         internal static byte[] Read(string appId,string title)
         {

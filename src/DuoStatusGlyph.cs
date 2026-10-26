@@ -18,6 +18,7 @@ namespace OneTaskBar
         internal int VolumeDots {get{return steps;}}
         internal bool BatteryVisible {get{return known;}}
         internal bool ChargeAnimating {get{return chargeRunning;}}
+        internal Brush BatteryColor {get{return powered?Glass95.DockDark?darkCharge:lightCharge:low?warningInk:ink;}}
         internal string BatteryNumberText {get{return !known?"":level<0?"–":Math.Min(100,level).ToString(CultureInfo.InvariantCulture);}}
         internal Rect BatteryNumberBounds {get;private set;}
         internal static Point VolumeDot(int index){return At(RingCenter,12.7,120-index*20);}
@@ -53,7 +54,7 @@ namespace OneTaskBar
         protected override void OnRender(DrawingContext dc)
         {
             if(ActualWidth<=0||ActualHeight<=0)return;double scale=Math.Min(ActualWidth/32,ActualHeight/34);dc.PushTransform(new ScaleTransform(scale,scale));var pen=Stroke(ink);BatteryNumberBounds=Rect.Empty;
-            if(known){dc.PushOpacity(.22);dc.DrawGeometry(null,pen,track);dc.Pop();double phase=(double)GetValue(ChargePhaseProperty),growth=chargeRunning?Math.Min(1,phase/.75):1;var fill=chargeRunning?Gauge(Math.Max(0,level)/100.0*growth):batteryFill;dc.DrawGeometry(null,low&&!chargeRunning?Stroke(warningInk):pen,fill);
+            if(known){dc.PushOpacity(.22);dc.DrawGeometry(null,pen,track);dc.Pop();double phase=(double)GetValue(ChargePhaseProperty),growth=chargeRunning?Math.Min(1,phase/.75):1;var fill=chargeRunning?Gauge(Math.Max(0,level)/100.0*growth):batteryFill;dc.DrawGeometry(null,Stroke(BatteryColor),fill);
                 if(chargeRunning){var accent=Glass95.DockDark?darkCharge:lightCharge;dc.PushOpacity(Math.Min(1,(1-phase)/.25));dc.DrawGeometry(null,Stroke(accent),fill);dc.Pop();dc.PushOpacity(.7+.3*Math.Sin(Math.PI*phase));Paint.Icon(dc,"bolt",accent,new Point(16,5.3),9.5);dc.Pop();}else DrawNumber(dc,low?warningInk:ink);}
             Paint.Icon(dc,network,ink,RingCenter,14,0,signal,-1);
             for(int i=0;i<4;i++){if(i>=steps)dc.PushOpacity(.24);dc.DrawEllipse(ink,null,VolumeDot(i),1.5,1.5);if(i>=steps)dc.Pop();}dc.Pop();
