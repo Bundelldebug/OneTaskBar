@@ -290,13 +290,14 @@ namespace OneTaskBar
     internal sealed class HudWindow : GlassWindow
     {
         internal static readonly Brush HudGlass=LightPanel.Tint("#80000000","#74000000","#7E000000");
+        internal static readonly Brush ContrastGlass=Paint.Brush("#B3181D24"),ContrastSolid=Paint.Brush("#FF242A30");
         readonly PillSlider slider=new PillSlider("volume") {Margin=new Thickness(10,9,10,9),IsHitTestVisible=false,AnimateValue=false,Light=true};
         internal readonly bool Modern=Preferences.Current.UIVersion>=90;
         internal double DisplayHeight {get{return Modern?QuickWidgetBoard.ControlHeight:62;}}
         internal PillSlider Slider {get{return slider;}}
         internal HudWindow() { Title="One TaskBar · 밝기 및 음량"; Width=286; Height=DisplayHeight; Radius=DisplayHeight/2;Dark=Modern;UnifiedFade=true;Surface.Background=Modern?HudGlass:PanelMaterial.Surface(Glass95.Dark,false); Surface.CornerRadius=new CornerRadius(Radius); Surface.Child=slider; ShowActivated=false;
             if(Modern&&!Glass95.Enabled)slider.ValueNumberInk=Paint.ControlWhite;
-            if(Glass95.Enabled)slider.GlassStandalone=true;if(Modern){slider.Margin=new Thickness(0);slider.Height=Double.NaN;slider.MinWidth=0;slider.NoTrackBorder=true;slider.LinearFill=true;Surface.BorderThickness=new Thickness(0);Surface.BorderBrush=Brushes.Transparent;}
+            if(Glass95.Enabled){slider.GlassStandalone=false;slider.ContrastTrack=true;slider.ValueNumberInk=Paint.ControlWhite;}if(Modern){slider.Margin=new Thickness(0);slider.Height=Double.NaN;slider.MinWidth=0;slider.NoTrackBorder=true;slider.LinearFill=true;Surface.BorderThickness=new Thickness(0);Surface.BorderBrush=Brushes.Transparent;}
             SourceInitialized+=(s,e)=> { var h=new WindowInteropHelper(this).Handle; Native.SetWindowLong(h,-20,Native.GetWindowLong(h,-20)|0x80|0x08000000);HwndSource.FromHwnd(h).CompositionTarget.RenderMode=RenderMode.SoftwareOnly; };
         }
         internal void Reveal(){Show();Surface.InvalidateVisual();Native.SetWindowPos(new WindowInteropHelper(this).Handle,new IntPtr(-1),0,0,0,0,0x53);}
