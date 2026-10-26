@@ -56,10 +56,8 @@ namespace OneTaskBar
             refreshButton.IsEnabled=false;scanIndicator.SetScanning(IsVisible);
             try {
                 if(page=="sound") {
-                    var slider=new PillSlider("volume") {Value=shell.Audio.Muted?0:shell.Audio.Value,Light=true,DarkTrack=true};slider.Changed+=v=>shell.Volume(v);body.Children.Add(Card(slider));Action(shell.Audio.Muted?"음소거 해제":"음소거",()=> {shell.Mute();Reload();});
-                    var outputs=await Task.Run(()=>Native.AudioOutputs());if(closed)return;if(outputs.Any(o=>o.Current&&BudsInfo.IsBuds(o.Name))){var symbol=await BackgroundWork.Run(BudsDeviceData.ShortcutIcon);if(closed)return;slider.SetDeviceIcon(symbol);}
-                    foreach(var output in outputs){var d=output;Action((d.Current?"✓  ":"")+d.Name,async()=> {try{await Task.Run(()=>Native.SetAudioOutput(d.Id));shell.Audio.Dispose();shell.Audio.Read();Reload();}catch(Exception e){status.Text=e.Message;}});}
-                    status.Text="출력 장치를 선택하면 Windows의 기본 소리 출력도 함께 바뀝니다.";
+                    var outputs=await BackgroundWork.Run(Native.AudioOutputs);if(closed)return;ImageSource symbol=null;if(outputs.Any(o=>BudsInfo.IsBuds(o.Name))){symbol=await BackgroundWork.Run(BudsDeviceData.ShortcutIcon);if(closed)return;}
+                    body.Children.Add(new AudioOutputView(outputs,shell.Services.Media,shell.Audio.Value,shell.Audio.Muted,async id=>{deviceActions++;try{await BackgroundWork.Run(()=>{Native.SetAudioOutput(id);return true;});if(closed)return;shell.Audio.Dispose();shell.Audio.Read();Reload();}finally{deviceActions--;}},shell.Volume,()=>{shell.Mute();Reload();},()=>shell.Media("play"),()=>shell.OpenMediaApplication(shell.Services.Media.AppId),message=>status.Text=message,symbol));status.Text="";
                 } else if(page=="power") {
                     if(PowerDisplay.Slot(shell.Power,Preferences.Current.DesktopPowerWatts)>0)body.Children.Add(Card(new BatteryPill {Width=140,Height=40,State=shell.Power}));
                     Text(shell.Power.Known?(shell.Power.Connected?"전원에 연결되어 있습니다":"배터리를 사용하고 있습니다"):"배터리가 없는 PC · Windows 전원 관리를 사용합니다");
