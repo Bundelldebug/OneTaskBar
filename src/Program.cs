@@ -60,6 +60,7 @@ namespace OneTaskBar
             if(args.Contains("--quick9-probe"))return QuickWidgetChecks.Run();
             if(args.Contains("--glass95-probe"))return Glass95Checks.Run(args.Contains("--inspect"));
             if(args.Contains("--beta-feedback-probe"))return BetaFeedbackChecks.Run();
+            if(args.Contains("--panel-theme-probe"))return PanelThemeChecks.Run();
             if(args.Contains("--media9-probe"))return MediaModernChecks.Run();
             if(args.Contains("--launcher-motion-probe"))return LauncherMotionChecks.Run();
             if(args.Contains("--deferred-icon-probe"))return DeferredIconChecks.Run();

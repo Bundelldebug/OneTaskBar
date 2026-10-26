@@ -14,10 +14,10 @@ namespace OneTaskBar
             internal readonly Brush Surface,Card,Solid,Text,Muted,Rail,Toggle,Rim;
             internal Palette(bool dark)
             {
-                Surface=PanelMaterial.Surface(dark,true);
-                Card=Film(dark);
-                Solid=Paint.Brush(dark?"#FF242832":"#FFF1F4FA");Text=Paint.Brush(dark?"#FFF5F7FC":"#FF172336");Muted=Paint.Brush(dark?"#FFD1D9E7":"#FF4C5B70");
-                Rail=Paint.Brush(dark?"#626C7A91":"#364F6481");Toggle=Paint.Brush(dark?"#28FFFFFF":"#70FFFFFF");Rim=Edge(dark,true);
+                Surface=PanelMaterial.PanelSurface(dark,true);
+                Card=Film(true);
+                Solid=dark?PanelMaterial.DarkSolid:Paint.Brush("#FF242832");Text=dark?PanelMaterial.DarkText:Paint.Brush("#FFF5F7FC");Muted=dark?PanelMaterial.DarkMuted:Paint.Brush("#FFD1D9E7");
+                Rail=Paint.Brush("#626C7A91");Toggle=Paint.Brush("#28FFFFFF");Rim=Edge(true,true);
             }
         }
         static readonly Palette light=new Palette(false),dark=new Palette(true);
@@ -28,7 +28,7 @@ namespace OneTaskBar
         static Palette Current {get{return Dark?dark:light;}}
         internal static bool CardBrush(Brush brush){return brush!=null&&(brush==light.Card||brush==dark.Card);}
         internal static bool Transparent {get{return Preferences.Current.Blur&&!SystemParameters.HighContrast;}}
-        internal static Brush Surface {get{return PanelMaterial.Surface(Dark,true);}}
+        internal static Brush Surface {get{return PanelMaterial.PanelSurface(Dark,true);}}
         internal static Brush Card {get{return Current.Card;}}
         internal static Brush Solid {get{return SystemParameters.HighContrast?SystemColors.WindowBrush:Current.Solid;}}
         internal static Brush Text {get{return SystemParameters.HighContrast?SystemColors.WindowTextBrush:Current.Text;}}

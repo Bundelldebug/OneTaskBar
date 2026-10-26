@@ -290,7 +290,7 @@ namespace OneTaskBar
         internal readonly bool Modern=Preferences.Current.UIVersion>=90;
         internal double DisplayHeight {get{return Modern?QuickWidgetBoard.ControlHeight:62;}}
         internal PillSlider Slider {get{return slider;}}
-        internal HudWindow() { Title="One TaskBar · 밝기 및 음량"; Width=286; Height=DisplayHeight; Radius=DisplayHeight/2;Dark=Modern;UnifiedFade=true;Surface.Background=Modern?HudGlass:GrayPanel.Glass; Surface.CornerRadius=new CornerRadius(Radius); Surface.Child=slider; ShowActivated=false;
+        internal HudWindow() { Title="One TaskBar · 밝기 및 음량"; Width=286; Height=DisplayHeight; Radius=DisplayHeight/2;Dark=Modern;UnifiedFade=true;Surface.Background=Modern?HudGlass:PanelMaterial.Surface(Glass95.Dark,false); Surface.CornerRadius=new CornerRadius(Radius); Surface.Child=slider; ShowActivated=false;
             if(Modern&&!Glass95.Enabled)slider.ValueNumberInk=Paint.ControlWhite;
             if(Glass95.Enabled)slider.GlassStandalone=true;if(Modern){slider.Margin=new Thickness(0);slider.Height=Double.NaN;slider.MinWidth=0;slider.NoTrackBorder=true;slider.LinearFill=true;Surface.BorderThickness=new Thickness(0);Surface.BorderBrush=Brushes.Transparent;}
             SourceInitialized+=(s,e)=> { var h=new WindowInteropHelper(this).Handle; Native.SetWindowLong(h,-20,Native.GetWindowLong(h,-20)|0x80|0x08000000);HwndSource.FromHwnd(h).CompositionTarget.RenderMode=RenderMode.SoftwareOnly; };
@@ -323,10 +323,9 @@ namespace OneTaskBar
             folderName=new TextBox {FontSize=18,FontWeight=FontWeights.SemiBold,Foreground=Paint.Text,Background=Brushes.Transparent,BorderThickness=new Thickness(0),Padding=new Thickness(5,7,5,7),MaxLength=48,ToolTip="폴더 이름 변경"};Grid.SetColumn(folderName,1);folderHeading.Children.Add(folderName);DockPanel.SetDock(folderHeading,Dock.Top);root.Children.Add(folderHeading);
             folderName.LostKeyboardFocus+=(s,e)=>CommitName();folderName.PreviewKeyDown+=(s,e)=> {if(e.Key==Key.Enter){CommitName();Keyboard.ClearFocus();e.Handled=true;}};
             DragReorder.DropArea(folderHeading,"drawer.apps",()=>folder!=null,(key,point)=> {bool moved=shell.AppScreen.Extract(key);if(moved)folder=null;return moved;},(key,point)=>preview="extract");
-            var search=new Border {Background=Paint.Brush("#EDFFFFFF"),CornerRadius=new CornerRadius(24),Padding=new Thickness(17,3,17,3),Margin=new Thickness(0,16,0,0),Width=420,MaxWidth=420};
+            var search=LauncherSearchField.Create(Search,()=>{Search.Clear();Search.Focus();});search.Margin=new Thickness(0,16,0,0);search.Width=search.MaxWidth=420;Search.MaxLength=120;
             searchBar=search;
-            var field=new Grid();field.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(27)});field.ColumnDefinitions.Add(new ColumnDefinition());field.Children.Add(new Glyph("search",20){Color=LightPanel.Muted,VerticalAlignment=VerticalAlignment.Center});Search.MaxLength=120;Grid.SetColumn(Search,1);field.Children.Add(Search);var hint=Paint.TextBlock("검색",15,LightPanel.Muted);hint.IsHitTestVisible=false;hint.Margin=new Thickness(6,0,0,0);Grid.SetColumn(hint,1);field.Children.Add(hint);search.Child=field;
-            Search.TextChanged+=(s,e)=> {hint.Visibility=Search.Text.Length==0?Visibility.Visible:Visibility.Collapsed;if(!composing)QueueSearch();};
+            Search.TextChanged+=(s,e)=> {if(!composing)QueueSearch();};
             TextCompositionManager.AddPreviewTextInputStartHandler(Search,(s,e)=>composing=true);TextCompositionManager.AddPreviewTextInputUpdateHandler(Search,(s,e)=>composing=true);Search.PreviewTextInput+=(s,e)=> {composing=false;QueueSearch();};Search.PreviewMouseLeftButtonDown+=(s,e)=> {if(Search.Text.Length==0){shell.ToggleSearch(null);e.Handled=true;}};
             var bottom=new StackPanel {HorizontalAlignment=HorizontalAlignment.Center};bottom.Children.Add(search);count.HorizontalAlignment=HorizontalAlignment.Center;count.Margin=new Thickness(0,8,0,0);bottom.Children.Add(count);DockPanel.SetDock(bottom,Dock.Bottom);root.Children.Add(bottom);
             appScroll=new SmoothScrollViewer {Content=items,VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};root.Children.Add(appScroll);
@@ -346,6 +345,7 @@ namespace OneTaskBar
             if(loadedApps==shell.Apps&&loadedWidth==cellWidth&&folder==null)return;loadedApps=shell.Apps;loadedWidth=cellWidth;folder=null;shell.AppScreen.Reconcile(shell.Apps);RefreshApps();
         }
         internal void RefreshApps(){tiles=shell.AppScreen.Tiles(shell.Apps);if(folder!=null&&!tiles.Any(t=>t.Key==folder&&t.Folder))folder=null;RenderApps();}
+        internal void RestoreSearch(string value){bool previous=composing;composing=true;try{Search.Text=value??"";}finally{composing=previous;}}
         List<StartTile> Current(){var node=tiles.FirstOrDefault(t=>t.Key==folder&&t.Folder);return node==null?tiles:node.Children;}
         void RenderApps()
         {

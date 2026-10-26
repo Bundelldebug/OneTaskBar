@@ -15,16 +15,16 @@ namespace OneTaskBar
         static void Opened(object sender,RoutedEventArgs args)
         {
             var menu=sender as ContextMenu;if(menu==null)return;MenuDismiss.Open(menu);
-            bool dark=Glass95.Dark,gray=false;
-            menu.Background=Preferences.Current.Blur?QuickPanel.Glass:Paint.Brush(dark?"#FF343936":"#FFE4E9ED");
+            bool dark=Glass95.Dark;
+            menu.Background=Preferences.Current.Blur?QuickPanel.Glass:PanelMaterial.Solid(dark);
             menu.Resources["MenuRadius"]=new CornerRadius(Glass95.Enabled?24:18);
             if(Glass95.Enabled){menu.Background=Glass95.Transparent?Glass95.Surface:Glass95.Solid;menu.BorderBrush=Glass95.Rim;menu.BorderThickness=new Thickness(.6);}
-            menu.Foreground=dark?Paint.ControlWhite:PanelMaterial.LightText;foreach(object entry in menu.Items){var item=entry as MenuItem;if(item!=null){item.Foreground=menu.Foreground;var icon=item.Icon as Glyph;if(icon!=null)icon.Color=menu.Foreground;}}
+            menu.Foreground=PanelMaterial.Text(dark);foreach(object entry in menu.Items){var item=entry as MenuItem;if(item!=null){item.Foreground=menu.Foreground;var icon=item.Icon as Glyph;if(icon!=null)icon.Color=menu.Foreground;}}
             if(Glass95.Enabled){menu.Foreground=Glass95.Text;foreach(object entry in menu.Items){var item=entry as MenuItem;if(item!=null){item.Foreground=Glass95.Text;var icon=item.Icon as Glyph;if(icon!=null)icon.Color=Glass95.Text;}}}
             menu.Dispatcher.BeginInvoke(new Action(()=> {
-                if(!menu.IsOpen||!Preferences.Current.Blur||Glass95.Enabled&&!Glass95.Transparent)return;
+                if(!menu.IsOpen||!Preferences.Current.Blur||SystemParameters.HighContrast||Glass95.Enabled&&!Glass95.Transparent)return;
                 try {LiveBackdrop previous;if(backdrops.TryGetValue(menu,out previous)){previous.Dispose();backdrops.Remove(menu);}var blur=new LiveBackdrop(menu,Glass95.Enabled?24:18);backdrops.Add(menu,blur);}
-                catch(Exception e){menu.Background=Paint.Brush(dark?"#FF343936":gray?"#FFBEC6C1":"#FFD4DDD6");AppLog.Once("menu-blur",e.Message);}
+                catch(Exception e){menu.Background=PanelMaterial.Solid(dark);AppLog.Once("menu-blur",e.Message);}
             }),DispatcherPriority.Loaded);
         }
         static void Closed(object sender,RoutedEventArgs args) {var menu=sender as ContextMenu;if(menu!=null)MenuDismiss.Close(menu);LiveBackdrop blur;if(menu!=null&&backdrops.TryGetValue(menu,out blur)){blur.Dispose();backdrops.Remove(menu);}}

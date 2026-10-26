@@ -17,7 +17,8 @@ namespace OneTaskBar
             Center=SwapTheme(Center,()=>new NotificationWindow(this),w=>w.Refresh());string detailPage=Detail!=null?Detail.PageKey:null;
             Detail=SwapTheme(Detail,()=>new DetailWindow(this,detailPage),null);Calendar=SwapTheme(Calendar,()=>new CalendarWindow(),null);
             string query=Finder!=null?Finder.Query.Text:null;Finder=SwapTheme(Finder,()=>new SearchWindow(this),w=>{w.Configure(w.Width,w.Height);w.Query.Text=query??"";w.Reload();});
-            Drawer=SwapTheme(Drawer,()=>new DrawerWindow(this),w=>{w.Configure(w.Width,w.Height);w.Reload();});StartMenu=SwapTheme(StartMenu,()=>new StartWindow(this),w=>{w.Configure(w.Width,w.Height);w.Reload();});
+            string drawerQuery=Drawer!=null?Drawer.Search.Text:null,drawerFolder=Drawer!=null?Drawer.OpenFolderKey:null,startFolder=StartMenu!=null?StartMenu.OpenFolderKey:null;bool recentPage=StartMenu!=null&&StartMenu.RecentPage;
+            Drawer=SwapTheme(Drawer,()=>new DrawerWindow(this),w=>{w.Configure(w.Width,w.Height);w.Reload();w.RestoreSearch(drawerQuery);if(!String.IsNullOrEmpty(drawerFolder))w.OpenFolder(drawerFolder);});StartMenu=SwapTheme(StartMenu,()=>new StartWindow(this),w=>{w.Configure(w.Width,w.Height);w.Reload();if(!String.IsNullOrEmpty(startFolder))w.OpenPinFolder(startFolder);if(recentPage)w.ShowRecentPage(true);});
             string page=Welcome!=null?Welcome.SettingsPage:null,search=Welcome!=null?Welcome.SearchSettings.Text:null;
             Welcome=SwapTheme(Welcome,()=>new WelcomeWindow(this),w=>{w.UpdateMode();w.SearchSettings.Text=search??"";if(!String.IsNullOrEmpty(page))w.OpenSettings(page);});
             if(hud!=null){hud.Close();hud=null;hudScreen=null;}foreach(var dock in docks)dock.Rebuild();
