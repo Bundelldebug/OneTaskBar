@@ -20,6 +20,7 @@ namespace OneTaskBar
             CompactStatusChecks.Validate(checks);
             IssueFollowupChecks.Validate(checks);
             PanelThemeChecks.Validate(checks);
+            QuickSettingChecks.Validate(checks);
             foreach(bool windowsDark in new[]{false,true}){Require(AppTheme.Resolve(0,windowsDark)==windowsDark,"Follow Windows palette");Require(!AppTheme.Resolve(1,windowsDark)&&AppTheme.Resolve(2,windowsDark),"Explicit app palettes are independent");}
             foreach(uint state in new uint[]{0,1,2,3})Require(TaskbarSpace.Physical(state,false)==(state|1U)&&TaskbarSpace.Physical(state,true)==(state&~1U),"Work-area lease preserves unrelated taskbar flags");
             Require(RecentThumbnails.Supported(@"C:\Pictures\photo.png")&&RecentThumbnails.Supported(@"D:\Films\movie.mp4")&&!RecentThumbnails.Supported(@"\\server\private\photo.jpg")&&!RecentThumbnails.Supported(@"C:\Programs\app.exe")&&!RecentThumbnails.Supported("https://example.com/photo.png"),"Recent preview paths and types are limited");
