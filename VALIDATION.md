@@ -1,4 +1,15 @@
-# 9.0.4 / 9.5.1-beta.1 validation
+# 9.0.5 / 9.5.2-beta.1 validation
+
+- Stable file/product versions: 9.0.5.0 / 9.0.5. Beta: 9.5.2.0 / 9.5.2-beta.1. The stable feature gate exposes UI 8.5/9.0; beta also exposes 9.5.
+- The local beta passes all 23 isolated fixtures through `tools/Test-UI.ps1 -Area All`. Stable skips the glass-only fixture. CI uses the same runner, including the new native dock recovery fixture. Each fixture has its own temporary data directory; live signaling and hardware-changing probes are excluded from this runner.
+- Regression coverage includes hidden/minimized owned dock HWND recovery without stealing focus, deliberate fullscreen hiding, status shortcut geometry at all four edges, Buds connection state, grouping/extraction of action and setting tiles, scrollable large groups, first-free-cell placement, pill picker search, resize clocks, search keyboard handling, window activation, native previews, notification assets, output transitions/corner clipping and idle panel retirement.
+- Floating notification, switcher and preview surfaces now intentionally share the exact Quick-panel tint. This supersedes the historical 92%-opaque popup treatment below. Audio output has its requested dark gray internal palette, cached frozen cover blur and clipped rounded content. Keyboard HUD contrast is separate.
+- Repeated unchanged toggle refreshes reuse their brush and avoid accessibility/property writes. Unchanged widget captions and shapes are reused. Notification app-icon and activation caches evict apps absent from the latest snapshot and clear when integration stops; pending snapshots do not republish after disposal. Buds watch shutdown clears connection state.
+- Quick UI source is split into construction (`QuickGridSurface`), editing (`QuickGridEditing`), state updates (`QuickGridState`) and tile rendering (`QuickWidgetTile`), with normal line breaks. `AGENTS.md` and `docs/DEBUGGING.md` route symptoms to exact files and focused test areas, reducing unrelated source/report reads.
+- Local normal installation preserved all 8 configuration/pin/layout files and verified one main process plus one recovery helper. Exact release assets receive payload and Defender checks before publication. Builds remain unsigned with the maintainer's authorization; no trust, security policy or antivirus exclusion is changed.
+- Runtime measurement after this checkpoint: about 216.6 MiB combined working set and 85.4 MiB private working set over 30 seconds, one display, media inactive. The preceding 276.5 MiB sample had active media, so these samples do not establish a percentage improvement. The 150 MiB total-RAM goal remains unmet. No forced GC or working-set trim is used.
+
+## Historical 9.0.4 / 9.5.1-beta.1 validation
 
 - Both releases include the common local beta 10 fixes below. Assembly/file versions are 9.0.4.0 and 9.5.1.0; product versions are 9.0.4 and 9.5.1-beta.1. The stable feature gate exposes only UI 8.5/9.0 and preserves theme settings when normalizing a saved UI 9.5 choice.
 - Selected Samsung mode glyphs now use the fixed dark-on-white brush, including when OEM access is denied. The same correction covers notification connection and Buds action controls. All four Samsung selection states are exercised with ready/denied access, both themes and every supported UI without changing hardware performance mode.
