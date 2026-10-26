@@ -14,6 +14,7 @@ namespace OneTaskBar
     internal sealed class DetailWindow : GlassWindow
     {
         readonly ShellController shell;readonly string page;
+        Border outputArtwork;
         internal string PageKey {get{return page;}}
         readonly StackPanel body=new StackPanel();readonly TextBlock status=Paint.TextBlock("",12,Paint.Muted);
         readonly DispatcherTimer ticker=new DispatcherTimer {Interval=TimeSpan.FromSeconds(1)};
@@ -40,6 +41,7 @@ namespace OneTaskBar
             refreshButton=Paint.Button(scanIndicator,()=>{Reload();if(page=="power")CheckSamsungAccess(true);},"다시 검색");refreshButton.Width=refreshButton.Height=34;refreshButton.VerticalAlignment=VerticalAlignment.Center;refreshButton.Background=Brushes.Transparent;refreshButton.Padding=new Thickness(0);refreshButton.HorizontalAlignment=HorizontalAlignment.Right;header.Children.Add(refreshButton);DockPanel.SetDock(header,Dock.Top);root.Children.Add(header);
             status.TextWrapping=TextWrapping.Wrap;status.Margin=new Thickness(5,10,5,0);DockPanel.SetDock(status,Dock.Bottom);root.Children.Add(status);
             root.Children.Add(new SmoothScrollViewer {Content=body,VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});Surface.Child=root;
+            if(page=="sound"){SmoothLauncher=true;var layers=new Grid();var fade=new LinearGradientBrush {StartPoint=new Point(0,0),EndPoint=new Point(0,1)};fade.GradientStops.Add(new GradientStop(Color.FromArgb(170,255,255,255),0));fade.GradientStops.Add(new GradientStop(Colors.Transparent,1));fade.Freeze();outputArtwork=new Border {Height=260,VerticalAlignment=VerticalAlignment.Top,IsHitTestVisible=false,OpacityMask=fade,Background=ArtworkPalette.OutputSurface(shell.Services.Media.Artwork)};layers.Children.Add(outputArtwork);Surface.Child=null;layers.Children.Add(root);Surface.Child=layers;TransitionContent=layers;}
             Closed+=(s,e)=> {closed=true;ticker.Stop();CancelScan();};Deactivated+=(s,e)=> {if(deviceActions==0&&!Program.Inspectable&&IsVisible&&!IsMouseOver)Hide();};if(!Wireless)Reload();
             ticker.Tick+=(s,e)=> {if(page=="focus")FocusStatus();else if(page=="power"&&!busy&&!changingMode&&!changingSamsung)RefreshPowerSelection();};
             IsVisibleChanged+=(s,e)=> {if(IsVisible&&(page=="focus"||page=="power"))ticker.Start();else ticker.Stop();if(Wireless){if(IsVisible)Reload();else CancelScan();}else scanIndicator.SetScanning(busy&&IsVisible);};
@@ -52,12 +54,12 @@ namespace OneTaskBar
         async void Reload()
         {
             if(Wireless){ReloadWireless();return;}
-            if(busy||closed||changingMode||changingSamsung)return;busy=true;body.Children.Clear();samsungButtons.Clear();windowsButtons.Clear();status.Text="불러오는 중…";
+            if(busy||closed||changingMode||changingSamsung)return;busy=true;if(page!="sound")body.Children.Clear();samsungButtons.Clear();windowsButtons.Clear();status.Text=page=="sound"&&body.Children.Count>0?"":"불러오는 중…";
             refreshButton.IsEnabled=false;scanIndicator.SetScanning(IsVisible);
             try {
                 if(page=="sound") {
                     var outputs=await BackgroundWork.Run(Native.AudioOutputs);if(closed)return;ImageSource symbol=null;if(outputs.Any(o=>BudsInfo.IsBuds(o.Name))){symbol=await BackgroundWork.Run(BudsDeviceData.ShortcutIcon);if(closed)return;}
-                    body.Children.Add(new AudioOutputView(outputs,shell.Services.Media,shell.Audio.Value,shell.Audio.Muted,async id=>{deviceActions++;try{await BackgroundWork.Run(()=>{Native.SetAudioOutput(id);return true;});if(closed)return;shell.Audio.Dispose();shell.Audio.Read();Reload();}finally{deviceActions--;}},shell.Volume,()=>{shell.Mute();Reload();},()=>shell.Media("play"),()=>shell.OpenMediaApplication(shell.Services.Media.AppId),message=>status.Text=message,symbol));status.Text="";
+                    body.Children.Clear();if(outputArtwork!=null)outputArtwork.Background=ArtworkPalette.OutputSurface(shell.Services.Media.Artwork);body.Children.Add(new AudioOutputView(outputs,shell.Services.Media,shell.Audio.Value,shell.Audio.Muted,async id=>{deviceActions++;try{await BackgroundWork.Run(()=>{Native.SetAudioOutput(id);return true;});if(closed)return;shell.Audio.Dispose();shell.Audio.Read();Reload();}finally{deviceActions--;}},shell.Volume,()=>{shell.Mute();Reload();},()=>shell.Media("play"),()=>shell.OpenMediaApplication(shell.Services.Media.AppId),message=>status.Text=message,symbol));status.Text="";LauncherMotion.Page(TransitionContent);
                 } else if(page=="power") {
                     if(PowerDisplay.Slot(shell.Power,Preferences.Current.DesktopPowerWatts)>0)body.Children.Add(Card(new BatteryPill {Width=140,Height=40,State=shell.Power}));
                     Text(shell.Power.Known?(shell.Power.Connected?"전원에 연결되어 있습니다":"배터리를 사용하고 있습니다"):"배터리가 없는 PC · Windows 전원 관리를 사용합니다");
