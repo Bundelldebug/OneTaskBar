@@ -51,7 +51,7 @@ namespace OneTaskBar
             renderQueued=false;ResultBuilds++;Cancel();Navigation.Clear();cards.Children.Clear();string query=Query.Text.Trim();
             var apps=query.Length==0?Recommendations():LauncherSearch.Apps(shell.Apps,query);
             if(apps.Count>0)AppCard(query.Length==0?"추천 앱":"검색된 앱",apps);
-            if(query.Length==0){SettingCard("주제별 설정",LauncherSearch.Settings.Take(6));RecentCard();return;}
+            if(query.Length==0){RecentCard();SettingCard("주제별 설정",LauncherSearch.Settings.Take(6));return;}
             var settings=LauncherSearch.Settings.Where(s=>LauncherSearch.Matches(s.Name+" "+s.Keywords,query)).ToList();if(settings.Count>0)SettingCard("설정",settings);
             files=new StackPanel();files.Children.Add(Label("파일과 사진을 찾고 있습니다…",12,LightPanel.Muted));filesCard=Card("내 파일",files);
             debounce.Start();
@@ -76,7 +76,13 @@ namespace OneTaskBar
         void RecentCard()
         {
             var wrap=new WrapPanel();if(history.Items.Count==0)wrap.Children.Add(Label("검색 결과를 열면 여기에 최근 검색이 표시됩니다",12,LightPanel.Muted));
-            foreach(string saved in history.Items.ToArray()){string query=saved;var row=new StackPanel {Orientation=Orientation.Horizontal};var repeat=Paint.Action(query,()=> {Query.Text=query;Query.Focus();Query.CaretIndex=Query.Text.Length;});repeat.Background=Brushes.Transparent;repeat.Padding=new Thickness(12,7,5,7);Navigation.Add(repeat,()=> {Query.Text=query;Query.Focus();Query.CaretIndex=Query.Text.Length;});row.Children.Add(repeat);var remove=Paint.Button(new Glyph("close",13){Color=Paint.Text},()=> {history.Remove(query);Reload();},"최근 검색 삭제");remove.Background=Brushes.Transparent;remove.Padding=new Thickness(6);row.Children.Add(remove);wrap.Children.Add(new Border {CornerRadius=new CornerRadius(20),Background=Paint.Brush(QuickPanel.Inactive),Child=row,Margin=new Thickness(0,0,8,7)});}Card("최근 검색",wrap,()=> {history.Clear();Reload();});
+            foreach(string saved in history.Items.ToArray()){string query=saved;Action repeat=()=> {Query.Text=query;Query.Focus();Query.CaretIndex=Query.Text.Length;};Button button;var chip=RecentChip(query,repeat,()=> {history.Remove(query);Reload();},out button);Navigation.Add(button,repeat);wrap.Children.Add(chip);}Card("최근 검색",wrap,()=> {history.Clear();Reload();});
+        }
+        internal static Border RecentChip(string query,Action repeat,Action remove,out Button button)
+        {
+            var row=new StackPanel {Orientation=Orientation.Horizontal};button=Paint.Action(query,repeat);button.Height=34;button.MaxWidth=260;button.Background=Brushes.Transparent;button.Padding=new Thickness(13,0,4,0);var label=button.Content as TextBlock;if(label!=null)label.TextTrimming=TextTrimming.CharacterEllipsis;row.Children.Add(button);
+            var clear=Paint.Button(new Glyph("close",12){Color=Paint.Text},remove,"최근 검색 삭제");clear.Width=26;clear.Height=26;clear.VerticalAlignment=VerticalAlignment.Center;clear.Background=Brushes.Transparent;clear.Padding=new Thickness(0);clear.Margin=new Thickness(0,0,4,0);clear.Resources["ButtonRadius"]=new CornerRadius(13);row.Children.Add(clear);
+            return new Border {Height=34,CornerRadius=new CornerRadius(17),Background=Paint.Brush(QuickPanel.Inactive),Child=row,Margin=new Thickness(0,0,8,8)};
         }
         async Task FindFiles()
         {
