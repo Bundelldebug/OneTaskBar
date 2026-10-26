@@ -118,13 +118,9 @@ namespace OneTaskBar
         }
         internal static bool IsFullScreen(Forms.Screen screen)
         {
-            var h=GetForegroundWindow(); uint pid; GetWindowThreadProcessId(h,out pid);
-            if(pid==Process.GetCurrentProcess().Id||!IsWindowVisible(h)||IsIconic(h))return false;
-            var name=new StringBuilder(100); GetClassName(h,name,100); if(name.ToString()=="Progman" || name.ToString()=="WorkerW" || name.ToString().StartsWith("Shell_")) return false;
-            RectI r; if(!GetWindowRect(h,out r)) return false;
-            return CoversMonitor(r,screen.Bounds,IsZoomed(h),(GetWindowLong(h,-16)&0xC40000)!=0);
+            return FullscreenVisibility.IsFullScreen(screen.Bounds,FullscreenVisibility.Capture());
         }
-        [DllImport("user32.dll")]static extern bool IsZoomed(IntPtr window);
+        [DllImport("user32.dll")]internal static extern bool IsZoomed(IntPtr window);
         internal static bool CoversMonitor(RectI rect,System.Drawing.Rectangle screen,bool maximized,bool framed){return !(maximized&&framed)&&rect.Left<=screen.Left&&rect.Top<=screen.Top&&rect.Right>=screen.Right&&rect.Bottom>=screen.Bottom;}
         internal static bool TaskbarAutoHide(){if(TaskbarSpace.Owned)return TaskbarSpace.AutoHide;if(TaskbarMask.TransientState)return TaskbarMask.SavedAutoHide;var data=new AppBarData {Size=(uint)Marshal.SizeOf(typeof(AppBarData))};return (SHAppBarMessage(4,ref data).ToUInt64()&1)!=0;}
         internal static void SetTaskbarAutoHide(bool value)

@@ -17,11 +17,13 @@ namespace OneTaskBar
         {
             string file=Path.Combine(Path.GetTempPath(),"OneTaskBar-locked-cover-"+Guid.NewGuid().ToString("N")+".db");IntPtr database=IntPtr.Zero;
             try{
-                if(sqlite3_open_v2(Encoding.UTF8.GetBytes(file+"\0"),out database,6,IntPtr.Zero)!=0||sqlite3_exec(database,Encoding.UTF8.GetBytes("CREATE TABLE urls(url TEXT,title TEXT,last_visit_time INTEGER);INSERT INTO urls VALUES('https://www.youtube.com/watch?v=AbC_123-xYz','Current title',1);PRAGMA locking_mode=EXCLUSIVE;BEGIN EXCLUSIVE;COMMIT;\0"),IntPtr.Zero,IntPtr.Zero,IntPtr.Zero)!=0)throw new Exception("Cover lock fixture failed to initialize");
+                var fixture=new StringBuilder("CREATE TABLE urls(url TEXT,title TEXT,last_visit_time INTEGER);");for(int i=0;i<120;i++){fixture.Append("INSERT INTO urls VALUES('https://www.youtube.com/watch?v=AbC_123-xYz&list=RDfixture&index=").Append(i).Append("','Current title',").Append(i).Append(");");fixture.Append("INSERT INTO urls VALUES('https://www.youtube.com/watch?v=AbC_123-xYz&list=RDfixture&index=").Append(i).Append("','Ambiguous title',").Append(i).Append(");");}fixture.Append("INSERT INTO urls VALUES('https://youtu.be/ZyX-321_CbA','Ambiguous title',-1);PRAGMA locking_mode=EXCLUSIVE;BEGIN EXCLUSIVE;COMMIT;\0");
+                if(sqlite3_open_v2(Encoding.UTF8.GetBytes(file+"\0"),out database,6,IntPtr.Zero)!=0||sqlite3_exec(database,Encoding.UTF8.GetBytes(fixture.ToString()),IntPtr.Zero,IntPtr.Zero,IntPtr.Zero)!=0)throw new Exception("Cover lock fixture failed to initialize");
                 byte[] before;using(var sha=SHA256.Create())before=HashFile(file);string video=YouTubeArtwork.Find(file,"Current title");if(video!="AbC_123-xYz"||!YouTubeArtwork.LookupStatus.StartsWith("readonly-stable;",StringComparison.Ordinal))throw new Exception("Stable, exclusively locked browser history cannot resolve the exact video");
+                if(YouTubeArtwork.Find(file,"Ambiguous title")!=null)throw new Exception("Repeated playlist URLs concealed a second distinct video");
                 using(var sha=SHA256.Create())if(!before.SequenceEqual(HashFile(file)))throw new Exception("Read-only cover lookup changed history");
                 File.WriteAllBytes(file+"-journal",new byte[]{217,213,5,249,32,161,99,215});if(YouTubeArtwork.Find(file,"Current title")!=null||YouTubeArtwork.LookupStatus!="browser-writing")throw new Exception("An active browser journal was read without a stable snapshot");
-                checks.Add("Locked browser cover lookup is exact, read-only, unchanged on disk and rejected while a write journal is active");
+                checks.Add("Locked browser cover lookup deduplicates 120 playlist URLs, rejects distinct-video ambiguity and active journals, and remains exact/read-only with unchanged database bytes");
             }finally{if(database!=IntPtr.Zero)sqlite3_close(database);foreach(string suffix in new[]{"","-journal","-wal","-shm"})try{File.Delete(file+suffix);}catch{}}
         }
         internal static int Run()

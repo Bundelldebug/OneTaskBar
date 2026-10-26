@@ -19,6 +19,9 @@ namespace OneTaskBar
         interface IDesktopInterop {void CreateDesktopWindowTarget(IntPtr window,[MarshalAs(UnmanagedType.Bool)]bool topmost,out IntPtr target);}
         static object dispatcherQueue;
         static Compositor compositor;
+        static int unavailableFixtures;
+        internal static IDisposable WithoutHostForFixture(){if(!Program.Inspectable)throw new InvalidOperationException("Backdrop fixture requires inspectable mode");return new UnavailableFixture();}
+        sealed class UnavailableFixture:IDisposable {bool disposed;internal UnavailableFixture(){unavailableFixtures++;}public void Dispose(){if(!disposed){disposed=true;unavailableFixtures--;}}}
         static readonly System.Collections.Generic.HashSet<LiveBackdrop> instances=new System.Collections.Generic.HashSet<LiveBackdrop>();
         internal static int InstanceCount {get{return instances.Count;}}
         internal static int OrphanCount {get{int count=0;foreach(var item in instances)if(item.background!=IntPtr.Zero&&Native.IsWindowVisible(item.background)&&!item.Visible)count++;return count;}}
@@ -78,7 +81,7 @@ namespace OneTaskBar
             // not exclude a non-layered HWND from every native hit-test path.
             EnableWindow(background,false);
             if(passThrough&&!SetLayeredWindowAttributes(background,0,255,2))throw new System.ComponentModel.Win32Exception();
-            int host=1;DwmSetWindowAttribute(background,17,ref host,4);
+            int host=1,result=unavailableFixtures>0?unchecked((int)0x80070057):DwmSetWindowAttribute(background,17,ref host,4);if(result<0)throw new NotSupportedException("Windows host backdrop is unavailable ("+result+")");
             if(window!=null)new WindowInteropHelper(window).Owner=background;
             IntPtr raw;
             ((IDesktopInterop)(object)compositor).CreateDesktopWindowTarget(background,true,out raw);

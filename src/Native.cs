@@ -64,6 +64,7 @@ namespace OneTaskBar
             DwmSetWindowAttribute(handle, 20, ref mode, 4);
             DwmSetWindowAttribute(handle, 33, ref corners, 4);
             DwmSetWindowAttribute(handle,38,ref backdrop,4);
+            if(SystemParameters.HighContrast||!WindowsTheme.Read().Transparency){Round(window,radius);return false;}
             bool success=false;
             try {var state=regions.GetValue(window,w=>new RegionState());state.Backdrop=new LiveBackdrop(window,radius);success=true;
                 window.Closed+=(s,e)=> {if(state.Backdrop!=null){state.Backdrop.Dispose();state.Backdrop=null;}};

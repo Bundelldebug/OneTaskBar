@@ -9,6 +9,7 @@ namespace OneTaskBar
     {
         internal int AppsLight=1,SystemLight=1;
         internal bool Available;
+        internal bool Transparency=true;
         internal bool Dark {get{return AppsLight==0;}}
     }
     internal static class WindowsTheme
@@ -21,7 +22,7 @@ namespace OneTaskBar
         internal static WindowsThemeState Read(bool force=false)
         {
             lock(gate){if(!force&&cached!=null&&DateTime.UtcNow<until)return cached;var state=new WindowsThemeState();
-                try {using(var entry=Registry.CurrentUser.OpenSubKey(key)){if(entry!=null){state.AppsLight=Convert.ToInt32(entry.GetValue("AppsUseLightTheme",1));state.SystemLight=Convert.ToInt32(entry.GetValue("SystemUsesLightTheme",1));}state.Available=true;}}
+                try {using(var entry=Registry.CurrentUser.OpenSubKey(key)){if(entry!=null){state.AppsLight=Convert.ToInt32(entry.GetValue("AppsUseLightTheme",1));state.SystemLight=Convert.ToInt32(entry.GetValue("SystemUsesLightTheme",1));state.Transparency=Convert.ToInt32(entry.GetValue("EnableTransparency",1))!=0;}state.Available=true;}}
                 catch(Exception e){AppLog.Once("theme-read",e.Message);}cached=state;until=DateTime.UtcNow.AddSeconds(1);return state;}
         }
         internal static void SetDark(bool dark) {Apply(dark?0:1,dark?0:1);}
