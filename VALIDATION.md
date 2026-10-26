@@ -1,4 +1,12 @@
-# 9.0.3 / 9.5.0-beta.9 validation
+# Local 9.5.0-beta.10 validation
+
+- Side docks now anchor the folded media cover and its inward-opening player 12 DIP from the monitor top. Geometry checks cover both edges, six DPI scales, both player designs and long app lists.
+- The side status surface is 44 DIP wide. Classic mode uses an 18-DIP battery pill; Duo mode removes the separate battery control and its layout slot. The integrated vector uses an upper battery arc, an inset network glyph and four curved volume dots. The independent option persists; charge feedback uses a finite opacity animation without an idle clock.
+- Brightness/volume numbers are independently persisted and default off. The shared control draws contrast-aware text inside horizontal, square and vertical bars in every supported UI and both palettes; media seek bars are excluded. Text is cached and preference observers detach on unload.
+- All 64 self-test groups and the local beta feedback, release UI, UI 9 quick settings, quick sizing, popup, UI 9 player, legacy player, compact dock, launcher motion and memory lifecycle fixtures pass. Owned WPF renders confirm the curved icon, removed battery slot, thin classic pill and numeric labels. Geometry assertions allow only native physical-pixel rounding.
+- This is a local follow-up to the published beta 9. It does not replace public release tags or assets. Existing UI/theme/layout choices are preserved on installation. Package, normal-launch and Defender validation are recorded separately after the final build.
+
+# Published 9.0.3 / 9.5.0-beta.9 validation
 
 - The 2026-10-26 report exposed a material-selection error: although the base palette had 30% opacity, the dock and launcher replaced it with 196/255 dark or 220/255 light opacity. Header/footer and card protection also obscured the fixed transparency. This was not an inversion of the percentage calculation.
 - The opaque readability replacements are removed. Dock, launcher and panel backgrounds now use the same fixed 30% opacity material. Light legacy docks no longer select a separate denser tint. The card film stays at or below 38/255 opacity; text and glyph opacity and selected-control contrast remain independent. Original geometry, custom opaque/image dock backgrounds and blur-off behavior are preserved.

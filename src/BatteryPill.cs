@@ -13,7 +13,7 @@ namespace OneTaskBar
         internal double ExpandedWidth=164,Reveal=1;
         internal double DrawWidth {get{return ActualWidth+(Math.Max(ActualWidth,ExpandedWidth)-ActualWidth)*Morph;}}
         public PowerState State=new PowerState();
-        public bool Celebration;public double Phase;
+        public bool Celebration;public double Phase;internal bool Compact;
         internal static bool IsLow(PowerState state,bool celebration=false){return state!=null&&state.Known&&state.Level>=0&&state.Level<=20&&!state.Connected&&!state.Charging&&!celebration;}
         int desktopWatts;
         public BatteryPill(){Width=52;Height=23;IsHitTestVisible=false;}
@@ -29,16 +29,16 @@ namespace OneTaskBar
         void Digits(DrawingContext dc,string label,Rect bounds,Brush color,bool bolt)
         {
             double size=bounds.Height*.61,glyph=bounds.Height*.53,gap=bounds.Height*.055;
-            var text=new FormattedText(label,CultureInfo.GetCultureInfo("ko-KR"),FlowDirection.LeftToRight,new Typeface(SystemFonts.MessageFontFamily,FontStyles.Normal,FontWeights.SemiBold,FontStretches.Normal),size,color,1.0);
+            double dpi=VisualTreeHelper.GetDpi(this).PixelsPerDip;var text=new FormattedText(label,CultureInfo.GetCultureInfo("ko-KR"),FlowDirection.LeftToRight,new Typeface(SystemFonts.MessageFontFamily,FontStyles.Normal,FontWeights.SemiBold,FontStretches.Normal),size,color,dpi);
             double group=text.Width+(bolt?glyph+gap:0),x=bounds.X+(bounds.Width-group)/2;
-            if(group>bounds.Width-8){size*=Math.Max(.5,(bounds.Width-8)/group);text=new FormattedText(label,CultureInfo.GetCultureInfo("ko-KR"),FlowDirection.LeftToRight,new Typeface(SystemFonts.MessageFontFamily,FontStyles.Normal,FontWeights.SemiBold,FontStretches.Normal),size,color,1.0);group=text.Width+(bolt?glyph+gap:0);x=bounds.X+(bounds.Width-group)/2;}
+            if(group>bounds.Width-8){size*=Math.Max(.5,(bounds.Width-8)/group);text=new FormattedText(label,CultureInfo.GetCultureInfo("ko-KR"),FlowDirection.LeftToRight,new Typeface(SystemFonts.MessageFontFamily,FontStyles.Normal,FontWeights.SemiBold,FontStretches.Normal),size,color,dpi);group=text.Width+(bolt?glyph+gap:0);x=bounds.X+(bounds.Width-group)/2;}
             if(bolt){Paint.Icon(dc,"bolt",color,new Point(x+glyph/2,bounds.Y+bounds.Height/2),glyph);x+=glyph+gap;}
             dc.DrawText(text,new Point(x,bounds.Y+(bounds.Height-text.Height)/2));
         }
         protected override void OnRender(DrawingContext dc)
         {
             if(ActualWidth<=0||ActualHeight<=0)return;
-            double width=DrawWidth,height=ActualHeight+(32-ActualHeight)*Morph;
+            double width=DrawWidth,height=ActualHeight+((Compact?24:32)-ActualHeight)*Morph;
             // The right edge stays attached to the real icon. Only the capsule geometry changes.
             var rect=new Rect(ActualWidth-width,(ActualHeight-height)/2,width,height);
             var outline=new RectangleGeometry(rect,height/2,height/2);
@@ -56,5 +56,6 @@ namespace OneTaskBar
     {
         internal static int Clamp(int watts){return Math.Max(0,Math.Min(9999,watts));}
         internal static double Slot(PowerState state,int watts){return state.Known?58:Clamp(watts)>0?78:0;}
+        internal static double DockSlot(PowerState state,int watts){return Preferences.Current.DuoStatusIcon?0:Slot(state,watts);}
     }
 }

@@ -29,7 +29,7 @@ namespace OneTaskBar
         internal static DockLayout Compute(System.Drawing.Rectangle screen,double scale,int count,double powerWidth=58,bool media=false,double reserved=68,int edge=3)
         {
             bool vertical=DockGeometry.Vertical(edge);double width=(vertical?screen.Height:screen.Width)/scale;
-            double status=vertical?154:StatusSize(width,powerWidth),statusX=width-status-12;
+            double status=vertical?DockGeometry.SideStatusLength(powerWidth):StatusSize(width,powerWidth),statusX=width-status-12;
             double mediaMinimum=media?Math.Min(44,Math.Max(1,statusX-204)):0;
             double minimumX=media?mediaMinimum+76:66;
             double available=Math.Max(FixedWidth,statusX-minimumX-12);
@@ -299,7 +299,7 @@ namespace OneTaskBar
             if(Preferences.Current.NativeSearch&&Finder!=null)Finder.Hide();
             if(Preferences.Current.NativeQuickSettings){if(Quick!=null)Quick.Hide();if(Detail!=null)Detail.Hide();}
             if(Preferences.Current.NativeNotifications&&Center!=null)Center.Hide();
-            if(!Preferences.Current.Animations||!Preferences.Current.ChargeAnimation){foreach(var charge in charges)charge.Close();charges.Clear();}
+            if(!Preferences.Current.Animations||!Preferences.Current.ChargeAnimation||Preferences.Current.DuoStatusIcon){foreach(var charge in charges)charge.Close();charges.Clear();}
             foreach(var dock in docks)dock.Rebuild();
         }
         void SetPin(AppEntry entry,bool pin)
@@ -659,8 +659,8 @@ namespace OneTaskBar
         {
             if(!Power.Known)return;
             foreach(var charge in charges) charge.Close(); charges.Clear();
-            foreach(var dock in docks)charges.Add(new BatteryAnimation(dock.Battery,preview));
-            if(docks.Count==0&&Welcome!=null){Welcome.PreviewBattery.Update(Power);charges.Add(new BatteryAnimation(Welcome.PreviewBattery,preview));}
+            foreach(var dock in docks){if(Preferences.Current.DuoStatusIcon)dock.DuoChargePulse();else charges.Add(new BatteryAnimation(dock.Battery,preview));}
+            if((docks.Count==0||Preferences.Current.DuoStatusIcon)&&Welcome!=null&&(preview||Welcome.IsVisible)){Welcome.PreviewBattery.Update(Power);charges.Add(new BatteryAnimation(Welcome.PreviewBattery,preview));}
         }
         internal BatteryPill ProbeBattery {get{return docks.Count>0?docks[0].Battery:null;}}
         internal TrayPlacement ProbeTrayAnchor {get{return docks.Count>0?docks[0].TrayAnchor():null;}}
