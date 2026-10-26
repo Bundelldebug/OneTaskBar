@@ -29,7 +29,7 @@ namespace OneTaskBar
         internal static bool CardBrush(Brush brush){return brush!=null&&(brush==light.Card||brush==dark.Card);}
         internal static bool Transparent {get{return Preferences.Current.Blur&&!SystemParameters.HighContrast;}}
         internal static Brush Surface {get{return PanelMaterial.Surface(Dark,true);}}
-        internal static Brush Card {get{return PanelMaterial.ProtectContrast?PanelMaterial.ReadableCard(Dark):Current.Card;}}
+        internal static Brush Card {get{return Current.Card;}}
         internal static Brush Solid {get{return SystemParameters.HighContrast?SystemColors.WindowBrush:Current.Solid;}}
         internal static Brush Text {get{return SystemParameters.HighContrast?SystemColors.WindowTextBrush:Current.Text;}}
         internal static Brush Muted {get{return SystemParameters.HighContrast?SystemColors.WindowTextBrush:Current.Muted;}}
@@ -39,7 +39,7 @@ namespace OneTaskBar
         internal static readonly Brush Accent=Paint.Brush("#FF3478FD"),Selected=Paint.ControlWhite;
         static Brush Film(bool dark)
         {
-            var film=new LinearGradientBrush {StartPoint=new Point(0,0),EndPoint=new Point(.25,1)};film.GradientStops.Add(new GradientStop(dark?Color.FromArgb(42,255,255,255):Color.FromArgb(112,255,255,255),0));film.GradientStops.Add(new GradientStop(dark?Color.FromArgb(19,224,235,255):Color.FromArgb(48,218,230,247),.46));film.GradientStops.Add(new GradientStop(dark?Color.FromArgb(22,255,255,255):Color.FromArgb(52,165,183,208),1));film.Freeze();return film;
+            var film=new LinearGradientBrush {StartPoint=new Point(0,0),EndPoint=new Point(.25,1)};film.GradientStops.Add(new GradientStop(dark?Color.FromArgb(28,255,255,255):Color.FromArgb(36,255,255,255),0));film.GradientStops.Add(new GradientStop(dark?Color.FromArgb(14,224,235,255):Color.FromArgb(14,218,230,247),.46));film.GradientStops.Add(new GradientStop(dark?Color.FromArgb(20,255,255,255):Color.FromArgb(22,165,183,208),1));film.Freeze();return film;
         }
         internal static Brush ToggleInk(bool value){return value?Paint.OnLight:Paint.Text;}
         internal static Brush DockForeground {get{return DockAppearance.Custom?DockAppearance.Foreground:DockDark?Paint.ControlWhite:Paint.OnLight;}}
