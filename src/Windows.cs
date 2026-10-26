@@ -27,6 +27,7 @@ namespace OneTaskBar
         readonly Button quickAccess,trayAccess,clockAccess;
         readonly Button startButton;readonly Glyph startGlyph=new Glyph("apps",23){Color=Glass95.DockForeground};
         internal readonly Button TaskViewButton;
+        internal readonly Button SearchButton;
         internal readonly Button OverflowButton;internal readonly DockOverflow Overflow;internal readonly DockDragController DragApps;
         readonly Button powerAccess;readonly ColumnDefinition powerColumn;double powerWidth=58;
         readonly ShellController controller;
@@ -59,8 +60,8 @@ namespace OneTaskBar
             controller=shell; Screen=screen;Edge=DockGeometry.Edge;
             hideDelay.Tick+=(s,e)=>CompleteAutoHide(InUse());
             pinDivider.RenderTransform=dividerOffset;Canvas.SetTop(pinDivider,9);Panel.SetZIndex(pinDivider,2);appCanvas.Children.Add(pinDivider);DragApps=new DockDragController(this,shell,appCanvas,PreviewAt,DropAt,PreviewHome);DragReorder.Finished+=EndDragPreview;
-            var search=Paint.Button(new Glyph("search",20){Color=Glass95.DockForeground},()=>controller.ToggleSearch(this),"검색");search.Padding=new Thickness(0);search.Background=Brushes.Transparent;search.Width=42;search.Height=42;Canvas.SetLeft(search,10);appCanvas.Children.Add(search);Apps.Surface.Child=appCanvas;
-            var desktops=Paint.Button(new Glyph("desktops",19){Color=Glass95.DockForeground},()=>controller.OpenTaskView(),"데스크톱 전환 · 작업 보기");TaskViewButton=desktops;desktops.Padding=new Thickness(0);desktops.Background=Brushes.Transparent;desktops.Width=desktops.Height=42;Canvas.SetLeft(desktops,52);appCanvas.Children.Add(desktops);
+            var search=Paint.Button(new Glyph("dock-search",22){Color=Glass95.DockForeground},()=>controller.ToggleSearch(this),"검색");SearchButton=search;search.Padding=new Thickness(0);search.Background=Brushes.Transparent;search.Width=42;search.Height=42;Motion.Dock(search,(FrameworkElement)search.Content);Canvas.SetLeft(search,10);appCanvas.Children.Add(search);Apps.Surface.Child=appCanvas;
+            var desktops=Paint.Button(new Glyph("dock-desktops",22){Color=Glass95.DockForeground},()=>controller.OpenTaskView(),"데스크톱 전환 · 작업 보기");TaskViewButton=desktops;desktops.Padding=new Thickness(0);desktops.Background=Brushes.Transparent;desktops.Width=desktops.Height=42;Motion.Dock(desktops,(FrameworkElement)desktops.Content);Canvas.SetLeft(desktops,52);appCanvas.Children.Add(desktops);
             OverflowButton=Paint.Button(new Glyph("more",23){Color=Glass95.DockForeground},()=>Overflow.Toggle(),"숨겨진 앱");OverflowButton.Width=46;OverflowButton.Height=42;OverflowButton.Padding=new Thickness(0);OverflowButton.Background=Brushes.Transparent;OverflowButton.Visibility=Visibility.Collapsed;Panel.SetZIndex(OverflowButton,3);appCanvas.Children.Add(OverflowButton);Overflow=new DockOverflow(shell,this,OverflowButton,QueueHide);
             resizeTimer.Tick+=(sender,args)=>ResizeFrame();
             visibilityTimer.Tick+=(sender,args)=>VisibilityFrame();

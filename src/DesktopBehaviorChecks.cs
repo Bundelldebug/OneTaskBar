@@ -8,6 +8,7 @@ using System.Web.Script.Serialization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Forms=System.Windows.Forms;
@@ -59,6 +60,7 @@ namespace OneTaskBar
         }
         static async Task<bool> DesktopReturn(DockHost dock)
         {
+            bool hover=Preferences.Current.Hover;try{using(Motion.WithAnimationsForFixture()){Preferences.Current.Hover=true;foreach(var button in new[]{dock.SearchButton,dock.TaskViewButton}){var glyph=(FrameworkElement)button.Content;var scale=((TransformGroup)glyph.RenderTransform).Children.OfType<ScaleTransform>().Single();button.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice,Environment.TickCount){RoutedEvent=UIElement.MouseEnterEvent});await Task.Delay(55);if(scale.ScaleX<=1)throw new Exception("Dock utility hover has no intermediate enlargement");button.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice,Environment.TickCount){RoutedEvent=UIElement.MouseLeaveEvent});await Task.Delay(170);if(Math.Abs(scale.ScaleX-1)>.001)throw new Exception("Dock utility hover did not settle");}}}finally{Preferences.Current.Hover=hover;}
             var windows=new[]{dock.Start,dock.Apps,dock.Status};var foreground=Native.GetForegroundWindow();bool mismatch=false,passed=true;
             for(int i=0;i<12;i++){
                 foreach(var window in windows){var handle=new WindowInteropHelper(window).Handle;Native.ShowWindow(handle,i%2==0?0:6);var owner=Native.GetWindow(handle,4);if(owner!=IntPtr.Zero)Native.ShowWindow(owner,0);mismatch|=dock.DockVisible&&(!Native.IsWindowVisible(handle)||Native.IsIconic(handle));}
