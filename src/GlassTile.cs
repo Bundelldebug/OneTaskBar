@@ -8,6 +8,9 @@ namespace OneTaskBar
     internal static class GlassOptics
     {
         static readonly Brush lightRim=Rim(false),darkRim=Rim(true),lightDepth=Depth(false),darkDepth=Depth(true);
+        static readonly Pen lightInner=Inner(false),darkInner=Inner(true),lightStrong=FrozenPen(lightRim,1.15),darkStrong=FrozenPen(darkRim,1.15),lightSoft=FrozenPen(lightRim,.8),darkSoft=FrozenPen(darkRim,.8);
+        static Pen FrozenPen(Brush brush,double width){var pen=new Pen(brush,width);pen.Freeze();return pen;}
+        static Pen Inner(bool dark){var brush=new LinearGradientBrush(Color.FromArgb(dark?(byte)25:(byte)38,255,255,255),Colors.Transparent,new Point(0,0),new Point(.25,.72));brush.Freeze();return FrozenPen(brush,3);}
         static Brush Rim(bool dark)
         {
             var brush=new LinearGradientBrush {StartPoint=new Point(.18,0),EndPoint=new Point(.78,1)};
@@ -24,8 +27,8 @@ namespace OneTaskBar
         {
             if(!Glass95.Transparent||width<3||height<3)return;bool dark=darkOverride??Glass95.Dark;var box=new Rect(.65,.65,width-1.3,height-1.3);var clip=new RectangleGeometry(box,radius,radius);dc.PushClip(clip);dc.DrawRectangle(dark?darkDepth:lightDepth,null,box);
             // A broad, low-opacity inner reflection plus one sharp top edge reads as thickness.
-            var light=new LinearGradientBrush(Color.FromArgb(dark?(byte)25:(byte)38,255,255,255),Colors.Transparent,new Point(0,0),new Point(.25,.72));dc.DrawRoundedRectangle(null,new Pen(light,3),new Rect(1.7,1.7,Math.Max(0,width-3.4),Math.Max(0,height-3.4)),Math.Max(0,radius-1),Math.Max(0,radius-1));
-            dc.DrawRoundedRectangle(null,new Pen(dark?darkRim:lightRim,strong?1.15:.8),box,radius,radius);dc.Pop();
+            dc.DrawRoundedRectangle(null,dark?darkInner:lightInner,new Rect(1.7,1.7,Math.Max(0,width-3.4),Math.Max(0,height-3.4)),Math.Max(0,radius-1),Math.Max(0,radius-1));
+            dc.DrawRoundedRectangle(null,dark?(strong?darkStrong:darkSoft):(strong?lightStrong:lightSoft),box,radius,radius);dc.Pop();
         }
     }
     internal sealed class GlassTileBorder : Border
@@ -35,11 +38,12 @@ namespace OneTaskBar
     }
     internal sealed class GlassTileShadow : FrameworkElement
     {
+        static readonly Brush shade=Paint.Brush("#05020913");
         internal double Radius=30;internal GlassTileShadow(){IsHitTestVisible=false;}
         protected override void OnRender(DrawingContext dc)
         {
             if(!Glass95.Enabled||!Glass95.Transparent||ActualWidth<3||ActualHeight<3)return;
-            for(int i=5;i>=1;i--){var shade=Color.FromArgb(5,2,9,19);var box=new Rect(i*.35,2.5+i*.12,Math.Max(0,ActualWidth-i*.7),Math.Max(0,ActualHeight-1));dc.DrawRoundedRectangle(new SolidColorBrush(shade),null,box,Radius,Radius);}
+            for(int i=5;i>=1;i--){var box=new Rect(i*.35,2.5+i*.12,Math.Max(0,ActualWidth-i*.7),Math.Max(0,ActualHeight-1));dc.DrawRoundedRectangle(shade,null,box,Radius,Radius);}
         }
     }
 }

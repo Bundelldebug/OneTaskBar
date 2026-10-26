@@ -327,13 +327,14 @@ namespace OneTaskBar
             if(lens!=null){lens.Active=Glass95.Enabled&&!OpaqueSurface&&HasBlur&&Preferences.Current.Blur&&!(DockSurface&&DockAppearance.Custom)&&!(this is HudWindow);lens.InvalidateVisual();}
             if(glassTint==null)return;if(DockSurface&&DockAppearance.Custom){Native.EnableBlur(this,false);Surface.Background=DockAppearance.Background;Surface.BorderBrush=Glass95.Enabled?Glass95.Rim:Brushes.Transparent;Surface.BorderThickness=new Thickness(Glass95.Enabled?.7:0);return;}
             bool enabled=HasBlur&&Preferences.Current.Blur&&!(DockSurface&&Preferences.Current.DockSolidBackground)&&(!Glass95.Enabled||Glass95.Transparent);Native.EnableBlur(this,enabled);
-            bool panel=PanelMaterial.ReadablePanel(this);
+            bool panel=PanelMaterial.ReadablePanel(this),popup=PanelMaterial.NotificationPopup(this);
             if(Glass95.Enabled&&!OpaqueSurface&&!(DockSurface&&Preferences.Current.DockSolidBackground)){
-                bool rimDark=panel||Dark;if(glassEdge==null||edgeDark!=rimDark){edgeDark=rimDark;glassEdge=Glass95.Edge(edgeDark);}Surface.BorderBrush=this is NowBar?(Brush)Brushes.Transparent:glassEdge;Surface.BorderThickness=new Thickness(0);
-                Surface.Background=this is NowBar?(enabled?glassTint:solidTint??Glass95.Solid):panel?(enabled?PanelMaterial.PanelSurface(Dark,true):PanelMaterial.Solid(Dark)):enabled?PanelMaterial.Surface(Dark,true):Paint.Brush(Dark?"#FF242832":"#FFF1F4FA");
+                bool rimDark=panel||popup||Dark;if(glassEdge==null||edgeDark!=rimDark){edgeDark=rimDark;glassEdge=Glass95.Edge(edgeDark);}Surface.BorderBrush=this is NowBar?(Brush)Brushes.Transparent:glassEdge;Surface.BorderThickness=new Thickness(0);
+                Surface.Background=this is NowBar?(enabled?glassTint:solidTint??Glass95.Solid):popup?(enabled?PanelMaterial.PopupSurface(Dark):PanelMaterial.Solid(Dark)):panel?(enabled?PanelMaterial.PanelSurface(Dark,true):PanelMaterial.Solid(Dark)):enabled?PanelMaterial.Surface(Dark,true):Paint.Brush(Dark?"#FF242832":"#FFF1F4FA");
             }else{
                 if(glassEdge!=null){glassEdge=null;Surface.BorderBrush=DockSurface?Brushes.Transparent:Paint.Brush("#38FFFFFF");Surface.BorderThickness=new Thickness(DockSurface?0:.7);}
                 if(DockSurface)Surface.Background=enabled?LightPanel.DockGlass:Dark?Paint.Brush("#FF29302D"):LightPanel.DockSolid;
+                else if(popup)Surface.Background=enabled?PanelMaterial.PopupSurface(Dark):PanelMaterial.Solid(Dark);
                 else if(panel){Dark=Glass95.Dark;Surface.Background=enabled?PanelMaterial.PanelSurface(Dark,false):PanelMaterial.Solid(Dark);}
                 else Surface.Background=enabled?glassTint:solidTint??Paint.Brush(Dark?"#FF344139":"#FFE0E5E2");
             }
