@@ -24,6 +24,7 @@ namespace OneTaskBar
         }
         internal static void Validate(List<string> checks)
         {
+            var sparse=new QuickWidgetLayout(null);foreach(var slot in sparse.Items)slot.Hidden=true;var occupied=sparse.Find("wifi");occupied.Hidden=false;occupied.X=0;occupied.Y=0;occupied.Columns=2;occupied.Rows=1;var added=sparse.Find("duo");added.Columns=1;added.Rows=1;sparse.SetHidden("duo",false);Require(added.X==2&&added.Y==0&&occupied.X==0&&occupied.Y==0&&sparse.Fits(),"new items fill the earliest free cell without moving existing tiles");sparse.SetHidden("duo",true);sparse.SetHidden("media",false);Require(sparse.Find("media").X==0&&sparse.Find("media").Y==1&&sparse.Fits(),"larger new items use the first complete free rectangle");
             string folder=Path.Combine(Path.GetTempPath(),"OneTaskBar-grid9-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(folder);string file=Path.Combine(folder,"quick-layout-9.json");
             try{
                 foreach(bool vertical in new[]{false,true})foreach(int length in new[]{1,2,3,4,5})foreach(double percent in new[]{0.0,25,50,100}){double width=vertical?72:72*length,height=vertical?72*length:72;var point=vertical?new Point(width/2,height*(1-percent/100)):new Point(width*percent/100,height/2);Require(PillSlider.PositionValue(width,height,point,vertical,false)==percent,"slider pointer mapping on both axes, including circular 1 x 1");}

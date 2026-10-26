@@ -50,7 +50,11 @@ namespace OneTaskBar
             if(Slider(key)){if(vertical)columns=1;else rows=1;}
             if(item.Columns==columns&&item.Rows==rows)return false;item.Columns=columns;item.Rows=rows;item.X=Math.Min(item.X,4-columns);Pack(item);return true;
         }
-        internal void SetHidden(string key,bool hidden){var item=Find(key);if(item==null||item.Hidden==hidden)return;item.Hidden=hidden;if(!hidden)Pack(item);}
+        internal void SetHidden(string key,bool hidden){var item=Find(key);if(item==null||item.Hidden==hidden)return;item.Hidden=hidden;if(!hidden)PlaceFirst(key);}
+        internal void PlaceFirst(string key)
+        {
+            var item=Find(key);if(item==null||item.Hidden)return;var occupied=Items.Where(i=>i!=item&&!i.Hidden).ToArray();int bottom=occupied.Select(i=>i.Y+i.Rows).DefaultIfEmpty(0).Max();for(int y=0;y<=bottom;y++)for(int x=0;x<=Columns-item.Columns;x++){item.X=x;item.Y=y;if(!occupied.Any(i=>Overlaps(item,i)))return;}
+        }
         void Pack(QuickWidgetSlot priority)
         {
             var placed=new List<QuickWidgetSlot>();if(priority!=null&&!priority.Hidden)placed.Add(priority);
