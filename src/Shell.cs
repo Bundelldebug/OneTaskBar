@@ -29,7 +29,7 @@ namespace OneTaskBar
         internal static DockLayout Compute(System.Drawing.Rectangle screen,double scale,int count,double powerWidth=58,bool media=false,double reserved=68,int edge=3,bool duo=false)
         {
             bool vertical=DockGeometry.Vertical(edge);double width=(vertical?screen.Height:screen.Width)/scale;
-            double status=vertical?DockGeometry.SideStatusLength(powerWidth):StatusSize(width,powerWidth,duo),statusX=width-status-12;
+            double status=(vertical?DockGeometry.SideStatusLength(powerWidth):StatusSize(width,powerWidth,duo))+DockStatusItems.Count*24,statusX=width-status-12;
             double mediaMinimum=media?Math.Min(44,Math.Max(1,statusX-204)):0;
             double minimumX=media?mediaMinimum+76:66;
             double available=Math.Max(FixedWidth,statusX-minimumX-12);

@@ -171,6 +171,7 @@ namespace OneTaskBar
             else if(kind=="power") dc.DrawGeometry(null,pen,Geometry.Parse("M12,1 L12,12 M7,4 A9,9 0 1 0 17,4"));
             else if(kind=="rotation") {dc.DrawGeometry(null,pen,Geometry.Parse("M3,11 A9,9 0 0 1 20,6 M17,3 L21,6 17,9 M21,13 A9,9 0 0 1 4,18 M7,15 L3,18 7,21"));}
             else if(kind=="devices") {dc.DrawRoundedRectangle(null,pen,new Rect(7,3,10,18),2,2);line(10,18,14,18);dc.DrawGeometry(null,pen,Geometry.Parse("M3,8 L1,12 3,16 M21,8 L23,12 21,16"));}
+            else if(kind=="calendar") {dc.DrawRoundedRectangle(null,pen,new Rect(3,5,18,17),3,3);line(3,10,21,10);line(8,2,8,7);line(16,2,16,7);dc.DrawEllipse(brush,null,new Point(8,15),1.2,1.2);dc.DrawEllipse(brush,null,new Point(15,15),1.2,1.2);}
             else if(kind=="focus") {dc.DrawEllipse(null,pen,new Point(12,12),10,10);dc.DrawGeometry(brush,null,Geometry.Parse("M12,3 L12,12 20,7 A9,9 0 0 0 12,3 Z"));}
             else { dc.DrawEllipse(null,pen,new Point(12,12),8,8); dc.DrawEllipse(brush,null,new Point(12,12),2,2); }
             dc.Pop(); dc.Pop();

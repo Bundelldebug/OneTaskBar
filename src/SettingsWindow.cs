@@ -64,6 +64,7 @@ namespace OneTaskBar
             watts.TextChanged+=(s,e)=> {int number;if(Int32.TryParse(watts.Text,out number)&&number>=0&&number<=9999&&Preferences.Current.DesktopPowerWatts!=number)Preferences.Set(p=>p.DesktopPowerWatts=number);};watts.LostKeyboardFocus+=(s,e)=>watts.Text=PowerDisplay.Clamp(Preferences.Current.DesktopPowerWatts).ToString();Grid.SetColumn(watts,1);powerRow.Children.Add(watts);hardware.Children.Add(powerRow);Group(groups,"PC 호환성",hardware);
             var appearance=new StackPanel();ThemeSetting(appearance);Row(appearance,"동적 블러","배경의 창과 화면 색을 캡슐에 반영합니다",Preferences.Current.Blur,v=>Preferences.Set(p=>p.Blur=v));
             Row(appearance,"듀오 스타일 상태 아이콘","배터리 원 게이지 · Wi-Fi · 음량 네 점을 하나로 표시합니다",Preferences.Current.DuoStatusIcon,v=>Preferences.Set(p=>p.DuoStatusIcon=v));
+            StatusItemsSetting(appearance);
             Row(appearance,"밝기·음량 수치 표시","조절바 끝에 현재 값을 표시합니다",Preferences.Current.SliderValueNumbers,v=>Preferences.Set(p=>p.SliderValueNumbers=v));
             Row(appearance,"호버 확대","마우스를 올린 앱 아이콘과 시작 버튼을 확대합니다",Preferences.Current.Hover,v=>Preferences.Set(p=>p.Hover=v));
             Row(appearance,"실행 중인 앱 표시","아이콘 아래에 실행 상태를 표시합니다",Preferences.Current.RunningDots,v=>Preferences.Set(p=>p.RunningDots=v));
