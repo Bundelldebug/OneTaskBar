@@ -42,7 +42,7 @@ namespace OneTaskBar
         {
             try{
                 string path=Resolve(appId,source);if(path==null||!File.Exists(path)||new FileInfo(path).Length>8388608)return null;
-                using(var stream=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete)){var image=BitmapDecode.Frozen(stream,logo?96:Math.Max(96,Math.Min(1280,pixels)));return logo?AppIcons.Normalize(image):image;}
+                using(var stream=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete)){var image=BitmapDecode.Frozen(stream,logo?256:Math.Max(96,Math.Min(1280,pixels)));return logo?AppIcons.Normalize(image,256):image;}
             }catch{return null;}
         }
         internal static string Resolve(string appId,string source)
