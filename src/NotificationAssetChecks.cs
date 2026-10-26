@@ -8,6 +8,9 @@ namespace OneTaskBar
     {
         internal static void Validate(List<string> checks)
         {
+            var native=System.Windows.Media.Imaging.BitmapSource.Create(256,256,96,96,System.Windows.Media.PixelFormats.Bgra32,null,new byte[256*256*4],256*4);native.Freeze();var small=new System.Windows.Media.Imaging.TransformedBitmap(native,new System.Windows.Media.ScaleTransform(.125,.125));small.Freeze();
+            if(AppIcons.Normalize(native,256).PixelWidth!=256||AppIcons.Normalize(native).PixelWidth>160||NotificationIcons.Best(small,native)!=native||NotificationIcons.Best(native,small)!=native)throw new Exception("Notification icons must retain native detail and prefer the sharper matching app resource");
+            using(var stream=new MemoryStream()){var encoder=new System.Windows.Media.Imaging.PngBitmapEncoder();encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(small));encoder.Save(stream);stream.Position=0;if(BitmapDecode.Frozen(stream,256).PixelWidth!=32)throw new Exception("Low-resolution notification icons must not be enlarged before quality comparison");}
             const string xml="<toast launch='target=42'><visual baseUri='ms-appx:///Images/'><binding template='ToastGeneric'><text>알림 그림</text><text>연결됨</text><image placement='appLogoOverride' src='logo.png'/><image src='small.png'/><image placement='hero' src='buds.png'/></binding></visual></toast>";
             var payload=NotificationPayload.Parse(xml,new[]{"알림 그림","연결됨"});if(payload==null||payload.Arguments!="target=42"||payload.LogoSource!="ms-appx:///Images/logo.png"||payload.ImageSource!="ms-appx:///Images/buds.png")throw new Exception("Native toast artwork/launch attributes lost");
             if(NativeToastAssets.Decode(Encoding.Unicode.GetPreamble().ConcatBytes(Encoding.Unicode.GetBytes(xml)))!=xml||NativeToastAssets.Decode(Encoding.UTF8.GetBytes(xml))!=xml)throw new Exception("Native toast UTF-8/UTF-16 decode");

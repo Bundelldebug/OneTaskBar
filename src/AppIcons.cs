@@ -62,11 +62,11 @@ namespace OneTaskBar
             return Normalize(result as BitmapSource)??result;
         }
         // Preserve the original artwork, colors and aspect ratio; remove transparent asset padding only.
-        internal static BitmapSource Normalize(BitmapSource original)
+        internal static BitmapSource Normalize(BitmapSource original,int maximumPixels=160)
         {
             if(original==null)return null;
             try {
-                if(original.PixelWidth>160||original.PixelHeight>160){double scale=160.0/Math.Max(original.PixelWidth,original.PixelHeight);var reduced=new TransformedBitmap(original,new ScaleTransform(scale,scale));reduced.Freeze();original=reduced;}
+                maximumPixels=Math.Max(32,Math.Min(256,maximumPixels));if(original.PixelWidth>maximumPixels||original.PixelHeight>maximumPixels){double scale=(double)maximumPixels/Math.Max(original.PixelWidth,original.PixelHeight);var reduced=new TransformedBitmap(original,new ScaleTransform(scale,scale));reduced.Freeze();original=reduced;}
                 var image=new FormatConvertedBitmap(original,PixelFormats.Bgra32,null,0);int w=image.PixelWidth,h=image.PixelHeight,stride=w*4;
                 if(w<2||h<2||w>2048||h>2048)return original;
                 var pixels=new byte[stride*h];image.CopyPixels(pixels,stride,0);int left=w,top=h,right=-1,bottom=-1;

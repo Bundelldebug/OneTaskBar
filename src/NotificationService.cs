@@ -61,7 +61,7 @@ namespace OneTaskBar
                     var binding=item.Notification.Visual.GetBinding(KnownNotificationBindings.ToastGeneric);if(binding==null)continue;
                     var text=binding.GetTextElements().Select(t=>t.Text).ToArray();
                     uint notificationId=item.Id;string appId=item.AppInfo.AppUserModelId??item.AppInfo.DisplayInfo.DisplayName;ImageSource icon;
-                    if(!icons.TryGetValue(appId,out icon)){icon=await Logo(item.AppInfo);if(icon==null){var known=catalog.FirstOrDefault(a=>String.Equals(a.AppID,appId,StringComparison.OrdinalIgnoreCase))??catalog.FirstOrDefault(a=>String.Equals(a.Name,item.AppInfo.DisplayInfo.DisplayName,StringComparison.OrdinalIgnoreCase));if(known!=null)icon=known.Icon??await BackgroundWork.Run(()=>AppIcons.Get(known));}icons[appId]=icon;}
+                    if(!icons.TryGetValue(appId,out icon)){icon=await Logo(item.AppInfo);var bitmap=icon as BitmapSource;if(bitmap==null||Math.Min(bitmap.PixelWidth,bitmap.PixelHeight)<128){var known=catalog.FirstOrDefault(a=>String.Equals(a.AppID,appId,StringComparison.OrdinalIgnoreCase))??catalog.FirstOrDefault(a=>String.Equals(a.Name,item.AppInfo.DisplayInfo.DisplayName,StringComparison.OrdinalIgnoreCase));if(known!=null)icon=NotificationIcons.Best(icon,known.Icon??await BackgroundWork.Run(()=>AppIcons.Get(known)));}icons[appId]=icon;}
                     Guid activator;if(!activators.TryGetValue(appId,out activator)){activator=NotificationActivation.Callback(appId);activators[appId]=activator;}
                     var previous=Items.FirstOrDefault(n=>n.Id==item.Id&&n.AppId==appId&&n.Created==item.CreationTime&&n.Title==(text.FirstOrDefault()??"알림")&&n.Body==String.Join("\n",text.Skip(1)));
                     var payload=previous!=null?previous.Payload:NotificationPayload.Read(appId,text);ImageSource artwork=previous!=null?previous.Artwork:null,overrideIcon=previous!=null?previous.Icon:null;
@@ -77,9 +77,9 @@ namespace OneTaskBar
         }
         static async Task<ImageSource> Logo(Windows.ApplicationModel.AppInfo app)
         {
-            try {using(var stream=await SystemServices.Wait(app.DisplayInfo.GetLogo(new Windows.Foundation.Size(96,96)).OpenReadAsync()))using(var reader=new DataReader(stream)) {
+            try {using(var stream=await SystemServices.Wait(app.DisplayInfo.GetLogo(new Windows.Foundation.Size(256,256)).OpenReadAsync()))using(var reader=new DataReader(stream)) {
                 uint length=(uint)Math.Min(stream.Size,2097152UL);await SystemServices.Wait(reader.LoadAsync(length));var bytes=new byte[length];reader.ReadBytes(bytes);
-                using(var data=new MemoryStream(bytes)){var image=new BitmapImage();image.BeginInit();image.CacheOption=BitmapCacheOption.OnLoad;image.DecodePixelWidth=96;image.StreamSource=data;image.EndInit();image.Freeze();return AppIcons.Normalize(image);}
+                using(var data=new MemoryStream(bytes))return AppIcons.Normalize(BitmapDecode.Frozen(data,256),256);
             }}catch{return null;}
         }
         internal void Dismiss(uint id) {try{if(Allowed){listener.RemoveNotification(id);Invalidate();}}catch(Exception e){AppLog.Write("notification-dismiss",e.Message);}}
