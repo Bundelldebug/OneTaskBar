@@ -9,8 +9,6 @@ namespace OneTaskBar
         internal const int Transparency=70;
         static readonly Brush[] tints=new Brush[4];
         static readonly Brush[] panels=new Brush[4];
-        static readonly Brush[] popups=new Brush[4];
-        internal const int PopupOpacity=92;
         internal const int LightPanelOpacity=30,DarkPanelOpacity=88;
         internal static void RefreshCards(DependencyObject root)
         {
@@ -34,7 +32,7 @@ namespace OneTaskBar
         internal static bool NotificationPopup(Window window){return window is NotificationBanner||window is NotificationConnectWindow||window is BudsConnectionPopup||window is WindowSwitcherView;}
         internal static Brush PopupSurface(bool dark)
         {
-            if(SystemParameters.HighContrast)return SystemColors.WindowBrush;int index=(Glass95.Enabled?2:0)+(dark?1:0);var cached=popups[index];if(cached!=null)return cached;var color=((SolidColorBrush)Solid(dark)).Color;color.A=(byte)Math.Round(PopupOpacity*255/100.0);var brush=new LinearGradientBrush {StartPoint=new Point(0,0),EndPoint=new Point(0,1)};foreach(double offset in new[]{0,.48,1})brush.GradientStops.Add(new GradientStop(color,offset));brush.Freeze();return popups[index]=brush;
+            return PanelSurface(dark,Glass95.Enabled);
         }
         internal static Brush PanelSurface(bool dark,bool modern)
         {
