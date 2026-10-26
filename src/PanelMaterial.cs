@@ -9,7 +9,7 @@ namespace OneTaskBar
         internal const int Transparency=70;
         static readonly Brush[] tints=new Brush[4];
         static readonly Brush[] panels=new Brush[4];
-        static readonly Brush[] popups=new Brush[2];
+        static readonly Brush[] popups=new Brush[4];
         internal const int PopupOpacity=92;
         internal const int LightPanelOpacity=30,DarkPanelOpacity=88;
         internal static void RefreshCards(DependencyObject root)
@@ -31,10 +31,10 @@ namespace OneTaskBar
         internal static Brush FieldStroke {get{return SystemParameters.HighContrast?SystemColors.WindowTextBrush:stroke;}}
         internal static Brush Focus {get{return SystemParameters.HighContrast?SystemColors.HighlightBrush:focus;}}
         internal static bool ReadablePanel(Window window){return window is QuickWindow||window is NotificationWindow||window is DetailWindow||window is CalendarWindow||window is StartWindow||window is SearchWindow||window is DrawerWindow;}
-        internal static bool NotificationPopup(Window window){return window is NotificationBanner||window is NotificationConnectWindow||window is BudsConnectionPopup;}
+        internal static bool NotificationPopup(Window window){return window is NotificationBanner||window is NotificationConnectWindow||window is BudsConnectionPopup||window is WindowSwitcherView;}
         internal static Brush PopupSurface(bool dark)
         {
-            if(SystemParameters.HighContrast)return SystemColors.WindowBrush;int index=dark?1:0;var cached=popups[index];if(cached!=null)return cached;var color=dark?Color.FromRgb(13,16,20):Color.FromRgb(36,40,50);color.A=(byte)Math.Round(PopupOpacity*255/100.0);var brush=new LinearGradientBrush {StartPoint=new Point(0,0),EndPoint=new Point(0,1)};foreach(double offset in new[]{0,.48,1})brush.GradientStops.Add(new GradientStop(color,offset));brush.Freeze();return popups[index]=brush;
+            if(SystemParameters.HighContrast)return SystemColors.WindowBrush;int index=(Glass95.Enabled?2:0)+(dark?1:0);var cached=popups[index];if(cached!=null)return cached;var color=((SolidColorBrush)Solid(dark)).Color;color.A=(byte)Math.Round(PopupOpacity*255/100.0);var brush=new LinearGradientBrush {StartPoint=new Point(0,0),EndPoint=new Point(0,1)};foreach(double offset in new[]{0,.48,1})brush.GradientStops.Add(new GradientStop(color,offset));brush.Freeze();return popups[index]=brush;
         }
         internal static Brush PanelSurface(bool dark,bool modern)
         {
