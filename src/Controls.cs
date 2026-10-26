@@ -18,15 +18,15 @@ namespace OneTaskBar
     {
         // Black tint over the live host backdrop keeps background color without a milky layer.
         static readonly Brush legacyGlass=LightPanel.Tint("#A0000000","#94000000","#9E000000"),legacyCard=Paint.Brush("#18FFFFFF");
-        internal static Brush Glass {get{return Glass95.Enabled?Glass95.Surface:PanelMaterial.Surface(Glass95.Dark,false);}}
-        internal static Brush Card {get{return Glass95.Enabled?Glass95.Card:PanelMaterial.Light?PanelMaterial.LightCard:legacyCard;}}
+        internal static Brush Glass {get{return PanelMaterial.PanelSurface(Glass95.Dark,Glass95.Enabled);}}
+        internal static Brush Card {get{return Glass95.Enabled?Glass95.Card:PanelMaterial.Card(Glass95.Dark);}}
         internal const string Inactive="#2A000000";
     }
     internal static class GrayPanel
     {
         // Neutral frosted glass retains live background color with readable dark content.
         static readonly Brush legacyGlass=LightPanel.Tint("#8F858E87","#75747F77","#887F8981"),legacyCard=Paint.Brush("#55ADB5AE");
-        internal static Brush Glass {get{return Glass95.Enabled?Glass95.Surface:PanelMaterial.Surface(Glass95.Dark,false);}}
+        internal static Brush Glass {get{return PanelMaterial.PanelSurface(Glass95.Dark,Glass95.Enabled);}}
         internal static Brush Card {get{return QuickPanel.Card;}}
         internal static Brush Muted {get{return LightPanel.Muted;}}
         internal static void Apply(DependencyObject root)
@@ -38,10 +38,10 @@ namespace OneTaskBar
     {
         static readonly Brush legacyGlass=Tint("#9BE5EBE7","#7BC5D0C9","#8FD8E2DB"),legacyDock=Tint("#AADFE7E2","#82C3D0C7","#96D5E1D9"),legacyMuted=Paint.Brush("#FF4C5B52"),legacyCard=Paint.Brush("#24FFFFFF");
         internal static readonly Brush DockSolid=Paint.Brush("#FFBAC1C7");
-        internal static Brush Glass {get{return Glass95.Enabled?Glass95.Surface:PanelMaterial.Surface(Glass95.Dark,false);}}
+        internal static Brush Glass {get{return PanelMaterial.PanelSurface(Glass95.Dark,Glass95.Enabled);}}
         internal static Brush DockGlass {get{return PanelMaterial.Surface(Glass95.DockDark,Glass95.Enabled);}}
-        internal static Brush Muted {get{return Glass95.Enabled?Glass95.Muted:PanelMaterial.Light?legacyMuted:Paint.Muted;}}
-        internal static Brush Card {get{return Glass95.Enabled?Glass95.Card:PanelMaterial.Light?PanelMaterial.LightCard:legacyCard;}}
+        internal static Brush Muted {get{return Paint.Muted;}}
+        internal static Brush Card {get{return QuickPanel.Card;}}
         internal static Brush Tint(string top,string middle,string bottom)
         {
             var brush=new LinearGradientBrush();brush.StartPoint=new Point(0,0);brush.EndPoint=new Point(0,1);
@@ -49,7 +49,7 @@ namespace OneTaskBar
         }
         internal static void Apply(DependencyObject root)
         {
-            if(!Glass95.Enabled&&!PanelMaterial.Light){var label=root as TextBlock;if(label!=null&&label.Foreground==Paint.Ink)label.Foreground=Paint.Text;var target=root as Control;if(target!=null&&target.Foreground==Paint.Ink)target.Foreground=Paint.Text;var icon=root as Glyph;if(icon!=null&&icon.Color==Paint.Ink)icon.Color=Paint.Text;foreach(object item in LogicalTreeHelper.GetChildren(root)){var element=item as DependencyObject;if(element!=null)Apply(element);}return;}
+            if(!Glass95.Enabled){var label=root as TextBlock;if(label!=null&&label.Foreground==Paint.Ink)label.Foreground=Paint.Text;var target=root as Control;if(target!=null&&target.Foreground==Paint.Ink)target.Foreground=Paint.Text;var icon=root as Glyph;if(icon!=null&&icon.Color==Paint.Ink)icon.Color=Paint.Text;foreach(object item in LogicalTreeHelper.GetChildren(root)){var element=item as DependencyObject;if(element!=null)Apply(element);}return;}
             var text=root as TextBlock;if(text!=null){if(text.Foreground==Paint.Text)text.Foreground=Paint.Ink;else if(text.Foreground==Paint.Muted)text.Foreground=Muted;}
             var control=root as Control;if(control!=null&&control.Foreground==Paint.Text)control.Foreground=Paint.Ink;
             var glyph=root as Glyph;if(glyph!=null){if(glyph.Color==Paint.Text)glyph.Color=Paint.Ink;else if(glyph.Color==Paint.Muted)glyph.Color=Muted;}
@@ -78,8 +78,8 @@ namespace OneTaskBar
         internal static readonly Brush OnLight=FixedOnLight();
         static Brush FixedOnLight(){var brush=new SolidColorBrush(Color.FromRgb(25,34,30));brush.Freeze();return brush;}
         static readonly Brush legacyText=Brush("#FFFFFFFF"),legacyMuted=Brush("#FFDBE3DF"),legacyInk=Brush("#FF19221E");
-        internal static Brush Text {get{return Glass95.Enabled?Glass95.Text:PanelMaterial.Light?PanelMaterial.LightText:legacyText;}}
-        internal static Brush Muted {get{return Glass95.Enabled?Glass95.Muted:PanelMaterial.Light?PanelMaterial.LightMuted:legacyMuted;}}
+        internal static Brush Text {get{return Glass95.Enabled?Glass95.Text:PanelMaterial.Text(Glass95.Dark);}}
+        internal static Brush Muted {get{return Glass95.Enabled?Glass95.Muted:PanelMaterial.Muted(Glass95.Dark);}}
         internal static Brush Ink {get{return Glass95.Enabled?Glass95.Text:legacyInk;}}
         internal static void Label(DrawingContext dc,string text,double size,Brush color,Point point,FontWeight weight)
         {
@@ -327,14 +327,14 @@ namespace OneTaskBar
             if(lens!=null){lens.Active=Glass95.Enabled&&!OpaqueSurface&&HasBlur&&Preferences.Current.Blur&&!(DockSurface&&DockAppearance.Custom)&&!(this is HudWindow);lens.InvalidateVisual();}
             if(glassTint==null)return;if(DockSurface&&DockAppearance.Custom){Native.EnableBlur(this,false);Surface.Background=DockAppearance.Background;Surface.BorderBrush=Glass95.Enabled?Glass95.Rim:Brushes.Transparent;Surface.BorderThickness=new Thickness(Glass95.Enabled?.7:0);return;}
             bool enabled=HasBlur&&Preferences.Current.Blur&&!(DockSurface&&Preferences.Current.DockSolidBackground)&&(!Glass95.Enabled||Glass95.Transparent);Native.EnableBlur(this,enabled);
+            bool panel=PanelMaterial.ReadablePanel(this);
             if(Glass95.Enabled&&!OpaqueSurface&&!(DockSurface&&Preferences.Current.DockSolidBackground)){
-                if(glassEdge==null||edgeDark!=Dark){edgeDark=Dark;glassEdge=Glass95.Edge(edgeDark);}Surface.BorderBrush=this is NowBar?(Brush)Brushes.Transparent:glassEdge;Surface.BorderThickness=new Thickness(0);
-                Surface.Background=this is NowBar?(enabled?glassTint:solidTint??Glass95.Solid):enabled?PanelMaterial.Surface(Dark,true):Paint.Brush(Dark?"#FF242832":"#FFF1F4FA");
+                bool rimDark=panel||Dark;if(glassEdge==null||edgeDark!=rimDark){edgeDark=rimDark;glassEdge=Glass95.Edge(edgeDark);}Surface.BorderBrush=this is NowBar?(Brush)Brushes.Transparent:glassEdge;Surface.BorderThickness=new Thickness(0);
+                Surface.Background=this is NowBar?(enabled?glassTint:solidTint??Glass95.Solid):panel?(enabled?PanelMaterial.PanelSurface(Dark,true):PanelMaterial.Solid(Dark)):enabled?PanelMaterial.Surface(Dark,true):Paint.Brush(Dark?"#FF242832":"#FFF1F4FA");
             }else{
                 if(glassEdge!=null){glassEdge=null;Surface.BorderBrush=DockSurface?Brushes.Transparent:Paint.Brush("#38FFFFFF");Surface.BorderThickness=new Thickness(DockSurface?0:.7);}
-                bool panel=this is QuickWindow||this is NotificationWindow||this is DetailWindow||this is CalendarWindow||this is StartWindow||this is SearchWindow||this is DrawerWindow;
                 if(DockSurface)Surface.Background=enabled?LightPanel.DockGlass:Dark?Paint.Brush("#FF29302D"):LightPanel.DockSolid;
-                else if(panel){Dark=Glass95.Dark;Surface.Background=enabled?PanelMaterial.Surface(Dark,false):PanelMaterial.Light?PanelMaterial.LightSolid:Paint.Brush("#FF29302D");}
+                else if(panel){Dark=Glass95.Dark;Surface.Background=enabled?PanelMaterial.PanelSurface(Dark,false):PanelMaterial.Solid(Dark);}
                 else Surface.Background=enabled?glassTint:solidTint??Paint.Brush(Dark?"#FF344139":"#FFE0E5E2");
             }
             if(!OpaqueSurface&&!(this is NowBar)&&!DockSurface)PanelMaterial.RefreshCards(Surface);
