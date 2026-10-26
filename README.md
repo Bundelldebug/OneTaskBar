@@ -90,9 +90,9 @@ Code and the original One TaskBar icon are under the [MIT license](LICENSE). [Th
 
 Production signing is not active. The maintainer reported on 2026-10-24 that SignPath Foundation declined the application; no usable certificate was issued. See the [Code signing policy and privacy details](docs/CODE_SIGNING.md). Unsigned development artifacts are not production-signed releases.
 
-## 9.0.3 and 9.5.0 beta 9
+## 9.0.4 and 9.5.1 beta 1
 
-The dock, launcher and panel backgrounds now apply the fixed 70% transparency directly, without the dense readability overlay. Card films are lighter while text and icons remain opaque. Stable 9.0.3 provides UI 8.5/9.0; UI 9.5 glass materials are available in 9.5.0 beta 9. See [stable notes](docs/RELEASE_NOTES_9.0.3.md) and [beta notes](docs/9.5-BETA.md). Both remain unsigned; Windows may block execution.
+Light panels now retain the previous dark design, with a separate deeper dark mode. Selected performance-mode icons and notification banners over bright windows are corrected. These releases also include the optional Duo status icon, slider value labels, compact side layouts, per-monitor fullscreen handling and more reliable exact-track artwork lookup. Stable 9.0.4 provides UI 8.5/9.0; the 9.5.1 beta also offers UI 9.5 glass materials. See [stable notes](docs/RELEASE_NOTES_9.0.4.md) and [beta notes](docs/9.5-BETA.md). Both remain unsigned; Windows may block execution.
 
 ## 9.0.1 (unsigned stable release)
 

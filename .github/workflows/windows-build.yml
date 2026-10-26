@@ -25,7 +25,7 @@ jobs:
       - name: Validate UI and lifecycle fixtures
         shell: pwsh
         run: |
-          $probes = @('update950-probe','beta-feedback-probe','quick9-probe','quick-size-probe','start-size-probe','media9-probe','launcher-motion-probe','launcher-keyboard-probe','deferred-icon-probe','settings-visibility-probe','window-switcher-probe','window-activation-probe','window-preview-probe','popup-probe','startup-probe','nowbar9-probe','nowbar-probe','memory-lifecycle-probe')
+          $probes = @('panel-theme-probe','notification-ui-probe','update950-probe','beta-feedback-probe','quick9-probe','quick-size-probe','start-size-probe','media9-probe','launcher-motion-probe','launcher-keyboard-probe','deferred-icon-probe','settings-visibility-probe','window-switcher-probe','window-activation-probe','window-preview-probe','popup-probe','startup-probe','nowbar9-probe','nowbar-probe','memory-lifecycle-probe')
           $info = [Diagnostics.FileVersionInfo]::GetVersionInfo((Resolve-Path ./dist/OneTaskBar.exe))
           if ([Version]$info.FileVersion -ge [Version]'9.5.0.0') { $probes += 'glass95-probe' }
           foreach ($probe in $probes) {
@@ -53,6 +53,8 @@ jobs:
         with:
           name: windows-test-report
           path: |
+            ${{ runner.temp }}/OneTaskBar-panel-theme-probe/panel-theme-probe.json
+            ${{ runner.temp }}/OneTaskBar-notification-ui-probe/notification-ui-probe.json
             ${{ runner.temp }}/OneTaskBar-update950-probe/update950-probe.json
             ${{ runner.temp }}/OneTaskBar-beta-feedback-probe/beta-feedback-probe.json
             ${{ runner.temp }}/OneTaskBar-glass95-probe/glass95-probe.json
