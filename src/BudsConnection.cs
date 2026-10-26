@@ -55,6 +55,8 @@ namespace OneTaskBar
         internal bool Enabled {get{return !disposed&&shell.Desktop&&shell.DisplayAwake&&Preferences.Current.NotificationPopups&&Preferences.Current.BudsConnectionPopups;}}
         bool ShouldWatch {get{return !disposed&&shell.Desktop&&shell.DisplayAwake;}}
         internal string ConnectedCaption {get;private set;}
+        internal bool HasConnectedBuds {get;private set;}
+        internal string BudsCaption {get;private set;}
         internal BudsConnections(ShellController owner){shell=owner;dispatcher=Application.Current.Dispatcher;expiry.Tick+=(s,e)=>{if(Popup==null){expiry.Stop();return;}if(Popup.IsMouseOver)Popup.Expires=DateTime.UtcNow.AddSeconds(2);else if(DateTime.UtcNow>=Popup.Expires)Hide(true);};}
         internal void Refresh()
         {
@@ -81,7 +83,7 @@ namespace OneTaskBar
                 int? battery=BudsInfo.Battery(device.Properties);var info=await BackgroundWork.Run(()=>BudsDeviceData.Enrich(new BudsInfo {Name=name,Container=identity,Detail=battery.HasValue?"연결됨 · 배터리 "+battery+"%":"연결됨"}));if(token==generation&&Enabled&&tracker.Connected(name,identity))Show(info,true);
             }catch(Exception error){AppLog.Once("buds-connection",error.GetType().Name);}
         }
-        internal void UpdateCaption(IEnumerable<BluetoothPeer> peers){string text=BluetoothDeviceView.ConnectedCaption(peers);if(text==ConnectedCaption)return;ConnectedCaption=text;if(shell.Quick!=null&&shell.Quick.IsVisible)shell.Quick.Refresh(shell.Power,shell.Brightness,shell.Audio.Value,shell.Audio.Muted,shell.Audio.Available,shell.Brightness>=0);}
+        internal void UpdateCaption(IEnumerable<BluetoothPeer> peers){var list=peers.ToArray();var buds=list.Where(p=>BudsInfo.IsBuds(p.Name)).ToArray();string text=BluetoothDeviceView.ConnectedCaption(list),caption=BluetoothDeviceView.ConnectedCaption(buds);bool connected=buds.Any(p=>p.Connected);if(text==ConnectedCaption&&caption==BudsCaption&&connected==HasConnectedBuds)return;ConnectedCaption=text;BudsCaption=caption;HasConnectedBuds=connected;if(shell.Quick!=null&&shell.Quick.IsVisible)shell.Quick.Refresh(shell.Power,shell.Brightness,shell.Audio.Value,shell.Audio.Muted,shell.Audio.Available,shell.Brightness>=0);}
         internal bool ShowNative(NotificationEntry entry){var info=BudsInfo.Toast(entry);if(info==null||!Enabled)return false;var device=devices.Values.FirstOrDefault(d=>BudsConnectionTracker.Normalize(d.Name)==BudsConnectionTracker.Normalize(info.Name));if(device!=null)info.Container=BluetoothPeer.ContainerId(device.Properties);if(shell.Demo)Show(info,false);else EnrichNative(info,generation);return true;}
         async void EnrichNative(BudsInfo info,int token){try{info=await BackgroundWork.Run(()=>BudsDeviceData.Enrich(info));if(token==generation&&Enabled)Show(info,false);}catch(Exception error){AppLog.Once("buds-native-data",error.GetType().Name);if(token==generation&&Enabled)Show(info,false);}}
         internal void Show(BudsInfo info,bool connection=false)
