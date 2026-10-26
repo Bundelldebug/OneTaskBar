@@ -51,7 +51,7 @@ namespace OneTaskBar
         void ConfigureEdge()
         {
             if(!DockGeometry.Vertical(Edge))return;appCanvas.LayoutTransform=new RotateTransform(90);var status=(Grid)Status.Surface.Child;status.Margin=new Thickness(3,3,3,3);status.ColumnDefinitions.Clear();status.ColumnDefinitions.Add(new ColumnDefinition());status.RowDefinitions.Clear();
-            foreach(double height in new[]{22.0,38,22,40})status.RowDefinitions.Add(new RowDefinition {Height=new GridLength(height)});
+            foreach(double height in new[]{22.0,38,22,0,40})status.RowDefinitions.Add(new RowDefinition {Height=new GridLength(height)});
             int index=0;foreach(FrameworkElement child in status.Children){Grid.SetColumn(child,0);Grid.SetRow(child,index++);child.HorizontalAlignment=HorizontalAlignment.Center;child.VerticalAlignment=VerticalAlignment.Center;child.Height=status.RowDefinitions[index-1].Height.Value;child.Width=38;}clock.FontSize=8.5;clock.TextAlignment=TextAlignment.Center;
         }
         void OrientIcons()

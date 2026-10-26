@@ -84,6 +84,7 @@ namespace OneTaskBar
             status.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(32)});
             status.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(1,GridUnitType.Star)});
             powerColumn=new ColumnDefinition {Width=new GridLength(58)};status.ColumnDefinitions.Add(powerColumn);
+            status.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(0)});
             status.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(94)});
             var native=Paint.Button(new Glyph("up",15) {Color=Glass95.DockForeground},()=>controller.ShowNative("tray",this),"Windows 숨겨진 아이콘 · 트레이");
             trayAccess=native;
@@ -96,13 +97,14 @@ namespace OneTaskBar
             var battery=Paint.Button(Battery,()=>controller.ToggleQuick(this),"배터리 · 빠른 설정"); battery.Padding=new Thickness(0); battery.Background=Brushes.Transparent;
             powerAccess=battery;
             Grid.SetColumn(battery,2);Panel.SetZIndex(battery,10);status.Children.Add(battery);
+            Grid.SetColumn(extraStatus,3);status.Children.Add(extraStatus);
             var time=Paint.Button(clock,()=>controller.ToggleNotifications(this),"알림센터");time.Padding=new Thickness(0);time.Background=Brushes.Transparent;time.BorderBrush=Brushes.Transparent;time.BorderThickness=new Thickness(0);
             clockAccess=time;
-            Grid.SetColumn(time,3); status.Children.Add(time); Status.Surface.Child=status;
+            Grid.SetColumn(time,4); status.Children.Add(time); Status.Surface.Child=status;
             var menu=new ContextMenu(); var settings=new MenuItem {Header="One TaskBar 설정",Icon=new Glyph("home",18){Color=Glass95.DockForeground}};settings.Click+=(s,e)=>controller.ShowWelcome();menu.Items.Add(settings);
             var resetOrder=new MenuItem {Header="앱 순서 초기화"};resetOrder.Click+=(s,e)=>controller.ResetDockOrder();menu.Items.Add(resetOrder);
             var restore=new MenuItem {Header="Windows 작업표시줄로 돌아가기"};restore.Click+=(s,e)=>controller.SetDesktop(false);menu.Items.Add(restore);Start.ContextMenu=menu;
-            ConfigureEdge();Rebuild();
+            ConfigureEdge();RebuildStatusItems();Rebuild();
         }
         static void Animate(ScaleTransform transform,double value)
         {
@@ -118,6 +120,7 @@ namespace OneTaskBar
         internal void Rebuild()
         {
             if(closed||DragReorder.Active)return;if(Scale<=0)Scale=1;
+            RebuildStatusItems();
             Battery.Compact=DockGeometry.Vertical(Edge);Battery.Height=Battery.Compact?18:23;
             foreach(var surface in new[]{Start,Apps,Status}){surface.SetMaterial(LightPanel.DockGlass,LightPanel.DockSolid);Glass95.DockInk(surface.Surface);}pinDivider.Background=Glass95.DockForeground;
             startGlyph.Kind=Preferences.Current.NativeStartButton?"windows-start":"apps";startGlyph.Color=Preferences.Current.NativeStartButton?Paint.Brush("#FF1975DD"):Glass95.DockForeground;startGlyph.InvalidateVisual();startButton.ToolTip=Preferences.Current.NativeStartButton?"Windows 시작":"앱 목록";System.Windows.Automation.AutomationProperties.SetName(startButton,(string)startButton.ToolTip);
