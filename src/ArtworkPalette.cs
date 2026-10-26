@@ -8,6 +8,13 @@ namespace OneTaskBar
     {
         static readonly ConditionalWeakTable<BitmapSource,ArtworkPalette> cache=new ConditionalWeakTable<BitmapSource,ArtworkPalette>();
         static readonly ConditionalWeakTable<BitmapSource,Brush> playerSurfaces=new ConditionalWeakTable<BitmapSource,Brush>();
+        static readonly ConditionalWeakTable<BitmapSource,Brush> outputSurfaces=new ConditionalWeakTable<BitmapSource,Brush>();
+        internal static Brush OutputSurface(BitmapSource source)
+        {
+            if(source==null)return Brushes.Transparent;return outputSurfaces.GetValue(source,image=>{
+                var cover=new System.Windows.Controls.Image {Source=image,Stretch=Stretch.UniformToFill,Width=96,Height=96,Effect=new System.Windows.Media.Effects.BlurEffect {Radius=16,RenderingBias=System.Windows.Media.Effects.RenderingBias.Performance}};cover.Measure(new System.Windows.Size(96,96));cover.Arrange(new System.Windows.Rect(0,0,96,96));var bitmap=new RenderTargetBitmap(96,96,96,96,PixelFormats.Pbgra32);bitmap.Render(cover);bitmap.Freeze();var brush=new ImageBrush(bitmap){Stretch=Stretch.UniformToFill};brush.Freeze();return brush;
+            });
+        }
         internal readonly Color Dominant,Background,ProgressColor;internal readonly Brush Glass,Solid,Ink;internal readonly double MinimumContrast;
         static readonly Color text=Color.FromRgb(244,248,245);const byte alpha=220;
         ArtworkPalette(Color dominant)
