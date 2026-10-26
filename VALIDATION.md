@@ -1,9 +1,10 @@
-# Local correction — 9.5.0-beta.9
+# 9.0.3 / 9.5.0-beta.9 validation
 
 - The 2026-10-26 report exposed a material-selection error: although the base palette had 30% opacity, the dock and launcher replaced it with 196/255 dark or 220/255 light opacity. Header/footer and card protection also obscured the fixed transparency. This was not an inversion of the percentage calculation.
 - The opaque readability replacements are removed. Dock, launcher and panel backgrounds now use the same fixed 30% opacity material. Light legacy docks no longer select a separate denser tint. The card film stays at or below 38/255 opacity; text and glyph opacity and selected-control contrast remain independent. Original geometry, custom opaque/image dock backgrounds and blur-off behavior are preserved.
 - Regression checks inspect the actual displayed Surface.Background and live host backdrop after material application, including dock orientations, quick settings, notifications, details and Start. Checking the base palette alone did not catch the earlier override. Both palettes and all supported UI versions are exercised without reading or capturing desktop pixels.
-- The local correction passes all 63 self-test groups plus beta feedback, release UI, UI 9 quick settings, glass95, popup, launcher motion and memory lifecycle fixtures. This is a local follow-up to the published releases below; those release tags and assets are immutable.
+- The local correction passes all 63 self-test groups plus beta feedback, release UI, UI 9 quick settings, glass95, popup, launcher motion and memory lifecycle fixtures. Final Windows CI, payload parity, normal execution and Defender checks gate publication of both release candidates. The stable build exposes only UI 8.5/9.0; beta preferences normalize to UI 9.0 when loaded by stable. Prior release tags and assets remain immutable.
+- Both packages remain unsigned under the maintainer's existing authorization. No security policy, antivirus exception, certificate trust, desktop sampling, forced GC or working-set trimming is introduced. Total installed-app RAM below 150 MiB remains an unmet goal; this transparency correction does not claim that budget.
 
 # Published 9.0.2 / 9.5.0-beta.8 validation
 
