@@ -16,6 +16,10 @@ namespace OneTaskBar
     {
         static void Require(bool value,string text){if(!value)throw new InvalidOperationException("Quick UI 9: "+text);}
         static string State(QuickWidgetLayout layout){return new JavaScriptSerializer().Serialize(layout.Items.OrderBy(i=>i.Key,StringComparer.Ordinal).Select(i=>new object[]{i.Key,i.X,i.Y,i.Columns,i.Rows,i.Hidden}).ToArray());}
+        static void RepeatedState()
+        {
+            var button=new QuickToggleButton {Content=new Glyph("wifi",22)};button.RefreshState(true,true);var background=button.Background;for(int i=0;i<100;i++)button.RefreshState(true,true);Require(Object.ReferenceEquals(background,button.Background),"unchanged toggles reuse the same brush instead of restarting animations");button.RefreshState(true,false);Require(!button.IsEnabled&&button.Checked&&Object.ReferenceEquals(background,button.Background),"availability changes preserve selection and its brush");button.RefreshState(false,true);Require(button.IsEnabled&&!button.Checked&&System.Windows.Automation.AutomationProperties.GetItemStatus(button)=="꺼짐","state changes still update availability and accessibility");
+        }
         static async Task ExpandedSpacing(QuickWindow quick)
         {
             var board=quick.GridUI.Board;string saved=State(board.Layout);quick.SetExpanded(true);await Task.Delay(280);var body=board.Frames["toggles"].Body;var rows=new List<double>();
@@ -48,7 +52,7 @@ namespace OneTaskBar
             var app=new Application {ShutdownMode=ShutdownMode.OnExplicitShutdown};ShellController shell=null;QuickWindow quick=null;WelcomeWindow settings=null;int result=1,oldUI=Preferences.Current.UIVersion;bool oldBuds=Preferences.Current.QuickGalaxyBuds;int oldColumns=Preferences.Current.QuickToggleColumns,oldRows=Preferences.Current.QuickToggleRows;
             app.Dispatcher.BeginInvoke(new Action(async()=>{
                 try{
-                    Directory.CreateDirectory(AppLog.Data);Validate(new List<string>());Program.Inspectable=true;Preferences.Current.UIVersion=90;Preferences.Current.QuickGalaxyBuds=true;Preferences.Current.QuickToggleColumns=2;Preferences.Current.QuickToggleRows=3;
+                    Directory.CreateDirectory(AppLog.Data);Validate(new List<string>());Program.Inspectable=true;Preferences.Current.UIVersion=90;RepeatedState();Preferences.Current.QuickGalaxyBuds=true;Preferences.Current.QuickToggleColumns=2;Preferences.Current.QuickToggleRows=3;
                     string legacyFile=Path.Combine(AppLog.Data,"layout.json");if(!File.Exists(legacyFile))File.WriteAllText(legacyFile,"{\"quick.sections\":[\"volume\",\"media\"],\"quick.actions\":[\"mute\",\"theme\",\"dnd\"]}");byte[] legacy=File.ReadAllBytes(legacyFile);
                     shell=new ShellController(true);shell.Desktop=true;shell.Services.OutputName="헤드폰 (테스트 Buds4 Pro)";shell.Services.Media=new MediaState {Available=true,Active=true,Title="테스트 미디어",Artist="테스트 아티스트",AppId="fixture.media",CanPlay=true};quick=new QuickWindow(shell);shell.Quick=quick;var screen=System.Windows.Forms.Screen.PrimaryScreen;quick.ShowAt(screen.Bounds,30,30,380,650);quick.Refresh(shell.Power,64,35,false,true,true);await Task.Delay(180);
                     Require(quick.Modern&&quick.GridUI.Board.Layout.Fits()&&quick.GridUI.Brightness.NoTrackBorder&&quick.GridUI.Volume.NoTrackBorder,"modern surface and borderless separate sliders");var board=quick.GridUI.Board;board.Layout.Reset(false);board.Reflow(false);await Task.Delay(60);Require(board.Frames["volume"].ActualHeight==60&&board.Frames["media"].TranslatePoint(new Point(),board).Y+board.Frames["media"].ActualHeight<=board.Scroller.ViewportHeight+.5,"60-DIP controls keep media and primary controls visible at 380 x 650");Program.Save(quick.Surface,380,650,Path.Combine(AppLog.Data,"quick9-default.png"));
