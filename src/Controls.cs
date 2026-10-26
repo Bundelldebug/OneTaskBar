@@ -98,7 +98,8 @@ namespace OneTaskBar
             var pen=new Pen(brush,1.8) { StartLineCap=PenLineCap.Round,EndLineCap=PenLineCap.Round,LineJoin=PenLineJoin.Round };
             dc.PushTransform(new TranslateTransform(center.X-size/2,center.Y-size/2)); dc.PushTransform(new ScaleTransform(size/24,size/24));
             Action<double,double,double,double> line=(x,y,a,b)=>dc.DrawLine(pen,new Point(x,y),new Point(a,b));
-            if(kind=="brightness") {
+            if(kind.StartsWith("pref-",StringComparison.Ordinal))QuickSettingIcons.Draw(dc,kind.Substring(5),pen);
+            else if(kind=="brightness") {
                 dc.DrawEllipse(brush,null,new Point(12,12),4.2,4.2);
                 for(int i=0;i<8;i++) { double a=i*Math.PI/4; line(12+8*Math.Cos(a),12+8*Math.Sin(a),12+10.6*Math.Cos(a),12+10.6*Math.Sin(a)); }
             } else if(kind=="scroll") {

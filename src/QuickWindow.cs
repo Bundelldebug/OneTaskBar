@@ -251,6 +251,7 @@ namespace OneTaskBar
         internal async void InvokeToggle(string key)
         {
             if(QuickActionCatalog.Commands.Contains(key)){QuickActionCatalog.Invoke(key,shell);return;}
+            var setting=QuickSettingCatalog.Find(key);if(setting!=null){Preferences.Set(p=>setting.Write(p,!setting.Read(p)));return;}
             if(pendingToggles.Contains(key))return;pendingToggles.Add(key);if(key=="theme")themeBusy=true;Refresh(shell.Power,shell.Brightness,shell.Audio.Value,shell.Audio.Muted,shell.Audio.Available,shell.Brightness>=0);
             try {
                 if(key=="mute"){bool before=shell.Audio.Muted;shell.Mute();shell.Audio.Read();if(shell.Audio.Muted==before)throw new InvalidOperationException("Windows 음소거 상태를 변경하지 못했습니다.");}
