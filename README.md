@@ -6,6 +6,12 @@ In taskbar replacement mode, Alt+Tab opens a top-centered glass panel with nativ
 
 A per-user Windows dock, app launcher, and control center with live backdrop blur. Written in C# and WPF, with an independent recovery watchdog. [한국어](README-ko.md)
 
+## 9.0.5 stable / 9.5.2 beta 1
+
+Fixes dock recovery on an empty desktop and adds configurable status shortcuts, searchable quick-setting icons, first-free-space placement, an animated output selector, sharper notification logos and launcher refinements. Unchanged controls reuse their state and inactive notification caches are released. Stable provides UI 8.5/9.0; beta also provides UI 9.5, including the contrasting keyboard HUD. [Stable changes](docs/RELEASE_NOTES_9.0.5.md) · [Beta changes](docs/9.5-BETA.md). Both releases are unsigned; Windows may still block execution. The total-RAM goal below 150 MiB remains unmet.
+
+For focused source navigation and isolated checks, see [debugging](docs/DEBUGGING.md).
+
 ## Install
 
 Download **OneTaskBar-Setup.exe** from [Releases](https://github.com/Bundelldebug/OneTaskBar/releases/latest), open it, and select Install. It installs for the current user, offers startup and desktop-shortcut choices, and launches the dock. Normal installation and use do **not** require administrator rights. No certificates, machine policies, or system executables are modified.
