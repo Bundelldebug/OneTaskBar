@@ -11,7 +11,7 @@ namespace OneTaskBar
         readonly List<EventWaitHandle> panelCommands=new List<EventWaitHandle>();
         void RegisterPanelCommands()
         {
-            var commands=new[]{"notifications","quick","start","search"}.Concat(Program.CaptureReview?new[]{"edge0","edge1","edge2","edge3","background0","background1","background2","background3"}:new string[0]);
+            var commands=new[]{"notifications","quick","start","search","desktops"}.Concat(Program.CaptureReview?new[]{"edge0","edge1","edge2","edge3","background0","background1","background2","background3"}:new string[0]);
             foreach(string panel in commands)
             {
                 string key=panel;
@@ -30,6 +30,7 @@ namespace OneTaskBar
             else if(key=="quick")ToggleQuick(dock);
             else if(key=="start")ToggleStart(dock);
             else if(key=="search")ToggleSearch(dock);
+            else if(key=="desktops")OpenDesktopOverview();
         }
     }
 }

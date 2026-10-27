@@ -386,11 +386,7 @@ namespace OneTaskBar
         }
         internal void ShowWelcome() { if(StartMenu!=null)StartMenu.HideImmediately();if(Welcome!=null&&Welcome.InterfaceVersion!=Preferences.Current.UIVersion){Welcome.ReleaseIdle();Welcome=null;}if(Welcome==null) Welcome=new WelcomeWindow(this); Welcome.UpdateMode(); Welcome.Show();Welcome.Pop(); Welcome.Activate(); }
         internal int TaskViewRequests;
-        internal async void OpenTaskView()
-        {
-            TaskViewRequests++;Previews.Close();foreach(var panel in new GlassWindow[]{Quick,Center,Detail,Drawer,Finder,StartMenu})if(panel!=null)panel.HideImmediately();foreach(var dock in docks)if(dock.MediaBar!=null)dock.MediaBar.SetExpanded(false);if(Demo)return;
-            if(!await Task.Run(()=>SystemPanels.TaskView())){ShowWelcome();Welcome.Feedback("작업 보기를 열지 못했습니다. 키보드 조합키를 놓고 다시 눌러 주세요.");}
-        }
+        internal void OpenTaskView(){OpenDesktopOverview();}
         internal void ShowNotificationConnection(bool resume=false)
         {
             Previews.Close();if(StartMenu!=null)StartMenu.HideImmediately();
@@ -743,7 +739,7 @@ namespace OneTaskBar
             TaskbarMask.Active=false;
             if(startupWork!=null){startupWork.Dispose();startupWork=null;}if(themeRefresh!=null)themeRefresh.Stop();timer.Stop();RecentApps.Dispose();Placement.Dispose(); SystemEvents.DisplaySettingsChanged-=DisplayChanged;SystemEvents.UserPreferenceChanged-=ThemeChanged; SystemEvents.PowerModeChanged-=PowerChanged;
             ConnectionSound.Dispose();
-            Previews.Dispose();Switcher.Dispose();if(brightnessEvents!=null)brightnessEvents.Dispose();
+            CloseDesktopOverview();Previews.Dispose();Switcher.Dispose();if(brightnessEvents!=null)brightnessEvents.Dispose();
             if(keys!=null) keys.Dispose();
             if(osdGate!=null)osdGate.Dispose();
             Banners.Dispose();Buds.Dispose();Toggles.Dispose();Services.Dispose();Notifications.Dispose();
