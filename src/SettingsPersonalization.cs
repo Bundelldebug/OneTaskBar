@@ -19,6 +19,9 @@ namespace OneTaskBar
         }
         void PersonalizeDock(StackPanel rows)
         {
+            DockScaleSetting(rows);
+            ClockSetting(rows);
+            Row(rows,"패널 색상을 작업표시줄과 맞추기","빠른 설정·알림·시작 메뉴에 선택한 작업표시줄 색상을 사용합니다",Preferences.Current.PanelsUseDockColor,v=>Preferences.Set(p=>p.PanelsUseDockColor=v));
             var placement=new StackPanel {Margin=new Thickness(15,14,15,14)};placement.Children.Add(Paint.TextBlock("작업표시줄 위치",15,AppSettingsPalette.Text));var positions=new System.Windows.Controls.Primitives.UniformGrid {Columns=4,Margin=new Thickness(0,10,0,0)};var positionButtons=new Button[4];
             Action refreshPosition=()=>{for(int n=0;n<4;n++){bool selected=DockGeometry.Edge==n;positionButtons[n].Background=selected?AppSettingsPalette.Accent:AppSettingsPalette.AccentLight;((TextBlock)positionButtons[n].Content).Foreground=selected?Paint.ControlWhite:AppSettingsPalette.Text;}};
             for(int n=0;n<4;n++){int edge=n;positionButtons[n]=Paint.Action(new[]{"왼쪽","위쪽","오른쪽","아래쪽"}[n],()=>{Preferences.Set(p=>p.DockEdge=edge);refreshPosition();});positionButtons[n].MinHeight=38;positionButtons[n].Margin=new Thickness(2);positions.Children.Add(positionButtons[n]);}refreshPosition();placement.Children.Add(positions);rows.Children.Add(placement);

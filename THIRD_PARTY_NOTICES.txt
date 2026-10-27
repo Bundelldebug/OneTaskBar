@@ -79,3 +79,13 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+
+Liquid glass design and optical references (implementation reference only):
+- dmitthedazed/am-glass — Apache-2.0; native backdrop, surface film and lens layering.
+  https://github.com/dmitthedazed/am-glass
+- nkzw-tech/liquid-glass — MIT; edge-restricted displacement and an undistorted center.
+  https://github.com/nkzw-tech/liquid-glass
+The One TaskBar contour sampler is an independent Windows Composition implementation.
+No Android/Xposed/Compose or React/SVG runtime code or binaries from these projects
+are incorporated or executed. Existing slider shapes and content are retained.

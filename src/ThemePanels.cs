@@ -7,6 +7,14 @@ namespace OneTaskBar
     internal sealed partial class ShellController
     {
         bool renderedPanelDark=Glass95.Dark,renderedDockDark=Glass95.DockDark,themeRefreshQueued;DispatcherTimer themeRefresh;
+        string renderedPanelTint=PanelTint.Key;
+        void RefreshPanelTint()
+        {
+            string key=PanelTint.Key;
+            if(key==renderedPanelTint)return;
+            renderedPanelTint=key;
+            PanelTint.RefreshOpen();
+        }
         void QueuePanelTheme(){if(themeRefreshQueued)return;themeRefreshQueued=true;Application.Current.Dispatcher.BeginInvoke(new Action(()=>{themeRefreshQueued=false;if(!disposed)RefreshPanelTheme();}),DispatcherPriority.Background);}
         internal void RefreshPanelTheme()
         {

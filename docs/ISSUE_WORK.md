@@ -1,6 +1,6 @@
 # Issue work queue
 
-Bug-fix release: 9.0.7 / 9.5.4-beta.1. Suggestions are intentionally a later local-development phase.
+Published bug-fix release: 9.0.7 / 9.5.4-beta.1. The following suggestions are implemented in the next local development build.
 
 ## Bugs
 
@@ -12,15 +12,17 @@ Bug-fix release: 9.0.7 / 9.5.4-beta.1. Suggestions are intentionally a later loc
 
 ## Suggestions after publication
 
-Apply and check each independently, preserving existing settings and default behavior.
+Each item was applied to the PC after its focused checks. Existing settings and pins were preserved.
 
-1. Dock scale as a percentage.
-2. Optional panel background color shared with the dock.
-3. Settings category navigation motion.
-4. Clock typography and compact display choices.
-5. UI-version illustrations and descriptions.
-6. Settings footer cleanup; place exit in the settings list.
-7. UI 9.5 optical refinement using the user-selected reference implementations. Preserve the established filled slider shape and the stable 8.5/9.0 appearance.
+1. `DockSizing.cs`: 60–140%, default 100%. Content zoom is separate from monitor DPI; work-area reservation, media anchors and inward popups follow the chosen size. Commit only after releasing the size control.
+2. `PanelTint.cs`: opt-in link to the selected dock color, default off. Frozen tint caches preserve panel ink contrast and the existing transparency policy; disabling restores the original palette.
+3. `SettingsPageMotion.cs`: short layered entry/return animation. Cancellation on hidden/unloaded views, no screenshots or persistent bitmap caches.
+4. `DockClock.cs`: bold time, smaller date; time-only/date-only choices. Existing runs are reused between ticks; compact modes reduce status space. Full timestamp remains in the tooltip.
+5. `UIVersionPreview.cs`, `UIVersionPicker.cs`: code-drawn selected-version illustration and description; scalable dropdown and shared cached control style.
+6. `SettingsPages.cs`: search is the only bottom control; exit is a red row at the end of the settings list and is searchable.
+7. UI 9.5 optical refinement follows the actual reference implementations. See `GLASS_RENDERING.md` for the GPU contour approximation and its limits. Established filled slider geometry and stable 8.5/9.0 rendering are retained.
+
+Latest color fixes: notification chrome uses the same text palette as Quick Settings; light notification capsule content retains its own contrasting ink. Keyboard HUDs use the same unfilled track brush and underlying panel tint as Quick Settings. Their fade and native keyboard paths remain unchanged.
 
 Earlier [issue 2](https://github.com/Bundelldebug/OneTaskBar/issues/2) suggestions already have implementations for notification-to-Quick navigation, stronger setting selections, dock color/image modes, themed tray overflow, calendar access, scroll fading, matching launcher searches, edge placement and separate theme preferences. Retain their regression coverage.
 

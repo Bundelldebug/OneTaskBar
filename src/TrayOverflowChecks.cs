@@ -26,6 +26,16 @@ namespace OneTaskBar
             TrayOverflowWindow view=null;SourceHost source=null;TrayIconSession recovery=null;bool originalMask=TaskbarMask.Active;
             app.Dispatcher.BeginInvoke(new Action(async()=>{try{
                 Program.Inspectable=true;
+                foreach(double dpi in new[]{1.0,1.5,2.0})foreach(double zoom in new[]{.6,1,1.4})foreach(int edge in new[]{0,1,2,3})
+                {
+                    var monitor=new System.Drawing.Rectangle(-2560,-600,(int)(1600*dpi),(int)(900*dpi));
+                    var anchor=new Point(monitor.Left+monitor.Width/2,monitor.Top+monitor.Height/2);
+                    var position=new TrayPlacement(anchor,monitor,dpi,edge,22*zoom);
+                    var target=position.Target((int)(240*dpi),(int)(260*dpi));
+                    double distance=edge==0?target.X-anchor.X:edge==2?anchor.X-target.X-240*dpi:edge==1?target.Y-anchor.Y:anchor.Y-target.Y-260*dpi;
+                    double expected=edge==3?8*dpi:(22*zoom+8)*dpi;
+                    Require(position.Scale==dpi&&Math.Abs(distance-expected)<=1,"dock zoom changes the anchor gap, not the popup DPI");
+                }
                 Require(TrayIcons.Decode(new byte[6])==null&&TrayIcons.Decode(new byte[1024*1024+1])==null,"invalid artwork is bounded");
                 var bitmap=ArtworkPalette.Sample(Colors.OrangeRed);
                 using(var stream=new MemoryStream()){

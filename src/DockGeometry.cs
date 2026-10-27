@@ -10,7 +10,7 @@ namespace OneTaskBar
         internal static int Edge {get{return Preferences.Current.DockEdge>=0&&Preferences.Current.DockEdge<=3?Preferences.Current.DockEdge:3;}}
         internal static bool Vertical(int edge){return edge==0||edge==2;}
         internal const double SideStatusWidth=44;
-        internal static double SideStatusLength(double powerWidth){return powerWidth>0?128:106;}
+        internal static double SideStatusLength(double powerWidth){return (powerWidth>0?128:106)-(40-DockClock.SideHeight);}
         internal static string ClockLabel(DateTime time,bool seconds,bool vertical){return time.ToString(vertical?seconds?"tt\nh:mm:ss\nMM-dd":"tt\nh:mm\nMM-dd":seconds?"tt h:mm:ss\nyyyy-MM-dd":"tt h:mm\nyyyy-MM-dd",System.Globalization.CultureInfo.GetCultureInfo("ko-KR"));}
         internal static Rect Rect(System.Drawing.Rectangle screen,double scale,int edge,Rect logical)
         {
@@ -29,8 +29,8 @@ namespace OneTaskBar
         }
         internal static Rect Popup(System.Drawing.Rectangle screen,double scale,double width,double height,int edge)
         {
-            double w=screen.Width/scale,h=screen.Height/scale,x=w-width-12,y=h-height-76;
-            if(edge==1)y=76;else if(edge==0){x=76;y=h-height-12;}else if(edge==2){x=w-width-76;y=h-height-12;}
+            double w=screen.Width/scale,h=screen.Height/scale,inset=DockSizing.PopupInset,x=w-width-12,y=h-height-inset;
+            if(edge==1)y=inset;else if(edge==0){x=inset;y=h-height-12;}else if(edge==2){x=w-width-inset;y=h-height-12;}
             return new Rect(Math.Max(12,Math.Min(w-width-12,x)),Math.Max(12,Math.Min(h-height-12,y)),width,height);
         }
         internal static Rect Beside(Rect anchor,Size popup,Rect work,int edge,double gap=10)
@@ -60,13 +60,14 @@ namespace OneTaskBar
         }
         void PlaceDock(GlassWindow window,Rect logical,bool show)
         {
-            var rect=DockGeometry.Rect(Screen.Bounds,Scale,Edge,logical);window.DockBounds=Native.PlacementBounds(Screen.Bounds,Scale,rect.X,rect.Y,rect.Width,rect.Height);window.Width=rect.Width;window.Height=rect.Height;if(show)window.ShowAt(Screen.Bounds,rect.X,rect.Y,rect.Width,rect.Height);else Native.Place(window,Screen.Bounds,rect.X,rect.Y,rect.Width,rect.Height);
+            var rect=DockSizing.DisplayRect(DockGeometry.Rect(Screen.Bounds,ContentScale,Edge,logical),Zoom);window.DockBounds=Native.PlacementBounds(Screen.Bounds,Scale,rect.X,rect.Y,rect.Width,rect.Height);window.Width=rect.Width;window.Height=rect.Height;if(show)window.ShowAt(Screen.Bounds,rect.X,rect.Y,rect.Width,rect.Height);else Native.Place(window,Screen.Bounds,rect.X,rect.Y,rect.Width,rect.Height);
         }
         void PlaceStatus(DockLayout layout,bool show,double y=Double.NaN)
         {
             if(Double.IsNaN(y))y=layout.Y;Rect rect;
-            if(DockGeometry.Vertical(Edge)){var position=DockGeometry.Rect(Screen.Bounds,Scale,Edge,new Rect(layout.StatusX,y,layout.StatusWidth,DockGeometry.SideStatusWidth));rect=new Rect(position.X,position.Y,DockGeometry.SideStatusWidth,layout.StatusWidth);}
-            else rect=DockGeometry.Rect(Screen.Bounds,Scale,Edge,new Rect(layout.StatusX,y,layout.StatusWidth,44));
+            if(DockGeometry.Vertical(Edge)){var position=DockGeometry.Rect(Screen.Bounds,ContentScale,Edge,new Rect(layout.StatusX,y,layout.StatusWidth,DockGeometry.SideStatusWidth));rect=new Rect(position.X,position.Y,DockGeometry.SideStatusWidth,layout.StatusWidth);}
+            else rect=DockGeometry.Rect(Screen.Bounds,ContentScale,Edge,new Rect(layout.StatusX,y,layout.StatusWidth,44));
+            rect=DockSizing.DisplayRect(rect,Zoom);
             Status.DockBounds=Native.PlacementBounds(Screen.Bounds,Scale,rect.X,rect.Y,rect.Width,rect.Height);Status.Width=rect.Width;Status.Height=rect.Height;if(show)Status.ShowAt(Screen.Bounds,rect.X,rect.Y,rect.Width,rect.Height);else Native.Place(Status,Screen.Bounds,rect.X,rect.Y,rect.Width,rect.Height);
         }
     }

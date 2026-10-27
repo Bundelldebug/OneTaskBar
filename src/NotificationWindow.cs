@@ -17,7 +17,10 @@ namespace OneTaskBar
         readonly Border mediaCard;
         internal bool MediaVisible {get{return mediaCard.Visibility==Visibility.Visible;}}
         readonly TextBlock clock=Paint.TextBlock("",28,Paint.Text),today=Paint.TextBlock("",12,Paint.Muted),count=Paint.TextBlock("알림",17,Paint.Text);
-        readonly Button access,clear,disturb;readonly Glyph disturbGlyph=new Glyph("dnd",20);
+        readonly Button access,clear,disturb,quickSettings;readonly Glyph disturbGlyph=new Glyph("dnd",20);
+        TextBlock emptyMessage,emptyStatus;
+        internal TextBlock ClockLabel {get{return clock;}}
+        internal TextBlock DateLabel {get{return today;}}
         readonly Dictionary<string,NotificationStackView> retained=new Dictionary<string,NotificationStackView>(StringComparer.OrdinalIgnoreCase);string signature;bool opening,disturbBusy;
         List<NotificationEntry> renderedItems;bool renderedAllowed;long clockSecond=-1;DateTime renderedDate;
         internal int CardCount {get{return retained.Count;}}
@@ -30,11 +33,32 @@ namespace OneTaskBar
             disturb=Paint.Button(disturbGlyph,()=>ToggleDisturb(),"방해 금지");disturb.Width=disturb.Height=42;disturb.Padding=new Thickness(0);disturb.Resources["ButtonRadius"]=new CornerRadius(21);disturb.HorizontalAlignment=HorizontalAlignment.Right;disturb.VerticalAlignment=VerticalAlignment.Center;header.Children.Add(disturb);root.Children.Add(header);
             var notifications=new DockPanel();var labelRow=new Grid {Height=39,Margin=new Thickness(6,0,3,7)};count.FontWeight=FontWeights.SemiBold;count.VerticalAlignment=VerticalAlignment.Center;labelRow.Children.Add(count);
             clear=Paint.Action("모두 지우기",()=> {shell.Notifications.Clear();RefreshNotifications();});clear.HorizontalAlignment=HorizontalAlignment.Right;clear.Padding=new Thickness(12,7,12,7);clear.FontSize=11;labelRow.Children.Add(clear);DockPanel.SetDock(labelRow,Dock.Top);notifications.Children.Add(labelRow);
-            access=Paint.Action("Windows 알림 연결",()=>RequestAccess());access.HorizontalAlignment=HorizontalAlignment.Stretch;access.Height=40;access.Margin=new Thickness(0,8,0,0);DockPanel.SetDock(access,Dock.Bottom);notifications.Children.Add(access);var quickSettings=Paint.Action("빠른 설정  ›",shell.QuickFromNotifications);quickSettings.Height=36;quickSettings.Margin=new Thickness(0,8,0,0);DockPanel.SetDock(quickSettings,Dock.Bottom);notifications.Children.Add(quickSettings);
+            access=Paint.Action("Windows 알림 연결",()=>RequestAccess());access.HorizontalAlignment=HorizontalAlignment.Stretch;access.Height=40;access.Margin=new Thickness(0,8,0,0);DockPanel.SetDock(access,Dock.Bottom);notifications.Children.Add(access);quickSettings=Paint.Action("빠른 설정  ›",shell.QuickFromNotifications);quickSettings.Height=36;quickSettings.Margin=new Thickness(0,8,0,0);DockPanel.SetDock(quickSettings,Dock.Bottom);notifications.Children.Add(quickSettings);
             var feed=new StackPanel();media=new MediaPlayerView(shell.Media,shell.SeekMedia,()=>shell.ShowDetail("sound"),condensed:true,openApp:shell.OpenMediaApplication,dense:true,sourceApp:id=>MediaApplication.Resolve(id,shell.Running.Concat(shell.Apps)));mediaCard=new Border {Child=media,CornerRadius=new CornerRadius(28),Margin=new Thickness(0,0,0,12),Visibility=Visibility.Collapsed};media.PaletteChanged=palette=>mediaCard.Background=media.MediaBackground;feed.Children.Add(mediaCard);feed.Children.Add(cards);
             notifications.Children.Add(new SmoothScrollViewer {Content=feed,VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,PanningMode=PanningMode.VerticalFirst});Grid.SetRow(notifications,1);root.Children.Add(notifications);Surface.Child=root;StableSurface=true;TransitionContent=root;
-            clock.Foreground=count.Foreground=NotificationStyle.Text;today.Foreground=NotificationStyle.Muted;foreach(var button in new[]{clear,access,quickSettings}){var text=button.Content as TextBlock;if(text!=null)text.Foreground=NotificationStyle.Text;button.Background=NotificationStyle.Card;}
+            RefreshChrome();
             Deactivated+=(s,e)=> {if(!Program.Inspectable&&IsVisible&&!IsMouseOver)Hide();};
+        }
+        internal void RefreshChrome()
+        {
+            clock.Foreground=count.Foreground=Paint.Text;
+            today.Foreground=Paint.Muted;
+            if(emptyMessage!=null)emptyMessage.Foreground=Paint.Text;
+            if(emptyStatus!=null)emptyStatus.Foreground=Paint.Muted;
+            foreach(var button in new[]{clear,access,quickSettings})
+            {
+                if(button==null)continue;
+                var text=button.Content as TextBlock;
+                if(text!=null)text.Foreground=Paint.Text;
+                button.Background=QuickPanel.Card;
+            }
+            if(disturb!=null&&!disturbBusy)
+            {
+                bool enabled=shell.Toggles.Disturb.State.Enabled;
+                disturb.Background=enabled?Paint.ControlWhite:QuickPanel.Card;
+                disturbGlyph.Color=enabled?Paint.OnLight:Paint.Text;
+                disturbGlyph.InvalidateVisual();
+            }
         }
         async void ToggleDisturb()
         {
@@ -52,16 +76,35 @@ namespace OneTaskBar
         }
         internal void Refresh()
         {
+            RefreshChrome();
             var playing=shell.Services.Media??new MediaState();mediaCard.Visibility=playing.Active?Visibility.Visible:Visibility.Collapsed;media.Update(playing,shell.Services.OutputName);if(playing.Active)mediaCard.Background=media.MediaBackground;
             var now=DateTime.Now;long second=now.Ticks/TimeSpan.TicksPerSecond;if(second!=clockSecond){clockSecond=second;clock.Text=now.ToString("H:mm:ss");}if(now.Date!=renderedDate){renderedDate=now.Date;today.Text=now.ToString("M월 d일 dddd",System.Globalization.CultureInfo.GetCultureInfo("ko-KR"));}
-            var dnd=shell.Toggles.Disturb.State;disturb.IsEnabled=dnd.Available&&!disturbBusy;disturb.Background=dnd.Enabled?Paint.ControlWhite:NotificationStyle.Card;disturbGlyph.Color=dnd.Enabled?Paint.Brush("#FF26312D"):NotificationStyle.Text;disturbGlyph.InvalidateVisual();System.Windows.Automation.AutomationProperties.SetItemStatus(disturb,dnd.Enabled?"켜짐":"꺼짐");
+            var dnd=shell.Toggles.Disturb.State;disturb.IsEnabled=dnd.Available&&!disturbBusy;System.Windows.Automation.AutomationProperties.SetItemStatus(disturb,dnd.Enabled?"켜짐":"꺼짐");
             var service=shell.Notifications;access.Visibility=service.Allowed?Visibility.Collapsed:Visibility.Visible;count.Text=service.Allowed&&service.Items.Count>0?"알림  "+service.Items.Count:"알림";clear.IsEnabled=service.Allowed&&service.Items.Count>0;clear.Opacity=clear.IsEnabled?1:.4;
             var accessText=access.Content as TextBlock;if(accessText!=null)accessText.Text="Windows 알림 연결";
             if(!shell.Demo&&signature!=null&&Object.ReferenceEquals(renderedItems,service.Items)&&renderedAllowed==service.Allowed)return;renderedItems=service.Items;renderedAllowed=service.Allowed;
             string current=service.Allowed+"|"+String.Join("|",service.Items.Select(a=>NotificationStack.ItemKey(a)+":"+a.App+":"+a.Title+":"+a.Body+":"+a.Created.UtcDateTime.Ticks+":"+(a.Icon!=null?a.Icon.GetHashCode():0)+":"+(a.Artwork!=null?a.Artwork.GetHashCode():0)));if(current==signature)return;signature=current;
             var items=NotificationStack.Group(service.Allowed?service.Items:new List<NotificationEntry>());var keys=new HashSet<string>(items.Select(g=>g.Key),StringComparer.OrdinalIgnoreCase);foreach(string key in retained.Keys.Where(k=>!keys.Contains(k)).ToArray()){var removed=retained[key];retained.Remove(key);RemoveCard(removed);}
             foreach(var empty in cards.Children.OfType<Border>().Where(b=>b.Tag as string=="empty").ToArray())cards.Children.Remove(empty);
-            if(!service.Allowed||service.Items.Count==0){var content=new StackPanel {Margin=new Thickness(20,32,20,34)};var empty=Paint.TextBlock(service.Allowed?"알림이 없습니다.":"Windows 알림 연결",15,NotificationStyle.Text);empty.FontWeight=FontWeights.SemiBold;empty.TextAlignment=TextAlignment.Center;content.Children.Add(empty);if(!service.Allowed){var status=Paint.TextBlock(service.Status,12,NotificationStyle.Muted);status.TextAlignment=TextAlignment.Center;status.TextWrapping=TextWrapping.Wrap;status.Margin=new Thickness(0,9,0,0);content.Children.Add(status);}cards.Children.Add(new Border {Tag="empty",Background=Brushes.Transparent,Margin=new Thickness(0,4,0,6),Child=content});return;}
+            emptyMessage=emptyStatus=null;
+            if(!service.Allowed||service.Items.Count==0)
+            {
+                var content=new StackPanel {Margin=new Thickness(20,32,20,34)};
+                emptyMessage=Paint.TextBlock(service.Allowed?"알림이 없습니다.":"Windows 알림 연결",15,Paint.Text);
+                emptyMessage.FontWeight=FontWeights.SemiBold;
+                emptyMessage.TextAlignment=TextAlignment.Center;
+                content.Children.Add(emptyMessage);
+                if(!service.Allowed)
+                {
+                    emptyStatus=Paint.TextBlock(service.Status,12,Paint.Muted);
+                    emptyStatus.TextAlignment=TextAlignment.Center;
+                    emptyStatus.TextWrapping=TextWrapping.Wrap;
+                    emptyStatus.Margin=new Thickness(0,9,0,0);
+                    content.Children.Add(emptyStatus);
+                }
+                cards.Children.Add(new Border {Tag="empty",Background=Brushes.Transparent,Margin=new Thickness(0,4,0,6),Child=content});
+                return;
+            }
 
             int index=0;foreach(var group in items){NotificationStackView card;bool added=!retained.TryGetValue(group.Key,out card);
                 if(added){card=new NotificationStackView(group,OpenNotification,item=>{service.Dismiss(item.Id);RefreshNotifications();},stack=>{foreach(var item in stack.Items)service.Dismiss(item.Id);RefreshNotifications();});retained[group.Key]=card;}else card.Update(group);

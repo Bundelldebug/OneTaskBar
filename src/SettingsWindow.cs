@@ -28,9 +28,9 @@ namespace OneTaskBar
             PreviewMouseLeftButtonDown+=DragSettingsHeader;
             var root=new DockPanel {Margin=new Thickness(28,24,28,20)};
             var header=SettingsHeader();DockPanel.SetDock(header,Dock.Top);root.Children.Add(header);
-            var footer=new StackPanel {Margin=new Thickness(2,15,2,0)};status.TextWrapping=TextWrapping.Wrap;status.Margin=new Thickness(0,0,0,12);footer.Children.Add(status);status.SetBinding(VisibilityProperty,new System.Windows.Data.Binding("Text"){Source=status,Converter=new EmptySettingsText()});
-            var actions=new DockPanel();var quit=Paint.Action("종료 · Windows 작업표시줄 복원",()=>Application.Current.Shutdown());quit.Background=AppSettingsPalette.Card;quit.BorderBrush=AppSettingsPalette.Stroke;quit.BorderThickness=new Thickness(1);quit.MinHeight=38;DockPanel.SetDock(quit,Dock.Right);actions.Children.Add(quit);
-            var quick=Paint.Action("빠른 설정",()=>shell.ToggleQuick(null));quick.HorizontalAlignment=HorizontalAlignment.Left;quick.Background=AppSettingsPalette.Card;quick.BorderBrush=AppSettingsPalette.Stroke;quick.BorderThickness=new Thickness(1);quick.MinHeight=38;actions.Children.Add(quick);footer.Children.Add(actions);DockPanel.SetDock(footer,Dock.Bottom);root.Children.Add(footer);
+            status.TextWrapping=TextWrapping.Wrap;status.Margin=new Thickness(5,0,5,10);
+            status.SetBinding(VisibilityProperty,new System.Windows.Data.Binding("Text"){Source=status,Converter=new EmptySettingsText()});
+            DockPanel.SetDock(status,Dock.Top);root.Children.Add(status);
             var groups=new StackPanel();
             Group(groups,"UI 버전",VersionSetting());
             var desktopRows=new StackPanel();desktop=Row(desktopRows,"Windows 작업표시줄 대체","기본 작업표시줄과 전환합니다",shell.Desktop,v=> {shell.SetDesktop(v,true);Show();Activate();});

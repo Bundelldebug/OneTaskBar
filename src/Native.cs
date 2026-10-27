@@ -109,8 +109,10 @@ namespace OneTaskBar
         internal static void EnableBlur(Window window,bool enabled){RegionState state;if(regions.TryGetValue(window,out state)&&state.Backdrop!=null)state.Backdrop.Enable(enabled);}
         internal static bool RealtimeBackdrop(Window window){RegionState state;return regions.TryGetValue(window,out state)&&state.Backdrop!=null&&state.Backdrop.Realtime;}
         internal static int RefractedRegions(Window window){RegionState state;return regions.TryGetValue(window,out state)&&state.Backdrop!=null?state.Backdrop.RefractedRegions:0;}
+        internal static int RefractionLayers(Window window){RegionState state;return regions.TryGetValue(window,out state)&&state.Backdrop!=null?state.Backdrop.RefractionLayers:0;}
         internal static void BlurOpacity(Window window,double value){RegionState state;if(regions.TryGetValue(window,out state)&&state.Backdrop!=null)state.Backdrop.SetOpacity(value);}
         internal static double BlurOpacity(Window window){RegionState state;return regions.TryGetValue(window,out state)&&state.Backdrop!=null?state.Backdrop.Opacity:0;}
+        internal static void RefreshOptics(Window window){RegionState state;if(regions.TryGetValue(window,out state)&&state.Backdrop!=null)state.Backdrop.RefreshOptics();}
         internal static void EnsureDockVisible(Window window,bool raise=false)
         {
             // Explorer can hide or minimize an HWND without changing WPF Visibility.
