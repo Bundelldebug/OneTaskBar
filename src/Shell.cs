@@ -456,6 +456,7 @@ namespace OneTaskBar
         internal void ToggleStart(DockHost dock)
         {
             Previews.Close();
+            if(dock==null){var anchor=docks.FirstOrDefault(d=>d.Screen.Bounds.Contains(Forms.Cursor.Position))??docks.FirstOrDefault();if(anchor!=null)anchor.AnimateStartIcon();}
             if(StartMenu==null)StartMenu=new StartWindow(this);
             if(StartMenu.IsVisible&&!StartMenu.IsDismissing){StartMenu.Hide();return;}
             foreach(var panel in new GlassWindow[]{Quick,Center,Detail,Drawer,Finder,StartMenu})if(panel!=null)panel.HideImmediately();

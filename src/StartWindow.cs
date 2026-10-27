@@ -13,7 +13,7 @@ using System.Windows.Media.Animation;
 namespace OneTaskBar
 {
     // The home page of the launcher. All app enumeration stays in the existing drawer.
-    internal sealed class StartWindow : GlassWindow
+    internal sealed partial class StartWindow : GlassWindow
     {
         readonly ShellController shell;
         readonly UniformGrid pins=new UniformGrid {Columns=6},recent=new UniformGrid {Columns=2};
@@ -80,7 +80,7 @@ namespace OneTaskBar
             SizeChanged+=(s,e)=>UpdatePinColumns();
             PreviewTextInput+=(s,e)=> {if(!Search.IsKeyboardFocusWithin&&!folderName.IsKeyboardFocusWithin&&!String.IsNullOrEmpty(e.Text)&&(Keyboard.Modifiers&(ModifierKeys.Control|ModifierKeys.Alt))==0){Search.Text+=e.Text;QueueSearch();e.Handled=true;}};
             Deactivated+=(s,e)=> {if(!Program.Inspectable&&!DragReorder.Active&&IsVisible&&!IsMouseOver&&!(power.ContextMenu!=null&&power.ContextMenu.IsOpen)&&!pinButtons.Values.Any(b=>b.ContextMenu!=null&&b.ContextMenu.IsOpen))Hide();};
-            IsVisibleChanged+=(s,e)=>SyncOutsideClick();DragReorder.Finished+=FinishPinDrag;Closed+=(s,e)=> {closed=true;++load;StopOutsideClick();DragReorder.Finished-=FinishPinDrag;};
+            IsVisibleChanged+=(s,e)=>SyncOutsideClick();PreviewMouseLeftButtonUp+=(s,e)=>Dispatcher.BeginInvoke(new Action(FlushRetainedUpdates),System.Windows.Threading.DispatcherPriority.Background);DragReorder.Finished+=FinishPinDrag;Closed+=(s,e)=> {closed=true;++load;StopOutsideClick();DragReorder.Finished-=FinishPinDrag;};
         }
         void StopOutsideClick(){if(outsideClick!=null){outsideClick.Dispose();outsideClick=null;}}
         void SyncOutsideClick(){StopOutsideClick();if(IsVisible&&!closed&&(!Program.Inspectable||outsideFixture))outsideClick=MenuDismiss.Watch(ContainsStartPoint,()=>{if(IsVisible&&!IsDismissing)Hide();});}
@@ -122,6 +122,10 @@ namespace OneTaskBar
         void UpdatePinColumns(){pins.Columns=pinned.Count==0?1:Math.Max(2,Math.Min(6,(int)Math.Floor((Width-48-(phoneColumn==null?0:phoneColumn.Width.Value))/86)));}
         void RenderPins()
         {
+            if(IsVisible&&pins.IsMouseOver&&Mouse.LeftButton==MouseButtonState.Pressed&&!DragReorder.Active){pinsPending=true;return;}
+            string signature=PinSignature();
+            if(signature==pinSignature&&pins.Children.Count>0){UpdatePinColumns();UpdateRecentPage();return;}
+            pinSignature=signature;
             var current=CurrentTiles();int pages=Math.Max(1,(current.Count+17)/18);pinPage=Math.Max(0,Math.Min(pages-1,pinPage));pins.Children.Clear();pinButtons.Clear();UpdatePinColumns();
             pinHeading.Visibility=openFolder==null?Visibility.Visible:Visibility.Collapsed;folderHeading.Visibility=openFolder==null?Visibility.Collapsed:Visibility.Visible;recentHeading.Visibility=recent.Visibility=openFolder==null?Visibility.Visible:Visibility.Collapsed;
             if(openFolder!=null){var folder=pinned.First(t=>t.Key==openFolder);folderName.Text=folder.Name;}
@@ -196,6 +200,10 @@ namespace OneTaskBar
         }
         void RenderRecent(List<StartRecent> entries)
         {
+            if(IsVisible&&recent.IsMouseOver&&Mouse.LeftButton==MouseButtonState.Pressed){recentPending=entries;return;}
+            string signature=RecentSignature(entries);
+            if(recentSignature==signature&&recent.Children.Count>0)return;
+            recentSignature=signature;
             recentMore.Content=Paint.TextBlock(moreRecent?"‹  뒤로":"더 보기  ›",11,Paint.Text);recentMore.ToolTip=moreRecent?"시작 화면으로 돌아가기":"최근 항목 화면 열기";recentMore.IsEnabled=moreRecent||entries.Count>8;recentMore.Opacity=recentMore.IsEnabled?1:.45;
             recent.Children.Clear();foreach(var value in entries.Take(moreRecent?24:8)){var item=value;var app=item.App;var row=new Grid();row.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(58)});row.ColumnDefinitions.Add(new ColumnDefinition());row.Children.Add(new RecentThumbnail(app));
                 var words=new StackPanel {VerticalAlignment=VerticalAlignment.Center};var name=Paint.TextBlock(app.Name,12,Paint.Text);name.TextTrimming=TextTrimming.CharacterEllipsis;words.Children.Add(name);words.Children.Add(Paint.TextBlock("최근 열람 · "+item.Time.ToString("M월 d일  H:mm"),10,Paint.Muted));Grid.SetColumn(words,1);row.Children.Add(words);
