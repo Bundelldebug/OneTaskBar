@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -44,9 +44,39 @@ namespace OneTaskBar
         {
             try{var info=new FileInfo(FileName);if(!info.Exists||info.Length>1048576)return null;var cache=new JavaScriptSerializer().Deserialize<StartupDockCache>(File.ReadAllText(FileName));if(cache==null||cache.Version!=1||cache.Inputs!=Fingerprint()||cache.Pins==null||cache.Pins.Count>256)return null;return cache.Pins.Where(p=>p!=null&&!p.Hidden&&!String.IsNullOrEmpty(p.Key)).GroupBy(p=>p.Key,StringComparer.OrdinalIgnoreCase).Select(g=>{var p=g.First();return new AppEntry {Name=p.Name,AppID=p.AppID,Target=p.Target,Executable=p.Executable,StoredKey=p.Key,Pinned=true};}).ToList();}catch{return null;}
         }
+        static readonly object writeGate=new object();
         internal static void Save(IEnumerable<AppEntry> pins)
         {
-            try{Directory.CreateDirectory(AppLog.Data);var cache=new StartupDockCache {Version=1,Inputs=Fingerprint(),Pins=pins.Take(256).Select(p=>new Catalog.PinPreference {Key=p.Key,Name=p.Name,AppID=p.AppID,Target=p.Target,Executable=p.Executable}).ToList()};string temp=FileName+".tmp";File.WriteAllText(temp,new JavaScriptSerializer().Serialize(cache));if(File.Exists(FileName))File.Replace(temp,FileName,null);else File.Move(temp,FileName);}catch(Exception error){AppLog.Once("startup-cache",error.GetType().Name);}
+            string temporary=null;
+            try
+            {
+                lock(writeGate)
+                {
+                    Directory.CreateDirectory(AppLog.Data);
+                    var cache=new StartupDockCache {Version=1,Inputs=Fingerprint(),Pins=pins.Take(256).Select(p=>new Catalog.PinPreference {Key=p.Key,Name=p.Name,AppID=p.AppID,Target=p.Target,Executable=p.Executable}).ToList()};
+                    temporary=FileName+"."+Guid.NewGuid().ToString("N")+".tmp";
+                    File.WriteAllText(temporary,new JavaScriptSerializer().Serialize(cache));
+                    for(int attempt=0;;attempt++)
+                    {
+                        try
+                        {
+                            if(File.Exists(FileName))File.Replace(temporary,FileName,null);
+                            else File.Move(temporary,FileName);
+                            break;
+                        }
+                        catch(IOException)
+                        {
+                            if(attempt>=3)throw;
+                            System.Threading.Thread.Sleep(20*(attempt+1));
+                        }
+                    }
+                }
+            }
+            catch(Exception error){AppLog.Once("startup-cache",error.GetType().Name+" "+error.HResult);}
+            finally
+            {
+                if(temporary!=null)try{File.Delete(temporary);}catch(IOException){}
+            }
         }
     }
 }

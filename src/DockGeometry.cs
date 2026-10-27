@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -60,14 +60,14 @@ namespace OneTaskBar
         }
         void PlaceDock(GlassWindow window,Rect logical,bool show)
         {
-            var rect=DockGeometry.Rect(Screen.Bounds,Scale,Edge,logical);window.Width=rect.Width;window.Height=rect.Height;if(show)window.ShowAt(Screen.Bounds,rect.X,rect.Y,rect.Width,rect.Height);else Native.Place(window,Screen.Bounds,rect.X,rect.Y,rect.Width,rect.Height);
+            var rect=DockGeometry.Rect(Screen.Bounds,Scale,Edge,logical);window.DockBounds=Native.PlacementBounds(Screen.Bounds,Scale,rect.X,rect.Y,rect.Width,rect.Height);window.Width=rect.Width;window.Height=rect.Height;if(show)window.ShowAt(Screen.Bounds,rect.X,rect.Y,rect.Width,rect.Height);else Native.Place(window,Screen.Bounds,rect.X,rect.Y,rect.Width,rect.Height);
         }
         void PlaceStatus(DockLayout layout,bool show,double y=Double.NaN)
         {
             if(Double.IsNaN(y))y=layout.Y;Rect rect;
             if(DockGeometry.Vertical(Edge)){var position=DockGeometry.Rect(Screen.Bounds,Scale,Edge,new Rect(layout.StatusX,y,layout.StatusWidth,DockGeometry.SideStatusWidth));rect=new Rect(position.X,position.Y,DockGeometry.SideStatusWidth,layout.StatusWidth);}
             else rect=DockGeometry.Rect(Screen.Bounds,Scale,Edge,new Rect(layout.StatusX,y,layout.StatusWidth,44));
-            Status.Width=rect.Width;Status.Height=rect.Height;if(show)Status.ShowAt(Screen.Bounds,rect.X,rect.Y,rect.Width,rect.Height);else Native.Place(Status,Screen.Bounds,rect.X,rect.Y,rect.Width,rect.Height);
+            Status.DockBounds=Native.PlacementBounds(Screen.Bounds,Scale,rect.X,rect.Y,rect.Width,rect.Height);Status.Width=rect.Width;Status.Height=rect.Height;if(show)Status.ShowAt(Screen.Bounds,rect.X,rect.Y,rect.Width,rect.Height);else Native.Place(Status,Screen.Bounds,rect.X,rect.Y,rect.Width,rect.Height);
         }
     }
 }

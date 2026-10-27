@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -34,9 +34,19 @@ namespace OneTaskBar
             settingsHeading=Paint.TextBlock("설정",28,AppSettingsPalette.Text);settingsHeading.FontWeight=FontWeights.SemiBold;settingsHeading.Margin=new Thickness(7,0,48,0);header.Children.Add(settingsHeading);
             settingsBack=Paint.Button(new Glyph("back",23){Color=AppSettingsPalette.Text},SettingsHome,"설정 홈으로 돌아가기");settingsBack.Width=settingsBack.Height=38;settingsBack.Padding=new Thickness(0);settingsBack.Background=Brushes.Transparent;settingsBack.HorizontalAlignment=HorizontalAlignment.Left;settingsBack.Visibility=Visibility.Collapsed;header.Children.Add(settingsBack);
             var close=Paint.Button(new Glyph("close",19){Color=AppSettingsPalette.Text},()=>Hide(),"설정 닫기");close.Width=close.Height=36;close.Padding=new Thickness(0);close.Background=Brushes.Transparent;close.HorizontalAlignment=HorizontalAlignment.Right;header.Children.Add(close);
-            header.PreviewMouseLeftButtonDown+=(s,e)=>{
-                DependencyObject node=e.OriginalSource as DependencyObject;while(node!=null&&node!=header){if(node is ButtonBase||node is TextBoxBase||node is ToggleSwitch)return;node=node is Visual?VisualTreeHelper.GetParent(node):LogicalTreeHelper.GetParent(node);}if(e.LeftButton==MouseButtonState.Pressed){DragMove();e.Handled=true;}
-            };return header;
+            return header;
+        }
+        void DragSettingsHeader(object sender,MouseButtonEventArgs e)
+        {
+            if(e.LeftButton!=MouseButtonState.Pressed||e.GetPosition(this).Y>92)return;
+            DependencyObject node=e.OriginalSource as DependencyObject;
+            while(node!=null&&node!=this)
+            {
+                if(node is ButtonBase||node is TextBoxBase||node is ToggleSwitch||node is System.Windows.Controls.Primitives.ScrollBar)return;
+                node=node is Visual?VisualTreeHelper.GetParent(node):LogicalTreeHelper.GetParent(node);
+            }
+            DragMove();
+            e.Handled=true;
         }
         static IEnumerable<TextBlock> SettingsWords(DependencyObject root)
         {

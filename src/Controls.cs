@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Automation;
@@ -184,7 +184,7 @@ namespace OneTaskBar
         {
             Button b=toggle?(Button)new QuickToggleButton():new Button();b.Content=content;b.Foreground=Text;b.Background=Brush("#1CFFFFFF");b.BorderThickness=new Thickness(0);b.Padding=new Thickness(12,8,12,8);b.Cursor=Cursors.Hand;b.ToolTip=hint;b.HorizontalContentAlignment=HorizontalAlignment.Center;
             b.Resources["ButtonRadius"]=new CornerRadius(18);
-            if(Glass95.Enabled&&content is TextBlock){b.Background=Glass95.Card;b.BorderBrush=Glass95.Rim;b.BorderThickness=new Thickness(.65);b.Resources["ButtonRadius"]=new CornerRadius(24);}
+            if(Glass95.Enabled&&Glass95.Transparent&&content is TextBlock){b.Background=Glass95.Card;b.BorderBrush=Glass95.Rim;b.BorderThickness=new Thickness(.65);b.Resources["ButtonRadius"]=new CornerRadius(24);}
             if(buttonTemplate==null)buttonTemplate=(ControlTemplate)System.Windows.Markup.XamlReader.Parse(
                 "<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Button'><Border x:Name='p' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' Background='{TemplateBinding Background}' BorderBrush='{TemplateBinding BorderBrush}' BorderThickness='{TemplateBinding BorderThickness}' CornerRadius='{DynamicResource ButtonRadius}' Padding='{TemplateBinding Padding}'><ContentPresenter HorizontalAlignment='{TemplateBinding HorizontalContentAlignment}' VerticalAlignment='{TemplateBinding VerticalContentAlignment}'/></Border></ControlTemplate>");
             b.Template=buttonTemplate;b.FocusVisualStyle=null;AutomationProperties.SetName(b,hint); b.Click+=(s,e)=>action();Motion.Button(b);return b;
@@ -291,6 +291,7 @@ namespace OneTaskBar
         static readonly DependencyProperty SurfaceFadeProperty=DependencyProperty.Register("SurfaceFade",typeof(double),typeof(GlassWindow),new PropertyMetadata(1.0,(d,e)=>{var window=(GlassWindow)d;if(window.Surface!=null)window.Surface.Opacity=(double)e.NewValue;Native.BlurOpacity(window,(double)e.NewValue);}));
         void ResetFade(){BeginAnimation(SurfaceFadeProperty,null);SetValue(SurfaceFadeProperty,1.0);Surface.Opacity=1;Native.BlurOpacity(this,1);}
         internal Rect? BackdropClip;
+        internal Native.RectI? DockBounds;
         internal bool IsDismissing {get{return hiding;}}
         internal DateTime HiddenSince=DateTime.UtcNow;
         internal virtual bool CanRelease {get{return true;}}
@@ -300,6 +301,7 @@ namespace OneTaskBar
             MenuTheme.Install();
             WindowStyle=WindowStyle.None; ResizeMode=ResizeMode.NoResize; AllowsTransparency=true;Background=Brushes.Transparent;
             ShowInTaskbar=Program.CaptureReview;Topmost=true;FontFamily=SystemFonts.MessageFontFamily;
+            ShellWindowPolicy.Track(this);
             Surface=new Border { Background=Paint.Brush("#B32C3932"),BorderBrush=Paint.Brush("#38FFFFFF"),BorderThickness=new Thickness(.7),CornerRadius=new CornerRadius(Radius) };
             Content=new AdornerDecorator {Child=Surface};
             var touchScroll=new Style(typeof(ScrollViewer));
@@ -312,7 +314,7 @@ namespace OneTaskBar
                 "<Style xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml' TargetType='ScrollBar'><Setter Property='Width' Value='4'/><Setter Property='Background' Value='Transparent'/><Setter Property='Template'><Setter.Value><ControlTemplate TargetType='ScrollBar'><Track x:Name='PART_Track' IsDirectionReversed='True' Orientation='{TemplateBinding Orientation}'><Track.Thumb><Thumb><Thumb.Template><ControlTemplate TargetType='Thumb'><Border Background='#55D5DFD9' CornerRadius='2'/></ControlTemplate></Thumb.Template></Thumb></Track.Thumb></Track></ControlTemplate></Setter.Value></Setter></Style>"));
             SourceInitialized+=(s,e)=> {
                 if(DockSurface||DockPalette)Dark=Glass95.DockDark;else if(Glass95.Enabled||this is QuickWindow||this is NotificationWindow||this is DetailWindow||this is CalendarWindow||this is StartWindow||this is SearchWindow||this is DrawerWindow)Dark=Glass95.Dark;
-                var hwnd=new WindowInteropHelper(this).Handle;int style=Native.GetWindowLong(hwnd,-20);Native.SetWindowLong(hwnd,-20,Program.CaptureReview?(style|0x40000)&~0x80:(style|0x80)&~0x40000);
+                ShellWindowPolicy.Apply(this);
                 glassTint=Surface.Background;HasBlur=!OpaqueSurface&&Native.Blur(this,Radius,Dark);ApplyMaterial();
                 var source=HwndSource.FromHwnd(new WindowInteropHelper(this).Handle);if(source!=null)source.AddHook((IntPtr h,int msg,IntPtr w,IntPtr l,ref bool handled)=> {
                     if(msg==0x5||msg==0x2E0)Dispatcher.BeginInvoke(new Action(()=> {if(!closed)Native.Round(this,Radius);}),System.Windows.Threading.DispatcherPriority.Render);return IntPtr.Zero;
@@ -379,6 +381,7 @@ namespace OneTaskBar
             bool resume=StableSurface&&!UnifiedFade&&IsVisible&&hiding;++motion;hiding=false;CompleteDismissal(false);if(UnifiedFade)ResetFade();Surface.IsHitTestVisible=true;Surface.BeginAnimation(UIElement.OpacityProperty,null);Surface.Opacity=1;Surface.RenderTransform=Transform.Identity;
             if(StableSurface&&TransitionContent!=null){if(resume&&Motion.Enabled){if(SmoothLauncher)LauncherMotion.Run(TransitionContent,true);else Motion.Launcher(TransitionContent,true);}else{if(SmoothLauncher)LauncherMotion.Cancel(TransitionContent);TransitionContent.BeginAnimation(OpacityProperty,null);TransitionContent.Opacity=1;TransitionContent.RenderTransform=Transform.Identity;}}
             base.Show();
+            ShellWindowPolicy.Apply(this);
         }
         public void Pop()
         {

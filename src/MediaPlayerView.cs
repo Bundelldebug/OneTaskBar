@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -33,7 +33,7 @@ namespace OneTaskBar
         {
             this.condensed=condensed;this.dense=dense;openApplication=openApp;sourceApplication=sourceApp;Height=dense?106:condensed?128:164;Margin=new Thickness(14,dense?4:condensed?6:12,14,dense?4:condensed?6:12);seekCommand=seek;
             foreach(double height in dense?new[]{20.0,32,24,30}:condensed?new[]{20.0,36,34,38}:new[]{20.0,44,44,56})RowDefinitions.Add(new RowDefinition {Height=new GridLength(height)});
-            route=new Grid();route.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(22)});route.ColumnDefinitions.Add(new ColumnDefinition());route.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(28)});route.Children.Add(deviceGlyph);device.TextTrimming=TextTrimming.CharacterEllipsis;device.FontWeight=FontWeights.SemiBold;Grid.SetColumn(device,1);route.Children.Add(device);OutputButton=Icon("audio-output",output,"출력 기기 변경",28,19);Grid.SetColumn(OutputButton,2);route.Children.Add(OutputButton);Children.Add(route);
+            route=new Grid();route.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(22)});route.ColumnDefinitions.Add(new ColumnDefinition());route.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(36)});route.Children.Add(deviceGlyph);device.TextTrimming=TextTrimming.CharacterEllipsis;device.FontWeight=FontWeights.SemiBold;Grid.SetColumn(device,1);route.Children.Add(device);OutputButton=Icon("audio-output",output,"출력 기기 변경",28,19);OutputButton.HorizontalAlignment=HorizontalAlignment.Center;Grid.SetColumn(OutputButton,2);route.Children.Add(OutputButton);Children.Add(route);
             header=new Grid {Margin=new Thickness(0,2,0,0)};header.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(50)});header.ColumnDefinitions.Add(new ColumnDefinition());header.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(28)});
             RenderOptions.SetBitmapScalingMode(header,BitmapScalingMode.HighQuality);
             ArtworkButton=Paint.Button(art,OpenArtwork,"현재 재생 중인 앱 열기");ArtworkButton.Padding=new Thickness(0);ArtworkButton.Background=Brushes.Transparent;ArtworkButton.Resources["ButtonRadius"]=new CornerRadius(11);header.Children.Add(ArtworkButton);

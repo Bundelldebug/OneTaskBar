@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -446,7 +446,9 @@ namespace OneTaskBar
         {
             if(!Preferences.Current.NativeStartButton){ToggleStart(dock);return;}
             foreach(var panel in new GlassWindow[]{Quick,Center,Detail,Drawer,Finder,StartMenu})if(panel!=null)panel.HideImmediately();
-            if(!await Task.Run(()=>SystemPanels.Start())){ShowWelcome();Welcome.Feedback("Windows 시작 메뉴를 열지 못했습니다. 다시 눌러 주세요.");}
+            var nativeScreen=dock!=null?dock.Screen:Forms.Screen.FromPoint(Forms.Cursor.Position);
+            int nativeEdge=dock!=null?dock.Edge:DockGeometry.Edge;
+            if(!await Task.Run(()=>{if(!SystemPanels.Start())return false;SystemPanelPlacement.Align(nativeScreen.Bounds,nativeEdge,"start");return true;})){ShowWelcome();Welcome.Feedback("Windows 시작 메뉴를 열지 못했습니다. 다시 눌러 주세요.");}
         }
         internal void ToggleStart(DockHost dock)
         {

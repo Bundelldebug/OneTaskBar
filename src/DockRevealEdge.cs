@@ -25,6 +25,15 @@ namespace OneTaskBar
         {
             if(disposed||visible==value)return;visible=value;var rect=DockGeometry.Reveal(screen,edge);if(value)Native.SetWindowPos(source.Handle,new IntPtr(-1),rect.Left,rect.Top,rect.Right-rect.Left,rect.Bottom-rect.Top,0x10|0x40);else Native.ShowWindow(source.Handle,0);
         }
+        internal bool ObservePointer(Native.PointI point)
+        {
+            if(disposed||!visible)return false;
+            var rect=DockGeometry.Reveal(screen,edge);
+            if(point.X<rect.Left||point.X>=rect.Right||point.Y<rect.Top||point.Y>=rect.Bottom)return false;
+            Show(false);
+            reveal();
+            return true;
+        }
         public void Dispose(){if(disposed)return;Show(false);disposed=true;source.RootVisual=null;source.Dispose();}
     }
 }

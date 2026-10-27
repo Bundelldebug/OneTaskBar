@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -29,13 +29,13 @@ namespace OneTaskBar
         internal static bool CardBrush(Brush brush){return brush!=null&&(brush==light.Card||brush==dark.Card);}
         internal static bool Transparent {get{return Preferences.Current.Blur&&!SystemParameters.HighContrast;}}
         internal static Brush Surface {get{return PanelMaterial.PanelSurface(Dark,true);}}
-        internal static Brush Card {get{return Current.Card;}}
+        internal static Brush Card {get{return Transparent?Current.Card:PanelMaterial.Card(Dark);}}
         internal static Brush Solid {get{return SystemParameters.HighContrast?SystemColors.WindowBrush:Current.Solid;}}
         internal static Brush Text {get{return SystemParameters.HighContrast?SystemColors.WindowTextBrush:Current.Text;}}
         internal static Brush Muted {get{return SystemParameters.HighContrast?SystemColors.WindowTextBrush:Current.Muted;}}
         internal static Brush Rail {get{return Current.Rail;}}
         internal static Brush Toggle {get{return Current.Toggle;}}
-        internal static Brush Rim {get{return Current.Rim;}}
+        internal static Brush Rim {get{return Transparent?Current.Rim:Brushes.Transparent;}}
         internal static readonly Brush Accent=Paint.Brush("#FF3478FD"),Selected=Paint.ControlWhite;
         static Brush Film(bool dark)
         {
