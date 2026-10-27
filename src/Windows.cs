@@ -26,6 +26,9 @@ namespace OneTaskBar
         readonly Grid statusIcons=new Grid {Height=34};readonly StackPanel classicStatus=new StackPanel {Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};readonly DuoStatusGlyph duoStatus=new DuoStatusGlyph {HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};
         readonly Button quickAccess,trayAccess,clockAccess;
         readonly Button startButton;readonly Glyph startGlyph=new Glyph("apps",23){Color=Glass95.DockForeground};
+        readonly Action pulseStart;
+        internal int StartPulses {get;private set;}
+        internal void AnimateStartIcon(){StartPulses++;if(pulseStart!=null)pulseStart();}
         internal readonly Button TaskViewButton;
         internal readonly Button SearchButton;
         internal readonly Button OverflowButton;internal readonly DockOverflow Overflow;internal readonly DockDragController DragApps;
@@ -76,7 +79,7 @@ namespace OneTaskBar
                 };
             }
             Start.Title="One TaskBar · 앱 서랍"; Apps.Title="One TaskBar · 앱"; Status.Title="One TaskBar · 상태";
-            var start=Paint.Button(startGlyph,()=>controller.ToggleStartButton(this),"앱 목록");startButton=start;
+            var start=Paint.Button(startGlyph,()=>controller.ToggleStartButton(this),"앱 목록");startButton=start;pulseStart=Motion.Dock(start,startGlyph);
             start.Width=start.Height=40; start.Padding=new Thickness(0); start.Background=Brushes.Transparent;
             var transform=new ScaleTransform(1,1); start.RenderTransform=transform; start.RenderTransformOrigin=new Point(.5,.5);
             start.MouseEnter+=(s,e)=>Animate(transform,1.09); start.MouseLeave+=(s,e)=>Animate(transform,1);
