@@ -149,8 +149,8 @@ namespace OneTaskBar
             try {
                 if(refraction==null)refraction=new GlassRefraction(compositor,root,blur);
                 refraction.Begin();
-                refraction.Add(0,0,width,height,corner,(float)(4*scale));
-                foreach(var region in regions)refraction.Add((float)region.X,(float)region.Y,(float)region.Width,(float)region.Height,(float)Math.Min(30*scale,Math.Min(region.Width,region.Height)/2),(float)(7*scale));
+                refraction.Add(0,0,width,height,corner,(float)(1.5*scale));
+                foreach(var region in regions)refraction.Add((float)region.X,(float)region.Y,(float)region.Width,(float)region.Height,(float)Math.Min(30*scale,Math.Min(region.Width,region.Height)/2),(float)(2.2*scale));
                 refraction.End();refractionLayout=signature;
             }catch(Exception error){
                 refractionUnavailable=true;
