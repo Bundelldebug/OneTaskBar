@@ -8,14 +8,14 @@ namespace OneTaskBar
     internal static class GlassOptics
     {
         static readonly Brush lightRim=Rim(false),darkRim=Rim(true),lightDepth=Depth(false),darkDepth=Depth(true);
-        static readonly Pen lightInner=Inner(false),darkInner=Inner(true),lightStrong=FrozenPen(lightRim,1.15),darkStrong=FrozenPen(darkRim,1.15),lightSoft=FrozenPen(lightRim,.8),darkSoft=FrozenPen(darkRim,.8);
+        static readonly Pen lightInner=Inner(false),darkInner=Inner(true),lightStrong=FrozenPen(lightRim,.85),darkStrong=FrozenPen(darkRim,.85),lightSoft=FrozenPen(lightRim,.65),darkSoft=FrozenPen(darkRim,.65);
         static Pen FrozenPen(Brush brush,double width){var pen=new Pen(brush,width);pen.Freeze();return pen;}
-        static Pen Inner(bool dark){var brush=new LinearGradientBrush(Color.FromArgb(dark?(byte)25:(byte)38,255,255,255),Colors.Transparent,new Point(0,0),new Point(.25,.72));brush.Freeze();return FrozenPen(brush,3);}
+        static Pen Inner(bool dark){var brush=new LinearGradientBrush(Color.FromArgb(dark?(byte)23:(byte)29,255,255,255),Colors.Transparent,new Point(0,0),new Point(.25,.72));brush.Freeze();return FrozenPen(brush,2.4);}
         static Brush Rim(bool dark)
         {
             var brush=new LinearGradientBrush {StartPoint=new Point(.18,0),EndPoint=new Point(.78,1)};
-            brush.GradientStops.Add(new GradientStop(Color.FromArgb(dark?(byte)202:(byte)242,255,255,255),0));
-            brush.GradientStops.Add(new GradientStop(Color.FromArgb(dark?(byte)101:(byte)142,234,245,255),.18));
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(dark?(byte)155:(byte)180,255,255,255),0));
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(dark?(byte)72:(byte)92,234,245,255),.18));
             brush.GradientStops.Add(new GradientStop(Color.FromArgb(12,215,231,250),.52));
             brush.GradientStops.Add(new GradientStop(Color.FromArgb(dark?(byte)33:(byte)58,84,108,142),1));brush.Freeze();return brush;
         }
@@ -34,7 +34,27 @@ namespace OneTaskBar
     internal sealed class GlassTileBorder : Border
     {
         internal bool Optical=true;
-        protected override void OnRender(DrawingContext dc){base.OnRender(dc);if(Optical&&Glass95.Enabled)GlassOptics.Draw(dc,ActualWidth,ActualHeight,CornerRadius.TopLeft,true,true);}
+        RadialGradientBrush reflection;
+        Point light=new Point(.3,.12);
+        protected override void OnMouseMove(System.Windows.Input.MouseEventArgs e)
+        {
+            base.OnMouseMove(e);
+            if(!Optical||!Glass95.Enabled||!Motion.Enabled||!Preferences.Current.Hover||ActualWidth<1||ActualHeight<1)return;
+            var point=e.GetPosition(this);var next=new Point(point.X/ActualWidth,point.Y/ActualHeight);
+            if(Math.Abs(next.X-light.X)+Math.Abs(next.Y-light.Y)<.05)return;
+            light=next;InvalidateVisual();
+        }
+        protected override void OnRender(DrawingContext dc)
+        {
+            base.OnRender(dc);
+            if(!Optical||!Glass95.Enabled)return;
+            GlassOptics.Draw(dc,ActualWidth,ActualHeight,CornerRadius.TopLeft,true,true);
+            if(!Glass95.Transparent||ActualWidth<3||ActualHeight<3)return;
+            if(reflection==null){reflection=new RadialGradientBrush(Color.FromArgb(10,255,255,255),Colors.Transparent){RadiusX=.75,RadiusY=.8};}
+            reflection.Center=reflection.GradientOrigin=light;
+            var box=new Rect(1.5,1.5,ActualWidth-3,ActualHeight-3);
+            dc.DrawRoundedRectangle(reflection,null,box,Math.Max(0,CornerRadius.TopLeft-1.5),Math.Max(0,CornerRadius.TopLeft-1.5));
+        }
     }
     internal sealed class GlassTileShadow : FrameworkElement
     {

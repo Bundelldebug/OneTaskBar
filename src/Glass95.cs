@@ -39,7 +39,12 @@ namespace OneTaskBar
         internal static readonly Brush Accent=Paint.Brush("#FF3478FD"),Selected=Paint.ControlWhite;
         static Brush Film(bool dark)
         {
-            var film=new LinearGradientBrush {StartPoint=new Point(0,0),EndPoint=new Point(.25,1)};film.GradientStops.Add(new GradientStop(dark?Color.FromArgb(28,255,255,255):Color.FromArgb(36,255,255,255),0));film.GradientStops.Add(new GradientStop(dark?Color.FromArgb(14,224,235,255):Color.FromArgb(14,218,230,247),.46));film.GradientStops.Add(new GradientStop(dark?Color.FromArgb(20,255,255,255):Color.FromArgb(22,165,183,208),1));film.Freeze();return film;
+            var film=new LinearGradientBrush {StartPoint=new Point(.08,0),EndPoint=new Point(.4,1)};
+            film.GradientStops.Add(new GradientStop(Color.FromArgb(13,255,255,255),0));
+            film.GradientStops.Add(new GradientStop(Color.FromArgb(3,255,255,255),.23));
+            film.GradientStops.Add(new GradientStop(Color.FromArgb(12,6,14,24),.58));
+            film.GradientStops.Add(new GradientStop(Color.FromArgb(32,5,12,20),1));
+            film.Freeze();return film;
         }
         internal static Brush ToggleInk(bool value){return value?Paint.OnLight:Paint.Text;}
         internal static Brush DockForeground {get{return DockAppearance.Custom?DockAppearance.Foreground:DockDark?Paint.ControlWhite:Paint.OnLight;}}
