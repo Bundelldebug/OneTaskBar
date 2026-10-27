@@ -16,13 +16,15 @@ namespace OneTaskBar
             notice.Text=text;
             notice.Visibility=Visibility.Visible;
         }
-        async void LoadBuds()
+        string budsModel;
+        async void LoadBuds(string name)
         {
             budsRequested=true;
+            string model=BudsDeviceData.SymbolFile(name);budsModel=model;
             try
             {
-                var symbol=await BackgroundWork.Run(BudsDeviceData.ShortcutIcon);
-                if(!closed)
+                var symbol=await BackgroundWork.Run(()=>BudsDeviceData.ShortcutIcon(name));
+                if(!closed&&model==budsModel)
                 {
                     budsSymbol=symbol;
                     ApplyBuds();
@@ -125,7 +127,8 @@ namespace OneTaskBar
             bool budsConnected=shell.Buds.HasConnectedBuds||BudsInfo.IsBuds(shell.Services.OutputName);
             tiles["buds"].Text("Galaxy Buds",budsConnected?shell.Buds.BudsCaption??"연결됨":"연결 안 됨");
             tiles["buds"].State(budsConnected,shell.GalaxyBuds()!=null);
-            if(!budsRequested&&(shell.GalaxyBuds()!=null||BudsInfo.IsBuds(shell.Services.OutputName)))LoadBuds();
+            string budsName=BudsDeviceData.ConnectedName(shell);
+            if((!budsRequested||budsModel!=BudsDeviceData.SymbolFile(budsName))&&(shell.GalaxyBuds()!=null||BudsInfo.IsBuds(budsName)))LoadBuds(budsName);
             ApplyBuds();
             var app=shell.SamsungSettings();
             samsung.Visibility=app!=null?Visibility.Visible:Visibility.Collapsed;

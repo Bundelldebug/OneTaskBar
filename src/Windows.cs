@@ -302,10 +302,10 @@ namespace OneTaskBar
             SourceInitialized+=(s,e)=> { var h=new WindowInteropHelper(this).Handle; Native.SetWindowLong(h,-20,Native.GetWindowLong(h,-20)|0x80|0x08000000);HwndSource.FromHwnd(h).CompositionTarget.RenderMode=RenderMode.SoftwareOnly; };
         }
         internal void Reveal(){Show();Surface.InvalidateVisual();Native.SetWindowPos(new WindowInteropHelper(this).Handle,new IntPtr(-1),0,0,0,0,0x53);}
-        bool budsOutput,deviceIconRequested;ImageSource deviceSymbol;
+        bool budsOutput;string deviceModel;ImageSource deviceSymbol;
         internal bool BudsIcon {get{return slider.HasDeviceIcon;}}
-        async void LoadDeviceSymbol(){deviceIconRequested=true;try{deviceSymbol=await BackgroundWork.Run(BudsDeviceData.ShortcutIcon);slider.SetDeviceIcon(budsOutput?deviceSymbol:null);}catch(Exception error){AppLog.Once("hud-device-symbol",error.GetType().Name);}}
-        internal void Set(string kind,double value,bool muted,string outputName=null){string icon=kind=="volume"?SoundIcon.For(value,muted,true):kind;if(slider.Kind!=icon){slider.Kind=icon;slider.InvalidateVisual();}slider.Value=muted?0:value;budsOutput=kind=="volume"&&BudsInfo.IsBuds(outputName);if(budsOutput&&!deviceIconRequested)LoadDeviceSymbol();slider.SetDeviceIcon(budsOutput?deviceSymbol:null);}
+        async void LoadDeviceSymbol(string name){string model=BudsDeviceData.SymbolFile(name);deviceModel=model;try{var image=await BackgroundWork.Run(()=>BudsDeviceData.ShortcutIcon(name));if(deviceModel!=model)return;deviceSymbol=image;slider.SetDeviceIcon(budsOutput?deviceSymbol:null);}catch(Exception error){AppLog.Once("hud-device-symbol",error.GetType().Name);}}
+        internal void Set(string kind,double value,bool muted,string outputName=null){string icon=kind=="volume"?SoundIcon.For(value,muted,true):kind;if(slider.Kind!=icon){slider.Kind=icon;slider.InvalidateVisual();}slider.Value=muted?0:value;budsOutput=kind=="volume"&&BudsInfo.IsBuds(outputName);if(budsOutput&&deviceModel!=BudsDeviceData.SymbolFile(outputName))LoadDeviceSymbol(outputName);slider.SetDeviceIcon(budsOutput?deviceSymbol:null);}
     }
     internal sealed class DrawerWindow : GlassWindow
     {
