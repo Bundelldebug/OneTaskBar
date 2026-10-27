@@ -21,6 +21,7 @@ namespace OneTaskBar
                 var first=Guid.NewGuid();var second=Guid.NewGuid();
                 Require(VirtualDesktops.Decode(first.ToByteArray().Concat(second.ToByteArray()).Concat(first.ToByteArray()).ToArray()).SequenceEqual(new[]{first,second}),"ordered desktop IDs deduplicate");
                 Require(VirtualDesktops.Decode(new byte[17]).Count==0&&VirtualDesktops.Decode(new byte[16*257]).Count==0,"malformed registry values are bounded");
+                int steps;Require(VirtualDesktops.Distance(new[]{second,first},second,first,out steps)&&steps==1&&!VirtualDesktops.Distance(new[]{second},second,first,out steps),"a reordered desktop list resolves the target ID and rejects a deleted target");
                 var snapshot=new DesktopSnapshot {Current=first};var page=new DesktopPage {Id=first,Name="데스크톱 1"};snapshot.Pages.Add(page);snapshot.Pages.Add(new DesktopPage {Id=second,Name="데스크톱 2"});
                 for(int i=0;i<3;i++){
                     var source=new Window {Title="검사 창 "+(i+1),Width=500,Height=320,Left=100+i*40,Top=130+i*30,Background=new SolidColorBrush(new[]{Colors.SteelBlue,Colors.DarkSeaGreen,Colors.IndianRed}[i]),Content=Paint.TextBlock("창 미리보기 "+(i+1),30,Brushes.White)};source.Show();sources.Add(source);

@@ -58,7 +58,7 @@ namespace OneTaskBar
             refreshButton.IsEnabled=false;scanIndicator.SetScanning(IsVisible);
             try {
                 if(page=="sound") {
-                    var outputs=await BackgroundWork.Run(Native.AudioOutputs);if(closed)return;ImageSource symbol=null;if(outputs.Any(o=>BudsInfo.IsBuds(o.Name))){symbol=await BackgroundWork.Run(BudsDeviceData.ShortcutIcon);if(closed)return;}
+                    var outputs=await BackgroundWork.Run(Native.AudioOutputs);if(closed)return;ImageSource symbol=null;var budsOutput=outputs.FirstOrDefault(o=>BudsInfo.IsBuds(o.Name));if(budsOutput!=null){string model=budsOutput.Name;symbol=await BackgroundWork.Run(()=>BudsDeviceData.ShortcutIcon(model));if(closed)return;}
                     body.Children.Clear();if(outputArtwork!=null)outputArtwork.Background=ArtworkPalette.OutputSurface(shell.Services.Media.Artwork);body.Children.Add(new AudioOutputView(outputs,shell.Services.Media,shell.Audio.Value,shell.Audio.Muted,async id=>{deviceActions++;try{await BackgroundWork.Run(()=>{Native.SetAudioOutput(id);return true;});if(closed)return;shell.Audio.Dispose();shell.Audio.Read();Reload();}finally{deviceActions--;}},shell.Volume,()=>{shell.Mute();Reload();},()=>shell.Media("play"),()=>shell.OpenMediaApplication(shell.Services.Media.AppId),message=>status.Text=message,symbol));status.Text="";LauncherMotion.Page(TransitionContent);
                 } else if(page=="power") {
                     if(PowerDisplay.Slot(shell.Power,Preferences.Current.DesktopPowerWatts)>0)body.Children.Add(Card(new BatteryPill {Width=140,Height=40,State=shell.Power}));

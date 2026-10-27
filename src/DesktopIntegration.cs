@@ -202,6 +202,7 @@ namespace OneTaskBar
                 var popup=Native.FindWindow(name,null);if(popup!=IntPtr.Zero&&Native.IsWindowVisible(popup))return popup;
             }return IntPtr.Zero;
         }
+        internal static IntPtr OverflowHandle(){return TrayWindow();}
         internal static void KeepTrayPosition(TrayPlacement anchor=null)
         {
             if(!TaskbarMask.Active)return;

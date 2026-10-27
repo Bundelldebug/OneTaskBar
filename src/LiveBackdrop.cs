@@ -37,7 +37,11 @@ namespace OneTaskBar
         SpriteVisual blur;
         CompositionRoundedRectangleGeometry shape;
         GlassRefraction refraction;
-        string refractionLayout;
+        readonly System.Collections.Generic.List<Rect> refractionRegions=new System.Collections.Generic.List<Rect>();
+        readonly System.Collections.Generic.List<Rect> previousRefractionRegions=new System.Collections.Generic.List<Rect>();
+        int refractedWidth,refractedHeight,refractedCorner;
+        double backdropScale=1;
+        bool refractionConfigured;
         bool refractionUnavailable;
         readonly Window window;
         readonly ContextMenu menu;
@@ -116,12 +120,13 @@ namespace OneTaskBar
         {
             if(target==null)return;Native.RectI bounds;var handle=Overlay;
             if(!Bounds(out bounds))return;
-            int w=bounds.Right-bounds.Left,h=bounds.Bottom-bounds.Top,c=(int)Math.Round(radius*Math.Max(96,Native.GetDpiForWindow(handle))/96.0);
+            backdropScale=Math.Max(96,Native.GetDpiForWindow(handle))/96.0;
+            int w=bounds.Right-bounds.Left,h=bounds.Bottom-bounds.Top,c=(int)Math.Round(radius*backdropScale);
             var glass=window as GlassWindow;Rect? clip=glass!=null?glass.BackdropClip:null;
             if(w==width&&h==height&&c==corner&&clip==lastClip){Sync();return;}
             popupX=bounds.Left;popupY=bounds.Top;lastClip=clip;
             if(w!=width||h!=height){var size=new Vector2(w,h);root.Size=size;blur.Size=size;}width=w;height=h;corner=c;
-            double scale=Math.Max(96,Native.GetDpiForWindow(handle))/96.0;float cw=clip.HasValue?(float)(clip.Value.Width*scale):w,ch=clip.HasValue?(float)(clip.Value.Height*scale):h;
+            double scale=backdropScale;float cw=clip.HasValue?(float)(clip.Value.Width*scale):w,ch=clip.HasValue?(float)(clip.Value.Height*scale):h;
             if(clip.HasValue){var boundsClip=Native.InputBounds(clip.Value,scale);if(!inputClip.HasValue||!inputClip.Value.Equals(boundsClip)){if(Native.ClipWindow(background,boundsClip))inputClip=boundsClip;}}
             shape.Offset=clip.HasValue?new Vector2((float)(clip.Value.X*scale),(float)(clip.Value.Y*scale)):Vector2.Zero;shape.Size=new Vector2(cw,ch);shape.CornerRadius=new Vector2(Math.Min(c,cw/2f),Math.Min(c,ch/2f));
             Sync();
@@ -130,28 +135,30 @@ namespace OneTaskBar
         void RefreshRefraction(object sender,EventArgs args)
         {
             var glass=window as GlassWindow;
-            bool active=root!=null&&glass!=null&&!(glass is DesktopOverview)&&glass.GlassMaterial&&Glass95.Enabled&&Glass95.Transparent&&enabled;
-            if(!active){if(refraction!=null){refraction.Begin();refraction.End();}refractionLayout=null;return;}
+            bool active=root!=null&&glass!=null&&glass.IsVisible&&!(glass is DesktopOverview)&&glass.GlassMaterial&&Glass95.Enabled&&Glass95.Transparent&&enabled;
+            if(!active){if(refractionConfigured&&refraction!=null){refraction.Begin();refraction.End();}refractionConfigured=false;return;}
             if(refractionUnavailable||width<4||height<4)return;
-            double scale=Math.Max(96,Native.GetDpiForWindow(Overlay))/96.0;
-            var regions=new System.Collections.Generic.List<Rect>();
+            double scale=backdropScale;
+            refractionRegions.Clear();
             var quick=window as QuickWindow;
             if(quick!=null&&quick.GridUI!=null){
                 foreach(var frame in quick.GridUI.Board.Frames.Values){
                     var body=frame.Body;
                     if(!body.IsVisible||body.ActualWidth<4||body.ActualHeight<4)continue;
                     var point=body.TranslatePoint(new Point(),window);
-                    regions.Add(new Rect(point.X*scale,point.Y*scale,body.ActualWidth*scale,body.ActualHeight*scale));
+                    refractionRegions.Add(new Rect(point.X*scale,point.Y*scale,body.ActualWidth*scale,body.ActualHeight*scale));
                 }
             }
-            var signature=width+":"+height+":"+corner+":"+String.Join(";",regions.ConvertAll(r=>r.ToString(System.Globalization.CultureInfo.InvariantCulture)));
-            if(signature==refractionLayout)return;
+            bool same=refractionConfigured&&refractedWidth==width&&refractedHeight==height&&refractedCorner==corner&&refractionRegions.Count==previousRefractionRegions.Count;
+            for(int i=0;same&&i<refractionRegions.Count;i++)same=refractionRegions[i]==previousRefractionRegions[i];
+            if(same)return;
             try {
                 if(refraction==null)refraction=new GlassRefraction(compositor,root,blur);
                 refraction.Begin();
                 refraction.Add(0,0,width,height,corner,(float)(1.5*scale));
-                foreach(var region in regions)refraction.Add((float)region.X,(float)region.Y,(float)region.Width,(float)region.Height,(float)Math.Min(30*scale,Math.Min(region.Width,region.Height)/2),(float)(2.2*scale));
-                refraction.End();refractionLayout=signature;
+                foreach(var region in refractionRegions)refraction.Add((float)region.X,(float)region.Y,(float)region.Width,(float)region.Height,(float)Math.Min(30*scale,Math.Min(region.Width,region.Height)/2),(float)(2.2*scale));
+                refraction.End();refractionConfigured=true;refractedWidth=width;refractedHeight=height;refractedCorner=corner;
+                previousRefractionRegions.Clear();previousRefractionRegions.AddRange(refractionRegions);
             }catch(Exception error){
                 refractionUnavailable=true;
                 if(refraction!=null){refraction.Dispose();refraction=null;}

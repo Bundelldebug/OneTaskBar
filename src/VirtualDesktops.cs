@@ -39,6 +39,18 @@ namespace OneTaskBar
         }
         static Guid ReadId(RegistryKey key,string name){var values=key==null?new List<Guid>():Decode(key.GetValue(name) as byte[]);return values.Count==1?values[0]:Guid.Empty;}
         internal static Guid CurrentId(){try{using(var key=Registry.CurrentUser.OpenSubKey(Root))return ReadId(key,"CurrentVirtualDesktop");}catch{return Guid.Empty;}}
+        internal static bool Distance(IList<Guid> order,Guid current,Guid target,out int steps)
+        {
+            steps=0;int from=order.IndexOf(current),to=order.IndexOf(target);
+            if(current==Guid.Empty||target==Guid.Empty||from<0||to<0)return false;
+            steps=to-from;return true;
+        }
+        internal static bool CurrentDistance(Guid target,out int steps)
+        {
+            steps=0;
+            try{using(var key=Registry.CurrentUser.OpenSubKey(Root))return key!=null&&Distance(Decode(key.GetValue("VirtualDesktopIDs") as byte[]),ReadId(key,"CurrentVirtualDesktop"),target,out steps);}
+            catch{return false;}
+        }
         internal static DesktopSnapshot Read(IEnumerable<AppEntry> apps,IntPtr foreground)
         {
             var result=new DesktopSnapshot();IManager manager=null;

@@ -231,7 +231,7 @@ namespace OneTaskBar
                 using(var current=Process.GetCurrentProcess()){lease.OwnerPid=current.Id;lease.OwnerStarted=current.StartTime.ToUniversalTime().Ticks;lease.Save();}EnsureGuard();
                 Native.HideTaskbars();TaskbarSpace.Acquire(lease); Relayout(); if(!keepSettingsOpen&&Welcome!=null) Welcome.Hide();
             } else {
-                Switcher.Cancel();browserFullscreen.Restore();
+                CloseTrayOverflow();CloseDesktopOverview();Switcher.Cancel();browserFullscreen.Restore();
                 TaskbarMask.Active=false;
                 foreach(var dock in docks) dock.Close(); docks.Clear();
                 foreach(var reservation in reservations) reservation.Dispose(); reservations.Clear();
@@ -245,7 +245,7 @@ namespace OneTaskBar
         void Relayout()
         {
             if(!Desktop || disposed) return;
-            Switcher.Cancel();
+            CloseTrayOverflow();CloseDesktopOverview();Switcher.Cancel();
             Previews.Close();
             string trayMonitor=trayDock!=null?trayDock.Screen.DeviceName:null;
             foreach(var animation in charges)animation.Close();charges.Clear();
@@ -282,7 +282,7 @@ namespace OneTaskBar
         }
         void UIVersionChanged()
         {
-            if(disposed)return;Switcher.PreferenceChanged();QueuePanelTheme();int version=Preferences.Current.UIVersion;
+            if(disposed)return;CloseTrayOverflow();CloseDesktopOverview();Switcher.PreferenceChanged();QueuePanelTheme();int version=Preferences.Current.UIVersion;
             if(Calendar!=null&&Calendar.InterfaceVersion!=version){Calendar.Close();Calendar=null;}
             if(Quick!=null&&Quick.InterfaceVersion!=version){Quick.Close();Quick=null;}
             if(Detail!=null&&Detail.InterfaceVersion!=version){Detail.Close();Detail=null;}
@@ -348,23 +348,17 @@ namespace OneTaskBar
             try{bool dismissed=Quick==null||!Quick.IsVisible||await Quick.DismissAsync();foreach(var dock in docks)if(dock.MediaBar!=null)dock.MediaBar.SetExpanded(false);if(Motion.Enabled)await Task.Delay(130);if(dismissed&&!disposed)app.Launch();}
             catch(Exception error){AppLog.Write("media-app-open",error.Message);}finally{externalLaunching=false;}
         }
-        internal void PrepareWindowSwitcher(){Previews.Close();foreach(var panel in new GlassWindow[]{Quick,Center,Detail,Drawer,Finder,StartMenu})if(panel!=null)panel.HideImmediately();foreach(var dock in docks)if(dock.MediaBar!=null)dock.MediaBar.SetExpanded(false);}
+        internal void PrepareWindowSwitcher(bool keepOverview=false){CloseTrayOverflow();if(!keepOverview)CloseDesktopOverview();Previews.Close();foreach(var panel in new GlassWindow[]{Quick,Center,Detail,Drawer,Finder,StartMenu})if(panel!=null)panel.HideImmediately();foreach(var dock in docks)if(dock.MediaBar!=null)dock.MediaBar.SetExpanded(false);}
         internal void NowBarOpening(NowBar selected){foreach(var dock in docks)if(dock.MediaBar!=null&&dock.MediaBar!=selected)dock.MediaBar.SetExpanded(false);foreach(var panel in new GlassWindow[]{Quick,Center,Detail,Drawer,Finder,StartMenu})if(panel!=null)panel.HideImmediately();}
         internal void ShowNative(string kind,DockHost dock=null)
         {
-            if(trayBusy||!Desktop||disposed)return;
-            trayDock=dock??docks.FirstOrDefault();if(trayDock==null)return;
-            var anchor=trayDock.TrayAnchor();trayBusy=true;
-            if(StartMenu!=null)StartMenu.HideImmediately();if(Quick!=null) Quick.Hide(); if(Drawer!=null) Drawer.Hide();
-            Task.Run(()=>ExplorerBridge.OpenTray(anchor)).ContinueWith(t=>Application.Current.Dispatcher.BeginInvoke(new Action(()=> {
-                trayBusy=false;
-                if(t.Status!=TaskStatus.RanToCompletion||!t.Result)AppLog.Write("native-panel","Windows tray invocation failed; native taskbar kept hidden");
-            })));
+            OpenTrayOverflow(dock);
         }
         int panelMotion;string pendingPanel;
         internal async void ToggleNotifications(DockHost dock){await TogglePanel(true,dock,false);}
         async Task TogglePanel(bool notifications,DockHost dock,bool forceCustom)
         {
+            CloseTrayOverflow();CloseDesktopOverview();
             Previews.Close();
             int request=++panelMotion;string key=notifications?"notifications":"quick";bool pending=pendingPanel==key;pendingPanel=null;
             try {
@@ -381,6 +375,7 @@ namespace OneTaskBar
         }
         internal void ShowDetail(string page)
         {
+            CloseTrayOverflow();CloseDesktopOverview();
             Previews.Close();if(StartMenu!=null)StartMenu.HideImmediately();
             if(Finder!=null)Finder.HideImmediately();
             if(Detail!=null){Detail.Close();Detail=null;}if(Center!=null)Center.Hide();if(Quick!=null)Quick.Hide();if(Drawer!=null)Drawer.HideImmediately();Detail=new DetailWindow(this,page);
@@ -436,6 +431,7 @@ namespace OneTaskBar
         }
         internal void ToggleDrawer(DockHost dock)
         {
+            CloseTrayOverflow();CloseDesktopOverview();
             Previews.Close();
             if(StartMenu!=null)StartMenu.HideImmediately();
             if(Drawer==null)Drawer=new DrawerWindow(this);
@@ -454,6 +450,7 @@ namespace OneTaskBar
         }
         internal void ToggleStart(DockHost dock)
         {
+            CloseTrayOverflow();CloseDesktopOverview();
             Previews.Close();
             if(dock==null){var anchor=docks.FirstOrDefault(d=>d.Screen.Bounds.Contains(Forms.Cursor.Position))??docks.FirstOrDefault();if(anchor!=null)anchor.AnimateStartIcon();}
             if(StartMenu==null)StartMenu=new StartWindow(this);
@@ -478,6 +475,7 @@ namespace OneTaskBar
         }
         internal async void ToggleSearch(DockHost dock,string query=null)
         {
+            CloseTrayOverflow();CloseDesktopOverview();
             Previews.Close();
             if(Preferences.Current.NativeSearch){
                 var closing=new List<Task<bool>>();foreach(var panel in new GlassWindow[]{Quick,Center,Detail,Drawer,Finder,StartMenu})if(panel!=null)closing.Add(panel.DismissAsync());
@@ -623,7 +621,7 @@ namespace OneTaskBar
         }
         internal bool DockInUse(DockHost dock)
         {
-            if((trayBusy||nativePanelBusy)&&trayDock==dock||dock.MediaBar!=null&&dock.MediaBar.Expanded)return true;
+            if((trayBusy||nativePanelBusy||TrayPopup!=null&&TrayPopup.IsVisible)&&trayDock==dock||dock.MediaBar!=null&&dock.MediaBar.Expanded)return true;
             foreach(var panel in new Window[]{Quick,Center,Detail,Drawer,Finder,StartMenu,Welcome,NotificationLink,Previews.Popup}){
                 if(panel==null||!panel.IsVisible)continue;Native.RectI rect;if(Native.GetWindowRect(new WindowInteropHelper(panel).Handle,out rect)&&dock.Screen.Bounds.Contains((rect.Left+rect.Right)/2,(rect.Top+rect.Bottom)/2))return true;
             }return false;
@@ -742,7 +740,7 @@ namespace OneTaskBar
             TaskbarMask.Active=false;
             if(startupWork!=null){startupWork.Dispose();startupWork=null;}if(themeRefresh!=null)themeRefresh.Stop();timer.Stop();RecentApps.Dispose();Placement.Dispose(); SystemEvents.DisplaySettingsChanged-=DisplayChanged;SystemEvents.UserPreferenceChanged-=ThemeChanged; SystemEvents.PowerModeChanged-=PowerChanged;
             ConnectionSound.Dispose();
-            CloseDesktopOverview();Previews.Dispose();Switcher.Dispose();if(brightnessEvents!=null)brightnessEvents.Dispose();
+            CloseTrayOverflow();CloseDesktopOverview();Previews.Dispose();Switcher.Dispose();if(brightnessEvents!=null)brightnessEvents.Dispose();
             if(keys!=null) keys.Dispose();
             if(osdGate!=null)osdGate.Dispose();
             Banners.Dispose();Buds.Dispose();Toggles.Dispose();Services.Dispose();Notifications.Dispose();

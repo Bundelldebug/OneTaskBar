@@ -1,4 +1,13 @@
-# 9.0.5 / 9.5.2-beta.1 validation
+# 9.0.6 / 9.5.3-beta.1 validation
+
+- Local beta: all 26 isolated fixtures pass through `tools/Test-UI.ps1 -Area All`. Stable uses the same shared source and skips the glass-only fixture. Reports, screenshots and runtime data stay under ignored `.qa-data/`; release CI reruns the suite on each exact candidate commit.
+- Added coverage: notification capsules and session-only media; folded labels and equal-size toggle circles; model-specific runtime Buds glyphs; retained Start controls and keyboard pulse; four-edge launcher anchoring; icons-only dock material; GPU-local glass bevel sampling; desktop overview preview fade/early-dismiss cleanup; virtual-display passive-surface filtering and empty-desktop recovery; and themed tray PNG/matching/monitor-placement/native-host restoration.
+- Actual installed tray enumeration was checked on this PC with 23 items. Registry PNG snapshots are preferred; installed app metadata and distinct system glyphs supply missing snapshots. The original Explorer host remains available for providers that cannot be represented. Context menus continue to use the application's native menu. No shell injection or Windhawk dependency was added.
+- Desktop overview renders its main window cards with live DWM thumbnails. Native hosts remain fixed during opacity transitions. Desktop-strip miniatures are app tiles. Registry desktop order is re-read before switching or closing a desktop; fixture actions never send OS desktop shortcuts or close user windows.
+- Unchanged glass layout checks reuse rectangle lists and compare numeric geometry without allocating strings or recreating GPU masks. Hidden panels do not repeat bevel updates. Timers, thumbnail hosts and proxy sessions release on normal close, interrupted hide and mode/theme changes.
+- This PC's existing settings, pins and layout files are preserved on installation. Hardware-specific virtual display drivers and every headset model were not available here; those paths have synthetic coverage in addition to normal desktop checks. The 150 MB total-RAM target remains a measurement target, not a guaranteed limit. Builds remain unsigned.
+
+## Previous 9.0.5 / 9.5.2-beta.1 validation
 
 - Stable file/product versions: 9.0.5.0 / 9.0.5. Beta: 9.5.2.0 / 9.5.2-beta.1. The stable feature gate exposes UI 8.5/9.0; beta also exposes 9.5.
 - The local beta passes all 23 isolated fixtures through `tools/Test-UI.ps1 -Area All`. Stable skips the glass-only fixture. CI uses the same runner, including the new native dock recovery fixture. Each fixture has its own temporary data directory; live signaling and hardware-changing probes are excluded from this runner.
