@@ -19,9 +19,12 @@ namespace OneTaskBar
     {
         internal readonly Forms.Screen Screen;
         internal double Scale;
+        internal readonly double Zoom=DockSizing.Zoom;
+        internal double ContentScale {get{return Scale*Zoom;}}
         internal readonly GlassWindow Start=new GlassWindow(),Apps=new GlassWindow(),Status=new GlassWindow();
         internal readonly BatteryPill Battery=new BatteryPill();
-        readonly TextBlock clock=Paint.TextBlock("",12,Glass95.DockForeground);
+        readonly DockClock clockFace=new DockClock();
+        readonly TextBlock clock;
         readonly Glyph wifiStatus=new Glyph("wifi",22){Color=Glass95.DockForeground},volumeStatus=new Glyph("volume",19){Color=Glass95.DockForeground};
         readonly Grid statusIcons=new Grid {Height=34};readonly StackPanel classicStatus=new StackPanel {Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};readonly DuoStatusGlyph duoStatus=new DuoStatusGlyph {HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};
         readonly Button quickAccess,trayAccess,clockAccess;
@@ -60,7 +63,7 @@ namespace OneTaskBar
         bool closed;internal NowBar MediaBar {get;private set;}
         internal DockHost(ShellController shell,Forms.Screen screen)
         {
-            controller=shell; Screen=screen;Edge=DockGeometry.Edge;
+            controller=shell; Screen=screen;Edge=DockGeometry.Edge;clock=clockFace.View;
             hideDelay.Tick+=(s,e)=>CompleteAutoHide(InUse());
             pinDivider.RenderTransform=dividerOffset;Canvas.SetTop(pinDivider,9);Panel.SetZIndex(pinDivider,2);appCanvas.Children.Add(pinDivider);DragApps=new DockDragController(this,shell,appCanvas,PreviewAt,DropAt,PreviewHome);DragReorder.Finished+=EndDragPreview;
             var search=Paint.Button(new Glyph("dock-search",22){Color=Glass95.DockForeground},()=>controller.ToggleSearch(this),"검색");SearchButton=search;search.Padding=new Thickness(0);search.Background=Brushes.Transparent;search.Width=42;search.Height=42;Motion.Dock(search,(FrameworkElement)search.Content);Canvas.SetLeft(search,10);appCanvas.Children.Add(search);Apps.Surface.Child=appCanvas;
@@ -71,7 +74,7 @@ namespace OneTaskBar
 
             foreach(var w in new GlassWindow[] {Start,Apps,Status}) {
                 w.MouseEnter+=(s,e)=>{interactionUntil=DateTime.UtcNow.AddMilliseconds(1000);hideDelay.Stop();if(autoHide&&!visible&&!fullScreen)Reveal();};w.MouseLeave+=(s,e)=>QueueHide();w.PreviewMouseDown+=(s,e)=>interactionUntil=DateTime.UtcNow.AddMilliseconds(1200);
-                w.SoftCorners=true;w.Dark=false;w.DockSurface=true; w.ShowActivated=false; w.Radius=22; w.Surface.CornerRadius=new CornerRadius(22); w.SetMaterial(LightPanel.DockGlass,LightPanel.DockSolid);w.Surface.BorderBrush=Brushes.Transparent;w.Surface.BorderThickness=new Thickness(0);
+                w.SoftCorners=true;w.Dark=false;w.DockSurface=true; w.ShowActivated=false; w.Radius=22*Zoom; w.Surface.CornerRadius=new CornerRadius(22);w.Surface.LayoutTransform=new ScaleTransform(Zoom,Zoom); w.SetMaterial(LightPanel.DockGlass,LightPanel.DockSolid);w.Surface.BorderBrush=Brushes.Transparent;w.Surface.BorderThickness=new Thickness(0);
                 w.SourceInitialized+=(s,e)=> {
                     var h=new WindowInteropHelper((Window)s).Handle;
                     Native.SetWindowLong(h,-20,(Native.GetWindowLong(h,-20)|0x80|0x08000000)&~0x40000);
@@ -126,11 +129,15 @@ namespace OneTaskBar
             if(closed||DragReorder.Active)return;if(Scale<=0)Scale=1;
             RebuildStatusItems();
             Battery.Compact=DockGeometry.Vertical(Edge);Battery.Height=Battery.Compact?18:23;
+            var clockGrid=(Grid)Status.Surface.Child;
+            if(DockGeometry.Vertical(Edge)){clockGrid.RowDefinitions[4].Height=new GridLength(DockClock.SideHeight);clockAccess.Height=DockClock.SideHeight;}
+            else clockGrid.ColumnDefinitions[4].Width=new GridLength(DockClock.Width);
+            clockFace.Update(DateTime.Now,Edge);
             foreach(var surface in new[]{Start,Apps,Status}){surface.SetMaterial(LightPanel.DockGlass,LightPanel.DockSolid);Glass95.DockInk(surface.Surface);}pinDivider.Background=Glass95.DockForeground;pinDivider.Effect=DockAppearance.Readability;duoStatus.Effect=DockAppearance.Readability;
             startGlyph.Kind=Preferences.Current.NativeStartButton?"windows-start":"apps";startGlyph.Color=Preferences.Current.NativeStartButton?Paint.Brush("#FF1975DD"):Glass95.DockForeground;startGlyph.InvalidateVisual();startButton.ToolTip=Preferences.Current.NativeStartButton?"Windows 시작":"앱 목록";System.Windows.Automation.AutomationProperties.SetName(startButton,(string)startButton.ToolTip);
             var entries=controller.DockApps();powerWidth=PowerDisplay.DockSlot(controller.Power,Preferences.Current.DesktopPowerWatts);powerColumn.Width=new GridLength(powerWidth);powerAccess.Visibility=powerWidth>0?Visibility.Visible:Visibility.Collapsed;Battery.Width=DockGeometry.Vertical(Edge)?38:powerWidth==78?70:52;if(DockGeometry.Vertical(Edge))((Grid)Status.Surface.Child).RowDefinitions[2].Height=new GridLength(powerWidth>0?22:0);classicStatus.Visibility=Preferences.Current.DuoStatusIcon?Visibility.Collapsed:Visibility.Visible;duoStatus.Visibility=Preferences.Current.DuoStatusIcon?Visibility.Visible:Visibility.Collapsed;statusIcons.Width=Preferences.Current.DuoStatusIcon?32:DockGeometry.Vertical(Edge)?36:56;if(!Preferences.Current.Animations||!Preferences.Current.ChargeAnimation||!Preferences.Current.DuoStatusIcon)duoStatus.StopPulse();
             mediaSpace=controller.Desktop&&(controller.Services.Media.Active||MediaBar!=null&&MediaBar.ReservesSpace);
-            var layout=DockLayout.Compute(Screen.Bounds,Scale,Math.Max(1,entries.Count),powerWidth,mediaSpace,68,Edge,Preferences.Current.DuoStatusIcon);bool overflow=entries.Count>layout.Capacity;int slots=Math.Max(0,layout.Capacity-(overflow?1:0));var shown=entries.Take(slots).ToArray();Overflow.Update(entries.Skip(slots));OverflowButton.Visibility=overflow?Visibility.Visible:Visibility.Collapsed;OverflowButton.ToolTip="숨겨진 앱 "+Overflow.Count+"개 · 마우스를 올려 펼치기";var keys=new HashSet<string>(shown.Select(e=>e.Key),StringComparer.OrdinalIgnoreCase);bool animate=placed&&visible&&Apps.IsVisible&&Motion.Enabled;
+            var layout=DockLayout.Compute(Screen.Bounds,ContentScale,Math.Max(1,entries.Count),powerWidth,mediaSpace,68,Edge,Preferences.Current.DuoStatusIcon,Math.Max(44,68/Zoom-24));bool overflow=entries.Count>layout.Capacity;int slots=Math.Max(0,layout.Capacity-(overflow?1:0));var shown=entries.Take(slots).ToArray();Overflow.Update(entries.Skip(slots));OverflowButton.Visibility=overflow?Visibility.Visible:Visibility.Collapsed;OverflowButton.ToolTip="숨겨진 앱 "+Overflow.Count+"개 · 마우스를 올려 펼치기";var keys=new HashSet<string>(shown.Select(e=>e.Key),StringComparer.OrdinalIgnoreCase);bool animate=placed&&visible&&Apps.IsVisible&&Motion.Enabled;
             int pinned=shown.Count(a=>a.Pinned);unpinnedOverflow=entries.Skip(slots).Any(a=>!a.Pinned);pinDivider.Visibility=pinned>0&&entries.Any(a=>!a.Pinned)?Visibility.Visible:Visibility.Collapsed;double nextDivider=DockLayout.AppOffset+pinned*46+6,oldDivider=Double.IsNaN(dividerX)?nextDivider:dividerX+dividerOffset.X;dividerX=nextDivider;Canvas.SetLeft(pinDivider,dividerX);dividerOffset.BeginAnimation(TranslateTransform.XProperty,null);dividerOffset.X=0;if(animate&&Math.Abs(oldDivider-nextDivider)>.01)dividerOffset.BeginAnimation(TranslateTransform.XProperty,Motion.PanelTween(oldDivider-nextDivider,0,330));
             TaskViewButton.Visibility=overflow&&layout.Capacity==0?Visibility.Collapsed:Visibility.Visible;Canvas.SetLeft(OverflowButton,layout.Capacity==0?52:DockLayout.AppOffset+shown.Length*46+12);
             foreach(var cell in cells.Values.Where(c=>!keys.Contains(c.Entry.Key)).ToArray()){
@@ -206,7 +213,7 @@ namespace OneTaskBar
         }
         void PlaceFrame()
         {
-            double y=currentY+(1-reveal)*8;appCanvas.Width=currentWidth;PlaceDock(Apps,new Rect(currentX,y,currentWidth,44),false);PlaceDock(Start,new Rect(currentStartX,y+2,40,40),false);if(targetLayout!=null)PlaceStatus(targetLayout,false,y);Native.Round(Apps,22);if(MediaBar!=null)RefreshMedia();
+            double y=currentY+(1-reveal)*8;appCanvas.Width=currentWidth;PlaceDock(Apps,new Rect(currentX,y,currentWidth,44),false);PlaceDock(Start,new Rect(currentStartX,y+2,40,40),false);if(targetLayout!=null)PlaceStatus(targetLayout,false,y);Native.Round(Apps,22*Zoom);if(MediaBar!=null)RefreshMedia();
         }
         internal string[] ShownKeys {get{return cells.Values.Where(c=>!c.Leaving).OrderBy(c=>c.X).Select(c=>c.Entry.Key).ToArray();}}
         internal Button AppButton(string key){DockCell cell;return cells.TryGetValue(key,out cell)?cell.Button:null;}
@@ -251,7 +258,7 @@ namespace OneTaskBar
         bool InUse()
         {
             if(DateTime.UtcNow<interactionUntil||DragReorder.Active||Overflow.IsOpen||Start.IsMouseOver||Apps.IsMouseOver||Status.IsMouseOver||(Start.ContextMenu!=null&&Start.ContextMenu.IsOpen)||cells.Values.Any(c=>c.Button.ContextMenu!=null&&c.Button.ContextMenu.IsOpen)||controller.DockInUse(this))return true;
-            if(!visible)return false;var pointer=Forms.Cursor.Position;var point=new Point((pointer.X-Screen.Bounds.Left)/Scale,(pointer.Y-Screen.Bounds.Top)/Scale);return targetLayout!=null&&DockGeometry.Rect(Screen.Bounds,Scale,Edge,new Rect(currentStartX-12,currentY-12,targetLayout.StatusX+targetLayout.StatusWidth-currentStartX+24,68)).Contains(point);
+            if(!visible)return false;var pointer=Forms.Cursor.Position;var point=new Point((pointer.X-Screen.Bounds.Left)/ContentScale,(pointer.Y-Screen.Bounds.Top)/ContentScale);return targetLayout!=null&&DockGeometry.Rect(Screen.Bounds,ContentScale,Edge,new Rect(currentStartX-12,currentY-12,targetLayout.StatusX+targetLayout.StatusWidth-currentStartX+24,68)).Contains(point);
         }
         internal void HideAfterMediaDismissed(){if(autoHide&&!fullScreen){hideDelay.Stop();interactionUntil=DateTime.MinValue;AnimateAutoHide(false);}}
         internal void CompleteAutoHide(bool interacting){hideDelay.Stop();if(autoHide&&!fullScreen&&!interacting)AnimateAutoHide(false);}
@@ -295,7 +302,7 @@ namespace OneTaskBar
             if(MediaBar!=null&&MediaBar.InterfaceVersion!=Preferences.Current.UIVersion){MediaBar.Close();MediaBar=null;}
             if(MediaBar==null&&controller.Services.Media.Active&&controller.Desktop)MediaBar=new NowBar(controller,Screen){DismissedOutside=HideAfterMediaDismissed};
             RefreshMedia();powerAccess.ToolTip=state.Known?"배터리 · 빠른 설정":"직접 입력한 PC 전력값 · 실시간 측정 아님";
-            Battery.Update(state);var now=DateTime.Now;clock.Text=DockGeometry.ClockLabel(now,Preferences.Current.Seconds,DockGeometry.Vertical(Edge));clockAccess.ToolTip=now.ToString("yyyy-MM-dd ddd tt h:mm:ss",System.Globalization.CultureInfo.GetCultureInfo("ko-KR"))+" · 알림센터";
+            Battery.Update(state);var now=DateTime.Now;clockFace.Update(now,Edge);clockAccess.ToolTip=now.ToString("yyyy-MM-dd ddd tt h:mm:ss",System.Globalization.CultureInfo.GetCultureInfo("ko-KR"))+" · 알림센터";
             bool radioOff=controller.Services.WifiOn==false;string wifiKind=NetworkRouteInfo.Glyph(controller.Services.NetworkRoute,controller.Services.WifiPresent,radioOff,controller.Wifi!=null,controller.Services.NetworkConnected);
             string soundKind=SoundIcon.For(controller.Audio.Value,controller.Audio.Muted,controller.Audio.Available);
             if(wifiStatus.Kind!=wifiKind){wifiStatus.Kind=wifiKind;wifiStatus.InvalidateVisual();}wifiStatus.Opacity=wifiKind=="wifi"||wifiKind=="network"||wifiKind=="ethernet"?1:.55;
@@ -308,7 +315,7 @@ namespace OneTaskBar
             if(Preferences.Current.DuoStatusIcon&&state.Known)quickAccess.ToolTip+=" · 배터리 "+state.Level+"%";System.Windows.Automation.AutomationProperties.SetHelpText(quickAccess,(string)quickAccess.ToolTip);
             if(Battery.ActualWidth>0){double right=Battery.TranslatePoint(new Point(Battery.ActualWidth,0),Status.Surface).X;Battery.ExpandedWidth=Math.Max(Battery.ActualWidth,Math.Min(164,right-12));}
         }
-        void RefreshMedia(){if(MediaBar!=null){double start=currentStartX,y=DockGeometry.Vertical(Edge)?12:currentY;y+=(1-reveal)*8;MediaBar.ConstrainDock(start,y);MediaBar.Update(controller.Services.Media,Scale,start,y,(visible||visibilityTimer.IsEnabled)&&controller.Desktop&&controller.DisplayAwake&&start-24>=44);MediaBar.Opacity=reveal;Native.BlurOpacity(MediaBar,reveal);}}
+        void RefreshMedia(){if(MediaBar!=null){double start=currentStartX*Zoom,y=(DockGeometry.Vertical(Edge)?12:currentY)*Zoom;y+=(1-reveal)*8*Zoom;MediaBar.ConstrainDock(start,y);MediaBar.Update(controller.Services.Media,Scale,start,y,(visible||visibilityTimer.IsEnabled)&&controller.Desktop&&controller.DisplayAwake&&start-24>=44);MediaBar.Opacity=reveal;Native.BlurOpacity(MediaBar,reveal);}}
         internal Point BatteryCenter()
         {
             FrameworkElement element=Preferences.Current.DuoStatusIcon?(FrameworkElement)duoStatus:Battery;return element.PointToScreen(new Point(element.ActualWidth/2,element.ActualHeight/2));
@@ -324,15 +331,14 @@ namespace OneTaskBar
     }
     internal sealed class HudWindow : GlassWindow
     {
-        internal static readonly Brush HudGlass=LightPanel.Tint("#80000000","#74000000","#7E000000");
-        internal static readonly Brush ContrastGlass=Paint.Brush("#B3181D24"),ContrastSolid=Paint.Brush("#FF242A30");
         readonly PillSlider slider=new PillSlider("volume") {Margin=new Thickness(10,9,10,9),IsHitTestVisible=false,AnimateValue=false,Light=true};
         internal readonly bool Modern=Preferences.Current.UIVersion>=90;
         internal double DisplayHeight {get{return Modern?QuickWidgetBoard.ControlHeight:62;}}
         internal PillSlider Slider {get{return slider;}}
-        internal HudWindow() { Title="One TaskBar · 밝기 및 음량"; Width=286; Height=DisplayHeight; Radius=DisplayHeight/2;Dark=Modern;UnifiedFade=true;Surface.Background=Modern?HudGlass:PanelMaterial.Surface(Glass95.Dark,false); Surface.CornerRadius=new CornerRadius(Radius); Surface.Child=slider; ShowActivated=false;
+        internal HudWindow() { Title="One TaskBar · 밝기 및 음량"; Width=286; Height=DisplayHeight; Radius=DisplayHeight/2;Dark=Glass95.Dark;UnifiedFade=true;Surface.Background=QuickPanel.Glass; Surface.CornerRadius=new CornerRadius(Radius); Surface.Child=slider; ShowActivated=false;
             if(Modern&&!Glass95.Enabled)slider.ValueNumberInk=Paint.ControlWhite;
-            if(Glass95.Enabled){slider.GlassStandalone=false;slider.ContrastTrack=true;slider.ValueNumberInk=Paint.ControlWhite;}if(Modern){slider.Margin=new Thickness(0);slider.Height=Double.NaN;slider.MinWidth=0;slider.NoTrackBorder=true;slider.LinearFill=true;Surface.BorderThickness=new Thickness(0);Surface.BorderBrush=Brushes.Transparent;}
+            slider.DarkTrack=!Modern;
+            if(Glass95.Enabled){slider.GlassStandalone=false;slider.ValueNumberInk=Paint.Text;}if(Modern){slider.Margin=new Thickness(0);slider.Height=Double.NaN;slider.MinWidth=0;slider.NoTrackBorder=true;slider.LinearFill=true;Surface.BorderThickness=new Thickness(0);Surface.BorderBrush=Brushes.Transparent;}
             SourceInitialized+=(s,e)=> { var h=new WindowInteropHelper(this).Handle; Native.SetWindowLong(h,-20,Native.GetWindowLong(h,-20)|0x80|0x08000000);HwndSource.FromHwnd(h).CompositionTarget.RenderMode=RenderMode.SoftwareOnly; };
         }
         internal void Reveal(){Show();Surface.InvalidateVisual();Native.SetWindowPos(new WindowInteropHelper(this).Handle,new IntPtr(-1),0,0,0,0,0x53);}

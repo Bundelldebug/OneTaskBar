@@ -22,6 +22,10 @@ namespace OneTaskBar
         sealed class Category {internal StackPanel Rows;internal Border Card;internal Section[] Sections;}
         readonly List<Section> sections=new List<Section>();readonly List<Category> categories=new List<Category>();readonly List<UIElement> versionElements=new List<UIElement>();
         StackPanel settingsHome,settingsDetail;SmoothScrollViewer settingsScroll;TextBlock settingsHeading,emptySettings;Button settingsBack;TextBox settingsSearch;
+        SettingsPageMotion pageMotion;
+        Border settingsExit;
+        internal Button ExitSettingsButton {get;private set;}
+        internal bool SettingsAnimating {get{return pageMotion!=null&&pageMotion.Active;}}
         internal string SettingsPage {get;private set;}
         internal TextBox SearchSettings {get{return settingsSearch;}}
         internal int SettingsSections {get{return sections.Count;}}
@@ -71,7 +75,9 @@ namespace OneTaskBar
         {
             if(settingsSearch==null)return;string term=settingsSearch.Text.Trim();bool searching=term.Length>0;foreach(var element in versionElements)element.Visibility=searching?Visibility.Collapsed:Visibility.Visible;
             foreach(var category in categories){category.Rows.Children.Clear();foreach(var section in category.Sections){bool match=!searching||section.Search.IndexOf(term,StringComparison.CurrentCultureIgnoreCase)>=0;section.Entry.Visibility=match?Visibility.Visible:Visibility.Collapsed;if(!match)continue;if(category.Rows.Children.Count>0)category.Rows.Children.Add(SettingSeparator());category.Rows.Children.Add(section.Entry);}category.Card.Visibility=category.Rows.Children.Count==0?Visibility.Collapsed:Visibility.Visible;}
-            emptySettings.Visibility=searching&&VisibleSettingsSections==0?Visibility.Visible:Visibility.Collapsed;if(String.IsNullOrEmpty(SettingsPage))settingsHeading.Text=searching?"검색 결과":"설정";settingsScroll.ScrollToTop();
+            bool exitMatch=!searching||"종료 Windows 작업표시줄 복원".IndexOf(term,StringComparison.CurrentCultureIgnoreCase)>=0;
+            if(settingsExit!=null)settingsExit.Visibility=exitMatch?Visibility.Visible:Visibility.Collapsed;
+            emptySettings.Visibility=searching&&VisibleSettingsSections==0&&!exitMatch?Visibility.Visible:Visibility.Collapsed;if(String.IsNullOrEmpty(SettingsPage))settingsHeading.Text=searching?"검색 결과":"설정";settingsScroll.ScrollToTop();
         }
         void SettingsPages(DockPanel root,StackPanel groups)
         {
@@ -91,15 +97,30 @@ namespace OneTaskBar
             }
             for(int start=0;start<sections.Count;start+=3){var category=new Category {Rows=new StackPanel(),Sections=sections.Skip(start).Take(3).ToArray()};category.Card=SettingsCard(category.Rows,false);categories.Add(category);groups.Children.Add(category.Card);}
             emptySettings=Paint.TextBlock("검색 결과가 없습니다",16,AppSettingsPalette.Muted);emptySettings.Margin=new Thickness(15,20,15,20);emptySettings.HorizontalAlignment=HorizontalAlignment.Center;emptySettings.Visibility=Visibility.Collapsed;groups.Children.Add(emptySettings);
-            root.Children.Add(settingsScroll);SettingsHome();
+            settingsExit=SettingsExitRow();groups.Children.Add(settingsExit);
+            pageMotion=new SettingsPageMotion(settingsScroll);root.Children.Add(pageMotion.View);SettingsHome();
         }
         internal void OpenSettings(string name)
         {
-            var section=sections.FirstOrDefault(s=>s.Name==name);if(section==null)return;SettingsPage=section.Name;settingsHeading.Text=section.Name;settingsHeading.Margin=new Thickness(48,0,48,0);settingsBack.Visibility=Visibility.Visible;settingsDetail.Children.Clear();if(section.Card==null)section.Card=SettingsCard(section.Content);settingsDetail.Children.Add(section.Card);settingsScroll.Content=settingsDetail;settingsScroll.ScrollToTop();LauncherMotion.Page(settingsDetail);
+            var section=sections.FirstOrDefault(s=>s.Name==name);if(section==null||SettingsPage==name)return;pageMotion.Cancel();SettingsPage=section.Name;settingsHeading.Text=section.Name;settingsHeading.Margin=new Thickness(48,0,48,0);settingsBack.Visibility=Visibility.Visible;settingsDetail.Children.Clear();if(section.Card==null)section.Card=SettingsCard(section.Content);settingsDetail.Children.Add(section.Card);settingsScroll.Content=settingsDetail;settingsScroll.ScrollToTop();pageMotion.Start(true);
         }
         internal void SettingsHome()
         {
-            SettingsPage=null;if(settingsHeading!=null){settingsHeading.Text="설정";settingsHeading.Margin=new Thickness(7,0,48,0);}if(settingsBack!=null)settingsBack.Visibility=Visibility.Collapsed;if(settingsScroll!=null){settingsScroll.Content=settingsHome;FilterSettings();}
+            bool returning=SettingsPage!=null;if(pageMotion!=null)pageMotion.Cancel();SettingsPage=null;if(settingsHeading!=null){settingsHeading.Text="설정";settingsHeading.Margin=new Thickness(7,0,48,0);}if(settingsBack!=null)settingsBack.Visibility=Visibility.Collapsed;if(settingsScroll!=null){settingsScroll.Content=settingsHome;FilterSettings();}if(returning&&pageMotion!=null)pageMotion.Start(false);
+        }
+        Border SettingsExitRow()
+        {
+            var ink=Paint.Brush(AppSettingsPalette.Dark?"#FFFF8585":"#FFC52E40");
+            var row=new Grid {Margin=new Thickness(15,12,15,12),MinHeight=50};
+            row.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(46)});row.ColumnDefinitions.Add(new ColumnDefinition());
+            row.Children.Add(new Glyph("power",23){Color=ink,HorizontalAlignment=HorizontalAlignment.Left});
+            var words=new StackPanel {VerticalAlignment=VerticalAlignment.Center};
+            words.Children.Add(Paint.TextBlock("One TaskBar 종료",17,ink));
+            var description=Paint.TextBlock("Windows 작업표시줄을 복원합니다",12,AppSettingsPalette.Muted);description.Margin=new Thickness(0,5,0,0);words.Children.Add(description);
+            Grid.SetColumn(words,1);row.Children.Add(words);
+            var button=Paint.Button(row,()=>Application.Current.Shutdown(),"One TaskBar 종료 · Windows 작업표시줄 복원");
+            button.Padding=new Thickness(0);button.Background=Brushes.Transparent;button.HorizontalContentAlignment=HorizontalAlignment.Stretch;
+            ExitSettingsButton=button;return SettingsCard(button,false);
         }
     }
 }

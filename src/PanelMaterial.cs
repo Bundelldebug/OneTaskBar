@@ -23,7 +23,7 @@ namespace OneTaskBar
         static readonly Brush field=Paint.Brush("#20FFFFFF"),stroke=Paint.Brush("#507F8B9B"),focus=Paint.Brush("#FF8DB7FF");
         internal static Brush Text(bool dark){return SystemParameters.HighContrast?SystemColors.WindowTextBrush:dark?DarkText:Glass95.Enabled?classicGlassText:classicText;}
         internal static Brush Muted(bool dark){return SystemParameters.HighContrast?SystemColors.WindowTextBrush:dark?DarkMuted:Glass95.Enabled?classicGlassMuted:classicMuted;}
-        internal static Brush Solid(bool dark){return SystemParameters.HighContrast?SystemColors.WindowBrush:dark?DarkSolid:Glass95.Enabled?classicGlassSolid:classicSolid;}
+        internal static Brush Solid(bool dark){return SystemParameters.HighContrast?SystemColors.WindowBrush:PanelTint.Enabled?PanelTint.Surface(dark,true):dark?DarkSolid:Glass95.Enabled?classicGlassSolid:classicSolid;}
         internal static Brush Card(bool dark){return SystemParameters.HighContrast?SystemColors.WindowBrush:DarkCard;}
         internal static Brush Field {get{return SystemParameters.HighContrast?SystemColors.WindowBrush:field;}}
         internal static Brush FieldStroke {get{return SystemParameters.HighContrast?SystemColors.WindowTextBrush:stroke;}}
@@ -37,6 +37,7 @@ namespace OneTaskBar
         internal static Brush PanelSurface(bool dark,bool modern)
         {
             if(SystemParameters.HighContrast)return SystemColors.WindowBrush;
+            if(PanelTint.Enabled)return PanelTint.Surface(dark,false);
             // Light mode intentionally retains the previous dark-mode material verbatim.
             if(!dark)return Surface(true,modern);
             int index=modern?1:0;var cached=panels[index];if(cached!=null)return cached;var color=((SolidColorBrush)DarkSolid).Color;color.A=(byte)Math.Round(DarkPanelOpacity*255/100.0);var brush=new LinearGradientBrush {StartPoint=new Point(0,0),EndPoint=new Point(0,1)};foreach(double offset in new[]{0,.48,1})brush.GradientStops.Add(new GradientStop(color,offset));brush.Freeze();return panels[index]=brush;

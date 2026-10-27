@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
@@ -21,6 +21,7 @@ namespace OneTaskBar
         readonly Grid compactRow;bool circle,retainedHost;
         readonly Border compactArt=new Border {Width=28,Height=28,CornerRadius=new CornerRadius(8),HorizontalAlignment=HorizontalAlignment.Left},glow=new Border {CornerRadius=new CornerRadius(22),Opacity=.2};
         readonly Stopwatch watch=new Stopwatch();bool animating;
+        internal bool GlassMotion {get{return animating;}}
         TimeSpan lastRendering=TimeSpan.MinValue;
         IDisposable outsideClick;
         Rect current,from,target,hostBox;NowBarLayout layout;double dockStart,dockTop,monitorScale=1;
@@ -87,7 +88,7 @@ namespace OneTaskBar
         {
             if(closed||!wanted){StopMotion();return;}double milliseconds=watch.Elapsed.TotalMilliseconds;if(lastFrame>0)MaximumFrameGap=Math.Max(MaximumFrameGap,milliseconds-lastFrame);lastFrame=milliseconds;FrameCount++;
             double t=Math.Min(1,milliseconds/300),ease=1-Math.Pow(1-t,3);current=new Rect(from.X+(target.X-from.X)*ease,from.Y+(target.Y-from.Y)*ease,from.Width+(target.Width-from.Width)*ease,from.Height+(target.Height-from.Height)*ease);long stamp=Program.Inspectable?Stopwatch.GetTimestamp():0;Place();if(stamp!=0)MaximumPlaceMilliseconds=Math.Max(MaximumPlaceMilliseconds,(Stopwatch.GetTimestamp()-stamp)*1000.0/Stopwatch.Frequency);
-            if(t>=1){StopMotion();if(!expanded)expandedContent.Visibility=Visibility.Collapsed;EnsureHost(false);title.Running=!expanded&&Motion.Enabled;}
+            if(t>=1){StopMotion();if(!expanded)expandedContent.Visibility=Visibility.Collapsed;EnsureHost(false);Native.RefreshOptics(this);title.Running=!expanded&&Motion.Enabled;}
         }
         void EnsureHost(bool show)
         {

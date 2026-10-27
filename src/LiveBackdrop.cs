@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -41,6 +41,7 @@ namespace OneTaskBar
         readonly System.Collections.Generic.List<Rect> previousRefractionRegions=new System.Collections.Generic.List<Rect>();
         int refractedWidth,refractedHeight,refractedCorner;
         double backdropScale=1;
+        Rect refractedClip;
         bool refractionConfigured;
         bool refractionUnavailable;
         readonly Window window;
@@ -53,6 +54,7 @@ namespace OneTaskBar
         Native.RectI? inputClip;
         internal bool Realtime {get{return blur!=null&&blur.Brush is CompositionBackdropBrush;}}
         internal int RefractedRegions {get{return refraction==null?0:refraction.Count;}}
+        internal int RefractionLayers {get{return refraction==null?0:refraction.LayerCount;}}
         internal LiveBackdrop(Window window,double radius)
         {
             this.window=window;this.radius=radius;
@@ -138,6 +140,13 @@ namespace OneTaskBar
             bool active=root!=null&&glass!=null&&glass.IsVisible&&!(glass is DesktopOverview)&&glass.GlassMaterial&&Glass95.Enabled&&Glass95.Transparent&&enabled;
             if(!active){if(refractionConfigured&&refraction!=null){refraction.Begin();refraction.End();}refractionConfigured=false;return;}
             if(refractionUnavailable||width<4||height<4)return;
+            var media=glass as NowBar;
+            if(media!=null&&media.GlassMotion)
+            {
+                if(refractionConfigured&&refraction!=null){refraction.Begin();refraction.End();}
+                refractionConfigured=false;
+                return;
+            }
             double scale=backdropScale;
             refractionRegions.Clear();
             var quick=window as QuickWindow;
@@ -149,15 +158,16 @@ namespace OneTaskBar
                     refractionRegions.Add(new Rect(point.X*scale,point.Y*scale,body.ActualWidth*scale,body.ActualHeight*scale));
                 }
             }
-            bool same=refractionConfigured&&refractedWidth==width&&refractedHeight==height&&refractedCorner==corner&&refractionRegions.Count==previousRefractionRegions.Count;
+            var outer=glass.BackdropClip.HasValue?new Rect(glass.BackdropClip.Value.X*scale,glass.BackdropClip.Value.Y*scale,glass.BackdropClip.Value.Width*scale,glass.BackdropClip.Value.Height*scale):new Rect(0,0,width,height);
+            bool same=refractionConfigured&&refractedClip==outer&&refractedWidth==width&&refractedHeight==height&&refractedCorner==corner&&refractionRegions.Count==previousRefractionRegions.Count;
             for(int i=0;same&&i<refractionRegions.Count;i++)same=refractionRegions[i]==previousRefractionRegions[i];
             if(same)return;
             try {
                 if(refraction==null)refraction=new GlassRefraction(compositor,root,blur);
                 refraction.Begin();
-                refraction.Add(0,0,width,height,corner,(float)(1.5*scale));
+                refraction.Add((float)outer.X,(float)outer.Y,(float)outer.Width,(float)outer.Height,corner,(float)(1.5*scale));
                 foreach(var region in refractionRegions)refraction.Add((float)region.X,(float)region.Y,(float)region.Width,(float)region.Height,(float)Math.Min(30*scale,Math.Min(region.Width,region.Height)/2),(float)(2.2*scale));
-                refraction.End();refractionConfigured=true;refractedWidth=width;refractedHeight=height;refractedCorner=corner;
+                refraction.End();refractionConfigured=true;refractedClip=outer;refractedWidth=width;refractedHeight=height;refractedCorner=corner;
                 previousRefractionRegions.Clear();previousRefractionRegions.AddRange(refractionRegions);
             }catch(Exception error){
                 refractionUnavailable=true;
@@ -165,6 +175,7 @@ namespace OneTaskBar
                 AppLog.Once("glass-refraction",error.ToString());
             }
         }
+        internal void RefreshOptics(){RefreshRefraction(null,EventArgs.Empty);}
         public void Dispose() {instances.Remove(this);if(window!=null)window.LayoutUpdated-=RefreshRefraction;if(popupTimer!=null)popupTimer.Stop();if(refraction!=null){refraction.Dispose();refraction=null;}if(target!=null){target.Root=null;target.Dispose();target=null;}if(root!=null)root.Children.RemoveAll();if(blur!=null){var brush=blur.Brush;blur.Brush=null;blur.Dispose();blur=null;if(brush!=null)brush.Dispose();}if(root!=null){root.Dispose();root=null;}if(shape!=null){shape.Dispose();shape=null;}if(background!=IntPtr.Zero){DestroyWindow(background);background=IntPtr.Zero;}}
     }
 }

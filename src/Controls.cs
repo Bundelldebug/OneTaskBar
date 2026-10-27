@@ -241,7 +241,7 @@ namespace OneTaskBar
             if(Glass95.Enabled&&Tablet&&!Slim){DrawGlass(dc,w,h);return;}
             double shown=(double)GetValue(DisplayValueProperty);string iconKind=Kind.StartsWith("volume",StringComparison.Ordinal)?SoundIcon.For(value,false,IsEnabled):Kind;
             double axis=Vertical?h:w,cross=Vertical?w:h;bool capsule=Tablet&&ShowIcon&&!Slim&&!LinearFill;double thickness=Slim?6:cross,top=(cross-thickness)/2;var track=Vertical?new Rect(top,0,thickness,h):new Rect(0,top,w,thickness);var logical=capsule?CapsuleFillBounds(axis,cross,shown):new Rect(0,top,FillWidth(axis,shown),thickness);var filled=Vertical?new Rect(logical.Y,h-logical.Right,logical.Height,logical.Width):logical;double fillRadius=Math.Min(filled.Width,filled.Height)/2;var fill=new RectangleGeometry(filled,fillRadius,fillRadius);
-            dc.DrawRoundedRectangle(Paint.Brush(DarkTrack?"#26000000":IsEnabled ? "#3C77817F" : "#286E7775"),NoTrackBorder?null:new Pen(Paint.Brush("#288B9692"),.7),track,thickness/2,thickness/2);
+            dc.DrawRoundedRectangle(UnfilledBrush,NoTrackBorder?null:new Pen(Paint.Brush("#288B9692"),.7),track,thickness/2,thickness/2);
             bool clipTrack=LinearFill&&!Slim;if(clipTrack)dc.PushClip(new RectangleGeometry(track,thickness/2,thickness/2));
             double fillOpacity=1;if(shown>0)dc.DrawGeometry(Tablet?Paint.ControlWhite:Brushes.Black,null,fill);
             var c=ValueIconCenter(w,h,Vertical?new Point(w/2,h-cross*(Tablet&&ShowIcon&&!Slim?.5:.70)):new Point(cross*(Tablet&&ShowIcon&&!Slim?.5:.70),h/2)); double icon=cross*.44;
@@ -330,6 +330,7 @@ namespace OneTaskBar
         }
         void ApplyMaterial()
         {
+            if(closed)return;
             if(DockSurface||DockPalette)Dark=Glass95.DockDark;else if(!OpaqueSurface)Dark=Glass95.Dark;
             if(lens!=null){lens.Active=Glass95.Enabled&&!OpaqueSurface&&HasBlur&&Preferences.Current.Blur&&!(DockSurface&&DockAppearance.Custom)&&!(this is HudWindow);lens.InvalidateVisual();}
             if(glassTint==null)return;
@@ -345,9 +346,10 @@ namespace OneTaskBar
             }
             bool enabled=HasBlur&&Preferences.Current.Blur&&!(DockSurface&&Preferences.Current.DockSolidBackground)&&(!Glass95.Enabled||Glass95.Transparent);Native.EnableBlur(this,enabled);
             bool panel=PanelMaterial.ReadablePanel(this),popup=PanelMaterial.NotificationPopup(this);
-            if(this is NotificationWindow){Dark=Glass95.Dark;Surface.Background=enabled?NotificationStyle.Surface:NotificationStyle.Solid;Surface.BorderBrush=Glass95.Enabled?Glass95.Rim:Paint.Brush("#28FFFFFF");Surface.BorderThickness=new Thickness(.7);return;}
+            var center=this as NotificationWindow;
+            if(center!=null){Dark=Glass95.Dark;Surface.Background=enabled?NotificationStyle.Surface:NotificationStyle.Solid;Surface.BorderBrush=Glass95.Enabled?Glass95.Rim:Paint.Brush("#28FFFFFF");Surface.BorderThickness=new Thickness(.7);center.RefreshChrome();return;}
             var detail=this as DetailWindow;if(detail!=null&&detail.PageKey=="sound"){Dark=true;if(lens!=null)lens.Active=false;Surface.Background=enabled?AudioOutputView.Glass:AudioOutputView.Solid;Surface.BorderBrush=Brushes.Transparent;Surface.BorderThickness=new Thickness(0);return;}
-            if(this is HudWindow&&Glass95.Enabled){Surface.Background=enabled?HudWindow.ContrastGlass:HudWindow.ContrastSolid;Surface.BorderBrush=Paint.Brush("#60FFFFFF");Surface.BorderThickness=new Thickness(.7);return;}
+            if(this is HudWindow){Dark=Glass95.Dark;if(Glass95.Enabled&&enabled){if(glassEdge==null||edgeDark!=Dark){edgeDark=Dark;glassEdge=Glass95.Edge(Dark);}}else glassEdge=null;Surface.Background=enabled?QuickPanel.Glass:PanelMaterial.Solid(Dark);Surface.BorderBrush=glassEdge??(Brush)Brushes.Transparent;Surface.BorderThickness=new Thickness(Glass95.Enabled?.7:0);return;}
             if(Glass95.Enabled&&!OpaqueSurface&&!(DockSurface&&Preferences.Current.DockSolidBackground)){
                 bool rimDark=panel||popup||Dark;if(glassEdge==null||edgeDark!=rimDark){edgeDark=rimDark;glassEdge=Glass95.Edge(edgeDark);}Surface.BorderBrush=this is NowBar?(Brush)Brushes.Transparent:glassEdge;Surface.BorderThickness=new Thickness(0);
                 Surface.Background=this is NowBar?(enabled?glassTint:solidTint??Glass95.Solid):popup?(enabled?PanelMaterial.PopupSurface(Dark):PanelMaterial.Solid(Dark)):panel?(enabled?PanelMaterial.PanelSurface(Dark,true):PanelMaterial.Solid(Dark)):enabled?PanelMaterial.Surface(Dark,true):Paint.Brush(Dark?"#FF242832":"#FFF1F4FA");

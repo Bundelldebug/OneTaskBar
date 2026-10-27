@@ -24,13 +24,13 @@ namespace OneTaskBar
         internal const double AppOffset=94,FixedWidth=116;
         internal double StartX,AppX,AppWidth,StatusX,StatusWidth,Y;
         internal int Capacity;
-        internal static double StatusSize(double screenWidth,double powerWidth=58,bool duo=false){return duo?172:Math.Min(282,Math.Max(226,screenWidth*.25))+powerWidth-58;}
+        internal static double StatusSize(double screenWidth,double powerWidth=58,bool duo=false){return (duo?172:Math.Min(282,Math.Max(226,screenWidth*.25))+powerWidth-58)-(94-DockClock.Width);}
         internal static double BalancedY(double height,double reserved){return height-(Math.Max(68,reserved)+44)/2;}
-        internal static DockLayout Compute(System.Drawing.Rectangle screen,double scale,int count,double powerWidth=58,bool media=false,double reserved=68,int edge=3,bool duo=false)
+        internal static DockLayout Compute(System.Drawing.Rectangle screen,double scale,int count,double powerWidth=58,bool media=false,double reserved=68,int edge=3,bool duo=false,double minimumMediaWidth=44)
         {
             bool vertical=DockGeometry.Vertical(edge);double width=(vertical?screen.Height:screen.Width)/scale;
             double status=(vertical?DockGeometry.SideStatusLength(powerWidth):StatusSize(width,powerWidth,duo))+DockStatusItems.Count*24,statusX=width-status-12;
-            double mediaMinimum=media?Math.Min(44,Math.Max(1,statusX-204)):0;
+            double mediaMinimum=media?Math.Min(minimumMediaWidth,Math.Max(1,statusX-204)):0;
             double minimumX=media?mediaMinimum+76:66;
             double available=Math.Max(FixedWidth,statusX-minimumX-12);
             int capacity=Math.Max(0,(int)Math.Floor((available-FixedWidth)/46));
@@ -252,7 +252,7 @@ namespace OneTaskBar
             foreach(var reservation in reservations) reservation.Dispose(); reservations.Clear();
             foreach(var dock in docks) dock.Close(); docks.Clear();
             SyncAutoHide(true);
-            var fullscreenWindows=FullscreenVisibility.Capture();foreach(var screen in Forms.Screen.AllScreens) { var dock=new DockHost(this,screen);docks.Add(dock);dock.Show();reservations.Add(new AppBarReservation(screen,dock.Scale,DockAutoHide,TaskbarOptionsChanged));dock.UpdateVisibility(FullscreenVisibility.IsFullScreen(screen.Bounds,fullscreenWindows),DockAutoHide);}
+            var fullscreenWindows=FullscreenVisibility.Capture();foreach(var screen in Forms.Screen.AllScreens) { var dock=new DockHost(this,screen);docks.Add(dock);dock.Show();reservations.Add(new AppBarReservation(screen,dock.ContentScale,DockAutoHide,TaskbarOptionsChanged));dock.UpdateVisibility(FullscreenVisibility.IsFullScreen(screen.Bounds,fullscreenWindows),DockAutoHide);}
             trayDock=trayMonitor==null?null:docks.FirstOrDefault(d=>d.Screen.DeviceName==trayMonitor)??docks.FirstOrDefault();
             if(StartMenu!=null)StartMenu.HideImmediately();if(Quick!=null) Quick.Hide(); if(Drawer!=null) Drawer.Hide();if(Finder!=null)Finder.HideImmediately();if(Center!=null)Center.Hide();if(Detail!=null)Detail.Hide();
         }
@@ -295,7 +295,8 @@ namespace OneTaskBar
         void OptionsChanged()
         {
             if(disposed)return;
-            if(docks.Any(d=>d.Edge!=DockGeometry.Edge))Relayout();
+            RefreshPanelTint();
+            if(docks.Any(d=>d.Edge!=DockGeometry.Edge||Math.Abs(d.Zoom-DockSizing.Zoom)>.001))Relayout();
             SyncAutoHide(true);
             Notifications.Check();Banners.Refresh();Buds.Refresh();
             Services.ArtworkModeChanged();

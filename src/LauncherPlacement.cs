@@ -14,10 +14,10 @@ namespace OneTaskBar
             double left=Math.Max(0,(work.Left-screen.Left)/scale),top=Math.Max(0,(work.Top-screen.Top)/scale);
             double right=Math.Min(sw,(work.Right-screen.Left)/scale),bottom=Math.Min(sh,(work.Bottom-screen.Top)/scale);
             if(right<=left||bottom<=top){left=top=0;right=sw;bottom=sh;}
-            if(edge==0)left=Math.Max(left,76);
-            else if(edge==1)top=Math.Max(top,76);
-            else if(edge==2)right=Math.Min(right,sw-76);
-            else bottom=Math.Min(bottom,sh-68);
+            if(edge==0)left=Math.Max(left,DockSizing.PopupInset);
+            else if(edge==1)top=Math.Max(top,DockSizing.PopupInset);
+            else if(edge==2)right=Math.Min(right,sw-DockSizing.PopupInset);
+            else bottom=Math.Min(bottom,sh-DockSizing.Reserved);
             double insetX=Math.Min(16,Math.Max(0,(right-left)/8)),insetY=Math.Min(8,Math.Max(0,(bottom-top)/8));
             left+=insetX;right-=insetX;top+=insetY;bottom-=insetY;
             double width=Math.Min(maximumWidth,Math.Max(1,right-left)),height=Math.Min(preferredHeight,Math.Max(1,bottom-top));

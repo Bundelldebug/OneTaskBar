@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Numerics;
 using Windows.UI.Composition;
@@ -29,8 +29,9 @@ namespace OneTaskBar
         readonly CompositionVisualSurface surface;
         readonly CompositionColorBrush white;
         readonly List<Bevel> bevels=new List<Bevel>();
-        int used;
-        internal int Count {get{return used;}}
+        int used,regions;
+        internal int Count {get{return regions;}}
+        internal int LayerCount {get{return used;}}
         internal GlassRefraction(Compositor compositor,ContainerVisual parent,SpriteVisual backdrop)
         {
             this.compositor=compositor;this.parent=parent;
@@ -44,10 +45,21 @@ namespace OneTaskBar
             brush.HorizontalAlignmentRatio=0;brush.VerticalAlignmentRatio=0;
             return brush;
         }
-        internal void Begin(){used=0;surface.SourceSize=parent.Size;}
+        internal void Begin(){used=0;regions=0;surface.SourceSize=parent.Size;}
         internal void Add(float x,float y,float width,float height,float radius,float thickness)
         {
             if(width<4||height<4)return;
+            regions++;
+            // Rounded contours approximate a smooth edge displacement field.
+            // Each contour samples the same live scene at a different depth;
+            // the undistorted center is never painted over.
+            float edge=Math.Min(thickness,Math.Min(width,height)/10);
+            AddContour(x,y,width,height,radius,0,edge*.6f,1.055f,.62f);
+            AddContour(x,y,width,height,radius,edge*.6f,edge*.8f,1.026f,.45f);
+            AddContour(x,y,width,height,radius,edge*1.4f,edge,1.008f,.24f);
+        }
+        void AddContour(float x,float y,float width,float height,float radius,float depth,float thickness,float magnification,float opacity)
+        {
             Bevel bevel;
             if(used==bevels.Count){
                 var geometry=compositor.CreateRoundedRectangleGeometry();
@@ -57,18 +69,18 @@ namespace OneTaskBar
                 var maskSurface=compositor.CreateVisualSurface();maskSurface.SourceVisual=mask;
                 var maskBrush=Brush(maskSurface);
                 var composite=compositor.CreateMaskBrush();composite.Source=source;composite.Mask=maskBrush;
-                var visual=compositor.CreateSpriteVisual();visual.Brush=composite;visual.BorderMode=CompositionBorderMode.Soft;visual.Opacity=.48f;
+                var visual=compositor.CreateSpriteVisual();visual.Brush=composite;visual.BorderMode=CompositionBorderMode.Soft;visual.Opacity=opacity;
                 parent.Children.InsertAtTop(visual);
                 bevel=new Bevel {Visual=visual,Geometry=geometry,Shape=shape,SceneBrush=source,MaskVisual=mask,MaskSurface=maskSurface,MaskBrush=maskBrush,Composite=composite};bevels.Add(bevel);
             }else bevel=bevels[used];
             used++;bevel.Visual.IsVisible=true;
             var size=new Vector2(width,height);
-            bevel.Visual.Size=size;bevel.Visual.Offset=new Vector3(x,y,0);
+            bevel.Visual.Size=size;bevel.Visual.Offset=new Vector3(x,y,0);bevel.Visual.Opacity=opacity;
             bevel.MaskVisual.Size=size;bevel.MaskSurface.SourceSize=size;
-            bevel.SceneBrush.TransformMatrix=Matrix3x2.CreateTranslation(-x,-y)*Matrix3x2.CreateScale(1.012f,new Vector2(width*.5f,height*.5f));
-            float inset=thickness*.5f;
+            bevel.SceneBrush.TransformMatrix=Matrix3x2.CreateTranslation(-x,-y)*Matrix3x2.CreateScale(magnification,new Vector2(width*.5f,height*.5f));
+            float inset=depth+thickness*.5f;
             bevel.Geometry.Offset=new Vector2(inset,inset);
-            bevel.Geometry.Size=new Vector2(Math.Max(1,width-thickness),Math.Max(1,height-thickness));
+            bevel.Geometry.Size=new Vector2(Math.Max(1,width-inset*2),Math.Max(1,height-inset*2));
             bevel.Geometry.CornerRadius=new Vector2(Math.Max(0,radius-inset));
             bevel.Shape.StrokeThickness=thickness;
         }

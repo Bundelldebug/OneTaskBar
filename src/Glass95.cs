@@ -30,7 +30,7 @@ namespace OneTaskBar
         internal static bool Transparent {get{return Preferences.Current.Blur&&!SystemParameters.HighContrast;}}
         internal static Brush Surface {get{return PanelMaterial.PanelSurface(Dark,true);}}
         internal static Brush Card {get{return Transparent?Current.Card:PanelMaterial.Card(Dark);}}
-        internal static Brush Solid {get{return SystemParameters.HighContrast?SystemColors.WindowBrush:Current.Solid;}}
+        internal static Brush Solid {get{return PanelMaterial.Solid(Dark);}}
         internal static Brush Text {get{return SystemParameters.HighContrast?SystemColors.WindowTextBrush:Current.Text;}}
         internal static Brush Muted {get{return SystemParameters.HighContrast?SystemColors.WindowTextBrush:Current.Muted;}}
         internal static Brush Rail {get{return Current.Rail;}}

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -8,9 +8,8 @@ namespace OneTaskBar
     internal static class GlassOptics
     {
         static readonly Brush lightRim=Rim(false),darkRim=Rim(true),lightDepth=Depth(false),darkDepth=Depth(true);
-        static readonly Pen lightInner=Inner(false),darkInner=Inner(true),lightStrong=FrozenPen(lightRim,.85),darkStrong=FrozenPen(darkRim,.85),lightSoft=FrozenPen(lightRim,.65),darkSoft=FrozenPen(darkRim,.65);
+        static readonly Pen lightStrong=FrozenPen(lightRim,.85),darkStrong=FrozenPen(darkRim,.85),lightSoft=FrozenPen(lightRim,.65),darkSoft=FrozenPen(darkRim,.65);
         static Pen FrozenPen(Brush brush,double width){var pen=new Pen(brush,width);pen.Freeze();return pen;}
-        static Pen Inner(bool dark){var brush=new LinearGradientBrush(Color.FromArgb(dark?(byte)23:(byte)29,255,255,255),Colors.Transparent,new Point(0,0),new Point(.25,.72));brush.Freeze();return FrozenPen(brush,2.4);}
         static Brush Rim(bool dark)
         {
             var brush=new LinearGradientBrush {StartPoint=new Point(.18,0),EndPoint=new Point(.78,1)};
@@ -26,8 +25,8 @@ namespace OneTaskBar
         internal static void Draw(DrawingContext dc,double width,double height,double radius,bool strong=true,bool? darkOverride=null)
         {
             if(!Glass95.Transparent||width<3||height<3)return;bool dark=darkOverride??Glass95.Dark;var box=new Rect(.65,.65,width-1.3,height-1.3);var clip=new RectangleGeometry(box,radius,radius);dc.PushClip(clip);dc.DrawRectangle(dark?darkDepth:lightDepth,null,box);
-            // A broad, low-opacity inner reflection plus one sharp top edge reads as thickness.
-            dc.DrawRoundedRectangle(null,dark?darkInner:lightInner,new Rect(1.7,1.7,Math.Max(0,width-3.4),Math.Max(0,height-3.4)),Math.Max(0,radius-1),Math.Max(0,radius-1));
+            // Optical depth comes from the live contour sampler. A second broad
+            // painted stroke produces a gray double outline instead of glass.
             dc.DrawRoundedRectangle(null,dark?(strong?darkStrong:darkSoft):(strong?lightStrong:lightSoft),box,radius,radius);dc.Pop();
         }
     }

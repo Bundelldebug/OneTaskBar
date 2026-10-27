@@ -44,6 +44,61 @@ namespace OneTaskBar
             shell.Quick=new QuickWindow(shell);shell.Quick.Refresh(new PowerState {Known=true,Level=76},64,35,false,true,true);shell.Center=new NotificationWindow(shell);shell.Center.Refresh();shell.StartMenu=new StartWindow(shell);shell.StartMenu.Configure(940,720);shell.StartMenu.RefreshPins();shell.StartMenu.FixtureRecent(new List<StartRecent>{new StartRecent {App=shell.Apps[0],Time=DateTime.Now}});shell.Drawer=new DrawerWindow(shell);shell.Drawer.Configure(720,680);shell.Drawer.Reload();shell.Finder=new SearchWindow(shell);shell.Finder.Configure(720,680);shell.Finder.Reload();foreach(var window in Panels(shell))window.ShowAt(screen.Bounds,20,20,window.Width,window.Height);
         }
         static GlassWindow[] Panels(ShellController shell){return new GlassWindow[]{shell.Quick,shell.Center,shell.StartMenu,shell.Drawer,shell.Finder};}
+        static void Chrome(ShellController shell)
+        {
+            Require(shell.Center.ClockLabel.Foreground==Paint.Text&&shell.Center.DateLabel.Foreground==Paint.Muted,"notification clock and date share the quick-settings text palette");
+            var hud=new HudWindow();
+            try
+            {
+                var sliders=Nodes<PillSlider>(shell.Quick.Surface).ToArray();
+                foreach(string kind in new[]{"brightness","volume"})
+                {
+                    string name=kind=="brightness"?"밝기":"음량";
+                    var quick=sliders.First(s=>System.Windows.Automation.AutomationProperties.GetName(s)==name);
+                    foreach(int value in new[]{0,35,100})
+                    {
+                        hud.Set(kind,value,false);
+                        Require(hud.Slider.UnfilledBrush==quick.UnfilledBrush,"keyboard and quick-settings unfilled tracks use the same color and alpha at both endpoints");
+                    }
+                }
+                Require(hud.Surface.Background==shell.Quick.Surface.Background,"keyboard track uses the same underlying panel tint");
+            }
+            finally{hud.Close();}
+        }
+        static void LinkedColor(ShellController shell)
+        {
+            bool linked=Preferences.Current.PanelsUseDockColor;
+            string color=Preferences.Current.DockBackgroundColor;
+            var previous=shell.Quick.Surface.Background;
+            try
+            {
+                Preferences.Current.PanelsUseDockColor=true;
+                foreach(string selected in new[]{"#FFFFFFFF","#FF3478FD","#FFCC3010"})
+                {
+                    Preferences.Current.DockBackgroundColor=selected;PanelTint.RefreshOpen();
+                    foreach(var window in Panels(shell))
+                        Require(window.Surface.Background==QuickPanel.Glass,"all open panels update to the linked color without resetting their content");
+                    Require(PanelTint.Surface(Glass95.Dark,false).IsFrozen&&PanelTint.Surface(Glass95.Dark,true).IsFrozen,"linked tint reuses frozen resources");
+                    var solid=((SolidColorBrush)PanelTint.Surface(Glass95.Dark,true)).Color;
+                    Require(Contrast(((SolidColorBrush)Paint.Text).Color,solid)>=4.5,"linked color retains text contrast in the opaque fallback");
+                }
+                Preferences.Current.PanelsUseDockColor=false;PanelTint.RefreshOpen();
+                Require(shell.Quick.Surface.Background==previous,"turning linked color off restores the exact default material");
+            }
+            finally
+            {
+                Preferences.Current.PanelsUseDockColor=linked;Preferences.Current.DockBackgroundColor=color;PanelTint.RefreshOpen();
+            }
+        }
+        static IEnumerable<T> Nodes<T>(DependencyObject root) where T:DependencyObject
+        {
+            var match=root as T;if(match!=null)yield return match;
+            foreach(object item in LogicalTreeHelper.GetChildren(root))
+            {
+                var child=item as DependencyObject;if(child==null)continue;
+                foreach(var result in Nodes<T>(child))yield return result;
+            }
+        }
         static void Feedback(ShellController shell,System.Windows.Forms.Screen screen,int ui,bool dark)
         {
             var state=SamsungPerformance.Parse("[\"0\",\"1\",\"2\",\"3\"]",3);var picker=new SamsungModePicker(state.Modes,_=>{});
@@ -60,10 +115,10 @@ namespace OneTaskBar
             app.Dispatcher.BeginInvoke(new Action(async()=>{try{
                 Program.Inspectable=true;Directory.CreateDirectory(AppLog.Data);Preferences.Current.Animations=false;Preferences.Current.UITheme=1;shell=new ShellController(true);shell.Apps=Enumerable.Range(1,10).Select(i=>new AppEntry {Name="테마 확인 앱 "+i,AppID="fixture.theme."+i,Icon=ArtworkPalette.Sample(i%2==0?System.Windows.Media.Colors.CornflowerBlue:System.Windows.Media.Colors.Teal)}).ToList();shell.StartPins.Replace(shell.Apps);shell.Notifications.Items=new List<NotificationEntry>{new NotificationEntry {Id=1,AppId="fixture.theme",App="테마 확인",Title="새로운 알림이 있습니다",Body="라이트와 다크 모드에서 알림 내용을 확인할 수 있습니다.",Created=DateTimeOffset.Now}};var screen=System.Windows.Forms.Screen.PrimaryScreen;
                 foreach(int ui in ReleaseFeatures.GlassUI?new[]{85,90,95}:new[]{85,90})foreach(bool dark in new[]{false,true})using(Glass95.WithDarkForFixture(dark)){
-                    Preferences.Current.UIVersion=ui;samples.Add(Matrix(ui,dark));OpenPanels(shell,screen);await Task.Delay(80);foreach(var window in Panels(shell)){Surface(window,dark);if(ui==(ReleaseFeatures.GlassUI?95:90)){string name=window is QuickWindow?"quick":window is NotificationWindow?"notifications":window is StartWindow?"start":window is DrawerWindow?"apps":"search";Program.Save(window.Surface,(int)window.Width,(int)window.Height,Path.Combine(AppLog.Data,"panel-"+name+(dark?"-dark":"-light")+".png"));}}Require(shell.StartMenu.Search.Foreground==Paint.Text&&shell.Drawer.Search.Foreground==Paint.Text&&shell.Finder.Query.Foreground==Paint.Text,"all launcher input text shares the same palette");ClosePanels(shell);Feedback(shell,screen,ui,dark);
+                    Preferences.Current.UIVersion=ui;samples.Add(Matrix(ui,dark));OpenPanels(shell,screen);await Task.Delay(80);Chrome(shell);LinkedColor(shell);foreach(var window in Panels(shell)){Surface(window,dark);if(ui==(ReleaseFeatures.GlassUI?95:90)){string name=window is QuickWindow?"quick":window is NotificationWindow?"notifications":window is StartWindow?"start":window is DrawerWindow?"apps":"search";Program.Save(window.Surface,(int)window.Width,(int)window.Height,Path.Combine(AppLog.Data,"panel-"+name+(dark?"-dark":"-light")+".png"));}}Require(shell.StartMenu.Search.Foreground==Paint.Text&&shell.Drawer.Search.Foreground==Paint.Text&&shell.Finder.Query.Foreground==Paint.Text,"all launcher input text shares the same palette");ClosePanels(shell);Feedback(shell,screen,ui,dark);
                 }
-                Preferences.Current.UIVersion=ReleaseFeatures.GlassUI?95:90;OpenPanels(shell,screen);shell.StartMenu.ShowRecentPage(true);shell.Drawer.RestoreSearch("보존");shell.Finder.Query.Text="계";
-                foreach(bool dark in new[]{true,false})using(Glass95.WithDarkForFixture(dark)){shell.RefreshPanelTheme();await Task.Delay(60);foreach(var window in Panels(shell))Surface(window,dark);Require(shell.StartMenu.RecentPage&&shell.Drawer.Search.Text=="보존"&&shell.Finder.Query.Text=="계","theme switching preserves recent More and search state without opening another search");}
+                Preferences.Current.UIVersion=ReleaseFeatures.GlassUI?95:90;OpenPanels(shell,screen);LinkedColor(shell);shell.StartMenu.ShowRecentPage(true);shell.Drawer.RestoreSearch("보존");shell.Finder.Query.Text="계";
+                foreach(bool dark in new[]{true,false})using(Glass95.WithDarkForFixture(dark)){shell.RefreshPanelTheme();await Task.Delay(60);foreach(var window in Panels(shell))Surface(window,dark);Chrome(shell);Require(shell.StartMenu.RecentPage&&shell.Drawer.Search.Text=="보존"&&shell.Finder.Query.Text=="계","theme switching preserves recent More and search state without opening another search");}
                 ClosePanels(shell);Require(LiveBackdrop.OrphanCount==0,"theme switching leaves no orphan backdrop host");AppLog.Json("panel-theme-probe.json",new {passed=true,samples=samples,windows=5,uiVersions=ReleaseFeatures.GlassUI?3:2,palettes=2,themeStatePreserved=true,osThemeChanged=false,desktopPixelsRead=false,deviceValuesChanged=false});result=0;
             }catch(Exception error){AppLog.Json("panel-theme-probe.json",new {passed=false,error=error.ToString(),samples=samples});}finally{if(shell!=null){ClosePanels(shell);shell.Dispose();}Preferences.Current.UIVersion=oldUI;Preferences.Current.UITheme=oldMode;Preferences.Current.Animations=oldAnimations;app.Shutdown(result);}}));app.Run();return result;
         }
