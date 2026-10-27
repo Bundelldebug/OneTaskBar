@@ -18,13 +18,39 @@ namespace OneTaskBar
         [DllImport("cfgmgr32.dll",CharSet=CharSet.Unicode)]static extern uint CM_Get_DevNode_PropertyW(uint instance,ref Key key,out uint type,[Out]byte[] data,ref uint size,uint flags);
         sealed class Device {internal Guid Container;internal string Name;internal int? Battery;}
         static readonly object gate=new object();static readonly Dictionary<string,ImageSource> pictures=new Dictionary<string,ImageSource>();static string root;static DateTime rootUntil;
-        static ImageSource shortcutIcon;static DateTime shortcutUntil;
-        internal static ImageSource ShortcutIcon()
+        static readonly Dictionary<string,ImageSource> symbols=new Dictionary<string,ImageSource>();
+        static string symbolRoot;static DateTime shortcutUntil;
+        internal static string SymbolFile(string name)
         {
-            lock(gate){if(shortcutIcon!=null||DateTime.UtcNow<shortcutUntil)return shortcutIcon;shortcutUntil=DateTime.UtcNow.AddMinutes(5);
-                try{var package=new PackageManager().FindPackagesForUser("").FirstOrDefault(p=>p.Id.Name.Equals("SAMSUNGELECTRONICSCO.LTD.GalaxyBuds",StringComparison.OrdinalIgnoreCase)&&!p.IsFramework);if(package==null)return null;
-                    foreach(string name in new[]{"ic_buds4f_left_dark.png","ic_buds3_left_dark.png","ic_tws_left_dark.png"}){string file=Path.Combine(package.InstalledPath,"Assets","Battery",name);if(!File.Exists(file))continue;shortcutIcon=NativeToastAssets.Image("",new Uri(file).AbsoluteUri,false,96);if(shortcutIcon!=null)return shortcutIcon;}
-                }catch(Exception error){AppLog.Once("buds-shortcut-icon",error.GetType().Name);}return null;
+            string model=Model(name);
+            return model!=null&&model.StartsWith("Buds4",StringComparison.Ordinal)?"ic_buds4f_left_dark.png":model!=null&&model.StartsWith("Buds3",StringComparison.Ordinal)?"ic_buds3_left_dark.png":model!=null?"ic_tws_left_dark.png":"ic_buds_pair_dark.png";
+        }
+        internal static string ConnectedName(ShellController shell){return BudsInfo.IsBuds(shell.Services.OutputName)?shell.Services.OutputName:shell.Buds.ModelName;}
+        internal static ImageSource ShortcutIcon(){return ShortcutIcon(null);}
+        internal static ImageSource ShortcutIcon(string name)
+        {
+            string key=SymbolFile(name);
+            lock(gate)
+            {
+                ImageSource cached;if(symbols.TryGetValue(key,out cached))return cached;
+                try
+                {
+                    if(symbolRoot==null&&DateTime.UtcNow>=shortcutUntil)
+                    {
+                        shortcutUntil=DateTime.UtcNow.AddMinutes(5);
+                        var package=new PackageManager().FindPackagesForUser("").FirstOrDefault(p=>p.Id.Name.Equals("SAMSUNGELECTRONICSCO.LTD.GalaxyBuds",StringComparison.OrdinalIgnoreCase)&&!p.IsFramework);
+                        if(package!=null)symbolRoot=Path.Combine(package.InstalledPath,"Assets","Battery");
+                    }
+                    if(symbolRoot==null)return null;
+                    foreach(string asset in new[]{key,"ic_buds_pair_dark.png"}.Distinct())
+                    {
+                        string file=Path.Combine(symbolRoot,asset);if(!File.Exists(file))continue;
+                        cached=NativeToastAssets.Image("",new Uri(file).AbsoluteUri,false,96);
+                        if(cached!=null){symbols[key]=cached;return cached;}
+                    }
+                }
+                catch(Exception error){AppLog.Once("buds-shortcut-icon",error.GetType().Name);}
+                return null;
             }
         }
         internal static BudsInfo Enrich(BudsInfo info)

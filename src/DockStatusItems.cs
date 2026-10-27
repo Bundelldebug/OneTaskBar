@@ -22,11 +22,11 @@ namespace OneTaskBar
         readonly StackPanel extraStatus=new StackPanel {VerticalAlignment=VerticalAlignment.Center,HorizontalAlignment=HorizontalAlignment.Center};
         string extraStatusKey;
         ImageSource statusBudsIcon;
-        bool statusBudsRequested;
-        async void LoadStatusBuds()
+        string statusBudsModel;
+        async void LoadStatusBuds(string name)
         {
-            statusBudsRequested=true;
-            try{var symbol=await BackgroundWork.Run(BudsDeviceData.ShortcutIcon);if(!closed){statusBudsIcon=symbol;UpdateStatusSymbols();}}
+            string model=BudsDeviceData.SymbolFile(name);statusBudsModel=model;
+            try{var symbol=await BackgroundWork.Run(()=>BudsDeviceData.ShortcutIcon(name));if(!closed&&statusBudsModel==model){statusBudsIcon=symbol;UpdateStatusSymbols();}}
             catch(Exception error){AppLog.Once("status-buds",error.GetType().Name);}
         }
         void UpdateStatusSymbols()
@@ -45,7 +45,8 @@ namespace OneTaskBar
             var keys=DockStatusItems.Clean(Preferences.Current.DockStatusItems);string signature=String.Join("|",keys);bool vertical=DockGeometry.Vertical(Edge);extraStatus.Orientation=vertical?Orientation.Vertical:Orientation.Horizontal;
             if(extraStatusKey!=signature){extraStatusKey=signature;extraStatus.Children.Clear();foreach(string key in keys){var choice=DockStatusItems.Choices.First(c=>c[0]==key);var glyph=new Glyph(choice[1],17){Color=Glass95.DockForeground};var button=Paint.Button(glyph,()=>DockStatusItems.Invoke(key,controller,Status),choice[2]);button.Tag=key;button.Width=24;button.Height=24;button.Padding=new Thickness(0);button.Background=Brushes.Transparent;extraStatus.Children.Add(button);}}
             UpdateStatusSymbols();
-            if(keys.Contains("buds")&&!statusBudsRequested)LoadStatusBuds();
+            string budsName=BudsDeviceData.ConnectedName(controller);
+            if(keys.Contains("buds")&&statusBudsModel!=BudsDeviceData.SymbolFile(budsName))LoadStatusBuds(budsName);
             var grid=(Grid)Status.Surface.Child;if(vertical){grid.RowDefinitions[3].Height=new GridLength(keys.Length*24);extraStatus.Width=38;extraStatus.Height=keys.Length*24;}else grid.ColumnDefinitions[3].Width=new GridLength(keys.Length*24);
             extraStatus.Visibility=keys.Length==0?Visibility.Collapsed:Visibility.Visible;
         }

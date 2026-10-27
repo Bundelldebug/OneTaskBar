@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -24,11 +24,11 @@ namespace OneTaskBar
         internal Brush MediaBackground {get;private set;}
         internal string PlayKind {get{return playGlyph.Kind;}}
         internal string OutputName {get{return device.Text;}}
-        bool budsOutput,deviceIconRequested;ImageSource deviceSymbol;
+        bool budsOutput;string deviceModel;ImageSource deviceSymbol;
         internal bool OutputBudsIcon {get{return deviceGlyph.HasDeviceIcon;}}
         internal void FitWidget(double width,double height){if(!dense)return;if(Modern&&(Math.Abs(widgetWidth-width)>.1||Math.Abs(widgetHeight-height)>.1))modeSet=false;widgetWidth=width;widgetHeight=height;double edge=Math.Min(width-28,height-(Modern?118:86));SetPoster(edge>=120?edge:0);}
         void FitWidgetControls(){if(Modern){FitModernControls();return;}if(!dense||widgetWidth<=0)return;bool narrow=widgetWidth<210;double side=narrow?10:14;Margin=new Thickness(side,Margin.Top,side,Margin.Bottom);PreviousButton.Width=PreviousButton.Height=NextButton.Width=NextButton.Height=narrow?26:30;PlayButton.Margin=new Thickness(narrow?6:24,0,narrow?6:24,0);title.FontSize=narrow?12:13;artist.FontSize=narrow?10:11;device.Visibility=narrow?Visibility.Collapsed:Visibility.Visible;route.ColumnDefinitions[1].Width=narrow?new GridLength(0):new GridLength(1,GridUnitType.Star);header.ColumnDefinitions[2].Width=new GridLength(IsCompact?28:0);}
-        async void LoadDeviceSymbol(){deviceIconRequested=true;try{deviceSymbol=await BackgroundWork.Run(BudsDeviceData.ShortcutIcon);deviceGlyph.SetDeviceIcon(budsOutput?deviceSymbol:null);}catch(Exception error){AppLog.Once("media-device-symbol",error.GetType().Name);}}
+        async void LoadDeviceSymbol(string name){string model=BudsDeviceData.SymbolFile(name);deviceModel=model;try{var image=await BackgroundWork.Run(()=>BudsDeviceData.ShortcutIcon(name));if(deviceModel!=model)return;deviceSymbol=image;deviceGlyph.SetDeviceIcon(budsOutput?deviceSymbol:null);}catch(Exception error){AppLog.Once("media-device-symbol",error.GetType().Name);}}
         internal MediaPlayerView(Action<string> command,Func<double,Task<bool>> seek,Action output,Action collapse=null,bool condensed=false,Action<string> openApp=null,bool dense=false,Func<string,AppEntry> sourceApp=null)
         {
             this.condensed=condensed;this.dense=dense;openApplication=openApp;sourceApplication=sourceApp;Height=dense?106:condensed?128:164;Margin=new Thickness(14,dense?4:condensed?6:12,14,dense?4:condensed?6:12);seekCommand=seek;
@@ -55,7 +55,7 @@ namespace OneTaskBar
             if(modeChanged){usingPoster=poster;Grid.SetRow(header,poster?0:1);Grid.SetRow(route,poster?1:0);header.Width=poster?posterEdge:Double.NaN;header.HorizontalAlignment=poster?HorizontalAlignment.Center:HorizontalAlignment.Stretch;header.Clip=poster?new RectangleGeometry(new Rect(0,0,posterEdge,posterEdge),17,17):null;art.Visibility=poster?Visibility.Collapsed:Visibility.Visible;posterShade.Visibility=poster?Visibility.Visible:Visibility.Collapsed;words.VerticalAlignment=poster?VerticalAlignment.Bottom:VerticalAlignment.Center;words.Margin=poster?new Thickness(13,0,0,12):new Thickness(0,0,5,0);if(poster){Height=posterEdge+(dense?78:124);RowDefinitions[0].Height=new GridLength(posterEdge);RowDefinitions[1].Height=new GridLength(24);header.ColumnDefinitions[0].Width=new GridLength(0);}}
             string key=media.AppId+"|"+media.Title+"|"+media.Artist;if(track!=key){track=key;Motion.Fade(title,.55,1,180);}title.Text=media.Title;artist.Text=media.Artist;
             string output=String.IsNullOrWhiteSpace(outputName)?"오디오 출력":outputName;if(device.Text!=output||device.ToolTip==null){device.Text=output;device.ToolTip="Windows 기본 미디어 출력 · "+device.Text;deviceGlyph.Kind=device.Text.IndexOf("Buds",StringComparison.OrdinalIgnoreCase)>=0||device.Text.IndexOf("헤드",StringComparison.Ordinal)>=0||device.Text.IndexOf("이어",StringComparison.Ordinal)>=0?"headphones":"volume";deviceGlyph.InvalidateVisual();OutputButton.ToolTip=compactOutput.ToolTip="출력 기기 변경 · "+device.Text;}
-            budsOutput=BudsInfo.IsBuds(output);if(budsOutput&&!deviceIconRequested)LoadDeviceSymbol();deviceGlyph.SetDeviceIcon(budsOutput?deviceSymbol:null);
+            budsOutput=BudsInfo.IsBuds(output);if(budsOutput&&deviceModel!=BudsDeviceData.SymbolFile(output))LoadDeviceSymbol(output);deviceGlyph.SetDeviceIcon(budsOutput?deviceSymbol:null);
             if(artwork!=media.Artwork||art.Background==null||modeChanged){artwork=media.Artwork;if(artwork!=null){var brush=new ImageBrush(artwork){Stretch=Stretch.UniformToFill,AlignmentX=AlignmentX.Center,AlignmentY=AlignmentY.Center};brush.Freeze();art.Background=brush;art.Child=null;}else{art.Background=IsCompact?Brushes.Transparent:QuickPanel.Card;art.Child=new Glyph("volume",23);}var palette=ArtworkPalette.Read(media.Artwork);MediaBackground=palette.PlayerSurface(media.Artwork);SetPalette(palette);if(PaletteChanged!=null)PaletteChanged(palette);}
             if(modeChanged){Grid.SetColumnSpan(ArtworkButton,usingPoster?3:1);ArtworkButton.Resources["ButtonRadius"]=new CornerRadius(usingPoster?17:11);}ArtworkButton.Background=usingPoster?art.Background:Brushes.Transparent;
             string stateKind=media.Playing?"pause":"play";if(playGlyph.Kind!=stateKind){playGlyph.Kind=stateKind;playGlyph.InvalidateVisual();}PlayButton.IsEnabled=media.Available&&media.CanPlay;PreviousButton.IsEnabled=media.CanPrevious;NextButton.IsEnabled=media.CanNext;PlayButton.Opacity=PlayButton.IsEnabled?1:.4;PreviousButton.Opacity=PreviousButton.IsEnabled?1:.4;NextButton.Opacity=NextButton.IsEnabled?1:.4;
