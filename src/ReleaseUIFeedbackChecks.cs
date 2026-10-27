@@ -16,6 +16,7 @@ namespace OneTaskBar
         {
             var brush=window.Surface.Background as LinearGradientBrush;
             Require(window.HasBlur&&Native.RealtimeBackdrop(window)&&Native.BlurOpacity(window)>.99,"The displayed material retains its live backdrop");
+            if(window is NotificationWindow){Require(window.Surface.Background==NotificationStyle.Surface,"Notification center uses its translucent capsule palette");return;}
             double opacity=PanelMaterial.ReadablePanel(window)?(window.Dark?PanelMaterial.DarkPanelOpacity:PanelMaterial.LightPanelOpacity)/100.0:.30;Require(brush!=null&&brush.Opacity>.99&&brush.GradientStops.All(s=>Math.Abs(s.Color.A/255.0-opacity)<.003),"The displayed material uses the readable panel palette or the original dock tint for its role");
         }
         internal static void Validate(List<string> checks)

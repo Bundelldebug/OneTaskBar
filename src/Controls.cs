@@ -321,7 +321,7 @@ namespace OneTaskBar
             SizeChanged+=(s,e)=> { if(new WindowInteropHelper(this).Handle!=IntPtr.Zero) Native.Round(this,Radius); };
             Preferences.Changed+=ApplyMaterial;
             MouseMove+=(s,e)=>MoveGlassHighlight(e.GetPosition(Surface));MouseLeave+=(s,e)=>MoveGlassHighlight(new Point(Surface.ActualWidth/2,Surface.ActualHeight/2));
-            Loaded+=(s,e)=>{if(lens==null){var layer=AdornerLayer.GetAdornerLayer(Surface);if(layer!=null){lens=new GlassLens(this);layer.Add(lens);}}ApplyMaterial();if(Program.CaptureReview){ShowInTaskbar=true;var h=new WindowInteropHelper(this).Handle;Native.SetWindowLong(h,-20,(Native.GetWindowLong(h,-20)|0x40000)&~0x80);}};
+            Loaded+=(s,e)=>{if(lens==null){var layer=AdornerLayer.GetAdornerLayer(Surface);if(layer!=null){lens=new GlassLens(this);layer.Add(lens);}}ApplyMaterial();if(Program.CaptureReview){ShowInTaskbar=true;var h=new WindowInteropHelper(this).Handle;Native.SetWindowLong(h,-20,(Native.GetWindowLong(h,-20)|0x40000)&~(0x80|0x08000000));}};
             IsVisibleChanged+=(s,e)=> {if(!IsVisible)HiddenSince=DateTime.UtcNow;};
             Closed+=(s,e)=> {closed=true;++motion;LauncherMotion.Cancel(TransitionContent);CompleteDismissal(false);Preferences.Changed-=ApplyMaterial;};
             PreviewKeyDown+=(s,e)=> { if(e.Key==Key.Escape&&!DragReorder.Active) { Hide(); e.Handled=true; } };
@@ -330,7 +330,7 @@ namespace OneTaskBar
         {
             if(DockSurface)Dark=Glass95.DockDark;else if(!OpaqueSurface)Dark=Glass95.Dark;
             if(lens!=null){lens.Active=Glass95.Enabled&&!OpaqueSurface&&HasBlur&&Preferences.Current.Blur&&!(DockSurface&&DockAppearance.Custom)&&!(this is HudWindow);lens.InvalidateVisual();}
-            if(glassTint==null)return;if(DockSurface&&DockAppearance.Custom){Native.EnableBlur(this,false);Surface.Background=DockAppearance.Background;Surface.BorderBrush=Glass95.Enabled?Glass95.Rim:Brushes.Transparent;Surface.BorderThickness=new Thickness(Glass95.Enabled?.7:0);return;}
+            if(glassTint==null)return;if(DockSurface&&DockAppearance.Custom){Native.EnableBlur(this,false);Surface.Background=DockAppearance.Background;Surface.BorderBrush=Glass95.Enabled&&!DockAppearance.IconsOnly?Glass95.Rim:Brushes.Transparent;Surface.BorderThickness=new Thickness(Glass95.Enabled&&!DockAppearance.IconsOnly?.7:0);return;}
             bool enabled=HasBlur&&Preferences.Current.Blur&&!(DockSurface&&Preferences.Current.DockSolidBackground)&&(!Glass95.Enabled||Glass95.Transparent);Native.EnableBlur(this,enabled);
             bool panel=PanelMaterial.ReadablePanel(this),popup=PanelMaterial.NotificationPopup(this);
             if(this is NotificationWindow){Dark=Glass95.Dark;Surface.Background=enabled?NotificationStyle.Surface:NotificationStyle.Solid;Surface.BorderBrush=Glass95.Enabled?Glass95.Rim:Paint.Brush("#28FFFFFF");Surface.BorderThickness=new Thickness(.7);return;}

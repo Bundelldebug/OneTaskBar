@@ -37,6 +37,7 @@ namespace OneTaskBar
             if(args.Contains("--stop")) { Signal("Stop"); return 0; }
             if(args.Length==2&&args[0]=="--open-panel"&&new[]{"notifications","quick","start","search"}.Contains(args[1])){Signal("Panel-"+args[1]);return 0;}
             if(args.Length==2&&args[0]=="--review-edge"&&new[]{"0","1","2","3"}.Contains(args[1])){Signal("Panel-edge"+args[1]);return 0;}
+            if(args.Length==2&&args[0]=="--review-background"&&new[]{"0","1","2","3"}.Contains(args[1])){Signal("Panel-background"+args[1]);return 0;}
             if(args.Length==3&&args[0]=="--register-notifications")return NotificationIdentity.RegisterHelper(args[1],args[2]);
             if(args.Length>0&&args[0]=="--notification-restart")return NotificationIdentity.RestartHelper(args);
             if(args.Contains("--notification-probe")) { Signal("ProbeNotifications"); return 0; }
