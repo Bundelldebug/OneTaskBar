@@ -11,7 +11,8 @@ namespace OneTaskBar
         readonly List<EventWaitHandle> panelCommands=new List<EventWaitHandle>();
         void RegisterPanelCommands()
         {
-            foreach(string panel in new[]{"notifications","quick","start","search"})
+            var commands=new[]{"notifications","quick","start","search"}.Concat(Program.CaptureReview?new[]{"edge0","edge1","edge2","edge3"}:new string[0]);
+            foreach(string panel in commands)
             {
                 string key=panel;
                 var signal=new EventWaitHandle(false,EventResetMode.AutoReset,@"Local\OneTaskBar.Panel-"+key);
@@ -22,6 +23,7 @@ namespace OneTaskBar
         void OpenPanelCommand(string key)
         {
             if(disposed)return;
+            if(Program.CaptureReview&&key.StartsWith("edge",StringComparison.Ordinal)){Preferences.Current.DockEdge=key[4]-'0';Relayout();return;}
             var dock=docks.FirstOrDefault();
             if(key=="notifications")ToggleNotifications(dock);
             else if(key=="quick")ToggleQuick(dock);

@@ -444,7 +444,7 @@ namespace OneTaskBar
             if(Finder!=null)Finder.HideImmediately();if(Center!=null)Center.Hide();if(Detail!=null)Detail.Hide();
             if(Quick!=null) Quick.Hide();
             var screen=dock!=null ? dock.Screen : Forms.Screen.FromPoint(Forms.Cursor.Position); double scale=dock!=null ? dock.Scale : MonitorScale(screen,Drawer);
-            var layout=LauncherLayout.Fit(screen.Bounds.Width/scale,screen.Bounds.Height/scale);
+            var layout=LauncherLayout.Fit(screen.Bounds,Native.WorkArea(screen),scale,dock!=null?dock.Edge:DockGeometry.Edge);
             Drawer.Search.Text="";Drawer.Configure(layout.Width,layout.Height);Drawer.Reload();Drawer.ShowAt(screen.Bounds,layout.X,layout.Y,layout.Width,layout.Height);Drawer.Pop();Drawer.Activate();Drawer.Search.Focus();
         }
         internal async void ToggleStartButton(DockHost dock)
@@ -462,8 +462,8 @@ namespace OneTaskBar
             foreach(var panel in new GlassWindow[]{Quick,Center,Detail,Drawer,Finder,StartMenu})if(panel!=null)panel.HideImmediately();
             foreach(var host in docks)if(host.MediaBar!=null)host.MediaBar.SetExpanded(false);
             var screen=dock!=null?dock.Screen:Forms.Screen.FromPoint(Forms.Cursor.Position);double scale=dock!=null?dock.Scale:MonitorScale(screen,StartMenu);
-            var fit=StartMenuLayout.Fit(screen.Bounds,Native.WorkArea(screen),scale,620);
-            StartMenu.Configure(fit.Width,fit.Height);StartMenu.Reload();StartMenu.ShowForMonitor(screen,scale);StartMenu.Pop();StartMenu.Activate();StartMenu.Search.Focus();
+            var fit=StartMenuLayout.Fit(screen.Bounds,Native.WorkArea(screen),scale,620,dock!=null?dock.Edge:DockGeometry.Edge);
+            StartMenu.Configure(fit.Width,fit.Height);StartMenu.Reload();StartMenu.ShowForMonitor(screen,scale,dock!=null?dock.Edge:DockGeometry.Edge);StartMenu.Pop();StartMenu.Activate();StartMenu.Search.Focus();
         }
         void EnsureGuard()
         {
@@ -487,7 +487,7 @@ namespace OneTaskBar
             }
             if(Finder==null)Finder=new SearchWindow(this);if(Finder.IsVisible){Finder.Hide();return;}
             foreach(var panel in new GlassWindow[]{Quick,Center,Detail,Drawer,StartMenu})if(panel!=null)panel.HideImmediately();
-            var screen=dock!=null?dock.Screen:Forms.Screen.FromPoint(Forms.Cursor.Position);double scale=dock!=null?dock.Scale:MonitorScale(screen,Finder);var layout=LauncherLayout.Fit(screen.Bounds.Width/scale,screen.Bounds.Height/scale);
+            var screen=dock!=null?dock.Screen:Forms.Screen.FromPoint(Forms.Cursor.Position);double scale=dock!=null?dock.Scale:MonitorScale(screen,Finder);var layout=LauncherLayout.Fit(screen.Bounds,Native.WorkArea(screen),scale,dock!=null?dock.Edge:DockGeometry.Edge);
             Finder.Configure(layout.Width,layout.Height);Finder.Reset();if(!String.IsNullOrEmpty(query)){Finder.Query.Text=query;Finder.Reload();}Finder.ShowAt(screen.Bounds,layout.X,layout.Y,layout.Width,layout.Height);Finder.Pop();Finder.Activate();Finder.Query.Focus();Finder.Query.CaretIndex=Finder.Query.Text.Length;
         }
         internal async void OpenScreenCapture()

@@ -26,7 +26,7 @@ namespace OneTaskBar
         readonly Grid pinHeading,folderHeading;readonly TextBox folderName;readonly Grid recentHeading;
         readonly Button recentMore;bool moreRecent;
         readonly StackPanel body=new StackPanel(),pagination;readonly SmoothScrollViewer bodyScroll;
-        readonly DockPanel launcherRoot;System.Windows.Forms.Screen autoScreen;double autoScale=1,preferredHomeHeight=620;bool fitting;
+        readonly DockPanel launcherRoot;System.Windows.Forms.Screen autoScreen;double autoScale=1,preferredHomeHeight=620;bool fitting;int autoEdge=3;
         internal SmoothScrollViewer ContentScroll {get{return bodyScroll;}}
         internal UniformGrid RecentItems {get{return recent;}}
         internal Button RecentMoreButton {get{return recentMore;}}
@@ -104,10 +104,10 @@ namespace OneTaskBar
             launcherRoot.Measure(new Size(Math.Max(1,Width-phoneColumn.Width.Value-Surface.BorderThickness.Left-Surface.BorderThickness.Right),Double.PositiveInfinity));
             double fourRows=4*(56+3)+recent.Margin.Top+recent.Margin.Bottom;preferredHomeHeight=Math.Max(620,Math.Ceiling(launcherRoot.DesiredSize.Height+Math.Max(0,fourRows-recent.DesiredSize.Height)+Surface.BorderThickness.Top+Surface.BorderThickness.Bottom));launcherRoot.InvalidateMeasure();return preferredHomeHeight;
         }
-        internal void ShowForMonitor(System.Windows.Forms.Screen screen,double scale){autoScreen=screen;autoScale=scale;FitWindow(true);}
+        internal void ShowForMonitor(System.Windows.Forms.Screen screen,double scale,int edge=3){autoScreen=screen;autoScale=scale;autoEdge=edge;FitWindow(true);}
         void FitWindow(bool show)
         {
-            if(fitting||closed||autoScreen==null)return;fitting=true;try{double oldWidth=Width,oldHeight=Height;var work=Native.WorkArea(autoScreen);var limits=StartMenuLayout.Fit(autoScreen.Bounds,work,autoScale,620);Configure(limits.Width,Height);var fit=StartMenuLayout.Fit(autoScreen.Bounds,work,autoScale,PreferredHomeHeight());if(show||Math.Abs(oldWidth-fit.Width)>.1||Math.Abs(oldHeight-fit.Height)>.1){Configure(fit.Width,fit.Height);ShowAt(autoScreen.Bounds,fit.X,fit.Y,fit.Width,fit.Height);}}finally{fitting=false;}
+            if(fitting||closed||autoScreen==null)return;fitting=true;try{double oldWidth=Width,oldHeight=Height;var work=Native.WorkArea(autoScreen);var limits=StartMenuLayout.Fit(autoScreen.Bounds,work,autoScale,620,autoEdge);Configure(limits.Width,Height);var fit=StartMenuLayout.Fit(autoScreen.Bounds,work,autoScale,PreferredHomeHeight(),autoEdge);if(show||Math.Abs(oldWidth-fit.Width)>.1||Math.Abs(oldHeight-fit.Height)>.1){Configure(fit.Width,fit.Height);ShowAt(autoScreen.Bounds,fit.X,fit.Y,fit.Width,fit.Height);}}finally{fitting=false;}
         }
         void FitVisible(){if(IsVisible&&!IsDismissing&&!moreRecent&&openFolder==null)FitWindow(false);}
         async void LoadPhone(bool force=false)
