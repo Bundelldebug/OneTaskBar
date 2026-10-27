@@ -1,4 +1,6 @@
-# 9.0.6 / 9.5.3-beta.1 validation
+# 9.0.7 / 9.5.4-beta.1 validation
+
+- Final pre-publication dock correction: the default dock material has an explicit live-backdrop path, separate from solid/image/icons-only modes. Light mode uses a restrained tonal gradient with 77/255 alpha (about 70% transparency). Icons-only mode keeps the surface empty; white utility/clock ink uses one small shared frozen outline effect, with no window-wide glow or plate behind app icons. Mode switching removes those effects and restores the live backdrop. `DockMaterialChecks` runs inside the desktop behavior fixture across available UI versions, both palettes and material/solid/empty transitions.
 
 - Local beta: all 26 isolated fixtures pass through `tools/Test-UI.ps1 -Area All`. Stable uses the same shared source and skips the glass-only fixture. Reports, screenshots and runtime data stay under ignored `.qa-data/`; release CI reruns the suite on each exact candidate commit.
 - Added coverage: notification capsules and session-only media; folded labels and equal-size toggle circles; model-specific runtime Buds glyphs; retained Start controls and keyboard pulse; four-edge launcher anchoring; icons-only dock material; GPU-local glass bevel sampling; desktop overview preview fade/early-dismiss cleanup; virtual-display passive-surface filtering and empty-desktop recovery; and themed tray PNG/matching/monitor-placement/native-host restoration.

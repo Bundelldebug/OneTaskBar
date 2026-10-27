@@ -4,12 +4,18 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Media.Effects;
 
 namespace OneTaskBar
 {
     internal static class DockAppearance
     {
         static string requested,imageFile,colorKey;static Brush image,solid;static Brush imageInk=Paint.Brush("#FF19221E");static int revision;
+        static readonly Brush lightGlass=LightPanel.Tint("#4DDEE7ED","#4DC4D0D9","#4DD5E1E8");
+        static readonly DropShadowEffect contrast=CreateContrast();
+        static DropShadowEffect CreateContrast(){var effect=new DropShadowEffect {Color=Colors.Black,Opacity=.92,BlurRadius=2.5,ShadowDepth=0,RenderingBias=RenderingBias.Performance};effect.Freeze();return effect;}
+        internal static Effect Readability {get{return IconsOnly?contrast:null;}}
+        internal static Brush Glass {get{return Glass95.DockDark?PanelMaterial.Surface(true,Glass95.Enabled):lightGlass;}}
         internal static bool IconsOnly {get{return Preferences.Current.DockBackgroundKind==3;}}
         internal static int Mode {get{return IconsOnly?3:Preferences.Current.DockBackgroundKind==2?2:Preferences.Current.DockBackgroundKind==1||Preferences.Current.DockSolidBackground?1:0;}}
         internal static bool Custom {get{return IconsOnly||Preferences.Current.DockSolidBackground||Preferences.Current.DockBackgroundKind==1||Preferences.Current.DockBackgroundKind==2;}}
@@ -27,7 +33,7 @@ namespace OneTaskBar
         }
         internal static Brush Foreground
         {
-            get{if(IconsOnly)return Glass95.DockDark?Paint.ControlWhite:Paint.OnLight;if(Preferences.Current.DockBackgroundKind==2&&image!=null&&imageFile==Preferences.Current.DockBackgroundImage)return imageInk;var color=((SolidColorBrush)Solid).Color;return Ink(color.R*.2126+color.G*.7152+color.B*.0722);}
+            get{if(IconsOnly)return Paint.ControlWhite;if(Preferences.Current.DockBackgroundKind==2&&image!=null&&imageFile==Preferences.Current.DockBackgroundImage)return imageInk;var color=((SolidColorBrush)Solid).Color;return Ink(color.R*.2126+color.G*.7152+color.B*.0722);}
         }
         static Brush Ink(double brightness){return Paint.Brush(brightness<145?"#FFF8F9FC":"#FF19221E");}
         static async void Load(string file,int token)
