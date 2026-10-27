@@ -25,7 +25,7 @@ namespace OneTaskBar
         internal static bool Bootstrap(string[] args)
         {
             if(IsCurrent||args.Contains("--identity-activation"))return false;
-            try{var registration=Find();if(!registration.Registered)return false;var allowed=new[]{"--desktop","--logon","--settings","--connect-notifications","--qa"};string forwarded=String.Join(" ",args.Where(a=>allowed.Contains(a)).Concat(new[]{"--identity-activation"}));object instance=Activator.CreateInstance(Type.GetTypeFromCLSID(new Guid("45BA127D-10A8-46EA-8AB7-56EA9078943C")));try{uint pid;((IApplicationActivation)instance).ActivateApplication(registration.AppId,forwarded,0,out pid);}finally{Marshal.ReleaseComObject(instance);}return true;}
+            try{var registration=Find();if(!registration.Registered)return false;var allowed=new[]{"--desktop","--logon","--settings","--connect-notifications","--qa","--review-ui"};string forwarded=String.Join(" ",args.Where(a=>allowed.Contains(a)).Concat(new[]{"--identity-activation"}));object instance=Activator.CreateInstance(Type.GetTypeFromCLSID(new Guid("45BA127D-10A8-46EA-8AB7-56EA9078943C")));try{uint pid;((IApplicationActivation)instance).ActivateApplication(registration.AppId,forwarded,0,out pid);}finally{Marshal.ReleaseComObject(instance);}return true;}
             catch(Exception error){AppLog.Once("identity-startup",error.Message);return false;}
         }
         static string ResultFile(string nonce){return Path.Combine(AppLog.Data,"notification-registration-"+nonce+".json");}

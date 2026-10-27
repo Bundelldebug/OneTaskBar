@@ -34,7 +34,7 @@ namespace OneTaskBar
         readonly Border front=new GlassTileBorder();
         readonly StackPanel content=new StackPanel(),items=new StackPanel();
         readonly Grid header=new Grid();
-        readonly TextBlock label=Paint.TextBlock("",11,Paint.Muted);
+        readonly TextBlock label=Paint.TextBlock("",11,NotificationStyle.Muted);
         readonly Glyph arrow=new Glyph("chevron",13);
         readonly Button expand;Button collapsedButton;
         readonly Dictionary<string,Border> retained=new Dictionary<string,Border>();
@@ -56,11 +56,11 @@ namespace OneTaskBar
         internal NotificationStackView(NotificationStack group,Action<NotificationEntry> onOpen,Action<NotificationEntry> onDismiss,Action<NotificationStack> onClear)
         {
             open=onOpen;dismiss=onDismiss;clear=onClear;Margin=new Thickness(0,4,0,7);
-            front.CornerRadius=new CornerRadius(32);front.Background=QuickPanel.Card;Children.Add(front);front.Child=content;
+            front.CornerRadius=new CornerRadius(32);front.Background=NotificationStyle.Card;Children.Add(front);front.Child=content;front.SizeChanged+=(s,e)=>front.CornerRadius=new CornerRadius(!Expanded&&fullText.Count==0?Math.Min(64,front.ActualHeight/2):28);arrow.Color=NotificationStyle.Muted;
             header.Margin=new Thickness(13,8,8,0);header.Height=28;
             var heading=new StackPanel {Orientation=Orientation.Horizontal};label.VerticalAlignment=VerticalAlignment.Center;heading.Children.Add(label);arrow.Margin=new Thickness(7,0,0,0);heading.Children.Add(arrow);
             expand=Paint.Button(heading,()=>SetExpanded(!Expanded),"앱 알림 펼치기 · 접기");expand.Background=Brushes.Transparent;expand.Padding=new Thickness(0);expand.HorizontalContentAlignment=HorizontalAlignment.Left;expand.HorizontalAlignment=HorizontalAlignment.Stretch;expand.Margin=new Thickness(0,0,30,0);header.Children.Add(expand);
-            var close=Paint.Button(new Glyph("close",12){Color=Paint.Muted},()=>clear(stack),"이 앱의 알림 모두 지우기");close.Background=Brushes.Transparent;close.Width=close.Height=26;close.Padding=new Thickness(6);close.HorizontalAlignment=HorizontalAlignment.Right;header.Children.Add(close);
+            var close=Paint.Button(new Glyph("close",12){Color=NotificationStyle.Muted},()=>clear(stack),"이 앱의 알림 모두 지우기");close.Background=Brushes.Transparent;close.Width=close.Height=26;close.Padding=new Thickness(6);close.HorizontalAlignment=HorizontalAlignment.Right;header.Children.Add(close);
             content.Children.Add(header);content.Children.Add(items);Update(group,false);
         }
         internal void Update(NotificationStack group,bool animate=true)
@@ -95,34 +95,34 @@ namespace OneTaskBar
         {
             if(!Expanded&&!DetailExpanded(entry))return Capsule(entry,grouped);
             var row=new StackPanel();
-            var app=Paint.TextBlock(grouped?entry.Created.LocalDateTime.ToString("H:mm"):entry.App+"  ·  "+entry.Created.LocalDateTime.ToString("H:mm"),10,Paint.Muted);app.TextTrimming=TextTrimming.CharacterEllipsis;row.Children.Add(app);
-            bool full=DetailExpanded(entry);var title=Paint.TextBlock(entry.Title,14,Paint.Text);title.FontWeight=FontWeights.SemiBold;title.TextWrapping=TextWrapping.Wrap;title.MaxHeight=full?Double.PositiveInfinity:44;title.TextTrimming=full?TextTrimming.None:TextTrimming.CharacterEllipsis;title.Margin=new Thickness(0,7,0,4);row.Children.Add(title);
-            TextBlock body=null;if(!String.IsNullOrEmpty(entry.Body)){body=Paint.TextBlock(entry.Body,12,Paint.Text);body.TextWrapping=TextWrapping.Wrap;body.MaxHeight=full?Double.PositiveInfinity:90;body.TextTrimming=full?TextTrimming.None:TextTrimming.CharacterEllipsis;row.Children.Add(body);}
+            var app=Paint.TextBlock(grouped?entry.Created.LocalDateTime.ToString("H:mm"):entry.App+"  ·  "+entry.Created.LocalDateTime.ToString("H:mm"),10,NotificationStyle.Muted);app.TextTrimming=TextTrimming.CharacterEllipsis;row.Children.Add(app);
+            bool full=DetailExpanded(entry);var title=Paint.TextBlock(entry.Title,14,NotificationStyle.Text);title.FontWeight=FontWeights.SemiBold;title.TextWrapping=TextWrapping.Wrap;title.MaxHeight=full?Double.PositiveInfinity:44;title.TextTrimming=full?TextTrimming.None:TextTrimming.CharacterEllipsis;title.Margin=new Thickness(0,7,0,4);row.Children.Add(title);
+            TextBlock body=null;if(!String.IsNullOrEmpty(entry.Body)){body=Paint.TextBlock(entry.Body,12,NotificationStyle.Text);body.TextWrapping=TextWrapping.Wrap;body.MaxHeight=full?Double.PositiveInfinity:90;body.TextTrimming=full?TextTrimming.None:TextTrimming.CharacterEllipsis;row.Children.Add(body);}
             if(entry.Artwork!=null)row.Children.Add(Picture(entry.Artwork,full?240:130));
             var source=CardIcon(entry);var layout=new Grid();layout.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(source!=null?40:0)});layout.ColumnDefinitions.Add(new ColumnDefinition());
             if(source!=null){var icon=AppIcons.Visual(source,32);icon.VerticalAlignment=VerticalAlignment.Top;icon.Margin=new Thickness(0,3,6,0);layout.Children.Add(icon);}Grid.SetColumn(row,1);layout.Children.Add(row);
             var hit=Paint.Button(layout,()=>open(entry),entry.App+" · 원래 알림 동작 열기");hit.Tag=entry.Id;hit.HorizontalContentAlignment=HorizontalAlignment.Stretch;hit.Background=Brushes.Transparent;hit.Padding=new Thickness(13,grouped?8:13,35,14);
-            var frame=new Grid();frame.Children.Add(hit);var close=Paint.Button(new Glyph("close",12){Color=Paint.Muted},()=>dismiss(entry),"알림 지우기");close.Width=close.Height=24;close.Padding=new Thickness(5);close.Background=Brushes.Transparent;close.HorizontalAlignment=HorizontalAlignment.Right;close.VerticalAlignment=VerticalAlignment.Top;close.Margin=new Thickness(0,5,8,0);frame.Children.Add(close);
+            var frame=new Grid();frame.Children.Add(hit);var close=Paint.Button(new Glyph("close",12){Color=NotificationStyle.Muted},()=>dismiss(entry),"알림 지우기");close.Width=close.Height=24;close.Padding=new Thickness(5);close.Background=Brushes.Transparent;close.HorizontalAlignment=HorizontalAlignment.Right;close.VerticalAlignment=VerticalAlignment.Top;close.Margin=new Thickness(0,5,8,0);frame.Children.Add(close);
             var more=DetailToggle(entry,title,body,false);more.VerticalAlignment=VerticalAlignment.Bottom;more.Margin=new Thickness(0,0,7,5);frame.Children.Add(more);hit.Padding=new Thickness(13,grouped?8:13,38,31);
             return new Border {Tag=CardVersion(entry,grouped),Child=frame,Background=Brushes.Transparent,CornerRadius=new CornerRadius(22)};
         }
         Border Capsule(NotificationEntry entry,bool grouped)
         {
-            var source=CardIcon(entry);var layout=new Grid();layout.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(source!=null?53:0)});layout.ColumnDefinitions.Add(new ColumnDefinition());layout.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(grouped?28:12)});
+            var source=CardIcon(entry);var layout=new Grid();layout.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(source!=null?53:0)});layout.ColumnDefinitions.Add(new ColumnDefinition());layout.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength((grouped?28:12)+(entry.Artwork!=null?48:0))});
             if(source!=null){var icon=AppIcons.Visual(source,42);icon.VerticalAlignment=VerticalAlignment.Center;icon.HorizontalAlignment=HorizontalAlignment.Left;layout.Children.Add(icon);}
-            var text=new StackPanel {VerticalAlignment=VerticalAlignment.Center};var heading=new DockPanel();var time=Paint.TextBlock(entry.Created.LocalDateTime.ToString("H:mm"),10,Paint.Muted);time.Margin=new Thickness(8,1,0,0);DockPanel.SetDock(time,Dock.Right);heading.Children.Add(time);var title=Paint.TextBlock(entry.Title,14,Paint.Text);title.FontWeight=FontWeights.SemiBold;title.TextTrimming=TextTrimming.CharacterEllipsis;heading.Children.Add(title);text.Children.Add(heading);
-            TextBlock body=null;if(!String.IsNullOrWhiteSpace(entry.Body)){body=Paint.TextBlock(entry.Body,12,Paint.Text);body.TextWrapping=TextWrapping.Wrap;body.MaxHeight=38;body.TextTrimming=TextTrimming.CharacterEllipsis;body.Margin=new Thickness(0,4,0,0);text.Children.Add(body);}Grid.SetColumn(text,1);layout.Children.Add(text);
-            if(grouped){var count=Paint.TextBlock(Count.ToString(),18,Paint.Muted);count.HorizontalAlignment=HorizontalAlignment.Right;count.Margin=new Thickness(5,0,0,0);Grid.SetColumn(count,2);layout.Children.Add(count);}
-            var summary=new StackPanel();summary.Children.Add(layout);if(entry.Artwork!=null)summary.Children.Add(Picture(entry.Artwork,112));
+            var text=new StackPanel {VerticalAlignment=VerticalAlignment.Center};var heading=new DockPanel();var time=Paint.TextBlock(entry.Created.LocalDateTime.ToString("H:mm"),10,NotificationStyle.Muted);time.Margin=new Thickness(8,1,0,0);DockPanel.SetDock(time,Dock.Right);heading.Children.Add(time);var title=Paint.TextBlock(entry.Title,14,NotificationStyle.Text);title.FontWeight=FontWeights.SemiBold;title.TextTrimming=TextTrimming.CharacterEllipsis;heading.Children.Add(title);text.Children.Add(heading);
+            TextBlock body=null;if(!String.IsNullOrWhiteSpace(entry.Body)){body=Paint.TextBlock(entry.Body,12,NotificationStyle.Text);body.TextWrapping=TextWrapping.Wrap;body.MaxHeight=38;body.TextTrimming=TextTrimming.CharacterEllipsis;body.Margin=new Thickness(0,4,0,0);text.Children.Add(body);}Grid.SetColumn(text,1);layout.Children.Add(text);
+            if(grouped){var count=Paint.TextBlock(Count.ToString(),18,NotificationStyle.Muted);count.HorizontalAlignment=HorizontalAlignment.Right;count.Margin=new Thickness(5,0,0,0);Grid.SetColumn(count,2);layout.Children.Add(count);}
+            if(entry.Artwork!=null){var picture=AppIcons.Visual(entry.Artwork,40);picture.Margin=new Thickness(4,0,grouped?28:0,0);picture.HorizontalAlignment=HorizontalAlignment.Right;Grid.SetColumn(picture,2);layout.Children.Add(picture);}var summary=new StackPanel();summary.Children.Add(layout);
             var hit=Paint.Button(summary,()=>{if(grouped)SetExpanded(true);else open(entry);},grouped?entry.App+" · 알림 "+Count+"개 펼치기":entry.App+" · 원래 알림 동작 열기");hit.Tag=entry.Id;hit.Background=Brushes.Transparent;hit.HorizontalContentAlignment=HorizontalAlignment.Stretch;hit.Padding=new Thickness(16,17,grouped?17:39,17);hit.MinHeight=80;
             var frame=new Grid();frame.Children.Add(hit);if(grouped){collapsedButton=hit;var menu=new ContextMenu();var clearAll=new MenuItem {Header="이 앱의 알림 모두 지우기"};clearAll.Click+=(s,e)=>clear(stack);menu.Items.Add(clearAll);hit.ContextMenu=menu;}
-            else{var close=Paint.Button(new Glyph("close",11){Color=Paint.Muted},()=>dismiss(entry),"알림 지우기");close.Background=Brushes.Transparent;close.Width=close.Height=22;close.Padding=new Thickness(5);close.HorizontalAlignment=HorizontalAlignment.Right;close.VerticalAlignment=VerticalAlignment.Top;close.Margin=new Thickness(0,5,6,0);frame.Children.Add(close);var more=DetailToggle(entry,title,body,true);more.VerticalAlignment=VerticalAlignment.Top;more.Margin=new Thickness(0,31,6,0);frame.Children.Add(more);}
+            else{var close=Paint.Button(new Glyph("close",11){Color=NotificationStyle.Muted},()=>dismiss(entry),"알림 지우기");close.Background=Brushes.Transparent;close.Width=close.Height=22;close.Padding=new Thickness(5);close.HorizontalAlignment=HorizontalAlignment.Right;close.VerticalAlignment=VerticalAlignment.Top;close.Margin=new Thickness(0,5,6,0);frame.Children.Add(close);var more=DetailToggle(entry,title,body,true);more.VerticalAlignment=VerticalAlignment.Top;more.Margin=new Thickness(0,31,6,0);frame.Children.Add(more);}
             return new Border {Tag=CardVersion(entry,grouped),Child=frame,Background=Brushes.Transparent,CornerRadius=new CornerRadius(32)};
         }
         static Image Picture(ImageSource source,double height){return new Image {Source=source,Height=height,Stretch=Stretch.Uniform,Margin=new Thickness(0,9,0,0)};}
         Button DetailToggle(NotificationEntry entry,TextBlock title,TextBlock body,bool singleLine)
         {
-            bool full=DetailExpanded(entry);var glyph=new Glyph("chevron",13){RenderTransformOrigin=new Point(.5,.5),RenderTransform=new RotateTransform(full?-90:90)};
+            bool full=DetailExpanded(entry);var glyph=new Glyph("chevron",13){Color=NotificationStyle.Muted,RenderTransformOrigin=new Point(.5,.5),RenderTransform=new RotateTransform(full?-90:90)};
             var button=Paint.Button(glyph,()=>SetDetail(entry,!DetailExpanded(entry)),full?"알림 내용 접기":"알림 내용 모두 펼치기");button.Background=Brushes.Transparent;button.Width=button.Height=27;button.Padding=new Thickness(6);button.HorizontalAlignment=HorizontalAlignment.Right;
             System.Windows.Automation.AutomationProperties.SetName(button,full?"알림 내용 접기":"알림 내용 모두 펼치기");detailButtons[NotificationStack.ItemKey(entry)]=button;
             Action update=()=>button.Visibility=full||entry.Artwork!=null||Clipped(title,singleLine)||body!=null&&Clipped(body,false)?Visibility.Visible:Visibility.Collapsed;

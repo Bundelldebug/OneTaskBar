@@ -47,3 +47,5 @@ Compare matching media, monitor and visible-panel states. `totalWorkingSetMiB` i
 - UI 9.5 changes glass material, not the established filled volume/brightness slider shape. Preserve 1×1 circles, pill buttons and the 8.5/9.0 switch.
 - Notification images remain native resolution up to 256 px; evict inactive app caches. Current-video artwork consent must remain scoped to the authorized track.
 - A normal restart/install and published asset verification are separate from fixture success. Preserve settings and use exact tested CI bytes for releases; do not overwrite existing release tags or assets.
+
+UI review: launch the installed app with --desktop --review-ui, then use --open-panel notifications|quick|start|search. Review mode exposes owned surfaces to the capture tool; restart without --review-ui afterward. Normal sessions and fixtures retain hidden tool windows.

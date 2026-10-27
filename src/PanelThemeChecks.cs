@@ -36,7 +36,7 @@ namespace OneTaskBar
         }
         static void Surface(GlassWindow window,bool dark)
         {
-            Require(window.Dark==dark,"window material follows its selected panel mode");Brush expected=window.HasBlur&&Preferences.Current.Blur?PanelMaterial.PanelSurface(dark,Glass95.Enabled):PanelMaterial.Solid(dark);Require(window.Surface.Background==expected,"the real displayed surface uses the shared panel palette");if(window.HasBlur)Require(Native.RealtimeBackdrop(window),"live blur remains available under the new tint");
+            Require(window.Dark==dark,"window material follows its selected panel mode");bool blur=window.HasBlur&&Preferences.Current.Blur;Brush expected=window is NotificationWindow?(blur?NotificationStyle.Surface:NotificationStyle.Solid):blur?PanelMaterial.PanelSurface(dark,Glass95.Enabled):PanelMaterial.Solid(dark);Require(window.Surface.Background==expected,"the displayed surface uses its selected panel palette");if(window.HasBlur)Require(Native.RealtimeBackdrop(window),"live blur remains available under the new tint");
         }
         static void ClosePanels(ShellController shell){if(shell.Quick!=null)shell.Quick.Close();if(shell.Center!=null)shell.Center.Close();if(shell.StartMenu!=null)shell.StartMenu.Close();if(shell.Drawer!=null)shell.Drawer.Close();if(shell.Finder!=null)shell.Finder.Close();shell.Quick=null;shell.Center=null;shell.StartMenu=null;shell.Drawer=null;shell.Finder=null;}
         static void OpenPanels(ShellController shell,System.Windows.Forms.Screen screen)
