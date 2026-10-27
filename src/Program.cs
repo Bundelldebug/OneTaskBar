@@ -35,7 +35,7 @@ namespace OneTaskBar
             CaptureReview=args.Contains("--review-ui");Inspectable=CaptureReview||args.Contains("--qa")||File.Exists(Path.Combine(AppLog.Data,"ui-inspection.flag"));
             if(args.Length>0 && args[0]=="--guard") { Guard(args); return 0; }
             if(args.Contains("--stop")) { Signal("Stop"); return 0; }
-            if(args.Length==2&&args[0]=="--open-panel"&&new[]{"notifications","quick","start","search"}.Contains(args[1])){Signal("Panel-"+args[1]);return 0;}
+            if(args.Length==2&&args[0]=="--open-panel"&&new[]{"notifications","quick","start","search","desktops"}.Contains(args[1])){Signal("Panel-"+args[1]);return 0;}
             if(args.Length==2&&args[0]=="--review-edge"&&new[]{"0","1","2","3"}.Contains(args[1])){Signal("Panel-edge"+args[1]);return 0;}
             if(args.Length==2&&args[0]=="--review-background"&&new[]{"0","1","2","3"}.Contains(args[1])){Signal("Panel-background"+args[1]);return 0;}
             if(args.Length==3&&args[0]=="--register-notifications")return NotificationIdentity.RegisterHelper(args[1],args[2]);
@@ -70,6 +70,7 @@ namespace OneTaskBar
             if(args.Contains("--deferred-icon-probe"))return DeferredIconChecks.Run();
             if(args.Contains("--settings-visibility-probe"))return SettingsVisibilityChecks.Run();
             if(args.Contains("--window-switcher-probe"))return WindowSwitcherChecks.Run(args.Contains("--inspect"));
+            if(args.Contains("--desktop-overview-probe"))return DesktopOverviewChecks.Run(args.Contains("--inspect"));
             if(args.Contains("--window-activation-probe"))return WindowActivationChecks.Run();
             if(args.Contains("--startup-probe"))return StartupChecks.Run();
             if(args.Contains("--startup-registration-probe"))return LogonStartup.ProbeRegistration();

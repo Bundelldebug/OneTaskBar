@@ -20,6 +20,23 @@ namespace OneTaskBar
         internal static bool Toggle(bool notifications)
         {return Shortcut((ushort)(notifications?0x4e:0x41));}
         internal static bool TaskView(){return Shortcut(0x09);}
+        internal static bool DesktopCommand(int steps,int operation)
+        {
+            if(operation<0||operation>2||Math.Abs(steps)>256)return false;
+            for(int i=0;i<50&&ModifiersHeld();i++)Thread.Sleep(20);
+            if(ModifiersHeld())return false;
+            if(operation==1)return DesktopChord(0x44);
+            for(int i=0;i<Math.Abs(steps);i++){if(!DesktopChord((ushort)(steps<0?0x25:0x27)))return false;Thread.Sleep(140);}
+            return operation!=2||DesktopChord(0x73);
+        }
+        static bool DesktopChord(ushort key)
+        {
+            if(ModifiersHeld())return false;
+            var inputs=new[]{Key(0x5b,1),Key(0x11,0),Key(key,0),Key(key,2),Key(0x11,2),Key(0x5b,3)};
+            uint sent=SendInput(6,inputs,Marshal.SizeOf(typeof(Input)));
+            if(sent>0&&sent<6)SendInput(3,new[]{Key(key,2),Key(0x11,2),Key(0x5b,3)},Marshal.SizeOf(typeof(Input)));
+            return sent==6;
+        }
         internal static bool Start()
         {
             // Ctrl+Esc is Windows' native Start shortcut and bypasses solo-Win remapping.

@@ -28,7 +28,7 @@ namespace OneTaskBar
         internal static Brush Field {get{return SystemParameters.HighContrast?SystemColors.WindowBrush:field;}}
         internal static Brush FieldStroke {get{return SystemParameters.HighContrast?SystemColors.WindowTextBrush:stroke;}}
         internal static Brush Focus {get{return SystemParameters.HighContrast?SystemColors.HighlightBrush:focus;}}
-        internal static bool ReadablePanel(Window window){return window is QuickWindow||window is NotificationWindow||window is DetailWindow||window is CalendarWindow||window is StartWindow||window is SearchWindow||window is DrawerWindow;}
+        internal static bool ReadablePanel(Window window){return window is DesktopOverview||window is QuickWindow||window is NotificationWindow||window is DetailWindow||window is CalendarWindow||window is StartWindow||window is SearchWindow||window is DrawerWindow;}
         internal static bool NotificationPopup(Window window){return window is NotificationBanner||window is NotificationConnectWindow||window is BudsConnectionPopup||window is WindowSwitcherView;}
         internal static Brush PopupSurface(bool dark)
         {

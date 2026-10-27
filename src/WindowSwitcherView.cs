@@ -19,8 +19,9 @@ namespace OneTaskBar
         [DllImport("dwmapi.dll")]static extern int DwmQueryThumbnailSourceSize(IntPtr thumbnail,out SizeI size);
         [DllImport("dwmapi.dll")]static extern int DwmUpdateThumbnailProperties(IntPtr thumbnail,ref Properties properties);
         [DllImport("dwmapi.dll")]static extern int DwmSetWindowAttribute(IntPtr window,int attribute,ref int value,int size);
-        readonly IntPtr source,owner;IntPtr thumbnail;bool closed;
+        readonly IntPtr source,owner;IntPtr thumbnail;bool closed;byte previewOpacity=255;
         internal bool Registered {get{return thumbnail!=IntPtr.Zero;}}
+        internal void SetPreviewOpacity(byte value){previewOpacity=value;}
         internal SwitchThumbnail(SwitchItem item,IntPtr parent,Action hover,Action click,Action<int> navigate)
         {
             source=item.Window;owner=parent;Title="One TaskBar · 전환 미리보기";WindowStyle=WindowStyle.None;ResizeMode=ResizeMode.NoResize;ShowInTaskbar=false;ShowActivated=false;Topmost=true;AllowsTransparency=false;Background=Paint.Brush("#FF4D5656");Content=AppIcons.Visual(item.App,38);Cursor=Cursors.Hand;
@@ -34,7 +35,7 @@ namespace OneTaskBar
         }
         void Update(int width,int height)
         {
-            if(thumbnail==IntPtr.Zero)return;SizeI size;if(DwmQueryThumbnailSourceSize(thumbnail,out size)!=0||size.Width<=0||size.Height<=0)return;double scale=Math.Min(width/(double)size.Width,height/(double)size.Height),w=size.Width*scale,h=size.Height*scale;var properties=new Properties {Flags=1|4|8|16,Destination=new Native.RectI {Left=(int)Math.Round((width-w)/2),Top=(int)Math.Round((height-h)/2),Right=(int)Math.Round((width+w)/2),Bottom=(int)Math.Round((height+h)/2)},Opacity=255,Visible=true,ClientOnly=true};DwmUpdateThumbnailProperties(thumbnail,ref properties);
+            if(thumbnail==IntPtr.Zero)return;SizeI size;if(DwmQueryThumbnailSourceSize(thumbnail,out size)!=0||size.Width<=0||size.Height<=0)return;double scale=Math.Min(width/(double)size.Width,height/(double)size.Height),w=size.Width*scale,h=size.Height*scale;var properties=new Properties {Flags=1|4|8|16,Destination=new Native.RectI {Left=(int)Math.Round((width-w)/2),Top=(int)Math.Round((height-h)/2),Right=(int)Math.Round((width+w)/2),Bottom=(int)Math.Round((height+h)/2)},Opacity=previewOpacity,Visible=true,ClientOnly=true};DwmUpdateThumbnailProperties(thumbnail,ref properties);
         }
         void Release(){if(thumbnail!=IntPtr.Zero){DwmUnregisterThumbnail(thumbnail);thumbnail=IntPtr.Zero;}}
     }
