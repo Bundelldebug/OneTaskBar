@@ -45,6 +45,13 @@ namespace OneTaskBar
         [DllImport("gdi32.dll")]static extern bool PtInRegion(IntPtr region,int x,int y);
         [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr window, int attr, ref int value, int size);
         [DllImport("dwmapi.dll")] static extern int DwmExtendFrameIntoClientArea(IntPtr window, ref Margins margins);
+        internal static bool ClearPreviewBackground(Window window)
+        {
+            var handle=new WindowInteropHelper(window).Handle;var source=HwndSource.FromHwnd(handle);
+            if(source!=null)source.CompositionTarget.BackgroundColor=Colors.Transparent;
+            var margins=new Margins {Left=-1,Right=-1,Top=-1,Bottom=-1};
+            return DwmExtendFrameIntoClientArea(handle,ref margins)>=0;
+        }
         [DllImport("dwmapi.dll")] internal static extern int DwmGetWindowAttribute(IntPtr window, int attr, out int value, int size);
         [DllImport("kernel32.dll")] internal static extern bool GetSystemPowerStatus(out PowerStatus status);
         [DllImport("user32.dll")] internal static extern IntPtr RegisterPowerSettingNotification(IntPtr window, ref Guid setting, uint flags);
@@ -104,14 +111,15 @@ namespace OneTaskBar
         internal static int RefractedRegions(Window window){RegionState state;return regions.TryGetValue(window,out state)&&state.Backdrop!=null?state.Backdrop.RefractedRegions:0;}
         internal static void BlurOpacity(Window window,double value){RegionState state;if(regions.TryGetValue(window,out state)&&state.Backdrop!=null)state.Backdrop.SetOpacity(value);}
         internal static double BlurOpacity(Window window){RegionState state;return regions.TryGetValue(window,out state)&&state.Backdrop!=null?state.Backdrop.Opacity:0;}
-        internal static void EnsureDockVisible(Window window)
+        internal static void EnsureDockVisible(Window window,bool raise=false)
         {
             // Explorer can hide or minimize an HWND without changing WPF Visibility.
             // Restore only a dock that its controller already intends to display.
             var handle=new WindowInteropHelper(window).Handle;if(handle==IntPtr.Zero)return;
             if(!window.IsVisible)window.Show();
             if(!IsWindowVisible(handle)||IsIconic(handle))ShowWindow(handle,4);
-            if((GetWindowLong(handle,-20)&8)==0)SetWindowPos(handle,new IntPtr(-1),0,0,0,0,0x53);
+            if(raise){var owner=GetWindow(handle,4);if(owner!=IntPtr.Zero)SetWindowPos(owner,new IntPtr(-1),0,0,0,0,0x53);}
+            if(raise||(GetWindowLong(handle,-20)&8)==0)SetWindowPos(handle,new IntPtr(-1),0,0,0,0,0x53);
             RegionState state;if(regions.TryGetValue(window,out state)&&state.Backdrop!=null)state.Backdrop.EnsureDockVisible();
         }
         internal static double PrepareMonitor(Window window,System.Drawing.Rectangle screen)
@@ -330,7 +338,8 @@ namespace OneTaskBar
         [DllImport("user32.dll")] static extern IntPtr CallNextHookEx(IntPtr hook,int code,IntPtr message,IntPtr info);
         [DllImport("kernel32.dll",CharSet=CharSet.Unicode)] static extern IntPtr GetModuleHandle(string module);
         readonly Hook callback; IntPtr handle;
-        public bool Enabled; public Func<int,bool> OnKey;internal Func<bool> InterceptStart,InterceptAltTab;internal Action OnStart;internal readonly WindowSwitchGesture AltTabGesture=new WindowSwitchGesture();
+        public bool Enabled; public Func<int,bool> OnKey;internal Func<bool> InterceptStart,InterceptAltTab,InterceptTaskView;internal Action OnStart,OnNativeStart,OnTaskView;internal readonly WindowSwitchGesture AltTabGesture=new WindowSwitchGesture();
+        readonly TaskViewGesture taskView=new TaskViewGesture();
         readonly StartKeyGesture start=new StartKeyGesture();
         int bufferedWin,nativeWins;
         [DllImport("user32.dll")]static extern short GetAsyncKeyState(int key);
@@ -343,13 +352,15 @@ namespace OneTaskBar
                 bool down=message==new IntPtr(0x100)||message==new IntPtr(0x104),up=message==new IntPtr(0x101)||message==new IntPtr(0x105);
                 if(down||up)try{uint flags=(uint)Marshal.ReadInt32(info,8);bool alt=(flags&0x20)!=0||(GetAsyncKeyState(0x12)&0x8000)!=0,ctrl=(GetAsyncKeyState(0x11)&0x8000)!=0,shift=(GetAsyncKeyState(0x10)&0x8000)!=0,win=(GetAsyncKeyState(0x5b)&0x8000)!=0||(GetAsyncKeyState(0x5c)&0x8000)!=0;if(AltTabGesture.Observe(key,down,Enabled&&InterceptAltTab!=null&&InterceptAltTab(),alt,ctrl,shift,win,(flags&0x10)!=0))return new IntPtr(1);}catch(Exception error){AppLog.Once("switcher-key",error.GetType().Name);}
                 if(down||up){bool modifiers=(GetAsyncKeyState(0x10)&0x8000)!=0||(GetAsyncKeyState(0x11)&0x8000)!=0||(GetAsyncKeyState(0x12)&0x8000)!=0;
-                    bool intercept=Enabled&&InterceptStart!=null&&InterceptStart(),invoke=start.Observe(key,down,intercept,modifiers),win=key==0x5b||key==0x5c;
+                    bool interceptStart=Enabled&&InterceptStart!=null&&InterceptStart(),interceptTask=Enabled&&InterceptTaskView!=null&&InterceptTaskView();
+                    bool open;if(taskView.Observe(key,down,bufferedWin,interceptTask,modifiers,(Marshal.ReadInt32(info,8)&0x10)!=0,out open)){if(open){start.Observe(bufferedWin,false,false,false);bufferedWin=0;if(OnTaskView!=null)OnTaskView();}return new IntPtr(1);}
+                    bool intercept=interceptStart||interceptTask,invoke=start.Observe(key,down,interceptStart,modifiers),win=key==0x5b||key==0x5c;
                     int winBit=key==0x5b?1:key==0x5c?2:0;
                     // Keep a solo Win press entirely out of Explorer. Cancelling its action
                     // at key-up is too late: shell/customizer dimming has already started.
                     if(win&&down&&bufferedWin==key)return new IntPtr(1);
                     if(win&&down&&bufferedWin==0&&(nativeWins&winBit)==0&&intercept&&!modifiers){bufferedWin=key;return new IntPtr(1);}
-                    if(win&&up&&bufferedWin==key){bufferedWin=0;if(invoke&&OnStart!=null)OnStart();return new IntPtr(1);}
+                    if(win&&up&&bufferedWin==key){bufferedWin=0;if(invoke&&OnStart!=null)OnStart();else if(!interceptStart&&OnNativeStart!=null)OnNativeStart();return new IntPtr(1);}
                     if(down&&bufferedWin!=0){int held=bufferedWin;bufferedWin=0;if(SystemPanels.ForwardStartChord((ushort)held,(ushort)key,(ushort)Marshal.ReadInt32(info,4),(uint)Marshal.ReadInt32(info,8))){nativeWins|=held==0x5b?1:2;nativeWins|=winBit;return new IntPtr(1);}}
                     if(win){if(down)nativeWins|=winBit;else nativeWins&=~winBit;}
                 }

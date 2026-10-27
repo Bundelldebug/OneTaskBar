@@ -20,18 +20,36 @@ namespace OneTaskBar
         [DllImport("dwmapi.dll")]static extern int DwmUpdateThumbnailProperties(IntPtr thumbnail,ref Properties properties);
         [DllImport("dwmapi.dll")]static extern int DwmSetWindowAttribute(IntPtr window,int attribute,ref int value,int size);
         readonly IntPtr source,owner;IntPtr thumbnail;bool closed;byte previewOpacity=255;
+        int lastX=Int32.MinValue,lastY,lastWidth,lastHeight;
+        internal int PositionChanges {get;private set;}
+        internal bool ClearBackground {get;private set;}
         internal bool Registered {get{return thumbnail!=IntPtr.Zero;}}
-        internal void SetPreviewOpacity(byte value){previewOpacity=value;}
+        internal void SetPreviewOpacity(byte value)
+        {
+            if(previewOpacity==value)return;previewOpacity=value;
+            if(thumbnail==IntPtr.Zero)return;
+            var properties=new Properties {Flags=4,Opacity=value};DwmUpdateThumbnailProperties(thumbnail,ref properties);
+        }
         internal SwitchThumbnail(SwitchItem item,IntPtr parent,Action hover,Action click,Action<int> navigate)
         {
-            source=item.Window;owner=parent;Title="One TaskBar · 전환 미리보기";WindowStyle=WindowStyle.None;ResizeMode=ResizeMode.NoResize;ShowInTaskbar=false;ShowActivated=false;Topmost=true;AllowsTransparency=false;Background=Paint.Brush("#FF4D5656");Content=AppIcons.Visual(item.App,38);Cursor=Cursors.Hand;
+            source=item.Window;owner=parent;Title="One TaskBar · 전환 미리보기";WindowStyle=WindowStyle.None;ResizeMode=ResizeMode.NoResize;ShowInTaskbar=false;ShowActivated=false;Topmost=true;AllowsTransparency=false;Background=Brushes.Transparent;Content=AppIcons.Visual(item.App,38);Cursor=Cursors.Hand;
+            SourceInitialized+=(s,e)=>ClearBackground=Native.ClearPreviewBackground(this);
             SourceInitialized+=(s,e)=>{var handle=new WindowInteropHelper(this).Handle;new WindowInteropHelper(this).Owner=owner;Native.SetWindowLong(handle,-20,(Native.GetWindowLong(handle,-20)|0x80|0x08000000)&~0x40000);Native.SetWindowLong(handle,-16,Native.GetWindowLong(handle,-16)|0x40000);int corner=2;DwmSetWindowAttribute(handle,33,ref corner,4);HwndSource.FromHwnd(handle).AddHook((IntPtr window,int message,IntPtr wp,IntPtr lp,ref bool handled)=>{if(message==0x83){handled=true;return IntPtr.Zero;}if(message==0x21){handled=true;return new IntPtr(3);}if(message==0x84){handled=true;return new IntPtr(1);}return IntPtr.Zero;});};
             MouseMove+=(s,e)=>hover();MouseLeftButtonUp+=(s,e)=>{e.Handled=true;click();};MouseWheel+=(s,e)=>{navigate(e.Delta>0?0x25:0x27);e.Handled=true;};Closed+=(s,e)=>{closed=true;Release();};
         }
         internal void Place(FrameworkElement anchor)
         {
-            if(closed||anchor.ActualWidth<1||anchor.ActualHeight<1)return;var p=anchor.PointToScreen(new Point());var dpi=VisualTreeHelper.GetDpi(anchor).DpiScaleX;int width=Math.Max(1,(int)Math.Round(anchor.ActualWidth*dpi)),height=Math.Max(1,(int)Math.Round(anchor.ActualHeight*dpi));var handle=new WindowInteropHelper(this).EnsureHandle();Native.SetWindowPos(handle,new IntPtr(-1),(int)Math.Round(p.X),(int)Math.Round(p.Y),width,height,0x10);if(!IsVisible)Show();Native.SetWindowPos(handle,new IntPtr(-1),(int)Math.Round(p.X),(int)Math.Round(p.Y),width,height,0x10);
-            if(thumbnail==IntPtr.Zero&&DwmRegisterThumbnail(handle,source,out thumbnail)==0)Content=null;Update(width,height);
+            if(closed||anchor.ActualWidth<1||anchor.ActualHeight<1)return;
+            var point=anchor.PointToScreen(new Point());var dpi=VisualTreeHelper.GetDpi(anchor).DpiScaleX;
+            int x=(int)Math.Round(point.X),y=(int)Math.Round(point.Y),width=Math.Max(1,(int)Math.Round(anchor.ActualWidth*dpi)),height=Math.Max(1,(int)Math.Round(anchor.ActualHeight*dpi));
+            if(IsVisible&&thumbnail!=IntPtr.Zero&&x==lastX&&y==lastY&&width==lastWidth&&height==lastHeight)return;
+            bool resized=width!=lastWidth||height!=lastHeight;
+            var handle=new WindowInteropHelper(this).EnsureHandle();
+            Native.SetWindowPos(handle,new IntPtr(-1),x,y,width,height,0x10);
+            if(!IsVisible){Show();Native.SetWindowPos(handle,new IntPtr(-1),x,y,width,height,0x10);}
+            PositionChanges++;lastX=x;lastY=y;lastWidth=width;lastHeight=height;
+            if(thumbnail==IntPtr.Zero&&DwmRegisterThumbnail(handle,source,out thumbnail)==0){Content=null;resized=true;}
+            if(resized)Update(width,height);
         }
         void Update(int width,int height)
         {

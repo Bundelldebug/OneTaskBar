@@ -324,7 +324,7 @@ namespace OneTaskBar
             Loaded+=(s,e)=>{if(lens==null){var layer=AdornerLayer.GetAdornerLayer(Surface);if(layer!=null){lens=new GlassLens(this);layer.Add(lens);}}ApplyMaterial();if(Program.CaptureReview){ShowInTaskbar=true;var h=new WindowInteropHelper(this).Handle;Native.SetWindowLong(h,-20,(Native.GetWindowLong(h,-20)|0x40000)&~(0x80|0x08000000));}};
             IsVisibleChanged+=(s,e)=> {if(!IsVisible)HiddenSince=DateTime.UtcNow;};
             Closed+=(s,e)=> {closed=true;++motion;LauncherMotion.Cancel(TransitionContent);CompleteDismissal(false);Preferences.Changed-=ApplyMaterial;};
-            PreviewKeyDown+=(s,e)=> { if(e.Key==Key.Escape&&!DragReorder.Active) { Hide(); e.Handled=true; } };
+            PreviewKeyDown+=(s,e)=> { if(e.Key==Key.Escape&&!DragReorder.Active) {var overview=this as DesktopOverview;if(overview!=null)overview.Dismiss();else Hide(); e.Handled=true; } };
         }
         void ApplyMaterial()
         {

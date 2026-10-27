@@ -224,7 +224,8 @@ namespace OneTaskBar
             bool hidden=!Apps.IsVisible;visible=value;if(hidden){reveal=0;foreach(var w in new[]{Start,Apps,Status}){w.Opacity=0;Native.BlurOpacity(w,0);w.Show();}}
             revealFrom=reveal;revealTarget=value?1:0;revealDuration=value?230:160;visibilityWatch.Restart();visibilityTimer.Start();ApplyReveal();
         }
-        void EnsureVisibleWindows(){foreach(var window in new[]{Start,Apps,Status})Native.EnsureDockVisible(window);}
+        void EnsureVisibleWindows(bool raise=false){foreach(var window in new[]{Start,Apps,Status})Native.EnsureDockVisible(window,raise);}
+        DateTime desktopRaiseAt;
         void ApplyReveal()
         {
             foreach(var w in new[]{Start,Apps,Status}){w.Opacity=reveal;w.Surface.IsHitTestVisible=visible&&reveal>.1;Native.BlurOpacity(w,reveal);}PlaceFrame();
@@ -247,12 +248,12 @@ namespace OneTaskBar
         {
             if(closed||!autoHide||fullScreen||!controller.DisplayAwake)return;interactionUntil=DateTime.UtcNow.AddMilliseconds(1200);if(revealEdge!=null)revealEdge.Show(false);AnimateAutoHide(true);Refresh(controller.Power);QueueHide();
         }
-        internal void UpdateVisibility(bool obscured,bool automatic)
+        internal void UpdateVisibility(bool obscured,bool automatic,bool desktopIdle=false)
         {
             if(closed)return;bool changed=autoHide!=automatic;fullScreen=obscured;autoHide=automatic;if(changed){workAreaAt=DateTime.MinValue;if(ready)Rebuild();}
             if(!autoHide&&revealEdge!=null){revealEdge.Dispose();revealEdge=null;}
             if(fullScreen){hideDelay.Stop();SetVisible(false);if(revealEdge!=null)revealEdge.Show(false);return;}
-            if(!autoHide){hideDelay.Stop();SetVisible(true);return;}
+            if(!autoHide){hideDelay.Stop();SetVisible(true);if(desktopIdle&&DateTime.UtcNow>=desktopRaiseAt){desktopRaiseAt=DateTime.UtcNow.AddSeconds(2);EnsureVisibleWindows(true);}return;}
             if(revealEdge==null)revealEdge=new DockRevealEdge(Screen.Bounds,Reveal,Edge);
             if(visible&&!visibilityTimer.IsEnabled)EnsureVisibleWindows();revealEdge.Show(!visible);QueueHide();
         }
