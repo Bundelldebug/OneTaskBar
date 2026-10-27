@@ -4,6 +4,11 @@ namespace OneTaskBar
     internal sealed class LauncherLayout
     {
         internal double X,Y,Width,Height;
+        internal static LauncherLayout Fit(System.Drawing.Rectangle screen,Native.RectI work,double scale,int edge)
+        {
+            var value=LauncherPlacement.Fit(screen,work,scale,720,680,edge);
+            return new LauncherLayout {X=value.X,Y=value.Y,Width=value.Width,Height=value.Height};
+        }
         internal static LauncherLayout Fit(double width,double height)
         {
             double w=Math.Min(720,Math.Max(1,width-32)),h=Math.Min(680,Math.Max(1,height-100));
