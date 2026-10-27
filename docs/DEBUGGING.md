@@ -31,7 +31,7 @@ Use this routing table before reading source. The probe runner prints one result
 | Alt+Tab does not raise an existing active app | `WindowSwitcherManager.cs`, `WindowActivation.cs` | Dock / `window-activation-probe` |
 | Search order, recent chips or keyboard focus | `SearchWindow.cs`, `SearchNavigation.cs`, `LauncherInputChecks.cs` | Launcher |
 | Settings blank, search empty strips, version label | `SettingsWindow.cs`, `SettingsPages.cs`, `UIVersionPicker.cs` | Settings |
-| Dock zoom, compact clock, scaled click/popup placement | `DockSizing.cs`, `DockClock.cs`, `DockGeometry.cs` | Settings / `beta-feedback-probe`, `DockSizingChecks` |
+| Dock zoom, compact clock, scaled click/popup placement | `DockSizing.cs`, `DockClock.cs`, `DockGeometry.cs`, `NowBarLayout.cs` | Settings / `beta-feedback-probe`, `DockSizingChecks`; Dock / `tray-overflow-probe` preserves real DPI while scaling anchor gaps |
 | Linked panel color or settings transition residue | `PanelTint.cs`, `SettingsPageMotion.cs` | `panel-theme-probe`, `settings-visibility-probe` |
 | Notification logo, image, action or stale cache | `NotificationService.cs`, `NotificationIcons.cs`, `NativeToastAssets.cs` | Notifications; `self-test` includes asset/cache checks |
 | Login delay, idle resource growth | `Startup.cs`, `Shell.cs`, `RuntimeCadence.cs`, `MemoryChecks.cs` | Startup; Resources |

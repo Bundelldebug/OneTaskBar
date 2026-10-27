@@ -150,18 +150,21 @@ namespace OneTaskBar
         internal readonly System.Drawing.Rectangle Monitor;
         internal readonly double Scale;
         internal readonly int Edge;
-        internal TrayPlacement(System.Windows.Point anchor,System.Drawing.Rectangle monitor,double scale,int edge=3)
+        readonly double dockHalfExtent;
+        internal TrayPlacement(System.Windows.Point anchor,System.Drawing.Rectangle monitor,double scale,int edge=3,double dockHalfExtent=22)
         {
             Anchor=new Native.PointI {X=(int)Math.Round(anchor.X),Y=(int)Math.Round(anchor.Y)};Monitor=monitor;Scale=Math.Max(1,scale);Edge=edge;
+            this.dockHalfExtent=dockHalfExtent;
         }
         internal Native.PointI Target(int width,int height)
         {
             int inset=(int)Math.Round(8*Scale),gap=inset;
             int minX=Monitor.Left+inset,minY=Monitor.Top+inset;
             int x=Anchor.X-width/2,y=Anchor.Y-height-gap;
-            if(Edge==0){x=Anchor.X+(int)Math.Round(22*Scale)+gap;y=Anchor.Y-height/2;}
-            else if(Edge==2){x=Anchor.X-width-(int)Math.Round(22*Scale)-gap;y=Anchor.Y-height/2;}
-            else if(Edge==1)y=Anchor.Y+(int)Math.Round(22*Scale)+gap;
+            int half=(int)Math.Round(dockHalfExtent*Scale);
+            if(Edge==0){x=Anchor.X+half+gap;y=Anchor.Y-height/2;}
+            else if(Edge==2){x=Anchor.X-width-half-gap;y=Anchor.Y-height/2;}
+            else if(Edge==1)y=Anchor.Y+half+gap;
             return new Native.PointI {
                 X=Math.Max(minX,Math.Min(x,Math.Max(minX,Monitor.Right-width-inset))),
                 Y=Math.Max(minY,Math.Min(y,Math.Max(minY,Monitor.Bottom-height-inset)))

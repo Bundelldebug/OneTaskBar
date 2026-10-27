@@ -55,6 +55,7 @@ namespace OneTaskBar
                 {
                     string name=kind=="brightness"?"밝기":"음량";
                     var quick=sliders.First(s=>System.Windows.Automation.AutomationProperties.GetName(s)==name);
+                    hud.Slider.IsEnabled=quick.IsEnabled;
                     foreach(int value in new[]{0,35,100})
                     {
                         hud.Set(kind,value,false);

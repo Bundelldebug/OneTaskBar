@@ -137,7 +137,7 @@ namespace OneTaskBar
             startGlyph.Kind=Preferences.Current.NativeStartButton?"windows-start":"apps";startGlyph.Color=Preferences.Current.NativeStartButton?Paint.Brush("#FF1975DD"):Glass95.DockForeground;startGlyph.InvalidateVisual();startButton.ToolTip=Preferences.Current.NativeStartButton?"Windows 시작":"앱 목록";System.Windows.Automation.AutomationProperties.SetName(startButton,(string)startButton.ToolTip);
             var entries=controller.DockApps();powerWidth=PowerDisplay.DockSlot(controller.Power,Preferences.Current.DesktopPowerWatts);powerColumn.Width=new GridLength(powerWidth);powerAccess.Visibility=powerWidth>0?Visibility.Visible:Visibility.Collapsed;Battery.Width=DockGeometry.Vertical(Edge)?38:powerWidth==78?70:52;if(DockGeometry.Vertical(Edge))((Grid)Status.Surface.Child).RowDefinitions[2].Height=new GridLength(powerWidth>0?22:0);classicStatus.Visibility=Preferences.Current.DuoStatusIcon?Visibility.Collapsed:Visibility.Visible;duoStatus.Visibility=Preferences.Current.DuoStatusIcon?Visibility.Visible:Visibility.Collapsed;statusIcons.Width=Preferences.Current.DuoStatusIcon?32:DockGeometry.Vertical(Edge)?36:56;if(!Preferences.Current.Animations||!Preferences.Current.ChargeAnimation||!Preferences.Current.DuoStatusIcon)duoStatus.StopPulse();
             mediaSpace=controller.Desktop&&(controller.Services.Media.Active||MediaBar!=null&&MediaBar.ReservesSpace);
-            var layout=DockLayout.Compute(Screen.Bounds,ContentScale,Math.Max(1,entries.Count),powerWidth,mediaSpace,68,Edge,Preferences.Current.DuoStatusIcon,Math.Max(44,68/Zoom-24));bool overflow=entries.Count>layout.Capacity;int slots=Math.Max(0,layout.Capacity-(overflow?1:0));var shown=entries.Take(slots).ToArray();Overflow.Update(entries.Skip(slots));OverflowButton.Visibility=overflow?Visibility.Visible:Visibility.Collapsed;OverflowButton.ToolTip="숨겨진 앱 "+Overflow.Count+"개 · 마우스를 올려 펼치기";var keys=new HashSet<string>(shown.Select(e=>e.Key),StringComparer.OrdinalIgnoreCase);bool animate=placed&&visible&&Apps.IsVisible&&Motion.Enabled;
+            var layout=DockLayout.Compute(Screen.Bounds,ContentScale,Math.Max(1,entries.Count),powerWidth,mediaSpace,68,Edge,Preferences.Current.DuoStatusIcon);bool overflow=entries.Count>layout.Capacity;int slots=Math.Max(0,layout.Capacity-(overflow?1:0));var shown=entries.Take(slots).ToArray();Overflow.Update(entries.Skip(slots));OverflowButton.Visibility=overflow?Visibility.Visible:Visibility.Collapsed;OverflowButton.ToolTip="숨겨진 앱 "+Overflow.Count+"개 · 마우스를 올려 펼치기";var keys=new HashSet<string>(shown.Select(e=>e.Key),StringComparer.OrdinalIgnoreCase);bool animate=placed&&visible&&Apps.IsVisible&&Motion.Enabled;
             int pinned=shown.Count(a=>a.Pinned);unpinnedOverflow=entries.Skip(slots).Any(a=>!a.Pinned);pinDivider.Visibility=pinned>0&&entries.Any(a=>!a.Pinned)?Visibility.Visible:Visibility.Collapsed;double nextDivider=DockLayout.AppOffset+pinned*46+6,oldDivider=Double.IsNaN(dividerX)?nextDivider:dividerX+dividerOffset.X;dividerX=nextDivider;Canvas.SetLeft(pinDivider,dividerX);dividerOffset.BeginAnimation(TranslateTransform.XProperty,null);dividerOffset.X=0;if(animate&&Math.Abs(oldDivider-nextDivider)>.01)dividerOffset.BeginAnimation(TranslateTransform.XProperty,Motion.PanelTween(oldDivider-nextDivider,0,330));
             TaskViewButton.Visibility=overflow&&layout.Capacity==0?Visibility.Collapsed:Visibility.Visible;Canvas.SetLeft(OverflowButton,layout.Capacity==0?52:DockLayout.AppOffset+shown.Length*46+12);
             foreach(var cell in cells.Values.Where(c=>!keys.Contains(c.Entry.Key)).ToArray()){
@@ -315,7 +315,16 @@ namespace OneTaskBar
             if(Preferences.Current.DuoStatusIcon&&state.Known)quickAccess.ToolTip+=" · 배터리 "+state.Level+"%";System.Windows.Automation.AutomationProperties.SetHelpText(quickAccess,(string)quickAccess.ToolTip);
             if(Battery.ActualWidth>0){double right=Battery.TranslatePoint(new Point(Battery.ActualWidth,0),Status.Surface).X;Battery.ExpandedWidth=Math.Max(Battery.ActualWidth,Math.Min(164,right-12));}
         }
-        void RefreshMedia(){if(MediaBar!=null){double start=currentStartX*Zoom,y=(DockGeometry.Vertical(Edge)?12:currentY)*Zoom;y+=(1-reveal)*8*Zoom;MediaBar.ConstrainDock(start,y);MediaBar.Update(controller.Services.Media,Scale,start,y,(visible||visibilityTimer.IsEnabled)&&controller.Desktop&&controller.DisplayAwake&&start-24>=44);MediaBar.Opacity=reveal;Native.BlurOpacity(MediaBar,reveal);}}
+        void RefreshMedia()
+        {
+            if(MediaBar==null)return;
+            double start=currentStartX*Zoom,y=(DockGeometry.Vertical(Edge)?12:currentY)*Zoom;
+            y+=(1-reveal)*8*Zoom;
+            MediaBar.ConstrainDock(start,y);
+            MediaBar.Update(controller.Services.Media,Scale,start,y,(visible||visibilityTimer.IsEnabled)&&controller.Desktop&&controller.DisplayAwake&&start-24*Zoom>=44*Zoom);
+            MediaBar.Opacity=reveal;
+            Native.BlurOpacity(MediaBar,reveal);
+        }
         internal Point BatteryCenter()
         {
             FrameworkElement element=Preferences.Current.DuoStatusIcon?(FrameworkElement)duoStatus:Battery;return element.PointToScreen(new Point(element.ActualWidth/2,element.ActualHeight/2));
@@ -324,7 +333,7 @@ namespace OneTaskBar
         internal TrayPlacement TrayAnchor()
         {
             // PointToScreen already returns physical pixels under per-monitor DPI awareness.
-            return new TrayPlacement(trayAccess.PointToScreen(new Point(trayAccess.ActualWidth/2,0)),Screen.Bounds,Scale,Edge);
+            return new TrayPlacement(trayAccess.PointToScreen(new Point(trayAccess.ActualWidth/2,0)),Screen.Bounds,Scale,Edge,22*Zoom);
         }
         internal object Inspect() {return new {scale=Scale,visible=visible,autoHide=autoHide,revealEdge=EdgeVisible,apps=Native.RegionInfo(Apps),start=Native.RegionInfo(Start),status=Native.RegionInfo(Status),blur=Apps.HasBlur&&Status.HasBlur,nowBar=MediaBar!=null?Native.RegionInfo(MediaBar):null};}
         internal void Close() { if(closed) return; closed=true;DragApps.Dispose();DragReorder.Finished-=EndDragPreview;resizeTimer.Stop();visibilityTimer.Stop();hideDelay.Stop();Overflow.Dispose();if(revealEdge!=null){revealEdge.Dispose();revealEdge=null;}if(MediaBar!=null)MediaBar.Close();cells.Clear(); Start.Close(); Apps.Close(); Status.Close(); }

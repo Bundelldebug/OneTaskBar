@@ -10,15 +10,17 @@ namespace OneTaskBar
         internal static async Task Run(ShellController shell,System.Windows.Forms.Screen screen)
         {
             int saved=Preferences.Current.DockScalePercent,edge=Preferences.Current.DockEdge,clockMode=Preferences.Current.DockClockMode;
+            var savedMedia=shell.Services.Media;
             DockHost dock=null;
             try
             {
+                shell.Services.Media=new MediaState {Available=true,Active=true,Title="크기 검사 미디어"};
                 foreach(int mode in new[]{0,1,2})foreach(int percent in new[]{60,100,140})foreach(int side in new[]{0,1,2,3})
                 {
                     Preferences.Current.DockClockMode=mode;
                     Preferences.Current.DockScalePercent=percent;
                     Preferences.Current.DockEdge=side;
-                    dock=new DockHost(shell,screen);dock.Show();
+                    dock=new DockHost(shell,screen);dock.Show();dock.Refresh(shell.Power);
                     await Task.Delay(55);
                     var expected=Native.DropMonitorScale(screen.Bounds);
                     if(Math.Abs(dock.Scale-expected)>.01||Math.Abs(dock.ContentScale-dock.Scale*percent/100.0)>.001)
@@ -38,6 +40,25 @@ namespace OneTaskBar
                     double reservedSize=DockGeometry.Vertical(side)?reserved.Right-reserved.Left:reserved.Bottom-reserved.Top;
                     if(Math.Abs(reservedSize/dock.Scale-DockSizing.Reserved)>1)
                         throw new Exception("Dock work-area reservation uses the wrong percentage");
+                    var media=dock.MediaBar;
+                    if(media==null||!media.IsVisible)throw new Exception("Resized dock lost its active media capsule");
+                    double compact=44*percent/100.0;
+                    if(Math.Abs(media.Shape.Height-compact)>.01||Math.Abs(media.Radius-compact/2)>.01)
+                        throw new Exception("Media capsule thickness or curvature differs from its dock at "+percent+"% edge "+side);
+                    var cover=(FrameworkElement)((System.Windows.Controls.Grid)media.CompactButton.Content).Children[0];
+                    var coverBounds=DockGeometry.ScreenRect(cover);
+                    if(Math.Abs(coverBounds.Height/dock.Scale-28*percent/100.0)>1)
+                        throw new Exception("Compact media contents did not follow the dock size");
+                    foreach(bool expanded in new[]{true,false})
+                    {
+                        media.SetExpanded(expanded);media.UpdateLayout();
+                        var mediaBounds=DockGeometry.ScreenRect(media.Surface);
+                        var monitorBounds=new Rect(screen.Bounds.Left,screen.Bounds.Top,screen.Bounds.Width,screen.Bounds.Height);
+                        monitorBounds.Inflate(1,1);
+                        if(!monitorBounds.Contains(mediaBounds))throw new Exception("Scaled media player left its monitor at edge "+side);
+                        if(expanded&&Math.Abs(media.Shape.Height-(media.Modern?130:188))>.01)
+                            throw new Exception("Dock resizing changed the expanded player's readable size");
+                    }
                     var grid=(System.Windows.Controls.Grid)dock.Status.Surface.Child;
                     foreach(UIElement child in grid.Children)
                     {
@@ -56,6 +77,7 @@ namespace OneTaskBar
                 Preferences.Current.DockScalePercent=saved;
                 Preferences.Current.DockEdge=edge;
                 Preferences.Current.DockClockMode=clockMode;
+                shell.Services.Media=savedMedia;
             }
         }
     }
