@@ -10,8 +10,9 @@ namespace OneTaskBar
     internal static class DockAppearance
     {
         static string requested,imageFile,colorKey;static Brush image,solid;static Brush imageInk=Paint.Brush("#FF19221E");static int revision;
-        internal static int Mode {get{return Preferences.Current.DockBackgroundKind==2?2:Preferences.Current.DockBackgroundKind==1||Preferences.Current.DockSolidBackground?1:0;}}
-        internal static bool Custom {get{return Preferences.Current.DockSolidBackground||Preferences.Current.DockBackgroundKind==1||Preferences.Current.DockBackgroundKind==2;}}
+        internal static bool IconsOnly {get{return Preferences.Current.DockBackgroundKind==3;}}
+        internal static int Mode {get{return IconsOnly?3:Preferences.Current.DockBackgroundKind==2?2:Preferences.Current.DockBackgroundKind==1||Preferences.Current.DockSolidBackground?1:0;}}
+        internal static bool Custom {get{return IconsOnly||Preferences.Current.DockSolidBackground||Preferences.Current.DockBackgroundKind==1||Preferences.Current.DockBackgroundKind==2;}}
         internal static bool TryColor(string value,out Color color)
         {
             color=Color.FromRgb(186,193,199);try{if(String.IsNullOrEmpty(value)||value.Length!=7&&value.Length!=9||value[0]!='#')return false;color=(Color)ColorConverter.ConvertFromString(value);color.A=255;return true;}catch{return false;}
@@ -22,11 +23,11 @@ namespace OneTaskBar
         }
         internal static Brush Background
         {
-            get{if(Preferences.Current.DockBackgroundKind!=2)return Solid;string file=Preferences.Current.DockBackgroundImage;if(!String.Equals(requested,file,StringComparison.Ordinal)){requested=file;Load(file,++revision);}return image!=null&&String.Equals(imageFile,file,StringComparison.Ordinal)?image:Solid;}
+            get{if(IconsOnly)return Brushes.Transparent;if(Preferences.Current.DockBackgroundKind!=2)return Solid;string file=Preferences.Current.DockBackgroundImage;if(!String.Equals(requested,file,StringComparison.Ordinal)){requested=file;Load(file,++revision);}return image!=null&&String.Equals(imageFile,file,StringComparison.Ordinal)?image:Solid;}
         }
         internal static Brush Foreground
         {
-            get{if(Preferences.Current.DockBackgroundKind==2&&image!=null&&imageFile==Preferences.Current.DockBackgroundImage)return imageInk;var color=((SolidColorBrush)Solid).Color;return Ink(color.R*.2126+color.G*.7152+color.B*.0722);}
+            get{if(IconsOnly)return Glass95.DockDark?Paint.ControlWhite:Paint.OnLight;if(Preferences.Current.DockBackgroundKind==2&&image!=null&&imageFile==Preferences.Current.DockBackgroundImage)return imageInk;var color=((SolidColorBrush)Solid).Color;return Ink(color.R*.2126+color.G*.7152+color.B*.0722);}
         }
         static Brush Ink(double brightness){return Paint.Brush(brightness<145?"#FFF8F9FC":"#FF19221E");}
         static async void Load(string file,int token)

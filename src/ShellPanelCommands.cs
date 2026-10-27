@@ -11,7 +11,7 @@ namespace OneTaskBar
         readonly List<EventWaitHandle> panelCommands=new List<EventWaitHandle>();
         void RegisterPanelCommands()
         {
-            var commands=new[]{"notifications","quick","start","search"}.Concat(Program.CaptureReview?new[]{"edge0","edge1","edge2","edge3"}:new string[0]);
+            var commands=new[]{"notifications","quick","start","search"}.Concat(Program.CaptureReview?new[]{"edge0","edge1","edge2","edge3","background0","background1","background2","background3"}:new string[0]);
             foreach(string panel in commands)
             {
                 string key=panel;
@@ -24,6 +24,7 @@ namespace OneTaskBar
         {
             if(disposed)return;
             if(Program.CaptureReview&&key.StartsWith("edge",StringComparison.Ordinal)){Preferences.Current.DockEdge=key[4]-'0';Relayout();return;}
+            if(Program.CaptureReview&&key.StartsWith("background",StringComparison.Ordinal)){Preferences.Current.DockBackgroundKind=key[10]-'0';Preferences.Current.DockSolidBackground=key[10]=='1';Relayout();return;}
             var dock=docks.FirstOrDefault();
             if(key=="notifications")ToggleNotifications(dock);
             else if(key=="quick")ToggleQuick(dock);
