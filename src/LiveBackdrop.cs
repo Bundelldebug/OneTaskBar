@@ -36,6 +36,9 @@ namespace OneTaskBar
         ContainerVisual root;
         SpriteVisual blur;
         CompositionRoundedRectangleGeometry shape;
+        GlassRefraction refraction;
+        string refractionLayout;
+        bool refractionUnavailable;
         readonly Window window;
         readonly ContextMenu menu;
         readonly IntPtr popupHandle;
@@ -45,12 +48,14 @@ namespace OneTaskBar
         Native.RectI placedBounds;bool shown,enabled=true;double opacity=1;Rect? lastClip;
         Native.RectI? inputClip;
         internal bool Realtime {get{return blur!=null&&blur.Brush is CompositionBackdropBrush;}}
+        internal int RefractedRegions {get{return refraction==null?0:refraction.Count;}}
         internal LiveBackdrop(Window window,double radius)
         {
             this.window=window;this.radius=radius;
             try{Initialize(window.Topmost);}catch{Dispose();throw;}
             window.IsVisibleChanged+=(s,e)=>Sync();window.LocationChanged+=(s,e)=>Sync();
             window.Activated+=(s,e)=>Sync(true);
+            window.LayoutUpdated+=RefreshRefraction;
         }
         internal LiveBackdrop(ContextMenu menu,double radius)
         {
@@ -120,7 +125,39 @@ namespace OneTaskBar
             if(clip.HasValue){var boundsClip=Native.InputBounds(clip.Value,scale);if(!inputClip.HasValue||!inputClip.Value.Equals(boundsClip)){if(Native.ClipWindow(background,boundsClip))inputClip=boundsClip;}}
             shape.Offset=clip.HasValue?new Vector2((float)(clip.Value.X*scale),(float)(clip.Value.Y*scale)):Vector2.Zero;shape.Size=new Vector2(cw,ch);shape.CornerRadius=new Vector2(Math.Min(c,cw/2f),Math.Min(c,ch/2f));
             Sync();
+            RefreshRefraction(null,EventArgs.Empty);
         }
-        public void Dispose() {instances.Remove(this);if(popupTimer!=null)popupTimer.Stop();if(target!=null){target.Root=null;target.Dispose();target=null;}if(root!=null)root.Children.RemoveAll();if(blur!=null){var brush=blur.Brush;blur.Brush=null;blur.Dispose();blur=null;if(brush!=null)brush.Dispose();}if(root!=null){root.Dispose();root=null;}if(shape!=null){shape.Dispose();shape=null;}if(background!=IntPtr.Zero){DestroyWindow(background);background=IntPtr.Zero;}}
+        void RefreshRefraction(object sender,EventArgs args)
+        {
+            var glass=window as GlassWindow;
+            bool active=root!=null&&glass!=null&&glass.GlassMaterial&&Glass95.Enabled&&Glass95.Transparent&&enabled;
+            if(!active){if(refraction!=null){refraction.Begin();refraction.End();}refractionLayout=null;return;}
+            if(refractionUnavailable||width<4||height<4)return;
+            double scale=Math.Max(96,Native.GetDpiForWindow(Overlay))/96.0;
+            var regions=new System.Collections.Generic.List<Rect>();
+            var quick=window as QuickWindow;
+            if(quick!=null&&quick.GridUI!=null){
+                foreach(var frame in quick.GridUI.Board.Frames.Values){
+                    var body=frame.Body;
+                    if(!body.IsVisible||body.ActualWidth<4||body.ActualHeight<4)continue;
+                    var point=body.TranslatePoint(new Point(),window);
+                    regions.Add(new Rect(point.X*scale,point.Y*scale,body.ActualWidth*scale,body.ActualHeight*scale));
+                }
+            }
+            var signature=width+":"+height+":"+corner+":"+String.Join(";",regions.ConvertAll(r=>r.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            if(signature==refractionLayout)return;
+            try {
+                if(refraction==null)refraction=new GlassRefraction(compositor,root,blur);
+                refraction.Begin();
+                refraction.Add(0,0,width,height,corner,(float)(4*scale));
+                foreach(var region in regions)refraction.Add((float)region.X,(float)region.Y,(float)region.Width,(float)region.Height,(float)Math.Min(30*scale,Math.Min(region.Width,region.Height)/2),(float)(7*scale));
+                refraction.End();refractionLayout=signature;
+            }catch(Exception error){
+                refractionUnavailable=true;
+                if(refraction!=null){refraction.Dispose();refraction=null;}
+                AppLog.Once("glass-refraction",error.ToString());
+            }
+        }
+        public void Dispose() {instances.Remove(this);if(window!=null)window.LayoutUpdated-=RefreshRefraction;if(popupTimer!=null)popupTimer.Stop();if(refraction!=null){refraction.Dispose();refraction=null;}if(target!=null){target.Root=null;target.Dispose();target=null;}if(root!=null)root.Children.RemoveAll();if(blur!=null){var brush=blur.Brush;blur.Brush=null;blur.Dispose();blur=null;if(brush!=null)brush.Dispose();}if(root!=null){root.Dispose();root=null;}if(shape!=null){shape.Dispose();shape=null;}if(background!=IntPtr.Zero){DestroyWindow(background);background=IntPtr.Zero;}}
     }
 }
