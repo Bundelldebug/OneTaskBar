@@ -82,7 +82,7 @@ namespace OneTaskBar
             EnableWindow(background,false);
             if(passThrough&&!SetLayeredWindowAttributes(background,0,255,2))throw new System.ComponentModel.Win32Exception();
             int host=1,result=unavailableFixtures>0?unchecked((int)0x80070057):DwmSetWindowAttribute(background,17,ref host,4);if(result<0)throw new NotSupportedException("Windows host backdrop is unavailable ("+result+")");
-            if(window!=null)new WindowInteropHelper(window).Owner=background;
+            if(window!=null&&!Program.CaptureReview)new WindowInteropHelper(window).Owner=background;
             IntPtr raw;
             ((IDesktopInterop)(object)compositor).CreateDesktopWindowTarget(background,true,out raw);
             try {target=(DesktopWindowTarget)Marshal.GetObjectForIUnknown(raw);}finally{Marshal.Release(raw);}

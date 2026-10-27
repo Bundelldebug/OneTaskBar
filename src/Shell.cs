@@ -149,6 +149,7 @@ namespace OneTaskBar
             panelProbe=new EventWaitHandle(false,EventResetMode.AutoReset,@"Local\OneTaskBar.ProbePanels");
             hudProbe=new EventWaitHandle(false,EventResetMode.AutoReset,@"Local\OneTaskBar.ProbeHud");
             connectNotifications=new EventWaitHandle(false,EventResetMode.AutoReset,@"Local\OneTaskBar.ConnectNotifications");
+            RegisterPanelCommands();
             waits.Add(ThreadPool.RegisterWaitForSingleObject(stop,(s,t)=>Application.Current.Dispatcher.BeginInvoke(new Action(()=>Application.Current.Shutdown())),null,Timeout.Infinite,false));
             waits.Add(ThreadPool.RegisterWaitForSingleObject(show,(s,t)=>Application.Current.Dispatcher.BeginInvoke(new Action(ShowWelcome)),null,Timeout.Infinite,false));
             waits.Add(ThreadPool.RegisterWaitForSingleObject(notificationProbe,(s,t)=>Application.Current.Dispatcher.BeginInvoke(new Action(ProbeNotifications)),null,Timeout.Infinite,false));
@@ -763,6 +764,7 @@ namespace OneTaskBar
             if(displayNotify!=IntPtr.Zero)Native.UnregisterPowerSettingNotification(displayNotify);
             if(messages!=null) { Native.UnregisterHotKey(messages.Handle,1); Native.UnregisterHotKey(messages.Handle,2); messages.Dispose(); }
             if(stop!=null) stop.Dispose(); if(show!=null) show.Dispose(); Audio.Dispose();
+            foreach(var command in panelCommands)command.Dispose();panelCommands.Clear();
             if(notificationProbe!=null)notificationProbe.Dispose();
             if(bannerProbe!=null)bannerProbe.Dispose();
             if(actionProbe!=null)actionProbe.Dispose();
