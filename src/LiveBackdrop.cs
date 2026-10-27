@@ -130,7 +130,7 @@ namespace OneTaskBar
         void RefreshRefraction(object sender,EventArgs args)
         {
             var glass=window as GlassWindow;
-            bool active=root!=null&&glass!=null&&glass.GlassMaterial&&Glass95.Enabled&&Glass95.Transparent&&enabled;
+            bool active=root!=null&&glass!=null&&!(glass is DesktopOverview)&&glass.GlassMaterial&&Glass95.Enabled&&Glass95.Transparent&&enabled;
             if(!active){if(refraction!=null){refraction.Begin();refraction.End();}refractionLayout=null;return;}
             if(refractionUnavailable||width<4||height<4)return;
             double scale=Math.Max(96,Native.GetDpiForWindow(Overlay))/96.0;

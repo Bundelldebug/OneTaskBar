@@ -28,6 +28,13 @@ namespace OneTaskBar
                 }
                 int commands=0;view=new DesktopOverview((id,window,operation)=>commands++,window=>{});view.Present(snapshot,System.Windows.Forms.Screen.PrimaryScreen.Bounds);await Task.Delay(320);
                 Require(view.PreviewCount==3&&view.RegisteredThumbnails==3&&!view.EmptyVisible&&!view.TransitionActive,"three live previews finish their entry animation");
+                var previews=app.Windows.OfType<SwitchThumbnail>().ToArray();Require(previews.All(p=>p.ClearBackground&&p.Background==Brushes.Transparent),"thumbnail hosts have no opaque rectangle behind their fading image");int moves=previews.Sum(p=>p.PositionChanges);
+                await Task.Delay(120);Require(previews.Sum(p=>p.PositionChanges)==moves,"opacity animation does not reposition native preview windows");
+                var chord=new TaskViewGesture();bool open;int opens=0;
+                if(chord.Observe(9,true,0x5b,true,false,false,out open)&&open)opens++;
+                Require(chord.Observe(9,true,0,true,false,false,out open)&&!open,"holding Tab consumes repeat without reopening");
+                Require(chord.Observe(9,false,0,true,false,false,out open)&&chord.Observe(0x5b,false,0,true,false,false,out open)&&opens==1,"Win+Tab opens once and consumes both releases");
+                Require(!chord.Observe(9,true,0x5b,true,true,false,out open)&&!chord.Observe(9,true,0x5b,true,false,true,out open),"other modifier chords and injected events pass through");
                 Program.Save(view.Surface,(int)view.Width,(int)view.Height,Path.Combine(AppLog.Data,"desktop-overview-windows.png"));
                 view.SelectPage(1);await Task.Delay(60);Require(view.PreviewCount==0&&view.EmptyVisible&&view.RegisteredThumbnails==0,"an empty desktop releases all source previews");
                 Program.Save(view.Surface,(int)view.Width,(int)view.Height,Path.Combine(AppLog.Data,"desktop-overview-empty.png"));
@@ -36,6 +43,10 @@ namespace OneTaskBar
                 var actual=VirtualDesktops.Read(new AppEntry[0],new WindowInteropHelper(view).Handle);Require(actual.Pages.Count>0&&actual.CurrentIndex<actual.Pages.Count,"the read-only Windows desktop query returns a valid current page");
                 if(inspect){AppLog.Json("desktop-overview-preview.json",new {ready=true});for(int i=0;i<240&&!File.Exists(Path.Combine(AppLog.Data,"preview-done"));i++)await Task.Delay(250);}
                 view.Dismiss();await Task.Delay(250);Require(!app.Windows.OfType<SwitchThumbnail>().Any()&&LiveBackdrop.OrphanCount==0&&commands==0,"closing the overview releases previews without issuing OS shortcuts");
+                for(int i=0;i<4;i++){
+                    view=new DesktopOverview((id,window,operation)=>commands++,window=>{});view.Present(snapshot,System.Windows.Forms.Screen.PrimaryScreen.Bounds);await Task.Delay(35);
+                    view.HideImmediately();await Task.Delay(35);Require(!app.Windows.OfType<SwitchThumbnail>().Any(),"hiding during entry cannot leave thumbnail windows behind");view.Close();
+                }
                 AppLog.Json("desktop-overview-probe.json",new {passed=true,liveThumbnails=true,emptyDesktop=true,rapidSelection=true,desktopMetadataReadOnly=true,osInputSent=false,realUserWindowsClosed=false});exit=0;
             }catch(Exception error){AppLog.Json("desktop-overview-probe.json",new {passed=false,error=error.ToString()});}finally{if(view!=null&&view.IsVisible)view.Close();foreach(var source in sources)source.Close();if(motion!=null)motion.Dispose();app.Shutdown(exit);}}),DispatcherPriority.ApplicationIdle);
             return app.Run();

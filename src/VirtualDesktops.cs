@@ -38,6 +38,7 @@ namespace OneTaskBar
             return result;
         }
         static Guid ReadId(RegistryKey key,string name){var values=key==null?new List<Guid>():Decode(key.GetValue(name) as byte[]);return values.Count==1?values[0]:Guid.Empty;}
+        internal static Guid CurrentId(){try{using(var key=Registry.CurrentUser.OpenSubKey(Root))return ReadId(key,"CurrentVirtualDesktop");}catch{return Guid.Empty;}}
         internal static DesktopSnapshot Read(IEnumerable<AppEntry> apps,IntPtr foreground)
         {
             var result=new DesktopSnapshot();IManager manager=null;

@@ -27,13 +27,14 @@ namespace OneTaskBar
         readonly Action<IntPtr> closeWindow;
         DesktopSnapshot snapshot;
         int selected,pageStart;
-        bool closing,closed;
+        bool closing,closed,leaving;
         readonly Stopwatch transition=new Stopwatch();
         internal int PageIndex {get{return selected;}}
         internal int PreviewCount {get{return previews.Count;}}
         internal int RegisteredThumbnails {get{return previews.Count(p=>p.Window.Registered);}}
         internal bool EmptyVisible {get{return empty.Visibility==Visibility.Visible;}}
         internal bool TransitionActive {get{return transition.IsRunning;}}
+        internal bool Retiring {get{return closing||closed;}}
 
         internal DesktopOverview(Action<Guid,IntPtr,int> execute,Action<IntPtr> close)
         {
@@ -63,14 +64,21 @@ namespace OneTaskBar
             };
             PreviewMouseLeftButtonUp+=(s,e)=>{if(e.OriginalSource==cards||e.OriginalSource==workspace){e.Handled=true;Dismiss();}};
             Closed+=(s,e)=>{closed=true;StopTransition();ReleasePreviews();};
+            IsVisibleChanged+=(s,e)=>{if(!IsVisible){StopTransition();ReleasePreviews();}};
         }
         internal void Present(DesktopSnapshot value,System.Drawing.Rectangle monitor)
         {
+            empty.Text="열려 있는 창이 없습니다";
             snapshot=value;selected=value.CurrentIndex;pageStart=0;
             double dpi=Native.PrepareMonitor(this,monitor);
             ShowAt(monitor,0,0,monitor.Width/dpi,monitor.Height/dpi);
             foreach(var button in ((Grid)body.Children[2]).Children.OfType<Button>())if((string)button.Tag=="remove-desktop")button.IsEnabled=value.Pages.Count>1;
             RenderDesktops();RenderWindows();Activate();
+        }
+        internal void ShowLoading(System.Drawing.Rectangle monitor)
+        {
+            var placeholder=new DesktopSnapshot();placeholder.Pages.Add(new DesktopPage {Name="데스크톱",Id=Guid.Empty});
+            Present(placeholder,monitor);empty.Text="데스크톱을 불러오는 중...";
         }
         void RenderDesktops()
         {
@@ -95,6 +103,7 @@ namespace OneTaskBar
         void ReleasePreviews(){foreach(var preview in previews)preview.Window.Close();previews.Clear();cards.Children.Clear();}
         void RenderWindows()
         {
+            if(closing||closed||!IsVisible)return;
             StopTransition();ReleasePreviews();
             var page=snapshot.Pages[selected];page.Windows.RemoveAll(w=>!Native.IsWindow(w.Window));
             caption.Text=page.Name+" · "+page.Windows.Count+"개 창";empty.Visibility=page.Windows.Count==0?Visibility.Visible:Visibility.Collapsed;
@@ -111,7 +120,7 @@ namespace OneTaskBar
                 previews.Add(new Preview {Anchor=anchor,Card=card,Window=native});
             }
             UpdateLayout();ArrangePreviews();
-            if(Motion.Enabled&&previews.Count>0){transition.Restart();CompositionTarget.Rendering+=Animate;Animate(null,EventArgs.Empty);}
+            if(Motion.Enabled&&previews.Count>0){leaving=false;transition.Restart();CompositionTarget.Rendering+=Animate;Animate(null,EventArgs.Empty);}
         }
         void ChangeWindowPage(int direction)
         {
@@ -130,12 +139,14 @@ namespace OneTaskBar
                 var preview=previews[i];double x=(width-(cardWidth*columns+gap*(columns-1)))/2+(i%columns)*(cardWidth+gap),y=30+(height-(cardHeight*rows+gap*(rows-1)))/2+(i/columns)*(cardHeight+gap);
                 preview.Card.Width=cardWidth;preview.Card.Height=cardHeight;Canvas.SetLeft(preview.Card,x);Canvas.SetTop(preview.Card,y);
             }
-            UpdateLayout();PlacePreviews(transition.IsRunning?Math.Min(1,transition.Elapsed.TotalMilliseconds/220):1);
+            UpdateLayout();foreach(var preview in previews)preview.Window.Place(preview.Anchor);
         }
         void PlacePreviews(double progress)
         {
             double eased=1-Math.Pow(1-progress,3);
-            foreach(var preview in previews){preview.Card.Opacity=eased;preview.Card.RenderTransform=new TranslateTransform(0,(1-eased)*14);preview.Window.SetPreviewOpacity((byte)Math.Round(eased*255));preview.Window.Place(preview.Anchor);}
+            if(leaving)eased=1-eased;
+            foreach(var preview in previews){preview.Card.Opacity=eased;preview.Window.SetPreviewOpacity((byte)Math.Round(eased*255));}
+            if(leaving){Surface.Opacity=eased;Native.BlurOpacity(this,eased);}
         }
         void Animate(object sender,EventArgs args){double progress=Math.Min(1,transition.Elapsed.TotalMilliseconds/220);PlacePreviews(progress);if(progress>=1)StopTransition();}
         void StopTransition(){transition.Stop();CompositionTarget.Rendering-=Animate;}
@@ -146,8 +157,9 @@ namespace OneTaskBar
         }
         internal async void Dismiss()
         {
-            if(closed||closing)return;closing=true;StopTransition();ReleasePreviews();
-            await DismissAsync();if(!closed)Close();
+            if(closed||closing)return;closing=true;StopTransition();
+            if(Motion.Enabled){leaving=true;transition.Restart();CompositionTarget.Rendering+=Animate;await Task.Delay(230);}
+            if(!closed)Close();
         }
     }
 }

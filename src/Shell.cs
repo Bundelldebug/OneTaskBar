@@ -121,6 +121,9 @@ namespace OneTaskBar
             if(demo) return;
             keys=new VolumeKeys();
             keys.InterceptStart=()=>Desktop&&!Preferences.Current.NativeStartKey;
+            keys.InterceptTaskView=()=>Desktop&&!disposed;
+            keys.OnTaskView=()=>Application.Current.Dispatcher.BeginInvoke(new Action(OpenDesktopOverview),DispatcherPriority.Input);
+            keys.OnNativeStart=()=>Task.Run(()=>SystemPanels.Start());
             keys.InterceptAltTab=()=>Desktop&&!Preferences.Current.NativeAltTab&&!disposed;keys.AltTabGesture.Cycle=Switcher.Cycle;keys.AltTabGesture.Navigate=Switcher.Navigate;keys.AltTabGesture.Finish=Switcher.Finish;keys.AltTabGesture.AltReleased=Switcher.AltReleased;
             keys.OnStart=()=>Application.Current.Dispatcher.BeginInvoke(new Action(()=> {if(Desktop&&!disposed)ToggleStart(null);}));
             keys.OnKey=(key)=> {
@@ -544,7 +547,7 @@ namespace OneTaskBar
             var foreground=Native.GetForegroundWindow(); uint foregroundPid; Native.GetWindowThreadProcessId(foreground,out foregroundPid);
             if(foregroundPid!=ownPid) LastApplication=foreground;
             if(foregroundPid!=ownPid)RememberForeground(foreground);if(Desktop&&foreground!=lastForeground)Switcher.Update(Running);
-            if(Desktop){browserFullscreen.Update(foreground);SyncAutoHide(false);var fullscreenWindows=FullscreenVisibility.Capture();foreach(var dock in docks){dock.UpdateVisibility(FullscreenVisibility.IsFullScreen(dock.Screen.Bounds,fullscreenWindows),DockAutoHide);if(foreground!=lastForeground)dock.UpdateActive(LastApplication);}}
+            if(Desktop){browserFullscreen.Update(foreground);SyncAutoHide(false);var fullscreenWindows=FullscreenVisibility.Capture();foreach(var dock in docks){dock.UpdateVisibility(FullscreenVisibility.IsFullScreen(dock.Screen.Bounds,fullscreenWindows),DockAutoHide,fullscreenWindows.Count==0);if(foreground!=lastForeground)dock.UpdateActive(LastApplication);}}
             lastForeground=foreground;
             bool battery=Power.Known&&!Power.Connected;double cadence=RuntimeCadence.Pulse(Desktop,battery,interactive,docks.Count>0&&docks.All(d=>!d.Apps.IsVisible),true);if(timer.Interval.TotalMilliseconds!=cadence)timer.Interval=TimeSpan.FromMilliseconds(cadence);
             if(Welcome!=null&&Welcome.IsVisible)Welcome.PreviewBattery.Update(Power);
@@ -616,7 +619,7 @@ namespace OneTaskBar
             int revision=++autoHideRevision;autoHideChanging=true;
             try{Native.SetTaskbarAutoHide(value);for(int i=0;i<20&&Native.TaskbarAutoHide()!=value;i++)await Task.Delay(50);if(revision!=autoHideRevision||disposed)return;if(Native.TaskbarAutoHide()!=value&&Welcome!=null)Welcome.Feedback("Windows 자동 숨김 변경을 확인하지 못했습니다. 다시 시도해 주세요.");}
             catch(Exception error){AppLog.Write("taskbar-autohide",error.Message);if(Welcome!=null)Welcome.Feedback(error.Message);}
-            finally{if(revision==autoHideRevision){autoHideChanging=false;if(!disposed){SyncAutoHide(true);var fullscreenWindows=FullscreenVisibility.Capture();foreach(var dock in docks)dock.UpdateVisibility(FullscreenVisibility.IsFullScreen(dock.Screen.Bounds,fullscreenWindows),DockAutoHide);}}}
+            finally{if(revision==autoHideRevision){autoHideChanging=false;if(!disposed){SyncAutoHide(true);var fullscreenWindows=FullscreenVisibility.Capture();foreach(var dock in docks)dock.UpdateVisibility(FullscreenVisibility.IsFullScreen(dock.Screen.Bounds,fullscreenWindows),DockAutoHide,fullscreenWindows.Count==0);}}}
         }
         internal bool DockInUse(DockHost dock)
         {
