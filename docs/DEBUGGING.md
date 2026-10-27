@@ -23,6 +23,7 @@ Use this routing table before reading source. The probe runner prints one result
 | Media wave, title, responsive layout or low-res art | `MediaPlayerModern.cs`, `MediaWave.cs`, `MarqueeTitle.cs`, `YouTubeArtwork.cs` | Media |
 | Different floating popup and quick-panel tint | `PanelMaterial.PopupSurface`, `WindowPreview.ApplyMaterial`, `WindowSwitcherView.cs` | Dock; Notifications; Settings / `panel-theme-probe` |
 | Dock missing on desktop or wrong fullscreen monitor | `DockHost.UpdateVisibility` in `Windows.cs`, `Native.EnsureDockVisible`, `FullscreenVisibility.cs` | Dock |
+| Light dock looks solid or background-free controls lack contrast | explicit dock branch in `GlassWindow.ApplyMaterial`, `DockAppearance.Glass` / `Readability`, `Glass95.DockInk` | Dock / `desktop-behavior-probe` includes `DockMaterialChecks` |
 | Virtual display leaves the dock hidden after the last app closes | `FullscreenVisibility.PassiveSurface`, `DockHost.UpdateVisibility` desktop-idle recovery | Dock / `desktop-behavior-probe` |
 | Desktop overview stutters or leaves a black preview window | `DesktopOverviewController.cs`, `DesktopOverview.cs`, `SwitchThumbnail` in `WindowSwitcherView.cs` | Dock / `desktop-overview-probe`; `desktop-overview-timing.json` contains counts/timing only |
 | Tray icons, native-host fallback or recovery | `TrayOverflowController.cs`, `TrayIcons.cs`, `TrayIconVisual.cs`, `TrayOverflowWindow.cs` | Dock / `tray-overflow-probe`; `tray-proxy-state.json` contains counts only |

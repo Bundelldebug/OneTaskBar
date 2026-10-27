@@ -39,7 +39,7 @@ namespace OneTaskBar
         static readonly Brush legacyGlass=Tint("#9BE5EBE7","#7BC5D0C9","#8FD8E2DB"),legacyDock=Tint("#AADFE7E2","#82C3D0C7","#96D5E1D9"),legacyMuted=Paint.Brush("#FF4C5B52"),legacyCard=Paint.Brush("#24FFFFFF");
         internal static readonly Brush DockSolid=Paint.Brush("#FFBAC1C7");
         internal static Brush Glass {get{return PanelMaterial.PanelSurface(Glass95.Dark,Glass95.Enabled);}}
-        internal static Brush DockGlass {get{return PanelMaterial.Surface(Glass95.DockDark,Glass95.Enabled);}}
+        internal static Brush DockGlass {get{return DockAppearance.Glass;}}
         internal static Brush Muted {get{return Paint.Muted;}}
         internal static Brush Card {get{return QuickPanel.Card;}}
         internal static Brush Tint(string top,string middle,string bottom)
@@ -330,7 +330,17 @@ namespace OneTaskBar
         {
             if(DockSurface||DockPalette)Dark=Glass95.DockDark;else if(!OpaqueSurface)Dark=Glass95.Dark;
             if(lens!=null){lens.Active=Glass95.Enabled&&!OpaqueSurface&&HasBlur&&Preferences.Current.Blur&&!(DockSurface&&DockAppearance.Custom)&&!(this is HudWindow);lens.InvalidateVisual();}
-            if(glassTint==null)return;if(DockSurface&&DockAppearance.Custom){Native.EnableBlur(this,false);Surface.Background=DockAppearance.Background;Surface.BorderBrush=Glass95.Enabled&&!DockAppearance.IconsOnly?Glass95.Rim:Brushes.Transparent;Surface.BorderThickness=new Thickness(Glass95.Enabled&&!DockAppearance.IconsOnly?.7:0);return;}
+            if(glassTint==null)return;
+            if(DockSurface){
+                bool custom=DockAppearance.Custom,useBlur=!custom&&HasBlur&&Preferences.Current.Blur&&(!Glass95.Enabled||Glass95.Transparent);
+                Native.EnableBlur(this,useBlur);
+                if(Glass95.Enabled&&!custom){if(glassEdge==null||edgeDark!=Dark){edgeDark=Dark;glassEdge=Glass95.Edge(Dark);}}
+                else glassEdge=null;
+                Surface.Background=custom?DockAppearance.Background:useBlur?LightPanel.DockGlass:Dark?Paint.Brush("#FF29302D"):LightPanel.DockSolid;
+                Surface.BorderBrush=custom?Glass95.Enabled&&!DockAppearance.IconsOnly?Glass95.Rim:Brushes.Transparent:glassEdge??(Brush)Brushes.Transparent;
+                Surface.BorderThickness=new Thickness(custom&&Glass95.Enabled&&!DockAppearance.IconsOnly?.7:0);
+                return;
+            }
             bool enabled=HasBlur&&Preferences.Current.Blur&&!(DockSurface&&Preferences.Current.DockSolidBackground)&&(!Glass95.Enabled||Glass95.Transparent);Native.EnableBlur(this,enabled);
             bool panel=PanelMaterial.ReadablePanel(this),popup=PanelMaterial.NotificationPopup(this);
             if(this is NotificationWindow){Dark=Glass95.Dark;Surface.Background=enabled?NotificationStyle.Surface:NotificationStyle.Solid;Surface.BorderBrush=Glass95.Enabled?Glass95.Rim:Paint.Brush("#28FFFFFF");Surface.BorderThickness=new Thickness(.7);return;}

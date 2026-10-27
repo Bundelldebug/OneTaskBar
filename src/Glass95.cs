@@ -57,8 +57,8 @@ namespace OneTaskBar
         }
         internal static void DockInk(DependencyObject root)
         {
-            var text=root as TextBlock;if(text!=null)text.Foreground=DockForeground;
-            var glyph=root as Glyph;if(glyph!=null&&glyph.Kind!="windows-start"){glyph.Color=DockForeground;glyph.InvalidateVisual();}
+            var text=root as TextBlock;if(text!=null){text.Foreground=DockForeground;text.Effect=DockAppearance.Readability;}
+            var glyph=root as Glyph;if(glyph!=null){glyph.Effect=DockAppearance.Readability;if(glyph.Kind!="windows-start")glyph.Color=DockForeground;glyph.InvalidateVisual();}
             foreach(object child in LogicalTreeHelper.GetChildren(root)){var node=child as DependencyObject;if(node!=null)DockInk(node);}
         }
         internal static void MediaInk(DependencyObject root)
