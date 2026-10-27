@@ -9,7 +9,7 @@ namespace OneTaskBar
 {
     internal static class DockStatusItems
     {
-        internal static readonly string[][] Choices={new[]{"bluetooth","bluetooth","블루투스"},new[]{"buds","bluetooth","Galaxy Buds"},new[]{"calendar","calendar","달력"},new[]{"capture","screenshot","화면 캡처"},new[]{"manager","task-manager","작업 관리자"},new[]{"settings","home","One TaskBar 설정"}};
+        internal static readonly string[][] Choices={new[]{"bluetooth","bluetooth","블루투스"},new[]{"buds","earbuds","Galaxy Buds"},new[]{"calendar","calendar","달력"},new[]{"capture","screenshot","화면 캡처"},new[]{"manager","task-manager","작업 관리자"},new[]{"settings","home","One TaskBar 설정"}};
         internal static string[] Clean(string[] items){return (items??new string[0]).Where(k=>Choices.Any(c=>c[0]==k)).Distinct().Take(4).ToArray();}
         internal static int Count {get{return Clean(Preferences.Current.DockStatusItems).Length;}}
         internal static void Invoke(string key,ShellController shell,GlassWindow anchor)
@@ -21,11 +21,31 @@ namespace OneTaskBar
     {
         readonly StackPanel extraStatus=new StackPanel {VerticalAlignment=VerticalAlignment.Center,HorizontalAlignment=HorizontalAlignment.Center};
         string extraStatusKey;
+        ImageSource statusBudsIcon;
+        bool statusBudsRequested;
+        async void LoadStatusBuds()
+        {
+            statusBudsRequested=true;
+            try{var symbol=await BackgroundWork.Run(BudsDeviceData.ShortcutIcon);if(!closed){statusBudsIcon=symbol;UpdateStatusSymbols();}}
+            catch(Exception error){AppLog.Once("status-buds",error.GetType().Name);}
+        }
+        void UpdateStatusSymbols()
+        {
+            foreach(var button in extraStatus.Children.OfType<Button>())
+            {
+                var glyph=button.Content as Glyph;
+                if(glyph==null)continue;
+                glyph.Update(glyph.Kind,Glass95.DockForeground);
+                if((string)button.Tag=="buds")glyph.SetDeviceIcon(statusBudsIcon);
+            }
+        }
+        internal Glyph StatusShortcut(string key){var button=extraStatus.Children.OfType<Button>().FirstOrDefault(b=>(string)b.Tag==key);return button==null?null:button.Content as Glyph;}
         void RebuildStatusItems()
         {
             var keys=DockStatusItems.Clean(Preferences.Current.DockStatusItems);string signature=String.Join("|",keys);bool vertical=DockGeometry.Vertical(Edge);extraStatus.Orientation=vertical?Orientation.Vertical:Orientation.Horizontal;
-            if(extraStatusKey!=signature){extraStatusKey=signature;extraStatus.Children.Clear();foreach(string key in keys){var choice=DockStatusItems.Choices.First(c=>c[0]==key);var glyph=new Glyph(choice[1],17){Color=Glass95.DockForeground};var button=Paint.Button(glyph,()=>DockStatusItems.Invoke(key,controller,Status),choice[2]);button.Width=24;button.Height=24;button.Padding=new Thickness(0);button.Background=Brushes.Transparent;extraStatus.Children.Add(button);}}
-            foreach(var glyph in extraStatus.Children.OfType<Button>().Select(b=>b.Content).OfType<Glyph>()){glyph.Color=Glass95.DockForeground;glyph.InvalidateVisual();}
+            if(extraStatusKey!=signature){extraStatusKey=signature;extraStatus.Children.Clear();foreach(string key in keys){var choice=DockStatusItems.Choices.First(c=>c[0]==key);var glyph=new Glyph(choice[1],17){Color=Glass95.DockForeground};var button=Paint.Button(glyph,()=>DockStatusItems.Invoke(key,controller,Status),choice[2]);button.Tag=key;button.Width=24;button.Height=24;button.Padding=new Thickness(0);button.Background=Brushes.Transparent;extraStatus.Children.Add(button);}}
+            UpdateStatusSymbols();
+            if(keys.Contains("buds")&&!statusBudsRequested)LoadStatusBuds();
             var grid=(Grid)Status.Surface.Child;if(vertical){grid.RowDefinitions[3].Height=new GridLength(keys.Length*24);extraStatus.Width=38;extraStatus.Height=keys.Length*24;}else grid.ColumnDefinitions[3].Width=new GridLength(keys.Length*24);
             extraStatus.Visibility=keys.Length==0?Visibility.Collapsed:Visibility.Visible;
         }
