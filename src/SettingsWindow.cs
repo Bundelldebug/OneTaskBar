@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -25,6 +25,7 @@ namespace OneTaskBar
         {
             shell=controller;Title=Program.AppName;ShowInTaskbar=false;Topmost=false;Width=760;Height=720;WindowStartupLocation=WindowStartupLocation.CenterScreen;Dark=false;OpaqueSurface=true;SetMaterial(AppSettingsPalette.Surface,AppSettingsPalette.Surface);Surface.BorderBrush=AppSettingsPalette.Stroke;Surface.BorderThickness=new Thickness(1);
             Icon=new BitmapImage(new Uri(Path.Combine(AppLog.Root,"assets","OneTaskBar.ico")));
+            PreviewMouseLeftButtonDown+=DragSettingsHeader;
             var root=new DockPanel {Margin=new Thickness(28,24,28,20)};
             var header=SettingsHeader();DockPanel.SetDock(header,Dock.Top);root.Children.Add(header);
             var footer=new StackPanel {Margin=new Thickness(2,15,2,0)};status.TextWrapping=TextWrapping.Wrap;status.Margin=new Thickness(0,0,0,12);footer.Children.Add(status);status.SetBinding(VisibilityProperty,new System.Windows.Data.Binding("Text"){Source=status,Converter=new EmptySettingsText()});

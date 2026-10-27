@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -117,6 +117,7 @@ namespace OneTaskBar
             // Restore only a dock that its controller already intends to display.
             var handle=new WindowInteropHelper(window).Handle;if(handle==IntPtr.Zero)return;
             if(!window.IsVisible)window.Show();
+            ShellWindowPolicy.Apply(window);
             if(!IsWindowVisible(handle)||IsIconic(handle))ShowWindow(handle,4);
             if(raise){var owner=GetWindow(handle,4);if(owner!=IntPtr.Zero)SetWindowPos(owner,new IntPtr(-1),0,0,0,0,0x53);}
             if(raise||(GetWindowLong(handle,-20)&8)==0)SetWindowPos(handle,new IntPtr(-1),0,0,0,0,0x53);
@@ -151,7 +152,7 @@ namespace OneTaskBar
         internal static object RegionInfo(Window window)
         {
             var handle=new WindowInteropHelper(window).Handle;if(handle==IntPtr.Zero)return null;RectI rect;GetWindowRect(handle,out rect);var r=CreateRectRgn(0,0,0,0);
-            try{int type=GetWindowRgn(handle,r),style=GetWindowLong(handle,-20);var owner=GetWindow(handle,4);int ownerStyle=owner!=IntPtr.Zero?GetWindowLong(owner,-20):0;return new {title=window.Title,visible=window.IsVisible,width=rect.Right-rect.Left,height=rect.Bottom-rect.Top,rounded=type!=0&&!PtInRegion(r,0,0)&&PtInRegion(r,(rect.Right-rect.Left)/2,(rect.Bottom-rect.Top)/2),excludedFromAltTab=(style&0x80)!=0&&(style&0x40000)==0,backdropExcludedFromAltTab=(ownerStyle&0x80)!=0&&(ownerStyle&0x40000)==0};}finally{DeleteObject(r);}
+            try{int type=GetWindowRgn(handle,r),style=GetWindowLong(handle,-20);var owner=GetWindow(handle,4);int ownerStyle=owner!=IntPtr.Zero?GetWindowLong(owner,-20):0;return new {title=window.Title,visible=window.IsVisible,left=rect.Left,top=rect.Top,width=rect.Right-rect.Left,height=rect.Bottom-rect.Top,rounded=type!=0&&!PtInRegion(r,0,0)&&PtInRegion(r,(rect.Right-rect.Left)/2,(rect.Bottom-rect.Top)/2),excludedFromAltTab=(style&0x80)!=0&&(style&0x40000)==0,backdropExcludedFromAltTab=(ownerStyle&0x80)!=0&&(ownerStyle&0x40000)==0};}finally{DeleteObject(r);}
         }
         internal static void Open(string target)
         {

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -149,17 +149,22 @@ namespace OneTaskBar
         internal readonly Native.PointI Anchor;
         internal readonly System.Drawing.Rectangle Monitor;
         internal readonly double Scale;
-        internal TrayPlacement(System.Windows.Point anchor,System.Drawing.Rectangle monitor,double scale)
+        internal readonly int Edge;
+        internal TrayPlacement(System.Windows.Point anchor,System.Drawing.Rectangle monitor,double scale,int edge=3)
         {
-            Anchor=new Native.PointI {X=(int)Math.Round(anchor.X),Y=(int)Math.Round(anchor.Y)};Monitor=monitor;Scale=Math.Max(1,scale);
+            Anchor=new Native.PointI {X=(int)Math.Round(anchor.X),Y=(int)Math.Round(anchor.Y)};Monitor=monitor;Scale=Math.Max(1,scale);Edge=edge;
         }
         internal Native.PointI Target(int width,int height)
         {
             int inset=(int)Math.Round(8*Scale),gap=inset;
             int minX=Monitor.Left+inset,minY=Monitor.Top+inset;
+            int x=Anchor.X-width/2,y=Anchor.Y-height-gap;
+            if(Edge==0){x=Anchor.X+(int)Math.Round(22*Scale)+gap;y=Anchor.Y-height/2;}
+            else if(Edge==2){x=Anchor.X-width-(int)Math.Round(22*Scale)-gap;y=Anchor.Y-height/2;}
+            else if(Edge==1)y=Anchor.Y+(int)Math.Round(22*Scale)+gap;
             return new Native.PointI {
-                X=Math.Max(minX,Math.Min(Anchor.X-width/2,Math.Max(minX,Monitor.Right-width-inset))),
-                Y=Math.Max(minY,Math.Min(Anchor.Y-height-gap,Math.Max(minY,Monitor.Bottom-height-inset)))
+                X=Math.Max(minX,Math.Min(x,Math.Max(minX,Monitor.Right-width-inset))),
+                Y=Math.Max(minY,Math.Min(y,Math.Max(minY,Monitor.Bottom-height-inset)))
             };
         }
     }
@@ -167,7 +172,9 @@ namespace OneTaskBar
     {
         internal static bool OpenSystemPanel(bool notifications,System.Drawing.Rectangle? monitor=null)
         {
-            return SystemPanels.Toggle(notifications);
+            bool opened=SystemPanels.Toggle(notifications);
+            if(opened&&monitor.HasValue)SystemPanelPlacement.Align(monitor.Value,DockGeometry.Edge,notifications?"notifications":"quick");
+            return opened;
         }
         internal static bool SystemPanelVisible(bool notifications)
         {
