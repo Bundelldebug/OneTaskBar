@@ -100,7 +100,7 @@ namespace OneTaskBar
                 ContextMenu menu;
                 item.ContextMenu=Board.ContentsEditing&&insideMenus.TryGetValue(key,out menu)?menu:tiles.ContainsKey(key)?tiles[key].ContextMenu:null;
                 Toggles[key].IsHitTestVisible=Toggles[key].Focusable=!Board.ContentsEditing;
-                ((TextBlock)item.Children[1]).Visibility=Expanded||slot.Rows>1?Visibility.Visible:Visibility.Collapsed;
+                ((TextBlock)item.Children[1]).Visibility=Expanded?Visibility.Visible:Visibility.Collapsed;
                 ((TextBlock)item.Children[1]).Margin=new Thickness(0,Expanded?6:0,0,0);
             }
             emptyActions.Visibility=members.Length==0?Visibility.Visible:Visibility.Collapsed;
@@ -152,8 +152,7 @@ namespace OneTaskBar
         void SizeActions()
         {
             if(actionGrid.Columns<1||actionGrid.Rows<1)return;
-            bool labels=Expanded||actionGrid.Rows>1;
-            double size=Math.Max(28,Math.Min(48,Math.Min(actionGrid.ActualWidth/actionGrid.Columns-4,actionGrid.ActualHeight/actionGrid.Rows-(labels?(Expanded?22:16):0)-2)));
+            double size=Math.Max(28,Math.Min(48,(Board.ActualWidth-30)/4-8));
             foreach(var button in Toggles.Values)
             {
                 button.Width=button.Height=size;
@@ -189,10 +188,37 @@ namespace OneTaskBar
         }
         internal void ExpandToggles(bool value,bool animate=true)
         {
+            if(Expanded==value)return;
+            var previous=actionGrid.Children.OfType<StackPanel>().ToDictionary(i=>(string)i.Tag,i=>i.TranslatePoint(new Point(),Board));
+            var frame=Board.Frames["toggles"];
+            double height=frame.ActualHeight;
+            actionGrid.Height=Double.NaN;
+            actionGrid.VerticalAlignment=VerticalAlignment.Stretch;
+            frame.StopExpansion();
             Board.ExpandedToggleRows=Math.Max(2,Math.Min(5,(ActionOrder.Members.Length+3)/4+1));
             Board.SetExpanded(value,animate);
             PresentToggles(Board.DisplayLayout.Find("toggles"));
-            if(animate&&host.IsVisible)Motion.Fade(actionGrid,.7,1,170);
+            Board.UpdateLayout();
+            if(animate&&host.IsVisible&&Motion.Enabled)
+            {
+                actionGrid.Height=actionGrid.ActualHeight;
+                actionGrid.VerticalAlignment=VerticalAlignment.Top;
+                foreach(StackPanel item in actionGrid.Children)
+                {
+                    Point from;
+                    var move=new TranslateTransform();
+                    item.RenderTransform=move;
+                    if(previous.TryGetValue((string)item.Tag,out from))
+                    {
+                        Point to=item.TranslatePoint(new Point(),Board);
+                        move.BeginAnimation(TranslateTransform.XProperty,Motion.Tween(from.X-to.X,0,220));
+                        move.BeginAnimation(TranslateTransform.YProperty,Motion.Tween(from.Y-to.Y,0,220));
+                    }
+                    else Motion.Fade(item,0,1,220);
+                    if(value)Motion.Fade((TextBlock)item.Children[1],0,1,220);
+                }
+                frame.AnimateExpansion(height,()=>{actionGrid.Height=Double.NaN;actionGrid.VerticalAlignment=VerticalAlignment.Stretch;});
+            }
         }
     }
 }
