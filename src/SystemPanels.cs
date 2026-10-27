@@ -20,6 +20,12 @@ namespace OneTaskBar
         internal static bool Toggle(bool notifications)
         {return Shortcut((ushort)(notifications?0x4e:0x41));}
         internal static bool TaskView(){return Shortcut(0x09);}
+        internal static bool ContextMenu()
+        {
+            if(ModifiersHeld())return false;
+            var keys=new[]{Key(0x10,0),Key(0x79,0),Key(0x79,2),Key(0x10,2)};
+            return SendInput(4,keys,Marshal.SizeOf(typeof(Input)))==4;
+        }
         internal static bool DesktopCommand(int steps,int operation)
         {
             if(operation<0||operation>2||Math.Abs(steps)>256)return false;

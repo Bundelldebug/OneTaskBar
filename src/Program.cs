@@ -71,6 +71,7 @@ namespace OneTaskBar
             if(args.Contains("--settings-visibility-probe"))return SettingsVisibilityChecks.Run();
             if(args.Contains("--window-switcher-probe"))return WindowSwitcherChecks.Run(args.Contains("--inspect"));
             if(args.Contains("--desktop-overview-probe"))return DesktopOverviewChecks.Run(args.Contains("--inspect"));
+            if(args.Contains("--tray-overflow-probe"))return TrayOverflowChecks.Run();
             if(args.Contains("--window-activation-probe"))return WindowActivationChecks.Run();
             if(args.Contains("--startup-probe"))return StartupChecks.Run();
             if(args.Contains("--startup-registration-probe"))return LogonStartup.ProbeRegistration();

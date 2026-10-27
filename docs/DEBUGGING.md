@@ -23,6 +23,10 @@ Use this routing table before reading source. The probe runner prints one result
 | Media wave, title, responsive layout or low-res art | `MediaPlayerModern.cs`, `MediaWave.cs`, `MarqueeTitle.cs`, `YouTubeArtwork.cs` | Media |
 | Different floating popup and quick-panel tint | `PanelMaterial.PopupSurface`, `WindowPreview.ApplyMaterial`, `WindowSwitcherView.cs` | Dock; Notifications; Settings / `panel-theme-probe` |
 | Dock missing on desktop or wrong fullscreen monitor | `DockHost.UpdateVisibility` in `Windows.cs`, `Native.EnsureDockVisible`, `FullscreenVisibility.cs` | Dock |
+| Virtual display leaves the dock hidden after the last app closes | `FullscreenVisibility.PassiveSurface`, `DockHost.UpdateVisibility` desktop-idle recovery | Dock / `desktop-behavior-probe` |
+| Desktop overview stutters or leaves a black preview window | `DesktopOverviewController.cs`, `DesktopOverview.cs`, `SwitchThumbnail` in `WindowSwitcherView.cs` | Dock / `desktop-overview-probe`; `desktop-overview-timing.json` contains counts/timing only |
+| Tray icons, native-host fallback or recovery | `TrayOverflowController.cs`, `TrayIcons.cs`, `TrayIconVisual.cs`, `TrayOverflowWindow.cs` | Dock / `tray-overflow-probe`; `tray-proxy-state.json` contains counts only |
+| Glass bevel clipping or repeated layout work | `GlassRefraction.cs`, `LiveBackdrop.RefreshRefraction` | Glass / `glass95-probe` |
 | Alt+Tab does not raise an existing active app | `WindowSwitcherManager.cs`, `WindowActivation.cs` | Dock / `window-activation-probe` |
 | Search order, recent chips or keyboard focus | `SearchWindow.cs`, `SearchNavigation.cs`, `LauncherInputChecks.cs` | Launcher |
 | Settings blank, search empty strips, version label | `SettingsWindow.cs`, `SettingsPages.cs`, `UIVersionPicker.cs` | Settings |
@@ -49,3 +53,5 @@ Compare matching media, monitor and visible-panel states. `totalWorkingSetMiB` i
 - A normal restart/install and published asset verification are separate from fixture success. Preserve settings and use exact tested CI bytes for releases; do not overwrite existing release tags or assets.
 
 UI review: launch the installed app with --desktop --review-ui, then use --open-panel notifications|quick|start|search. Review mode exposes owned surfaces to the capture tool; restart without --review-ui afterward. Normal sessions and fixtures retain hidden tool windows.
+
+Desktop overview and tray fixtures create their own source windows. They never send desktop-switch shortcuts, close user windows or invoke the real tray. Test the real desktop shortcut and tray callbacks separately. Tray review mode writes provider labels/IDs to a local `tray-provider-review.json`; keep it private. Normal mode records counts only. No process injection or shell patcher is used. Explorer's original window styles/opacity are restored when the popup closes and by the recovery helper after a crash.

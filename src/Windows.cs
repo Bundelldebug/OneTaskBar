@@ -90,7 +90,7 @@ namespace OneTaskBar
             powerColumn=new ColumnDefinition {Width=new GridLength(58)};status.ColumnDefinitions.Add(powerColumn);
             status.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(0)});
             status.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(94)});
-            var native=Paint.Button(new Glyph("up",15) {Color=Glass95.DockForeground},()=>controller.ShowNative("tray",this),"Windows 숨겨진 아이콘 · 트레이");
+            var native=Paint.Button(new Glyph("up",15) {Color=Glass95.DockForeground},()=>controller.ShowNative("tray",this),"숨겨진 아이콘 · 트레이");
             trayAccess=native;
             native.Padding=new Thickness(0); native.Background=Brushes.Transparent; status.Children.Add(native);
             bool vertical=DockGeometry.Vertical(Edge);if(vertical){wifiStatus.Width=wifiStatus.Height=18;volumeStatus.Width=volumeStatus.Height=16;}wifiStatus.Margin=vertical?new Thickness(0,0,2,0):new Thickness(2,0,10,0);classicStatus.Children.Add(wifiStatus);classicStatus.Children.Add(volumeStatus);statusIcons.Children.Add(classicStatus);statusIcons.Children.Add(duoStatus);

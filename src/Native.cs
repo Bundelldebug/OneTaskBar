@@ -162,6 +162,7 @@ namespace OneTaskBar
         {
             EnumWindows((h, s) => { var n = new StringBuilder(100); GetClassName(h,n,100);
                 if(n.ToString()=="Shell_TrayWnd" || n.ToString()=="Shell_SecondaryTrayWnd") {TaskbarMask.Restore(h);ShowWindow(h,5);}
+                if(n.ToString()=="TopLevelWindowForOverflowXamlIsland"||n.ToString()=="NotifyIconOverflowWindow")TrayIconSession.Restore(h);
                 return true; }, IntPtr.Zero);
         }
         internal static void HideTaskbars()

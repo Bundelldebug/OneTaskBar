@@ -19,7 +19,7 @@ namespace OneTaskBar
             TaskViewRequests++;
             if(Overview!=null&&Overview.IsVisible&&!Overview.Retiring){overviewRequest++;Overview.Dismiss();return;}
             int request=++overviewRequest;
-            Switcher.Cancel();PrepareWindowSwitcher();
+            Switcher.Cancel();PrepareWindowSwitcher(true);
             if(Demo)return;
             var foreground=Native.GetForegroundWindow();
             var monitor=System.Windows.Forms.Screen.FromPoint(System.Windows.Forms.Cursor.Position);
@@ -41,7 +41,13 @@ namespace OneTaskBar
             int index=snapshot.Pages.FindIndex(p=>p.Id==id);
             if(index<0||disposed)return;
             await Task.Delay(Motion.Enabled?180:30);
-            bool changed=await Task.Run(()=>SystemPanels.DesktopCommand(index-snapshot.CurrentIndex,operation));
+            overviewCache=null;
+            bool changed=await Task.Run(()=>{
+                int steps;
+                if(operation==1)return SystemPanels.DesktopCommand(0,1);
+                if(!VirtualDesktops.CurrentDistance(id,out steps))return operation==0&&snapshot.Pages.Count==1&&snapshot.Current==id;
+                return SystemPanels.DesktopCommand(steps,operation);
+            });
             if(changed&&window!=IntPtr.Zero&&Native.IsWindow(window))WindowActivation.Activate(window);
             if(!changed)AppLog.Write("desktop-command","Windows did not accept the desktop shortcut");
         }
