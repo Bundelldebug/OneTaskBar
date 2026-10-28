@@ -90,7 +90,7 @@ namespace OneTaskBar
         }
         internal void Show(NotificationEntry item)
         {
-            if(disposed)return;if(shell.Buds.ShowNative(item))return;var existing=visible.FirstOrDefault(b=>String.Equals(NotificationStack.AppKey(b.Entry),NotificationStack.AppKey(item),StringComparison.OrdinalIgnoreCase));if(existing!=null){existing.Update(item);Layout();return;}
+            if(disposed)return;shell.NotificationSound.Notify(item);if(shell.Buds.ShowNative(item))return;var existing=visible.FirstOrDefault(b=>String.Equals(NotificationStack.AppKey(b.Entry),NotificationStack.AppKey(item),StringComparison.OrdinalIgnoreCase));if(existing!=null){existing.Update(item);Layout();return;}
             while(visible.Count>=3)Close(visible[0],false);
             var banner=new NotificationBanner(item,Open,Close);visible.Add(banner);Shown++;Layout();banner.Appear();expiry.Start();
         }

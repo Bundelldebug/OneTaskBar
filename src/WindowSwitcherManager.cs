@@ -1,7 +1,8 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Threading;
@@ -23,7 +24,27 @@ namespace OneTaskBar
         {
             shell=controller;fixture=read!=null;if(fixture&&!Program.Inspectable)throw new InvalidOperationException("Switcher fixture requires inspectable mode");fixtureRead=read;activate=activation??WindowActivation.Activate;pulse.Tick+=(s,e)=>Pulse();
         }
-        internal void Update(IEnumerable<AppEntry> apps){if(disposed)return;metadata=apps.ToArray();if(Preferences.Current.NativeAltTab||!fixture&&!shell.Desktop){snapshot.Clear();return;}try{snapshot=fixture?fixtureRead():SwitchWindows.Read(metadata);}catch(Exception error){AppLog.Once("switcher-list",error.GetType().Name);snapshot.Clear();}}
+        int snapshotRevision;bool readingSnapshot;
+        internal async void Update(IEnumerable<AppEntry> apps)
+        {
+            if(disposed)return;metadata=apps.ToArray();++snapshotRevision;
+            if(Preferences.Current.NativeAltTab||!fixture&&!shell.Desktop){snapshot.Clear();return;}
+            if(fixture){snapshot=fixtureRead();return;}
+            if(readingSnapshot)return;readingSnapshot=true;
+            try
+            {
+                int revision;
+                do
+                {
+                    revision=snapshotRevision;var source=metadata;
+                    var next=await Task.Run(()=>SwitchWindows.Read(source));
+                    if(disposed||Preferences.Current.NativeAltTab||!shell.Desktop)return;
+                    if(revision==snapshotRevision)snapshot=next;
+                }while(revision!=snapshotRevision);
+            }
+            catch(Exception error){AppLog.Once("switcher-list",error.GetType().Name);}
+            finally{readingSnapshot=false;}
+        }
         internal void PreferenceChanged(){bool next=Preferences.Current.NativeAltTab;if(next==preferNative)return;preferNative=next;if(next){Cancel();snapshot.Clear();}else Update(metadata);}
         internal void AltReleased(){if(!Active)WindowActivation.CancelMenu(Native.GetForegroundWindow());}
         internal bool Cycle(bool reverse)
@@ -37,7 +58,7 @@ namespace OneTaskBar
         {
             queued=false;if(!Enabled){Cancel();return;}if(finish==false){End(false);return;}
             try{
-                if(pending){var items=fixture?fixtureRead():SwitchWindows.Read(metadata);if(items.Count==0){End(false);return;}int first=commands.Count==0?1:commands[0];if(first!=1&&first!=-1)first=1;session=new SwitchSession(items,original,first);if(commands.Count>0)commands.RemoveAt(0);pending=false;shell.PrepareWindowSwitcher();}
+                if(pending){var items=fixture?fixtureRead():SwitchWindows.Read(metadata,false,false);if(items.Count==0){End(false);return;}int first=commands.Count==0?1:commands[0];if(first!=1&&first!=-1)first=1;session=new SwitchSession(items,original,first);if(commands.Count>0)commands.RemoveAt(0);pending=false;shell.PrepareWindowSwitcher();}
                 if(session==null)return;var previous=session.Current;foreach(int command in commands){if(command==Int32.MinValue)session.Selected=0;else if(command==Int32.MaxValue)session.Selected=session.Items.Count-1;else session.Move(command);}commands.Clear();bool pruned=session.Prune(Native.IsWindow);if(session.Items.Count==0){End(false);return;}if(finish.HasValue){End(finish.Value);return;}if(view==null||pruned||session.Current!=previous)Render();pulse.Start();
             }catch(Exception error){AppLog.Write("switcher",error.GetType().Name+": "+error.Message);End(false);}
         }

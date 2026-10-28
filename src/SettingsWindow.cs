@@ -42,6 +42,7 @@ namespace OneTaskBar
             var panels=new StackPanel();
             ChoiceRow(panels,"알림센터","시계와 알림 버튼에서 열 화면",Preferences.Current.NativeNotifications,v=>Preferences.Set(p=>p.NativeNotifications=v));
             Row(panels,"One Taskbar 알림 팝업","Windows 알림을 둥근 블러 카드로 표시합니다. 방해 금지와 앱별 배너 설정을 따릅니다",Preferences.Current.NotificationPopups,v=>Preferences.Set(p=>p.NotificationPopups=v));
+            NotificationSoundSetting(panels);
             Row(panels,"Galaxy Buds 연결 팝업","버즈 연결 정보를 오른쪽 아래에 표시합니다. 등록된 기기의 상태 변경만 감지합니다",Preferences.Current.BudsConnectionPopups,v=>Preferences.Set(p=>p.BudsConnectionPopups=v));
             var notificationLink=Paint.Action("Windows 알림 연결 · 권한 관리",()=>shell.ShowNotificationConnection());notificationLink.HorizontalContentAlignment=HorizontalAlignment.Left;notificationLink.Margin=new Thickness(12,5,12,12);panels.Children.Add(notificationLink);
             ChoiceRow(panels,"빠른 설정","Wi-Fi·소리·배터리 버튼에서 열 화면",Preferences.Current.NativeQuickSettings,v=>Preferences.Set(p=>p.NativeQuickSettings=v));

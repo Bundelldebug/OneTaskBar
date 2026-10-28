@@ -68,6 +68,7 @@ namespace OneTaskBar
         DesktopLease lease;
         readonly ChargeState chargeState=new ChargeState();
         internal readonly ChargeSound ConnectionSound=new ChargeSound();
+        internal readonly NotificationAudio NotificationSound=new NotificationAudio();
         readonly DispatcherTimer timer=new DispatcherTimer { Interval=TimeSpan.FromMilliseconds(100) };
         readonly ShellEvents shellEvents;
         readonly VolumeKeys keys;
@@ -301,6 +302,7 @@ namespace OneTaskBar
             Notifications.Check();Banners.Refresh();Buds.Refresh();
             Services.ArtworkModeChanged();
             if(!Preferences.Current.ChargeSoundEnabled)ConnectionSound.Dispose();
+            NotificationSound.Refresh();
             if(Preferences.Current.NativeSearch&&Finder!=null)Finder.Hide();
             if(Preferences.Current.NativeQuickSettings){if(Quick!=null)Quick.Hide();if(Detail!=null)Detail.Hide();}
             if(Preferences.Current.NativeNotifications&&Center!=null)Center.Hide();
@@ -743,6 +745,7 @@ namespace OneTaskBar
             TaskbarMask.Active=false;
             if(startupWork!=null){startupWork.Dispose();startupWork=null;}if(themeRefresh!=null)themeRefresh.Stop();timer.Stop();RecentApps.Dispose();Placement.Dispose(); SystemEvents.DisplaySettingsChanged-=DisplayChanged;SystemEvents.UserPreferenceChanged-=ThemeChanged; SystemEvents.PowerModeChanged-=PowerChanged;
             ConnectionSound.Dispose();
+            NotificationSound.Dispose();
             CloseTrayOverflow();CloseDesktopOverview();Previews.Dispose();Switcher.Dispose();if(brightnessEvents!=null)brightnessEvents.Dispose();
             if(keys!=null) keys.Dispose();
             if(osdGate!=null)osdGate.Dispose();

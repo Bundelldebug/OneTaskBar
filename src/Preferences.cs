@@ -11,6 +11,8 @@ namespace OneTaskBar
         public bool NativeNotifications=false,NativeQuickSettings=false;
         public bool NotificationIntegration=true;
         public bool NotificationPopups=true;
+        public bool NotificationSoundEnabled=false;
+        public string NotificationSoundFile;
         public bool BudsConnectionPopups=true;
         public bool QuickGalaxyBuds=false;
         public int UIVersion=85;

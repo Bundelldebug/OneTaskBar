@@ -28,12 +28,14 @@ Use this routing table before reading source. The probe runner prints one result
 | Desktop overview stutters or leaves a black preview window | `DesktopOverviewController.cs`, `DesktopOverview.cs`, `SwitchThumbnail` in `WindowSwitcherView.cs` | Dock / `desktop-overview-probe`; `desktop-overview-timing.json` contains counts/timing only |
 | Tray icons, native-host fallback or recovery | `TrayOverflowController.cs`, `TrayIcons.cs`, `TrayIconVisual.cs`, `TrayOverflowWindow.cs` | Dock / `tray-overflow-probe`; `tray-proxy-state.json` contains counts only |
 | Glass bevel clipping or repeated layout work | `GlassRefraction.cs`, `LiveBackdrop.RefreshRefraction` | Glass / `glass95-probe` |
-| Alt+Tab does not raise an existing active app | `WindowSwitcherManager.cs`, `WindowActivation.cs` | Dock / `window-activation-probe` |
+| Alt+Tab does not raise an existing active app, especially Samsung Notes | `SwitchSession` in `WindowSwitchModel.cs` normalizes foreground children; `WindowActivationDiagnostics.ResponseTarget` probes the host frame, `WindowActivationFocus.cs` targets actual content; a denied optional destination queue must not abort activation | Dock / `window-switcher-probe`, `window-activation-probe`; private `window-activation-last.json` records classes/handles and queue errors, never titles/content |
 | Search order, recent chips or keyboard focus | `SearchWindow.cs`, `SearchNavigation.cs`, `LauncherInputChecks.cs` | Launcher |
 | Settings blank, search empty strips, version label | `SettingsWindow.cs`, `SettingsPages.cs`, `UIVersionPicker.cs` | Settings |
 | Dock zoom, compact clock, scaled click/popup placement | `DockSizing.cs`, `DockClock.cs`, `DockGeometry.cs`, `NowBarLayout.cs` | Settings / `beta-feedback-probe`, `DockSizingChecks`; Dock / `tray-overflow-probe` preserves real DPI while scaling anchor gaps |
 | Linked panel color or settings transition residue | `PanelTint.cs`, `SettingsPageMotion.cs` | `panel-theme-probe`, `settings-visibility-probe` |
 | Notification logo, image, action or stale cache | `NotificationService.cs`, `NotificationIcons.cs`, `NativeToastAssets.cs` | Notifications; `self-test` includes asset/cache checks |
+| Notification swipe opens instead of deleting, or fails to settle | `NotificationSwipe.cs`, `NotificationStack.cs` | Notifications / `notification-swipe-probe`, `notification-stack-probe`; add `--inspect --review-ui` for a disposable mouse fixture |
+| Custom notification sound or repeated sounds | `NotificationAudio.cs`, `SettingsSound.cs`, `NotificationBanners.Show` | `self-test` checks disabled defaults and independent persistence; live sounds require a fresh eligible banner, not a history refresh |
 | Login delay, idle resource growth | `Startup.cs`, `Shell.cs`, `RuntimeCadence.cs`, `MemoryChecks.cs` | Startup; Resources |
 
 ## Runtime measurements
@@ -45,6 +47,10 @@ Use this routing table before reading source. The probe runner prints one result
 ```
 
 Compare matching media, monitor and visible-panel states. `totalWorkingSetMiB` includes shared resident pages; `privateWorkingSetMiB` is private resident memory; `privateBytesMiB` is committed private memory, not RAM in use. CPU is normalized across logical processors. Do not claim the 150 MB total-RAM goal from private memory alone.
+
+Wave and marquee motion use compositor frame callbacks only while moving. Marquee endpoint pauses sleep on one dormant timer; paused/hidden waves detach after their amplitude settles. Desktop overview reuses its hidden shell but releases every native thumbnail on hide. Resize work is coalesced; switcher selection alone must not force layout or reposition every preview. The existing motion/lifecycle probes cover these boundaries.
+
+The activation fixture must put its own source window in the foreground first; it normalizes a hosted foreground to the outer frame for setup. Samsung Notes' `Windows.UI.Core.CoreWindow` can time out WM_NULL while its `ApplicationFrameWindow` is responsive. Probe that frame and activate the actual CoreWindow when needed. Source/target queue links can be denied independently; keep successful links, attempt normal activation, and always detach. No simulated Alt key, foreground-timeout registry changes, elevation or general-use SwitchToThisWindow fallback is used.
 
 ## Boundaries and compatibility
 
