@@ -10,6 +10,8 @@ On 2026-10-25, after reporting the unavailable signing environment and approving
 
 ## Roles and approval
 
+For the maintainer's 2026-10-28 request to upload the applied animation, notification and hosted-window fixes, the next patches are prepared as **9.0.9** and **9.5.6-beta.1** using the previously accepted unsigned publication choice. Their notes disclose unsigned status and possible Windows blocking. Validate the exact hosted CI artifacts, payloads and checksums before publication. This does not activate a signing provider, change Windows trust, or relax the signed-only publication tool.
+
 Project maintainer, reviewer and signing approver: [Bundelldebug](https://github.com/Bundelldebug). External contributions must be reviewed before signing. Repository and signing-service access must use MFA. Each signing request needs maintainer approval under the provider's rules. Keys stay with the signing provider; no private key or certificate trust is installed by this program.
 
 After provider approval, the project attribution will be: “Free code signing provided by SignPath.io, certificate by SignPath Foundation”. This is a planned attribution, not a claim of current sponsorship.
