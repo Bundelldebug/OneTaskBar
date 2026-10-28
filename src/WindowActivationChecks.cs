@@ -36,14 +36,14 @@ namespace OneTaskBar
         // Arrange only these two owned fixture processes, without a synthetic OS key/click.
         static void Prepare(IntPtr target)
         {
-            uint pid;uint current=GetCurrentThreadId(),foreground=Native.GetWindowThreadProcessId(Native.GetForegroundWindow(),out pid),destination=Native.GetWindowThreadProcessId(target,out pid);bool first=false,second=false;
+            uint pid;uint current=GetCurrentThreadId(),foreground=Native.GetWindowThreadProcessId(Native.GetAncestor(Native.GetForegroundWindow(),2),out pid),destination=Native.GetWindowThreadProcessId(target,out pid);bool first=false,second=false;
             try{if(foreground!=0&&foreground!=current)first=AttachThreadInput(current,foreground,true);if(destination!=0&&destination!=current&&destination!=foreground)second=AttachThreadInput(current,destination,true);Native.SetForegroundWindow(target);}finally{if(second)AttachThreadInput(current,destination,false);if(first)AttachThreadInput(current,foreground,false);}
         }
         internal static int Run()
         {
             var application=new Application {ShutdownMode=ShutdownMode.OnExplicitShutdown};var children=new List<Process>();var handles=new List<IntPtr>();WindowSwitcherManager manager=null;ShellController shell=null;IDisposable pointer=null;bool oldNative=Preferences.Current.NativeAltTab;int result=1;var cases=new List<object>();
             application.Dispatcher.BeginInvoke(new Action(async()=>{try{
-                Program.Inspectable=true;Preferences.Current.NativeAltTab=false;pointer=MenuDismiss.WithSyntheticPointerForFixture();
+                Program.Inspectable=true;Preferences.Current.NativeAltTab=false;pointer=MenuDismiss.WithSyntheticPointerForFixture();Require(WindowActivation.HostedCore("Windows.UI.Core.CoreWindow","ApplicationFrameWindow")&&!WindowActivation.HostedCore("Edit","ApplicationFrameWindow")&&!WindowActivation.HostedCore("Windows.UI.Core.CoreWindow","Chrome_WidgetWin_1"),"Only hosted UWP content delegates response checks to its real frame");
                 foreach(string name in new[]{"a","b"}){string file=Path.Combine(AppLog.Data,"focus-source-"+name+".txt");var start=new ProcessStartInfo(Path.Combine(AppLog.Root,"OneTaskBar.exe"),"--window-focus-source "+name){UseShellExecute=false,WorkingDirectory=AppLog.Root};var child=Process.Start(start);children.Add(child);await Wait(()=>File.Exists(file)&&new FileInfo(file).Length>0);var handle=new IntPtr(Int64.Parse(File.ReadAllText(file)));uint pid;Native.GetWindowThreadProcessId(handle,out pid);Require(pid==(uint)child.Id,"Fixture HWND must belong to its own child process");handles.Add(handle);}
                 var a=handles[0];var b=handles[1];var entries=handles.Select((h,i)=>new SwitchItem {Window=h,Title="별도 프로세스 "+i,App=new AppEntry {Name="실제 앱 전환 "+i,Target="fixture:external:"+i,Icon=ArtworkPalette.Sample(i==0?Colors.SteelBlue:Colors.SeaGreen)}}).ToList();shell=new ShellController(true);manager=new WindowSwitcherManager(shell,()=>entries.ToList());manager.Update(new AppEntry[0]);
                 foreach(int state in new[]{0,2,1}){

@@ -29,7 +29,7 @@ namespace OneTaskBar
             for(int i=0;i<columns;i++)icons.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(48)});
             for(int i=0;i<(count+columns-1)/columns;i++)icons.RowDefinitions.Add(new RowDefinition {Height=new GridLength(48)});
             for(int i=0;i<count;i++){
-                var item=session.Items[i];UIElement image=item.Icon==null?(UIElement)new Glyph(item.Fallback,23) {Color=Glass95.DockForeground}:new TrayIconVisual(item.Icon);
+                var item=session.Items[i];UIElement image=item.Icon==null?(UIElement)new Glyph(item.Fallback,23) {Color=Paint.Text}:new TrayIconVisual(item.Icon,Paint.Text);
                 var button=Paint.Button(image,()=>ActivateItem(item,false),item.Name);button.Margin=new Thickness(2);button.Padding=new Thickness(8);button.Background=Brushes.Transparent;button.Resources["ButtonRadius"]=new CornerRadius(18);
                 System.Windows.Automation.AutomationProperties.SetName(button,item.Name);
                 button.PreviewMouseRightButtonUp+=(s,e)=>{e.Handled=true;ActivateItem(item,true);};

@@ -13,7 +13,7 @@ Start with the relevant row in `docs/DEBUGGING.md`. Search exact symbols with `r
 | Dock / fullscreen | `Windows.cs`, `DockGeometry.cs`, `FullscreenVisibility.cs`, `DesktopIntegration.cs` |
 | Output / HUD / media | `AudioOutputView.cs`, `DetailWindow.cs`, `MediaPlayerView.cs`, `MediaPlayerModern.cs`, `NowBar.cs` |
 | Launcher | `StartWindow.cs`, `SearchWindow.cs`, `SearchNavigation.cs`, `LauncherLayout.cs` |
-| Notifications | `NotificationService.cs`, `NotificationStack.cs`, `NotificationBanners.cs`, `BudsConnection.cs` |
+| Notifications | `NotificationService.cs`, `NotificationStack.cs`, `NotificationSwipe.cs`, `NotificationBanners.cs`, `NotificationAudio.cs`, `BudsConnection.cs` |
 | Preferences / settings | `Preferences.cs`, `SettingsWindow.cs`, `SettingsPages.cs`, `SettingsPersonalization.cs` |
 | Runtime | `Shell.cs`, `RuntimeCadence.cs`, `Startup.cs`, `MemoryChecks.cs` |
 

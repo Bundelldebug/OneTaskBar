@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -27,6 +27,11 @@ namespace OneTaskBar
                     var footer=new Border {Background=Paint.Brush("#33000000"),Child=new TextBlock {Text="실시간 창 미리보기 · "+(index+1),Margin=new Thickness(18),Foreground=Brushes.White,FontSize=15}};Grid.SetRow(footer,1);surface.Children.Add(footer);
                     var source=new Window {Title="창 전환 검사 · "+(index+1),Width=500,Height=330,Left=50+index*30,Top=320+index*18,ShowInTaskbar=false,Content=surface};sources.Add(source);source.Show();
                     var entry=new AppEntry {Name=new[]{"검색","파일 탐색기","미디어 플레이어","메모","사진","브라우저","One Taskbar"}[index],Target="fixture:switch:"+index,Icon=ArtworkPalette.Sample(color)};var handle=new WindowInteropHelper(source).Handle;entry.Windows.Add(handle);items.Add(new SwitchItem {Window=handle,Title=source.Title,App=entry});
+                }
+                using(var child=new HwndSource(new HwndSourceParameters("Hosted foreground fixture") {ParentWindow=items[0].Window,WindowStyle=0x50000000,Width=30,Height=30}))
+                {
+                    Require(Native.GetAncestor(child.Handle,2)==items[0].Window,"fixture child belongs to its outer frame");
+                    Require(new SwitchSession(items,child.Handle,1).Current.Window==items[1].Window&&new SwitchSession(items,child.Handle,-1).Current.Window==items[items.Count-1].Window,"hosted foreground advances from the frame in both directions, rather than reselecting itself");
                 }
                 var available=items.Take(3).ToList();manager=new WindowSwitcherManager(shell,()=>available.ToList(),h=>{activated.Add(h);Native.Activate(h);});manager.Update(new AppEntry[0]);sources[0].Activate();await Task.Delay(70);IntPtr original=Native.GetForegroundWindow();
                 var gesture=new WindowSwitchGesture {Cycle=manager.Cycle,Navigate=manager.Navigate,Finish=manager.Finish,AltReleased=manager.AltReleased};

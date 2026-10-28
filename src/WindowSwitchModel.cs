@@ -14,7 +14,15 @@ namespace OneTaskBar
     internal sealed class SwitchSession
     {
         internal readonly List<SwitchItem> Items;internal int Selected;
-        internal SwitchSession(IEnumerable<SwitchItem> items,IntPtr foreground,int steps){Items=items.GroupBy(i=>i.Window).Select(g=>g.First()).ToList();int current=Items.FindIndex(i=>i.Window==foreground);Selected=Wrap(current<0?(steps>0?steps-1:steps):current+steps,Items.Count);}
+        internal SwitchSession(IEnumerable<SwitchItem> items,IntPtr foreground,int steps)
+        {
+            Items=items.GroupBy(i=>i.Window).Select(g=>g.First()).ToList();
+            // UWP/hosted apps can expose their CoreWindow as foreground while
+            // the switch list contains the outer ApplicationFrameWindow.
+            var root=Native.GetAncestor(foreground,2);if(root==IntPtr.Zero)root=foreground;
+            int current=Items.FindIndex(i=>i.Window==foreground||i.Window==root);
+            Selected=Wrap(current<0?(steps>0?steps-1:steps):current+steps,Items.Count);
+        }
         internal static int Wrap(int index,int count){return count<=0?0:(index%count+count)%count;}
         internal void Move(int delta){Selected=Wrap(Selected+delta,Items.Count);}
         internal SwitchItem Current {get{return Items.Count==0?null:Items[Math.Min(Selected,Items.Count-1)];}}
@@ -65,12 +73,12 @@ namespace OneTaskBar
         static readonly int ownPid=Process.GetCurrentProcess().Id;
         [DllImport("user32.dll")]static extern IntPtr GetLastActivePopup(IntPtr window);
         internal static bool Eligible(bool visible,bool own,bool cloaked,int extended,string windowClass,bool isOwnerPopup){return visible&&!own&&!cloaked&&(extended&0x08000000)==0&&((extended&0x40000)!=0||((extended&0x80)==0&&isOwnerPopup))&&windowClass!="Progman"&&windowClass!="WorkerW"&&windowClass!="Shell_TrayWnd"&&windowClass!="Shell_SecondaryTrayWnd";}
-        internal static List<SwitchItem> Read(IEnumerable<AppEntry> apps,bool allDesktops=false)
+        internal static List<SwitchItem> Read(IEnumerable<AppEntry> apps,bool allDesktops=false,bool resolveUnknown=true)
         {
             var map=new Dictionary<IntPtr,AppEntry>();foreach(var app in apps)foreach(var window in app.Windows)if(!map.ContainsKey(window))map[window]=app;int own=ownPid;var result=new List<SwitchItem>();
             Native.EnumWindows((window,state)=>{try{
                 if(!Native.IsWindowVisible(window))return true;uint pid;Native.GetWindowThreadProcessId(window,out pid);if(pid==own)return true;int cloak;if(Native.DwmGetWindowAttribute(window,14,out cloak,4)!=0)cloak=0;var type=new StringBuilder(128);Native.GetClassName(window,type,type.Capacity);var root=Native.GetAncestor(window,3);var popup=root;for(int i=0;i<12;i++){var next=GetLastActivePopup(popup);if(next==IntPtr.Zero||next==popup)break;popup=next;if(Native.IsWindowVisible(popup))break;}if(!Eligible(true,false,allDesktops?(cloak&1)!=0:cloak!=0,Native.GetWindowLong(window,-20),type.ToString(),popup==window))return true;
-                var title=new StringBuilder(512);Native.GetWindowText(window,title,title.Capacity);if(String.IsNullOrWhiteSpace(title.ToString()))return true;AppEntry entry;if(!map.TryGetValue(window,out entry)){string target=null;try{using(var process=Process.GetProcessById((int)pid))target=process.MainModule.FileName;}catch{}entry=new AppEntry {Name=title.ToString(),Target=target};}result.Add(new SwitchItem {Window=window,Title=title.ToString(),App=entry});
+                var title=new StringBuilder(512);Native.GetWindowText(window,title,title.Capacity);if(String.IsNullOrWhiteSpace(title.ToString()))return true;AppEntry entry;if(!map.TryGetValue(window,out entry)){string target=null;if(resolveUnknown)try{using(var process=Process.GetProcessById((int)pid))target=process.MainModule.FileName;}catch{}entry=new AppEntry {Name=title.ToString(),Target=target};}result.Add(new SwitchItem {Window=window,Title=title.ToString(),App=entry});
             }catch{}return result.Count<256;},IntPtr.Zero);return result;
         }
     }

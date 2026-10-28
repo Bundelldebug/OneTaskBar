@@ -49,6 +49,7 @@ namespace OneTaskBar
         internal string AppKey {get{return stack.Key;}}
         internal Button ExpandButton {get{return !Expanded&&Count>1?collapsedButton:expand;}}
         internal IEnumerable<Border> RetainedCards {get{return retained.Values;}}
+        internal NotificationSwipe Swipe {get;private set;}
         internal static ImageSource CardIcon(NotificationEntry entry){return BudsInfo.Toast(entry)==null?entry.Icon:null;}
         internal bool DetailExpanded(NotificationEntry entry){return fullText.Contains(NotificationStack.ItemKey(entry));}
         internal Button DetailButton(NotificationEntry entry){Button button;return detailButtons.TryGetValue(NotificationStack.ItemKey(entry),out button)?button:null;}
@@ -60,11 +61,12 @@ namespace OneTaskBar
             header.Margin=new Thickness(13,8,8,0);header.Height=28;
             var heading=new StackPanel {Orientation=Orientation.Horizontal};label.VerticalAlignment=VerticalAlignment.Center;heading.Children.Add(label);arrow.Margin=new Thickness(7,0,0,0);heading.Children.Add(arrow);
             expand=Paint.Button(heading,()=>SetExpanded(!Expanded),"앱 알림 펼치기 · 접기");expand.Background=Brushes.Transparent;expand.Padding=new Thickness(0);expand.HorizontalContentAlignment=HorizontalAlignment.Left;expand.HorizontalAlignment=HorizontalAlignment.Stretch;expand.Margin=new Thickness(0,0,30,0);header.Children.Add(expand);
-            var close=Paint.Button(new Glyph("close",12){Color=NotificationStyle.Muted},()=>clear(stack),"이 앱의 알림 모두 지우기");close.Background=Brushes.Transparent;close.Width=close.Height=26;close.Padding=new Thickness(6);close.HorizontalAlignment=HorizontalAlignment.Right;header.Children.Add(close);
+            Swipe=NotificationSwipe.Attach(front,()=>{if(Count>1)clear(stack);else dismiss(stack.Latest);},()=>!Expanded);
             content.Children.Add(header);content.Children.Add(items);Update(group,false);
         }
         internal void Update(NotificationStack group,bool animate=true)
         {
+            if(Swipe!=null&&Swipe.Completed)Swipe.Restore();
             stack=group;fullText.RemoveWhere(k=>!group.Items.Any(n=>NotificationStack.ItemKey(n)==k));string next=String.Join("\n",group.Items.Select(n=>NotificationStack.ItemKey(n)+"|"+Version(n)));if(next==signature)return;signature=next;if(Count<2)Expanded=false;Rebuild(animate);
         }
         internal void SetExpanded(bool value)
@@ -102,9 +104,11 @@ namespace OneTaskBar
             var source=CardIcon(entry);var layout=new Grid();layout.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(source!=null?40:0)});layout.ColumnDefinitions.Add(new ColumnDefinition());
             if(source!=null){var icon=AppIcons.Visual(source,32);icon.VerticalAlignment=VerticalAlignment.Top;icon.Margin=new Thickness(0,3,6,0);layout.Children.Add(icon);}Grid.SetColumn(row,1);layout.Children.Add(row);
             var hit=Paint.Button(layout,()=>open(entry),entry.App+" · 원래 알림 동작 열기");hit.Tag=entry.Id;hit.HorizontalContentAlignment=HorizontalAlignment.Stretch;hit.Background=Brushes.Transparent;hit.Padding=new Thickness(13,grouped?8:13,35,14);
-            var frame=new Grid();frame.Children.Add(hit);var close=Paint.Button(new Glyph("close",12){Color=NotificationStyle.Muted},()=>dismiss(entry),"알림 지우기");close.Width=close.Height=24;close.Padding=new Thickness(5);close.Background=Brushes.Transparent;close.HorizontalAlignment=HorizontalAlignment.Right;close.VerticalAlignment=VerticalAlignment.Top;close.Margin=new Thickness(0,5,8,0);frame.Children.Add(close);
+            var frame=new Grid();frame.Children.Add(hit);
             var more=DetailToggle(entry,title,body,false);more.VerticalAlignment=VerticalAlignment.Bottom;more.Margin=new Thickness(0,0,7,5);frame.Children.Add(more);hit.Padding=new Thickness(13,grouped?8:13,38,31);
-            return new Border {Tag=CardVersion(entry,grouped),Child=frame,Background=Brushes.Transparent,CornerRadius=new CornerRadius(22)};
+            var card=new Border {Tag=CardVersion(entry,grouped),Child=frame,Background=Brushes.Transparent,CornerRadius=new CornerRadius(22)};
+            if(Expanded)NotificationSwipe.Attach(card,()=>dismiss(entry));
+            return card;
         }
         Border Capsule(NotificationEntry entry,bool grouped)
         {
@@ -116,7 +120,7 @@ namespace OneTaskBar
             if(entry.Artwork!=null){var picture=AppIcons.Visual(entry.Artwork,40);picture.Margin=new Thickness(4,0,grouped?28:0,0);picture.HorizontalAlignment=HorizontalAlignment.Right;Grid.SetColumn(picture,2);layout.Children.Add(picture);}var summary=new StackPanel();summary.Children.Add(layout);
             var hit=Paint.Button(summary,()=>{if(grouped)SetExpanded(true);else open(entry);},grouped?entry.App+" · 알림 "+Count+"개 펼치기":entry.App+" · 원래 알림 동작 열기");hit.Tag=entry.Id;hit.Background=Brushes.Transparent;hit.HorizontalContentAlignment=HorizontalAlignment.Stretch;hit.Padding=new Thickness(16,17,grouped?17:39,17);hit.MinHeight=80;
             var frame=new Grid();frame.Children.Add(hit);if(grouped){collapsedButton=hit;var menu=new ContextMenu();var clearAll=new MenuItem {Header="이 앱의 알림 모두 지우기"};clearAll.Click+=(s,e)=>clear(stack);menu.Items.Add(clearAll);hit.ContextMenu=menu;}
-            else{var close=Paint.Button(new Glyph("close",11){Color=NotificationStyle.Muted},()=>dismiss(entry),"알림 지우기");close.Background=Brushes.Transparent;close.Width=close.Height=22;close.Padding=new Thickness(5);close.HorizontalAlignment=HorizontalAlignment.Right;close.VerticalAlignment=VerticalAlignment.Top;close.Margin=new Thickness(0,5,6,0);frame.Children.Add(close);var more=DetailToggle(entry,title,body,true);more.VerticalAlignment=VerticalAlignment.Top;more.Margin=new Thickness(0,31,6,0);frame.Children.Add(more);}
+            else{var more=DetailToggle(entry,title,body,true);more.VerticalAlignment=VerticalAlignment.Center;more.Margin=new Thickness(0,0,6,0);frame.Children.Add(more);}
             return new Border {Tag=CardVersion(entry,grouped),Child=frame,Background=Brushes.Transparent,CornerRadius=new CornerRadius(32)};
         }
         static Image Picture(ImageSource source,double height){return new Image {Source=source,Height=height,Stretch=Stretch.Uniform,Margin=new Thickness(0,9,0,0)};}

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -45,7 +45,9 @@ namespace OneTaskBar
                 }
                 var mono=new RenderTargetBitmap(32,32,96,96,PixelFormats.Pbgra32);
                 var drawing=new DrawingVisual();using(var dc=drawing.RenderOpen())dc.DrawEllipse(Brushes.Black,null,new Point(16,16),12,12);mono.Render(drawing);mono.Freeze();
-                Require(TrayIconVisual.IsMonochrome(mono)&&!TrayIconVisual.IsMonochrome(bitmap),"only monochrome tray artwork follows the dock ink");
+                Require(TrayIconVisual.IsMonochrome(mono)&&!TrayIconVisual.IsMonochrome(bitmap),"only uniform monochrome ink follows popup text");
+                var detailed=new RenderTargetBitmap(32,32,96,96,PixelFormats.Pbgra32);var logo=new DrawingVisual();using(var dc=logo.RenderOpen()){dc.DrawEllipse(Brushes.Black,null,new Point(16,16),12,12);dc.DrawEllipse(Brushes.White,null,new Point(16,16),6,6);}detailed.Render(logo);detailed.Freeze();
+                Require(!TrayIconVisual.IsMonochrome(detailed),"grayscale logos retain internal white and black details");var visual=new TrayIconVisual(detailed,Brushes.White);visual.Measure(new Size(26,26));visual.Arrange(new Rect(0,0,26,26));var rendered=new RenderTargetBitmap(26,26,96,96,PixelFormats.Pbgra32);rendered.Render(visual);var centerPixel=new byte[4];rendered.CopyPixels(new Int32Rect(13,13,1,1),centerPixel,4,0);Require(centerPixel[0]>230&&centerPixel[1]>230&&centerPixel[2]>230,"original white logo center survives popup rendering");
                 int exact=TrayIcons.Score("spotify premium","SpotifyGuid","SpotifyGuid","Spotify","spotify.exe");
                 Require(exact>TrayIcons.Score("spotify premium","","Other","Spotify","spotify.exe")&&TrayIcons.Score("","","","","")==0,"identity matching prefers the native GUID and rejects empty labels");
                 var items=Enumerable.Range(0,21).Select(i=>new TrayIconItem {Name="검사 아이콘 "+i,Icon=i%2==0?(ImageSource)mono:bitmap}).ToList();

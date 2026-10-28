@@ -24,17 +24,17 @@ namespace OneTaskBar
             var foreground=Native.GetForegroundWindow();
             var monitor=System.Windows.Forms.Screen.FromPoint(System.Windows.Forms.Cursor.Position);
             var apps=Running.ToArray();
-            if(Overview!=null)Overview.Close();
+            if(Overview!=null&&(Overview.Retiring||Overview.IsClosed)){Overview.Close();Overview=null;}
             var clock=Stopwatch.StartNew();DesktopSnapshot value=null;
-            var panel=new DesktopOverview((id,window,operation)=>{if(value!=null)ApplyDesktopCommand(value,id,window,operation);},window=>PostMessage(window,0x10,IntPtr.Zero,IntPtr.Zero));
-            Overview=panel;panel.Closed+=(s,e)=>{if(Overview==panel)Overview=null;};
+            var panel=Overview;
+            if(panel==null){panel=new DesktopOverview((id,window,operation)=>{if(overviewCache!=null)ApplyDesktopCommand(overviewCache,id,window,operation);},window=>PostMessage(window,0x10,IntPtr.Zero,IntPtr.Zero));Overview=panel;panel.Closed+=(s,e)=>{if(Overview==panel)Overview=null;};}
             bool cached=overviewCache!=null&&DateTime.UtcNow-overviewCachedAt<TimeSpan.FromSeconds(2)&&overviewCache.Current==VirtualDesktops.CurrentId();
             if(cached)value=overviewCache;
             else{panel.ShowLoading(monitor.Bounds);value=await Task.Run(()=>VirtualDesktops.Read(apps,foreground));}
             if(disposed||request!=overviewRequest||Overview!=panel||panel.Retiring)return;
             overviewCache=value;overviewCachedAt=DateTime.UtcNow;
             panel.Present(value,monitor.Bounds);
-            AppLog.Json("desktop-overview-timing.json",new {readyMilliseconds=clock.Elapsed.TotalMilliseconds,cached=cached,desktops=value.Pages.Count,windows=value.Pages.Sum(p=>p.Windows.Count)});
+            AppLog.Json("desktop-overview-timing.json",new {readyMilliseconds=clock.Elapsed.TotalMilliseconds,buildMilliseconds=panel.BuildMilliseconds,layoutPasses=panel.LayoutPasses,cached=cached,desktops=value.Pages.Count,windows=value.Pages.Sum(p=>p.Windows.Count)});
         }
         async void ApplyDesktopCommand(DesktopSnapshot snapshot,Guid id,IntPtr window,int operation)
         {

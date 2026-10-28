@@ -56,7 +56,7 @@ namespace OneTaskBar
             files=new StackPanel();files.Children.Add(Label("파일과 사진을 찾고 있습니다…",12,LightPanel.Muted));filesCard=Card("내 파일",files);
             debounce.Start();
         }
-        internal List<AppEntry> Recommendations() {return shell.RecentApps.Recommend(shell.Apps,shell.Running);}
+        internal List<AppEntry> Recommendations() {return shell.RecentApps.Recommend(shell.Apps,shell.Running,12);}
         Border Card(string title,UIElement body,Action extra=null)
         {
             var panel=new StackPanel();var head=new Grid {Margin=new Thickness(0,0,0,16)};var text=Label(title,17,Paint.Ink);text.FontWeight=FontWeights.SemiBold;head.Children.Add(text);
