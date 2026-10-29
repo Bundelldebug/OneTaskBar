@@ -44,8 +44,7 @@ namespace OneTaskBar
                     LeaveNative();
                     item.Element.SetFocus();SystemPanels.ContextMenu();
                 }else{
-                    object pattern;
-                    if(item.Element.TryGetCurrentPattern(InvokePattern.Pattern,out pattern))((InvokePattern)pattern).Invoke();
+                    TrayButtonAction.Invoke(item.Element);
                 }
             }catch(Exception error){AppLog.Once("tray-action",error.GetType().Name);}
         }
@@ -91,7 +90,7 @@ namespace OneTaskBar
                     if(result.Count>=128)break;
                     string name=element.Current.Name??"",id=element.Current.AutomationId??"";
                     if(String.IsNullOrWhiteSpace(name))continue;
-                    object pattern;if(!element.TryGetCurrentPattern(InvokePattern.Pattern,out pattern))continue;
+                    if(!TrayButtonAction.CanInvoke(element))continue;
                     string normalized=Normalize(name);
                     var match=saved.OrderByDescending(s=>Score(normalized,id,s.Id,s.Name,s.Path)).FirstOrDefault();
                     if(match!=null&&Score(normalized,id,match.Id,match.Name,match.Path)==0)match=null;

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -275,46 +275,6 @@ namespace OneTaskBar
     {
         readonly Action changed;internal AudioVolumeCallback(Action changed){this.changed=changed;}
         public int OnNotify(IntPtr data){try{changed();}catch{}return 0;}
-    }
-    internal sealed class AudioService : IDisposable
-    {
-        IAudioEndpointVolume endpoint;
-        readonly AudioVolumeCallback callback;IntPtr callbackPointer;
-        internal Action Changed;
-        public AudioService(){callback=new AudioVolumeCallback(()=>{var changed=Changed;if(changed!=null)changed();});}
-        internal bool NotificationsRegistered {get{return callbackPointer!=IntPtr.Zero;}}
-        internal double ExactValue {get{Ensure();float value;Marshal.ThrowExceptionForHR(endpoint.GetMasterVolumeLevelScalar(out value));return (double)value*100;}}
-        string deviceId;
-        DateTime nextDeviceCheck;
-        public bool Available; public double Value; public bool Muted;
-        void Ensure()
-        {
-            if(endpoint!=null && DateTime.UtcNow<nextDeviceCheck) return;
-            IMMDeviceEnumerator enumerator=null; IMMDevice device=null;
-            try {
-                enumerator=(IMMDeviceEnumerator)new DeviceEnumerator();
-                if(enumerator.GetDefaultAudioEndpoint(0,1,out device)!=0) throw new InvalidOperationException("No audio output");
-                string id; device.GetId(out id);
-                if(id!=deviceId || endpoint==null) {
-                    Dispose(); object result; var iid=typeof(IAudioEndpointVolume).GUID;
-                    Marshal.ThrowExceptionForHR(device.Activate(ref iid,23,IntPtr.Zero,out result));
-                    endpoint=(IAudioEndpointVolume)result; deviceId=id;
-                    try{callbackPointer=Marshal.GetComInterfaceForObject(callback,typeof(IAudioVolumeCallback));Marshal.ThrowExceptionForHR(endpoint.RegisterControlChangeNotify(callbackPointer));}
-                    catch{if(callbackPointer!=IntPtr.Zero){Marshal.Release(callbackPointer);callbackPointer=IntPtr.Zero;}}
-                }
-                nextDeviceCheck=DateTime.UtcNow.AddSeconds(3);
-            } finally { if(device!=null) Marshal.ReleaseComObject(device); if(enumerator!=null) Marshal.ReleaseComObject(enumerator); }
-        }
-        public void Read()
-        {
-            try { Ensure(); float value; bool muted;
-                Marshal.ThrowExceptionForHR(endpoint.GetMasterVolumeLevelScalar(out value));
-                Marshal.ThrowExceptionForHR(endpoint.GetMute(out muted)); Value=Math.Round(value*100); Muted=muted; Available=true;
-            } catch { Available=false; Dispose(); }
-        }
-        public void Set(double value) { Ensure(); var ctx=Guid.Empty; Marshal.ThrowExceptionForHR(endpoint.SetMasterVolumeLevelScalar((float)(Math.Max(0,Math.Min(100,value))/100),ref ctx)); }
-        public void Mute(bool muted) { Ensure(); var ctx=Guid.Empty; Marshal.ThrowExceptionForHR(endpoint.SetMute(muted,ref ctx)); }
-        public void Dispose() { if(endpoint!=null) {if(callbackPointer!=IntPtr.Zero){try{endpoint.UnregisterControlChangeNotify(callbackPointer);}catch{}Marshal.Release(callbackPointer);callbackPointer=IntPtr.Zero;}Marshal.ReleaseComObject(endpoint); endpoint=null; } }
     }
     internal static class BrightnessService
     {

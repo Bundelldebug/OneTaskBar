@@ -13,6 +13,7 @@ namespace OneTaskBar
     internal sealed class AppEntry
     {
         public string Name {get;set;} public string AppID {get;set;} public string Target {get;set;}
+        public string SourceFolder {get;set;}
         public ImageSource Icon;
         public readonly List<IntPtr> Windows=new List<IntPtr>();
         internal string Executable,StoredKey;internal long StartedUtcTicks;
@@ -30,7 +31,7 @@ namespace OneTaskBar
         }
         internal AppEntry Copy()
         {
-            var result=new AppEntry {Name=Name,AppID=AppID,Target=Target,Icon=Icon,Executable=Executable,StoredKey=StoredKey,Pinned=Pinned,ExplorerItem=ExplorerItem,StartedUtcTicks=StartedUtcTicks};
+            var result=new AppEntry {Name=Name,AppID=AppID,Target=Target,SourceFolder=SourceFolder,Icon=Icon,Executable=Executable,StoredKey=StoredKey,Pinned=Pinned,ExplorerItem=ExplorerItem,StartedUtcTicks=StartedUtcTicks};
             result.Windows.AddRange(Windows.Where(Native.IsWindow)); return result;
         }
         public void LoadIcon()
@@ -54,7 +55,25 @@ namespace OneTaskBar
                 using(p) { p.Start(); BackgroundWork.HintChild(p); if(!p.WaitForExit(25000)) { p.Kill(); AppLog.Write("catalog","Get-StartApps timed out"); } }
                 if(File.Exists(cache)) {
                     var rows=new JavaScriptSerializer().Deserialize<List<AppEntry>>(File.ReadAllText(cache,Encoding.UTF8));
-                    if(rows!=null && rows.Count>0) {foreach(var item in rows.Where(a=>!String.IsNullOrEmpty(a.AppID)&&!a.AppID.Contains("!"))){bool direct=Path.IsPathRooted(item.AppID)&&File.Exists(item.AppID);if(direct)item.Target=item.Executable=item.AppID;var shortcut=WebAppIcons.LaunchShortcut(item.AppID,item.Name);if(shortcut!=null&&shortcut.Target.EndsWith(".exe",StringComparison.OrdinalIgnoreCase)&&File.Exists(shortcut.Target)&&(!direct||String.Equals(shortcut.Target,item.AppID,StringComparison.OrdinalIgnoreCase))){item.Target=shortcut.File;item.Executable=shortcut.Target;}}if(loadIcons)Parallel.ForEach(rows,new ParallelOptions {MaxDegreeOfParallelism=3},item=>item.LoadIcon()); return rows.OrderBy(a=>a.Name,StringComparer.CurrentCultureIgnoreCase).ToList(); }
+                    if(rows!=null&&rows.Count>0)
+                    {
+                        foreach(var item in rows.Where(a=>!String.IsNullOrEmpty(a.AppID)&&!a.AppID.Contains("!")))
+                        {
+                            bool direct=Path.IsPathRooted(item.AppID)&&File.Exists(item.AppID);
+                            if(direct)item.Target=item.Executable=item.AppID;
+                            var shortcut=WebAppIcons.LaunchShortcut(item.AppID,item.Name);
+                            if(shortcut==null)continue;
+                            item.SourceFolder=InternetShortcuts.Folder(shortcut.File);
+                            if(shortcut.File.EndsWith(".url",StringComparison.OrdinalIgnoreCase))item.Target=shortcut.File;
+                            else if(!String.IsNullOrEmpty(shortcut.Target)&&shortcut.Target.EndsWith(".exe",StringComparison.OrdinalIgnoreCase)&&File.Exists(shortcut.Target)&&(!direct||String.Equals(shortcut.Target,item.AppID,StringComparison.OrdinalIgnoreCase)))
+                            {
+                                item.Target=shortcut.File;
+                                item.Executable=shortcut.Target;
+                            }
+                        }
+                        if(loadIcons)Parallel.ForEach(rows,new ParallelOptions {MaxDegreeOfParallelism=3},item=>item.LoadIcon());
+                        return rows.OrderBy(a=>a.Name,StringComparer.CurrentCultureIgnoreCase).ToList();
+                    }
                 }
             } catch(Exception e) { AppLog.Write("catalog",e.Message); }
             var fallback=new List<AppEntry> { new AppEntry { Name="파일 탐색기",Target="explorer.exe" },new AppEntry { Name="설정",Target="ms-settings:" },new AppEntry { Name="메모장",Target="notepad.exe" } };
@@ -95,12 +114,12 @@ namespace OneTaskBar
         {
             var apps=installed.ToList();var known=apps.FirstOrDefault(a=>String.Equals(a.Key,saved.Key,StringComparison.OrdinalIgnoreCase))??apps.FirstOrDefault(a=>Same(a,saved));
             string old=saved.Executable??saved.Target;
-            if(known==null&&saved.Windows.Count>0&&!String.IsNullOrEmpty(old)&&!String.IsNullOrEmpty(saved.AppID)&&!saved.AppID.Contains("!")&&!WebAppIcons.IsWebApp(saved.AppID)){var exact=apps.Where(a=>String.Equals(a.Executable,old,StringComparison.OrdinalIgnoreCase)&&!String.IsNullOrEmpty(a.AppID)&&String.Equals(a.AppID,a.Executable,StringComparison.OrdinalIgnoreCase)).Take(2).ToArray();if(exact.Length==1)known=exact[0];}
+            if(known==null&&saved.Windows.Count>0&&!String.IsNullOrEmpty(old)&&!String.IsNullOrEmpty(saved.AppID)&&!saved.AppID.Contains("!")&&!WebAppIcons.HasSeparateIdentity(saved.AppID)){var exact=apps.Where(a=>String.Equals(a.Executable,old,StringComparison.OrdinalIgnoreCase)&&!String.IsNullOrEmpty(a.AppID)&&String.Equals(a.AppID,a.Executable,StringComparison.OrdinalIgnoreCase)).Take(2).ToArray();if(exact.Length==1)known=exact[0];}
             string folder=ExecutableFolder(old,true);
             if(known==null&&folder!=null){
                 var aliases=apps.Where(a=>String.Equals(ExecutableFolder(a.Executable??a.Target??a.AppID,false),folder,StringComparison.OrdinalIgnoreCase)).Take(2).ToArray();if(aliases.Length==1)known=aliases[0];
             }
-            if(known==null)return saved.Copy();var result=known.Copy();result.StoredKey=saved.Key;result.Pinned=saved.Pinned;result.ExplorerItem=saved.ExplorerItem;result.StartedUtcTicks=saved.StartedUtcTicks;foreach(var window in saved.Windows)if(!result.Windows.Contains(window))result.Windows.Add(window);return result;
+            if(known==null)return saved.Copy();var result=known.Copy();if(saved.Windows.Count>0&&WebAppIcons.HasSeparateIdentity(saved.AppID)&&saved.Icon!=null)result.Icon=saved.Icon;result.StoredKey=saved.Key;result.Pinned=saved.Pinned;result.ExplorerItem=saved.ExplorerItem;result.StartedUtcTicks=saved.StartedUtcTicks;foreach(var window in saved.Windows)if(!result.Windows.Contains(window))result.Windows.Add(window);return result;
         }
         internal static bool PresentationChanged(IList<AppEntry> before,IList<AppEntry> after){return before.Count!=after.Count||before.Where((a,i)=>!String.Equals(a.Key,after[i].Key,StringComparison.OrdinalIgnoreCase)||a.Name!=after[i].Name||a.Target!=after[i].Target||a.AppID!=after[i].AppID||!Object.ReferenceEquals(a.Icon,after[i].Icon)).Any();}
         static string ExecutableFolder(string path,bool electron)
@@ -114,7 +133,7 @@ namespace OneTaskBar
             foreach(var item in running) {
                 var match=result.FirstOrDefault(a=>Same(a,item));
                 if(match==null) {var copy=item.Copy();copy.Pinned=false;result.Add(copy);}
-                else { foreach(var w in item.Windows) if(!match.Windows.Contains(w)) match.Windows.Add(w); if(match.Icon==null) match.Icon=item.Icon; }
+                else { foreach(var w in item.Windows) if(!match.Windows.Contains(w)) match.Windows.Add(w); if(item.Icon!=null&&(match.Icon==null||WebAppIcons.HasSeparateIdentity(item.AppID))) match.Icon=item.Icon; }
             }
             return result;
         }
@@ -123,7 +142,9 @@ namespace OneTaskBar
             var result=new List<AppEntry>();
             string dir=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),"Microsoft","Internet Explorer","Quick Launch","User Pinned","TaskBar");
             if(Directory.Exists(dir)) foreach(string file in Directory.GetFiles(dir,"*.lnk")) {
-                string target=resolveLinks?Native.ShortcutTarget(file):null; var item=new AppEntry {Name=Path.GetFileNameWithoutExtension(file),Target=file,Executable=target,Pinned=true};
+                var shortcut=resolveLinks?Native.ShortcutInfo(file):null;
+                string target=shortcut==null?null:shortcut.Target;
+                var item=new AppEntry {Name=Path.GetFileNameWithoutExtension(file),AppID=shortcut==null?null:shortcut.Id,Target=file,Executable=target,Pinned=true};
                 if(!resolveLinks){var cached=installed.FirstOrDefault(a=>String.Equals(a.Name,item.Name,StringComparison.CurrentCultureIgnoreCase));if(cached!=null){item.AppID=cached.AppID;item.Executable=cached.Executable;}}
                 if(String.IsNullOrEmpty(target)&&(item.Name=="File Explorer"||item.Name=="파일 탐색기")) {target=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),"explorer.exe");item.Executable=target;item.AppID="Microsoft.Windows.Explorer";}
                 item.AppID=item.AppID??installed.Where(a=>!String.IsNullOrEmpty(target)&&(String.Equals(a.AppID,target,StringComparison.OrdinalIgnoreCase)||String.Equals(a.Name,item.Name,StringComparison.CurrentCultureIgnoreCase))).Select(a=>a.AppID).FirstOrDefault();

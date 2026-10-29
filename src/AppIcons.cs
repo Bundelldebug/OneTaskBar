@@ -19,7 +19,7 @@ namespace OneTaskBar
         internal const int CacheLimit=48;
         static readonly SemaphoreSlim loaders=new SemaphoreSlim(3);
         internal static int CachedCount {get{lock(cacheLock)return cache.Count;}}
-        static string Key(AppEntry app){string key=!String.IsNullOrEmpty(app.AppID)&&app.AppID.Contains("!")?app.AppID:(app.AppID??"")+"|"+(app.Target??app.Executable??"");return WebAppIcons.IsWebApp(app.AppID)?app.AppID+(app.Windows.Count>0?"|window":"|shortcut"):key;}
+        static string Key(AppEntry app){string key=!String.IsNullOrEmpty(app.AppID)&&app.AppID.Contains("!")?app.AppID:(app.AppID??"")+"|"+(app.Target??app.Executable??"");return WebAppIcons.HasSeparateIdentity(app.AppID)?app.AppID+(app.Windows.Count>0?"|window":"|shortcut"):key;}
         static ImageSource Ready(AppEntry app){lock(cacheLock){CachedIcon item;if(!cache.TryGetValue(Key(app),out item)||!item.Image.IsValueCreated)return null;recent.Remove(item.Position);recent.AddFirst(item.Position);return item.Image.Value;}}
         internal static FrameworkElement Visual(AppEntry app,double size){var image=app.Icon??Ready(app);return image!=null?Visual(image,size):new DeferredIcon(app,size);}
         // Decode only icons that have entered a visible viewport, with bounded parallel work.
@@ -51,6 +51,7 @@ namespace OneTaskBar
         static ImageSource Load(AppEntry app)
         {
             ImageSource result=WebAppIcons.Read(app);
+            if(result==null&&(String.IsNullOrEmpty(app.AppID)||!app.AppID.Contains("!")))result=InternetShortcuts.Icon(app);
             if(!String.IsNullOrEmpty(app.AppID)&&app.AppID.Contains("!")) {
                 result=TaskbarLogo.Read(app.AppID)??Native.AppIcon("shell:AppsFolder\\"+app.AppID);
                 if(result==null){var read=Task.Run(async()=>await SystemServices.AppLogo(app.AppID));if(read.Wait(1600)&&read.Status==TaskStatus.RanToCompletion)result=read.Result;}

@@ -23,6 +23,11 @@ namespace OneTaskBar
     internal sealed class SystemServices : IDisposable
     {
         internal string OutputName="오디오 출력";DateTime outputAt;
+        int outputRevision,outputDirty=1;
+        internal void InvalidateOutput(int revision)
+        {
+            if(Interlocked.Exchange(ref outputRevision,revision)!=revision)Interlocked.Exchange(ref outputDirty,1);
+        }
         internal static async Task<BitmapSource> AppLogo(string appId)
         {
             try {
@@ -72,7 +77,7 @@ namespace OneTaskBar
         public void Dispose(){disposed=true;try{NetworkInformation.NetworkStatusChanged-=NetworkChanged;}catch{}SelectSession(null);if(manager!=null)try{manager.CurrentSessionChanged-=CurrentChanged;}catch{}manager=null;}
         internal async Task Refresh()
         {
-            if(disposed)return;if(DateTime.UtcNow>=outputAt){outputAt=DateTime.UtcNow.AddSeconds(Interactive?2:10);try{OutputName=await BackgroundWork.Run(()=>Native.DefaultAudioOutputName());}catch{OutputName="오디오 출력";}}
+            if(disposed)return;if(Interlocked.Exchange(ref outputDirty,0)!=0||DateTime.UtcNow>=outputAt){outputAt=DateTime.UtcNow.AddSeconds(Interactive?10:60);try{OutputName=await BackgroundWork.Run(()=>Native.DefaultAudioOutputName());}catch{OutputName="오디오 출력";}}
             bool radioFailed=false,probeRadio=DateTime.UtcNow>=radioProbeAt;
             try {
                 if(DateTime.UtcNow>=radioProbeAt) {
@@ -93,7 +98,7 @@ namespace OneTaskBar
             try {
                 if(manager==null){manager=await Wait(GlobalSystemMediaTransportControlsSessionManager.RequestAsync());manager.CurrentSessionChanged+=CurrentChanged;}
                 if(Interlocked.Exchange(ref playbackDirty,0)==0&&Volatile.Read(ref propertiesDirty)==0&&DateTime.UtcNow<playbackAt&&DateTime.UtcNow<metadataAt&&!artwork.Due(DateTime.UtcNow)&&!artworkUpgrade.Pending(DateTime.UtcNow))return;
-                playbackAt=DateTime.UtcNow.AddSeconds(Interactive?2:5);
+                playbackAt=DateTime.UtcNow.AddSeconds(Interactive?2:30);
                 if(disposed)return;SelectSession(manager.GetCurrentSession()); if(session==null) {if(Media.Available)Media=new MediaState();artwork.Clear();Interlocked.Exchange(ref propertiesDirty,0);metadataAt=DateTime.UtcNow.AddSeconds(60);return;}
                 var info=session.GetPlaybackInfo();var previous=Media;
                 var state=new MediaState {Available=true,Title=previous.Title,Artist=previous.Artist,AppId=session.SourceAppUserModelId,

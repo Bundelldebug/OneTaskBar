@@ -23,7 +23,7 @@ namespace OneTaskBar
             try{
                 session=await Task.Run(()=>TrayIcons.Open(anchor,metadata));
                 if(disposed||!Desktop||request!=trayRequest)return;
-                if(session==null){AppLog.Once("tray-provider","Native tray retained because its accessibility provider is unavailable");return;}
+                if(session==null){AppLog.Once("tray-provider","Native tray retained because its accessibility provider is unavailable");if(!ExplorerBridge.TrayVisible())ActionNotice.Show("숨겨진 트레이 아이콘을 열지 못했습니다. Explorer 상태를 확인해 주세요.");return;}
                 if(!session.Mask()){
                     session.LeaveNative();
                     AppLog.Once("tray-mask","Native tray retained because its host cannot be represented safely");
@@ -41,7 +41,8 @@ namespace OneTaskBar
         void CloseTrayOverflow()
         {
             trayRequest++;
-            if(TrayPopup!=null){TrayPopup.Close();TrayPopup=null;}
+            var popup=TrayPopup;TrayPopup=null;
+            if(popup!=null)popup.Close();
         }
     }
 }

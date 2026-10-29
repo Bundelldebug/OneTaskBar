@@ -192,14 +192,13 @@ namespace OneTaskBar
             try {var handle=Native.FindWindow("Shell_TrayWnd",null);if(handle!=trayHost){trayHost=handle;chevron=null;}if(handle==IntPtr.Zero||chevron!=null)return;
                 var root=AutomationElement.FromHandle(handle);
                 foreach(AutomationElement button in root.FindAll(TreeScope.Descendants,new PropertyCondition(AutomationElement.ControlTypeProperty,ControlType.Button))){string id=button.Current.AutomationId??"",name=button.Current.Name??"";if(id.StartsWith("Appid: "))continue;
-                    if(name.Contains("숨겨진")||name.Contains("오버플로")||name.Contains("더 많은 아이콘")||name.IndexOf("hidden",StringComparison.OrdinalIgnoreCase)>=0||name.IndexOf("overflow",StringComparison.OrdinalIgnoreCase)>=0){chevron=button;break;}}
-                if(chevron==null)chevron=root.FindFirst(TreeScope.Descendants,new PropertyCondition(AutomationElement.ClassNameProperty,"SystemTray.NormalButton"));
+                    if(TrayButtonAction.IsChevron(id,name)){chevron=button;break;}}
             }catch(Exception e){AppLog.Once("tray-cache",e.Message);}
         }
         static bool InvokeChevron()
         {
             if(!TaskbarMask.Active)return false;
-            try {if(chevron==null)return false;object pattern;if(chevron.TryGetCurrentPattern(InvokePattern.Pattern,out pattern)){((InvokePattern)pattern).Invoke();return true;}}
+            try {if(TrayButtonAction.Invoke(chevron,true))return true;chevron=null;}
             catch{chevron=null;}return false;
         }
         internal static bool TrayVisible()
@@ -248,7 +247,7 @@ namespace OneTaskBar
         {
             var handle=Native.FindWindow("Shell_TrayWnd",null);if(handle==IntPtr.Zero||!TaskbarMask.Hide(handle))return false;
             bool wasOpen=TrayVisible();CacheTray();bool cached=chevron!=null,invoked=InvokeChevron();
-            if(invoked){for(int i=0;i<20;i++){if(wasOpen||TrayVisible())return TrayOpened(handle,wasOpen,placement);System.Threading.Thread.Sleep(15);}}
+            if(invoked){for(int i=0;i<40;i++){if(wasOpen||TrayVisible())return TrayOpened(handle,wasOpen,placement);System.Threading.Thread.Sleep(25);}}
             var data=new Native.AppBarData {Size=(uint)Marshal.SizeOf(typeof(Native.AppBarData)),Window=handle};
             uint state=(uint)Native.SHAppBarMessage(4,ref data).ToUInt64();
             DesktopLease.RecordTemporaryState(TaskbarSpace.Owned?TaskbarSpace.Owner.TaskbarState:state);
@@ -350,13 +349,13 @@ namespace OneTaskBar
             screen=monitor;scale=dpiScale;edge=DockGeometry.Edge;autoHide=hidden;stateChanged=changed;
             var p=new HwndSourceParameters("OneTaskBar.WorkArea") {WindowStyle=unchecked((int)0x80000000),ExtendedWindowStyle=0x80|0x08000000,PositionX=screen.Bounds.Left,PositionY=screen.Bounds.Bottom-1,Width=1,Height=1};
             source=new HwndSource(p); source.AddHook(Message);
-            if(!autoHide)Register();
+            if(!autoHide&&!Preferences.Current.MaximizedBehindDock)Register();
         }
         Native.AppBarData Data() {return new Native.AppBarData {Size=(uint)Marshal.SizeOf(typeof(Native.AppBarData)),Window=source.Handle,Edge=(uint)edge};}
         IntPtr Message(IntPtr h,int msg,IntPtr w,IntPtr l,ref bool handled) {if(msg==0x8053){if(w.ToInt32()==1)Update();else if(w.ToInt32()==0&&stateChanged!=null)stateChanged();}return IntPtr.Zero;}
         void Register(){if(registered||disposed)return;var data=Data();data.Callback=0x8053;registered=Native.SHAppBarMessage(0,ref data)!=UIntPtr.Zero;positioned=false;Update();}
         void Remove(){if(!registered)return;registered=false;positioned=false;var data=Data();Native.SHAppBarMessage(1,ref data);}
-        internal void SetAutoHide(bool value){if(autoHide==value)return;autoHide=value;if(value)Remove();else Register();}
+        internal void SetAutoHide(bool value){autoHide=value;if(value||Preferences.Current.MaximizedBehindDock)Remove();else Register();}
         internal static int ReservationTop(System.Drawing.Rectangle screen,double scale,int availableBottom,bool hidden){return hidden?availableBottom:Math.Min(availableBottom,screen.Bottom-(int)Math.Round(68*scale));}
         internal static Native.RectI Reservation(System.Drawing.Rectangle screen,double scale,Native.RectI available,bool hidden,int edge)
         {
@@ -364,7 +363,7 @@ namespace OneTaskBar
         }
         void Update()
         {
-            if(busy||disposed||autoHide||!registered) return; busy=true;
+            if(busy||disposed||autoHide||Preferences.Current.MaximizedBehindDock||!registered) return; busy=true;
             try { var b=screen.Bounds; var data=Data(); data.Rect=new Native.RectI {Left=b.Left,Top=b.Top,Right=b.Right,Bottom=b.Bottom};
                 Native.SHAppBarMessage(2,ref data);data.Rect=Reservation(b,scale,data.Rect,autoHide,(int)data.Edge);if(positioned&&data.Rect.Equals(lastPosition))return;Native.SHAppBarMessage(3,ref data);lastPosition=data.Rect;positioned=true;
             } finally {busy=false;}

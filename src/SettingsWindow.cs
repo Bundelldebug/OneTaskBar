@@ -35,6 +35,7 @@ namespace OneTaskBar
             Group(groups,"UI 버전",VersionSetting());
             var desktopRows=new StackPanel();desktop=Row(desktopRows,"Windows 작업표시줄 대체","기본 작업표시줄과 전환합니다",shell.Desktop,v=> {shell.SetDesktop(v,true);Show();Activate();});
             autoHide=Row(desktopRows,"작업표시줄 자동 숨기기","선택한 화면 가장자리에 커서를 대면 다시 표시합니다",shell.Demo?shell.DockAutoHide:Native.TaskbarAutoHide(),v=>shell.SetAutoHide(v));
+            Row(desktopRows,"최대화 창을 작업표시줄 뒤까지 확장","최대화한 앱이 화면 가장자리까지 채우고 작업표시줄이 그 위에 표시됩니다",Preferences.Current.MaximizedBehindDock,v=>Preferences.Set(p=>p.MaximizedBehindDock=v));
             Row(desktopRows,"앱 드래그로 분할·팝업 열기","독의 앱을 화면 가장자리로 끌면 분할, 중앙으로 끌면 팝업으로 엽니다. 독 안에서는 순서를 바꿉니다",Preferences.Current.DockWindowDrop,v=>Preferences.Set(p=>p.DockWindowDrop=v));
             Row(desktopRows,"작업표시줄 단색 배경","하단 작업표시줄을 블러 없는 회색 단색으로 표시합니다",Preferences.Current.DockSolidBackground,v=>Preferences.Set(p=>{p.DockSolidBackground=v;p.DockBackgroundKind=v?1:0;}));
             startup=Row(desktopRows,"로그인 시 자동 시작","현재 사용자 로그인 작업으로 지연 없이 실행합니다",StartupPreference.Enabled,v=> {try{StartupPreference.Set(v);status.Text=v?"로그인 자동 시작을 켰습니다":"로그인 자동 시작을 껐습니다";}catch(Exception e){status.Text="자동 시작 설정을 저장하지 못했습니다: "+e.Message;if(startup!=null)startup.Refresh(StartupPreference.Enabled);}});
@@ -54,6 +55,13 @@ namespace OneTaskBar
             ChoiceRow(launcher,"키보드 시작 키","Windows 키만 눌렀을 때 열 화면",Preferences.Current.NativeStartKey,v=>Preferences.Set(p=>p.NativeStartKey=v),"One Taskbar","Windows 시작");
             ChoiceRow(launcher,"검색 버튼","독과 앱 화면의 검색 버튼에서 열 화면",Preferences.Current.NativeSearch,v=>Preferences.Set(p=>p.NativeSearch=v),"런처 검색","Windows 검색");
             ChoiceRow(launcher,"Alt+Tab 창 전환","작업표시줄 대체 모드에서 사용할 창 전환 화면",Preferences.Current.NativeAltTab,v=>Preferences.Set(p=>p.NativeAltTab=v),"One Taskbar","Windows 기본");
+            Row(launcher,"Windows 시작 메뉴 폴더로 정리","앱 화면에서 Windows 시작 메뉴의 폴더별로 앱을 모읍니다",Preferences.Current.GroupAppsByStartMenu,v=>
+            {
+                Preferences.Set(p=>p.GroupAppsByStartMenu=v);
+                shell.AppScreen.Reconcile(shell.Apps);
+                shell.AppScreen.ApplyWindowsFolders(shell.Apps,v);
+                if(shell.Drawer!=null)shell.Drawer.RefreshApps();
+            });
             Group(groups,"시작과 검색",launcher);
             var nowBar=new StackPanel();ChoiceRow(nowBar,"미디어 플레이어 펼침 스타일","큰 커버는 앨범 이미지를 위로 펼쳐 표시합니다",Preferences.Current.NowBarLargeCover,v=>Preferences.Set(p=>p.NowBarLargeCover=v),"기본","큰 커버");Row(nowBar,"YouTube 고화질 커버",(Preferences.Current.YouTubeArtworkTrack!=null?"현재 영상만 허용됨 · ":"")+"삼성 브라우저의 재생 제목과 일치하는 기록에서 영상 ID만 읽어 YouTube 이미지 서버에서 커버를 가져옵니다",YouTubeArtwork.Enabled,v=>Preferences.Set(p=>{p.YouTubeHighResArtwork=v;p.YouTubeArtworkTrack=null;}));Group(groups,"미디어 플레이어",nowBar);
             var safety=new StackPanel();Row(safety,"긴급 종료 단축키","Ctrl + Shift + Tab + 1 · One TaskBar 종료 및 Windows 작업표시줄 복원",Preferences.Current.EmergencyExit,v=>Preferences.Set(p=>p.EmergencyExit=v));Group(groups,"복구",safety);

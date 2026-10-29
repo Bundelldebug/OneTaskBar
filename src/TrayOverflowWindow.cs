@@ -17,7 +17,7 @@ namespace OneTaskBar
         readonly DispatcherTimer timer=new DispatcherTimer {Interval=TimeSpan.FromMilliseconds(200)};
         readonly Grid icons=new Grid {Margin=new Thickness(12)};
         IDisposable outside;
-        bool closing;
+        bool closing,closed;
         internal int IconCount {get;private set;}
         internal bool Watching {get{return timer.IsEnabled;}}
         internal TrayOverflowWindow(TrayIconSession session,Action<TrayIconItem,bool> action)
@@ -38,7 +38,8 @@ namespace OneTaskBar
             SourceInitialized+=(s,e)=>HwndSource.FromHwnd(new WindowInteropHelper(this).Handle).AddHook((IntPtr h,int message,IntPtr wp,IntPtr lp,ref bool handled)=>{if(message==0x21){handled=true;return new IntPtr(3);}return IntPtr.Zero;});
             timer.Tick+=(s,e)=>{if(!session.SourceVisible)Dismiss();};
             IsVisibleChanged+=(s,e)=>{if(!IsVisible&&!closing){closing=true;Close();}};
-            Closed+=(s,e)=>{timer.Stop();if(outside!=null){outside.Dispose();outside=null;}session.Dispose();};
+            Closing+=(s,e)=>{closing=true;timer.Stop();if(outside!=null){outside.Dispose();outside=null;}};
+            Closed+=(s,e)=>{closed=true;session.Dispose();};
         }
         internal void Present(TrayPlacement placement,bool watch=true)
         {
@@ -53,8 +54,8 @@ namespace OneTaskBar
             if(closing)return;closing=true;timer.Stop();HideImmediately();
             try{await Task.Run(()=>invoke(item,context));}
             catch(Exception error){AppLog.Once("tray-command",error.GetType().Name);}
-            finally{Close();}
+            finally{if(!closed)Close();}
         }
-        internal async void Dismiss(){if(closing)return;closing=true;timer.Stop();await DismissAsync();Close();}
+        internal async void Dismiss(){if(closing)return;closing=true;timer.Stop();await DismissAsync();if(!closed)Close();}
     }
 }

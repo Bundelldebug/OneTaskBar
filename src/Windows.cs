@@ -397,7 +397,7 @@ namespace OneTaskBar
         }
         internal void Reload()
         {
-            if(loadedApps==shell.Apps&&loadedWidth==cellWidth&&folder==null)return;loadedApps=shell.Apps;loadedWidth=cellWidth;folder=null;shell.AppScreen.Reconcile(shell.Apps);RefreshApps();
+            if(loadedApps==shell.Apps&&loadedWidth==cellWidth&&folder==null)return;loadedApps=shell.Apps;loadedWidth=cellWidth;folder=null;shell.AppScreen.Reconcile(shell.Apps);if(Preferences.Current.GroupAppsByStartMenu)shell.AppScreen.ApplyWindowsFolders(shell.Apps,true);RefreshApps();
         }
         internal void RefreshApps(){tiles=shell.AppScreen.Tiles(shell.Apps);if(folder!=null&&!tiles.Any(t=>t.Key==folder&&t.Folder))folder=null;RenderApps();}
         internal void RestoreSearch(string value){bool previous=composing;composing=true;try{Search.Text=value??"";}finally{composing=previous;}}
@@ -430,6 +430,17 @@ namespace OneTaskBar
         ContextMenu AppMenu(StartTile tile)
         {
             var menu=tile.Folder?new ContextMenu():WindowPicker.Menu(tile.App,shell,allowAdmin:true);
+            if(!tile.Folder&&folder==null)
+            {
+                var create=new MenuItem {Header="새 폴더 만들기"};
+                create.Click+=(s,e)=>
+                {
+                    string key=shell.AppScreen.CreateFolder(tile.Key);
+                    if(key==null)return;
+                    RefreshApps();OpenFolder(key);folderName.Focus();folderName.SelectAll();
+                };
+                menu.Items.Add(new Separator());menu.Items.Add(create);
+            }
             if(tile.Folder){var rename=new MenuItem {Header="폴더 이름 변경"};rename.Click+=(s,e)=> {OpenFolder(tile.Key);folderName.Focus();folderName.SelectAll();};menu.Items.Add(rename);var dissolve=new MenuItem {Header="폴더 풀기 · 앱 유지"};dissolve.Click+=(s,e)=> {if(shell.AppScreen.Dissolve(tile.Key))RefreshApps();};menu.Items.Add(dissolve);}
             else if(folder!=null){menu.Items.Add(new Separator());var extract=new MenuItem {Header="폴더 밖으로 꺼내기"};extract.Click+=(s,e)=> {if(shell.AppScreen.Extract(tile.Key)){folder=null;RefreshApps();}};menu.Items.Add(extract);}
             else {var groupMenu=new MenuItem {Header="폴더로 묶기"};groupMenu.SubmenuOpened+=(s,e)=> {groupMenu.Items.Clear();foreach(var other in tiles.Where(t=>t.Key!=tile.Key)){var target=other;var item=new MenuItem {Header=target.Folder?target.Name+"에 추가":target.Name+"와 새 폴더"};item.Click+=(sender,args)=> {if(shell.AppScreen.Combine(tile.Key,target.Key))RefreshApps();};groupMenu.Items.Add(item);}};menu.Items.Add(new Separator());menu.Items.Add(groupMenu);}return menu;
