@@ -22,3 +22,5 @@ Build: `./Build.ps1 -SkipTests`. Run relevant isolated fixtures: `./tools/Test-U
 Stable builds expose UI 8.5/9.0; beta also exposes 9.5 through `ReleaseFeatures.GlassUI`. Shared fixes belong in both release branches. Preserve persisted widget/toggle keys, pins, settings and the disabled-by-default options during changes.
 
 Keep normal control flow on separate lines in touched/new code. Split by responsibility rather than adding another large mixed file. Reuse frozen brushes/artwork; unchanged refreshes should not allocate or restart animations. Release timers, backdrop hosts and image caches when their owners retire. Do not force GC or trim the working set to manufacture measurements.
+
+Public GitHub writing: describe the user-visible change and necessary usage details in plain language. Release notes should be short; keep implementation logs, request history and repeated validation boilerplate in development documents. Retain material limitations, licensing and unsigned-build notices.

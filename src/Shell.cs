@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -140,7 +140,7 @@ namespace OneTaskBar
             powerNotify=Native.RegisterPowerSettingNotification(messages.Handle,ref source,0);
             var brightSource=new Guid("8ffee2c6-2d01-46be-adb9-398addc5b4ff");brightnessNotify=Native.RegisterPowerSettingNotification(messages.Handle,ref brightSource,0);
             var displaySource=new Guid("2b84c20e-ad23-4ddf-93db-05ffbd7efca5");displayNotify=Native.RegisterPowerSettingNotification(messages.Handle,ref displaySource,0);
-            Audio.Changed=Wake;
+            Audio.Changed=()=>{Services.InvalidateOutput(Audio.DeviceRevision);Wake();};
             Services.Changed=ServiceChanged;Notifications.Updated=ServiceChanged;Notifications.AppCatalog=()=>Apps;
             osdGate=new NativeOsdGate(()=>Desktop&&!disposed,ReplaceNativeOsd,()=>Desktop&&!disposed&&Brightness>=0&&Audio.Available);
             Native.RegisterHotKey(messages.Handle,1,0x4000|2|1,0x51); // Ctrl+Alt+Q, no Win-key hook.
@@ -466,6 +466,17 @@ namespace OneTaskBar
             var fit=StartMenuLayout.Fit(screen.Bounds,Native.WorkArea(screen),scale,620,dock!=null?dock.Edge:DockGeometry.Edge);
             StartMenu.Configure(fit.Width,fit.Height);StartMenu.Reload();StartMenu.ShowForMonitor(screen,scale,dock!=null?dock.Edge:DockGeometry.Edge);StartMenu.Pop();StartMenu.Activate();StartMenu.Search.Focus();
         }
+        internal bool ContainsStartButton(Native.PointI point)
+        {
+            foreach(var dock in docks)
+            {
+                if(!dock.Start.IsVisible)continue;
+                Native.RectI bounds;
+                var handle=new WindowInteropHelper(dock.Start).Handle;
+                if(handle!=IntPtr.Zero&&Native.GetWindowRect(handle,out bounds)&&point.X>=bounds.Left&&point.X<bounds.Right&&point.Y>=bounds.Top&&point.Y<bounds.Bottom)return true;
+            }
+            return false;
+        }
         void EnsureGuard()
         {
             if(guardStarted||Demo)return;string helper=Path.Combine(AppLog.Root,"OneTaskBar.Guard.exe");if(!File.Exists(helper))return;
@@ -559,7 +570,7 @@ namespace OneTaskBar
             Audio.Read();
             if(previousVolume>=0 && Audio.Available && (Math.Abs(Audio.Value-previousVolume)>=1 || Audio.Muted!=previousMuted) && (Quick==null || !Quick.IsVisible)) ShowHud("volume",Audio.Value,Audio.Muted);
             previousVolume=Audio.Value; previousMuted=Audio.Muted;
-            Services.Interactive=interactive;Notifications.Interactive=Center!=null&&Center.IsVisible;
+            Services.Interactive=(Quick!=null&&Quick.IsVisible)||(Center!=null&&Center.IsVisible)||(Detail!=null&&Detail.IsVisible)||docks.Any(d=>d.MediaBar!=null&&d.MediaBar.Expanded);Notifications.Interactive=Center!=null&&Center.IsVisible;
             if(now>=servicesAt&&!servicesBusy) {servicesAt=now.AddMilliseconds(interactive?500:2000);servicesBusy=true;RefreshServices();}
             if(Center!=null&&Center.IsVisible)Center.Refresh();
             if(Quick!=null && Quick.IsVisible) Quick.Refresh(Power,Brightness,Audio.Value,Audio.Muted,Audio.Available,Brightness>=0);
@@ -568,7 +579,7 @@ namespace OneTaskBar
             if(hud!=null && hud.IsVisible && now>hudUntil) hud.Hide();
             if(now>=wifiAt&&!wifiBusy){wifiAt=now.AddSeconds(interactive?1:5);wifiBusy=true;BackgroundWork.Run(()=>Native.ReadWifi()).ContinueWith(t=>Application.Current.Dispatcher.BeginInvoke(new Action(()=>{wifiBusy=false;if(!disposed&&t.Status==TaskStatus.RanToCompletion){Wifi=t.Result.Name;WifiGeneration=t.Result.Generation;WifiSignal=t.Result.Signal;WifiTraffic=(wifiSent>=0&&t.Result.Sent>wifiSent?1:0)|(wifiReceived>=0&&t.Result.Received>wifiReceived?2:0);wifiSent=t.Result.Sent;wifiReceived=t.Result.Received;}})));}
             if(now>=queryAt && !brightnessBusy) {
-                queryAt=now.AddSeconds(Brightness<0?60:interactive?5:battery?15:10); brightnessBusy=true;
+                queryAt=now.AddSeconds(Brightness<0?60:BrightnessEventsReady?120:interactive?5:battery?15:10); brightnessBusy=true;
                 BackgroundWork.Run(()=>BrightnessService.Read()).ContinueWith(t=>Application.Current.Dispatcher.BeginInvoke(new Action(()=> {
                     brightnessBusy=false; if(disposed || t.Status!=TaskStatus.RanToCompletion) return;
                     if(DateTime.UtcNow<commitBrightnessUntil || brightnessWriting) return;
@@ -594,7 +605,7 @@ namespace OneTaskBar
                     var old=Pins;Pins=t.Result.Pins;explorerItems=t.Result.Mirror;ExplorerBridge.Save(explorerItems);StartupDockCache.Save(Pins);
                     if(Catalog.PresentationChanged(old,Pins))foreach(var dock in docks)dock.Rebuild();
                 })));}
-            ++iteration;if(now>=liveStateAt){liveStateAt=now.AddSeconds(30);AppLog.Json("live-state.json",new {time=DateTimeOffset.Now.ToString("o"),sequence=iteration,pulseMilliseconds=cadence,desktop=Desktop,battery=Power.Level,connected=Power.Connected,volume=Audio.Value,muted=Audio.Muted,brightness=Brightness,displays=docks.Count,apps=Apps.Count,pinned=Pins.Count,running=Running.Count,appRefreshMs=Math.Round(lastAppRefreshMs,1),wifi=Services.WifiOn,bluetooth=Services.BluetoothOn,media=Services.Media.Title,mediaActive=Services.Media.Active,retiredPanels=RetiredPanels,managedBytes=GC.GetTotalMemory(false),backdropCount=LiveBackdrop.InstanceCount,windowCount=Application.Current.Windows.Count,output=Services.OutputName,wifiSignal=WifiSignal,packaged=Notifications.Packaged,notificationsAllowed=Notifications.Allowed,cachedIcons=AppIcons.CachedCount,ecoWorkers=BackgroundWork.EcoWorkers,backgroundJobs=BackgroundWork.Completed,mediaMetadataReads=Services.MetadataReads,notificationSnapshotReads=Notifications.SnapshotReads,notificationCount=Notifications.Items.Count,inspectable=Program.Inspectable,quick=Quick!=null?Native.RegionInfo(Quick):null,center=Center!=null?Native.RegionInfo(Center):null,docks=docks.Select(d=>d.Inspect()).ToArray()});}
+            ++iteration;if(now>=liveStateAt){liveStateAt=now.AddSeconds(30);AppLog.Json("live-state.json",new {time=DateTimeOffset.Now.ToString("o"),sequence=iteration,pulseMilliseconds=cadence,desktop=Desktop,battery=Power.Level,connected=Power.Connected,volume=Audio.Value,muted=Audio.Muted,brightness=Brightness,displays=docks.Count,apps=Apps.Count,pinned=Pins.Count,running=Running.Count,appRefreshMs=Math.Round(lastAppRefreshMs,1),wifi=Services.WifiOn,bluetooth=Services.BluetoothOn,media=Services.Media.Title,mediaActive=Services.Media.Active,mediaPlaying=Services.Media.Playing,audioReads=Audio.ReadCount,retiredPanels=RetiredPanels,managedBytes=GC.GetTotalMemory(false),backdropCount=LiveBackdrop.InstanceCount,windowCount=Application.Current.Windows.Count,output=Services.OutputName,wifiSignal=WifiSignal,packaged=Notifications.Packaged,notificationsAllowed=Notifications.Allowed,cachedIcons=AppIcons.CachedCount,ecoWorkers=BackgroundWork.EcoWorkers,backgroundJobs=BackgroundWork.Completed,mediaMetadataReads=Services.MetadataReads,notificationSnapshotReads=Notifications.SnapshotReads,notificationCount=Notifications.Items.Count,inspectable=Program.Inspectable,quick=Quick!=null?Native.RegionInfo(Quick):null,center=Center!=null?Native.RegionInfo(Center):null,docks=docks.Select(d=>d.Inspect()).ToArray()});}
         }
         T ReleasePanel<T>(T panel,DateTime now) where T:GlassWindow
         {

@@ -27,6 +27,8 @@ namespace OneTaskBar
         public string DockBackgroundColor="#FFBAC1C7",DockBackgroundImage;
         public bool NativeStartKey=true,NativeSearch=false;
         public bool NativeStartButton=false;
+        public bool GroupAppsByStartMenu=false;
+        public bool MaximizedBehindDock=false;
         public bool NativeAltTab=false;
         public bool QuickSliderScroll=false;
         public bool DuoStatusIcon=true,SliderValueNumbers=false;

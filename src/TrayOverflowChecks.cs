@@ -71,6 +71,14 @@ namespace OneTaskBar
                     view.Present(placement,false);view.HideImmediately();await Task.Delay(30);
                 }
                 Require(!app.Windows.OfType<TrayOverflowWindow>().Any()&&LiveBackdrop.OrphanCount==0,"interrupted popups leave no windows or backdrop hosts");
+                for(int i=0;i<2;i++)
+                {
+                    view=new TrayOverflowWindow(new TrayIconSession(IntPtr.Zero,new List<TrayIconItem> {new TrayIconItem {Name="검사"}}),(item,context)=>{});
+                    view.Present(placement,false);
+                    if(i==1)view.Dismiss();
+                    view.Close();await Task.Delay(320);
+                }
+                Require(!app.Windows.OfType<TrayOverflowWindow>().Any()&&LiveBackdrop.OrphanCount==0,"direct close and animation interruption release the tray exactly once");
                 AppLog.Json("tray-overflow-probe.json",new {passed=true,icons=21,nativePng=true,monochromeInk=true,nativeHostRecovery=true,realTrayInvoked=false});exit=0;
             }catch(Exception error){AppLog.Json("tray-overflow-probe.json",new {passed=false,error=error.ToString()});}
             finally{if(view!=null&&view.IsVisible)view.Close();if(recovery!=null)recovery.Dispose();TaskbarMask.Active=originalMask;if(source!=null)source.Dispose();app.Shutdown(exit);}}),DispatcherPriority.ApplicationIdle);

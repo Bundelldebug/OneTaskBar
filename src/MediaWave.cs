@@ -67,6 +67,7 @@ namespace OneTaskBar
             set
             {
                 if(waveMode==value)return;waveMode=value;
+                if(!value)SetValue(DisplayValueProperty,this.value);
                 if(!waveObserved){waveObserved=true;IsVisibleChanged+=(s,e)=>UpdateWaveClock();Loaded+=(s,e)=>UpdateWaveClock();Unloaded+=(s,e)=>StopWave();}
                 UpdateWaveClock();InvalidateVisual();
             }

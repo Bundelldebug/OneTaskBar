@@ -18,7 +18,7 @@ namespace OneTaskBar
         internal string Key,Name;internal AppEntry App;internal List<StartTile> Children;
         internal bool Folder {get{return Children!=null;}}
     }
-    internal sealed class StartPinStore
+    internal sealed partial class StartPinStore
     {
         readonly string file;readonly int capacity;List<StartPinNode> items=new List<StartPinNode>();bool initialized;
         internal StartPinStore(string path,int limit=120)

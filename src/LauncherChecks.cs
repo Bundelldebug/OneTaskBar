@@ -16,6 +16,7 @@ namespace OneTaskBar
     {
         internal static void Validate(List<string> checks)
         {
+            FeedbackRegressionChecks.Validate(checks);
             var serial=new JavaScriptSerializer();var old=serial.Deserialize<PreferenceData>("{}");if(!old.NativeStartKey||old.NativeSearch||old.DesktopPowerWatts!=0)throw new Exception("Launcher preference defaults changed");
             if(old.NativeStartButton)throw new Exception("Existing users must retain the app-list button");var buttonChoice=serial.Deserialize<PreferenceData>(serial.Serialize(new PreferenceData {NativeStartButton=true,NativeStartKey=false}));if(!buttonChoice.NativeStartButton||buttonChoice.NativeStartKey)throw new Exception("Button and keyboard Start options were coupled");
             foreach(int phy in new[]{0,1,6,7,8,9,10,11,100}){var bytes=new byte[604];Buffer.BlockCopy(BitConverter.GetBytes(1),0,bytes,0,4);var name=System.Text.Encoding.UTF8.GetBytes("Test 5G");Buffer.BlockCopy(BitConverter.GetBytes(name.Length),0,bytes,520,4);Buffer.BlockCopy(name,0,bytes,524,name.Length);Buffer.BlockCopy(BitConverter.GetBytes(phy),0,bytes,568,4);var link=WifiLink.Parse(bytes);int expected=phy==7?4:phy==8?5:phy==10?6:phy==11?7:0;if(link.Name!="Test 5G"||link.Generation!=expected)throw new Exception("Actual PHY generation parsing failed");bytes[0]=4;if(WifiLink.Parse(bytes).Generation!=0||WifiLink.Parse(bytes).Name!=null)throw new Exception("Disconnected Wi-Fi retained badge");}
