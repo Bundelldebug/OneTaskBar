@@ -15,13 +15,13 @@ namespace OneTaskBar
         internal static Rect Rect(System.Drawing.Rectangle screen,double scale,int edge,Rect logical)
         {
             double width=screen.Width/scale,height=screen.Height/scale;
-            if(edge==1)return new Rect(logical.X,height-logical.Bottom,logical.Width,logical.Height);
+            if(edge==1)return new Rect(logical.X,height-logical.Bottom+IslandSafeArea.BottomOffsetPixels(screen)/scale,logical.Width,logical.Height);
             if(edge==0)return new Rect(width-logical.Bottom,logical.X,logical.Height,logical.Width);
             if(edge==2)return new Rect(logical.Y,logical.X,logical.Height,logical.Width);return logical;
         }
         internal static double Reserved(System.Drawing.Rectangle screen,Native.RectI work,double scale,int edge)
         {
-            double gap=edge==0?work.Left-screen.Left:edge==1?work.Top-screen.Top:edge==2?screen.Right-work.Right:screen.Bottom-work.Bottom;return Math.Max(68,gap/scale);
+            double gap=edge==0?work.Left-screen.Left:edge==1?work.Top-screen.Top-IslandSafeArea.BottomOffsetPixels(screen):edge==2?screen.Right-work.Right:screen.Bottom-work.Bottom;return Math.Max(68,gap/scale);
         }
         internal static Native.RectI Reveal(System.Drawing.Rectangle screen,int edge)
         {

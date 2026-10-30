@@ -343,6 +343,7 @@ namespace OneTaskBar
     }
     internal sealed class AppBarReservation : IDisposable
     {
+        internal bool IsTopOn(string monitor){return edge==1&&screen.DeviceName==monitor;}
         readonly HwndSource source; readonly Forms.Screen screen; readonly double scale;readonly int edge;readonly Action stateChanged;bool busy,disposed,autoHide,positioned,registered;Native.RectI lastPosition;
         internal AppBarReservation(Forms.Screen monitor,double dpiScale,bool hidden=false,Action changed=null)
         {

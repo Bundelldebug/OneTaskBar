@@ -47,6 +47,7 @@ namespace OneTaskBar
             Row(panels,"Galaxy Buds 연결 팝업","버즈 연결 정보를 오른쪽 아래에 표시합니다. 등록된 기기의 상태 변경만 감지합니다",Preferences.Current.BudsConnectionPopups,v=>Preferences.Set(p=>p.BudsConnectionPopups=v));
             var notificationLink=Paint.Action("Windows 알림 연결 · 권한 관리",()=>shell.ShowNotificationConnection());notificationLink.HorizontalContentAlignment=HorizontalAlignment.Left;notificationLink.Margin=new Thickness(12,5,12,12);panels.Children.Add(notificationLink);
             ChoiceRow(panels,"빠른 설정","Wi-Fi·소리·배터리 버튼에서 열 화면",Preferences.Current.NativeQuickSettings,v=>Preferences.Set(p=>p.NativeQuickSettings=v));
+            ChoiceRow(panels,"데스크톱 전환","독 버튼과 Win+Tab에서 열 화면",Preferences.Current.NativeTaskView,v=>Preferences.Set(p=>p.NativeTaskView=v));
             var legacyBuds=Row(panels,"8.5에서 주변 기기 연결 대신 Galaxy Buds 열기","Galaxy Buds 앱 설치가 필요합니다",Preferences.Current.QuickGalaxyBuds,v=>Preferences.Set(p=>p.QuickGalaxyBuds=v));legacyBudsOption=(FrameworkElement)legacyBuds.Parent;var budsHint=Paint.TextBlock("9.0에서는 주변 기기 연결과 Galaxy Buds를 각각 배치할 수 있습니다. 빠른 설정의 배치 편집 → 항목 추가에서 선택하세요.",12.5,AppSettingsPalette.Muted);budsHint.TextWrapping=TextWrapping.Wrap;budsHint.Margin=new Thickness(15,12,15,12);independentBudsHint=budsHint;panels.Children.Add(budsHint);RefreshVersionOptions();
             Row(panels,"슬라이더 스크롤 조절","밝기·음량·재생 위치 위에서 휠이나 트랙패드 스크롤로 값을 바꿉니다. 기본은 꺼짐입니다",Preferences.Current.QuickSliderScroll,v=>Preferences.Set(p=>p.QuickSliderScroll=v));
             Group(groups,"패널 선택",panels);
@@ -63,7 +64,7 @@ namespace OneTaskBar
                 if(shell.Drawer!=null)shell.Drawer.RefreshApps();
             });
             Group(groups,"시작과 검색",launcher);
-            var nowBar=new StackPanel();ChoiceRow(nowBar,"미디어 플레이어 펼침 스타일","큰 커버는 앨범 이미지를 위로 펼쳐 표시합니다",Preferences.Current.NowBarLargeCover,v=>Preferences.Set(p=>p.NowBarLargeCover=v),"기본","큰 커버");Row(nowBar,"YouTube 고화질 커버",(Preferences.Current.YouTubeArtworkTrack!=null?"현재 영상만 허용됨 · ":"")+"삼성 브라우저의 재생 제목과 일치하는 기록에서 영상 ID만 읽어 YouTube 이미지 서버에서 커버를 가져옵니다",YouTubeArtwork.Enabled,v=>Preferences.Set(p=>{p.YouTubeHighResArtwork=v;p.YouTubeArtworkTrack=null;}));Group(groups,"미디어 플레이어",nowBar);
+            var nowBar=new StackPanel();ChoiceRow(nowBar,"미디어 플레이어 펼침 스타일","큰 커버는 앨범 이미지를 위로 펼쳐 표시합니다",Preferences.Current.NowBarLargeCover,v=>Preferences.Set(p=>p.NowBarLargeCover=v),"기본","큰 커버");Row(nowBar,"YouTube 고화질 커버",(Preferences.Current.YouTubeArtworkTrack!=null?"현재 영상만 허용됨 · ":"")+"삼성 브라우저의 재생 제목과 일치하는 기록에서 영상 ID만 읽어 YouTube 이미지 서버에서 커버를 가져옵니다",YouTubeArtwork.Enabled,v=>Preferences.Set(p=>{p.YouTubeHighResArtwork=v;p.YouTubeArtworkTrack=null;}));if(ReleaseFeatures.GlassUI)Row(nowBar,"Dynamic Island","상단 안전 영역에 미디어와 충전·음량·밝기 상태를 표시합니다. 전체화면에서는 숨깁니다",Preferences.Current.DynamicIsland,v=>Preferences.Set(p=>p.DynamicIsland=v));Group(groups,"미디어 플레이어",nowBar);
             var safety=new StackPanel();Row(safety,"긴급 종료 단축키","Ctrl + Shift + Tab + 1 · One TaskBar 종료 및 Windows 작업표시줄 복원",Preferences.Current.EmergencyExit,v=>Preferences.Set(p=>p.EmergencyExit=v));Group(groups,"복구",safety);
             var hardware=new StackPanel();
             var powerRow=new Grid {Margin=new Thickness(15,11,15,11)};powerRow.ColumnDefinitions.Add(new ColumnDefinition());powerRow.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(105)});

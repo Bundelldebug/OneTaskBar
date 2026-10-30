@@ -1,4 +1,13 @@
-# 9.0.7 / 9.5.4-beta.1 validation
+# Validation
+
+## 9.0.11 / 9.5.8-beta.1
+
+- Local fixtures cover monitor selection and persistence, missing-monitor fallback, status shortcut symbols and layout, mute readback, overview motion and the stable feature gate. CI reruns the full isolated suite on the release commit.
+- The beta island reserves 32 DIP. Native checks verify actual HWND placement, delayed work-area moves, fullscreen release/re-entry, top-dock coexistence and crash cleanup. On this PC's external display at 125%, the installed capsule starts at pixel 2 and its 28-DIP media surface fits above the 40-pixel work-area boundary. Closed media has no title; expanded controls retain it.
+- Display-order/disconnection cases use synthetic monitor identities; physical placement was checked on the currently attached external display. The user confirmed that the capsule no longer overlaps the tab strip and both installed touch-keyboard/Cast buttons open their Windows panels. Receiver connections were not tested; isolated fixtures do not connect to devices.
+- No trackpad gesture mappings, security-policy changes, forced collection or working-set trimming are introduced. The 150 MB total-RAM goal is still unverified.
+
+## 9.0.7 / 9.5.4-beta.1 history
 
 - Final pre-publication dock correction: the default dock material has an explicit live-backdrop path, separate from solid/image/icons-only modes. Light mode uses a restrained tonal gradient with 77/255 alpha (about 70% transparency). Icons-only mode keeps the surface empty; white utility/clock ink uses one small shared frozen outline effect, with no window-wide glow or plate behind app icons. Mode switching removes those effects and restores the live backdrop. `DockMaterialChecks` runs inside the desktop behavior fixture across available UI versions, both palettes and material/solid/empty transitions.
 

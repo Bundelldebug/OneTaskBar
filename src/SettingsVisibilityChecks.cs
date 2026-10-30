@@ -19,6 +19,21 @@ namespace OneTaskBar
                 // SetDesktop previously hid settings before its toggle handler called Show alone.
                 if(Children<Button>(window).Any(b=>System.Windows.Automation.AutomationProperties.GetName(b)=="빠른 설정"))throw new InvalidOperationException("Settings retains the retired footer shortcut");
                 if(window.ExitSettingsButton==null)throw new InvalidOperationException("Settings list has no exit entry");
+                string savedMonitor=Preferences.Current.DockMonitor;
+                try
+                {
+                    var picker=window.DisplayPicker;
+                    if(picker==null||picker.Items.Count<3)throw new InvalidOperationException("Display picker must list all, primary and available monitors");
+                    foreach(var choice in picker.Items.Cast<DockDisplayChoice>().Reverse().ToArray())
+                    {
+                        picker.SelectedItem=choice;
+                        if((Preferences.Current.DockMonitor??"")!=choice.Value||String.IsNullOrWhiteSpace(choice.ToString()))
+                            throw new InvalidOperationException("Display choice must retain its device key and readable label");
+                        var saved=new System.Web.Script.Serialization.JavaScriptSerializer().Deserialize<PreferenceData>(System.IO.File.ReadAllText(System.IO.Path.Combine(AppLog.Data,"settings.json")));
+                        if((saved.DockMonitor??"")!=choice.Value)throw new InvalidOperationException("Display choice does not persist");
+                    }
+                }
+                finally{Preferences.Set(p=>p.DockMonitor=savedMonitor);}
                 window.SettingsHome();await Task.Delay(300);
                 foreach(var choice in UIVersions.Available)
                 {
@@ -38,7 +53,7 @@ namespace OneTaskBar
                 }
                 window.OpenSettings("데스크톱");
                 for(int i=0;i<5;i++){window.Hide();await Task.Delay(20+i*15);window.Show();await Task.Delay(370);if(!window.IsVisible||window.IsDismissing||root.Opacity<.999||Math.Abs(root.RenderTransform.Value.M11-1)>.001||!Children<ToggleSwitch>(root).Any(t=>t.IsVisible&&System.Windows.Automation.AutomationProperties.GetName(t)=="Windows 작업표시줄 대체"))throw new InvalidOperationException("Settings becomes an empty surface after reopening during dismissal");}
-                Preferences.Current.Animations=false;window.Hide();window.Show();if(!window.IsVisible||root.Opacity!=1)throw new InvalidOperationException("Settings reopen with animations disabled");Program.Save(window.Surface,(int)window.Width,(int)window.Height,System.IO.Path.Combine(AppLog.Data,"settings-reopen-visible.png"));AppLog.Json("settings-visibility-probe.json",new {passed=true,showAloneReversesPendingHide=true,repeatedReopenVisible=true,animationsDisabled=true,taskbarModeChanged=false,osInputSent=false});result=0;
+                Preferences.Current.Animations=false;window.Hide();window.Show();if(!window.IsVisible||root.Opacity!=1)throw new InvalidOperationException("Settings reopen with animations disabled");Program.Save(window.Surface,(int)window.Width,(int)window.Height,System.IO.Path.Combine(AppLog.Data,"settings-reopen-visible.png"));AppLog.Json("settings-visibility-probe.json",new {passed=true,showAloneReversesPendingHide=true,repeatedReopenVisible=true,displaySelectionPersists=true,animationsDisabled=true,taskbarModeChanged=false,osInputSent=false});result=0;
             }catch(Exception error){AppLog.Json("settings-visibility-probe.json",new {passed=false,error=error.ToString()});}finally{if(shell!=null)shell.Dispose();Preferences.Current.Animations=oldAnimations;if(scope!=null)scope.Dispose();application.Shutdown(result);}}),DispatcherPriority.ApplicationIdle);return application.Run();
         }
     }

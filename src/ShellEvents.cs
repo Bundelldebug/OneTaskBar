@@ -24,7 +24,11 @@ namespace OneTaskBar
             debounce.Tick+=(s,e)=> {debounce.Stop();if(!disposed)this.changed();};
             callback=OnEvent;
             windows=SetWinEventHook(0x8000,0x8003,IntPtr.Zero,callback,0,0,2);
-            foregroundCallback=(hook,id,window,objectId,child,thread,time)=>{if(!disposed&&focusChanged!=null)dispatcher.BeginInvoke(focusChanged,DispatcherPriority.Normal);};
+            foregroundCallback=(hook,id,window,objectId,child,thread,time)=>
+            {
+                if(disposed)return;
+                if(focusChanged!=null)dispatcher.BeginInvoke(focusChanged,DispatcherPriority.Normal);
+            };
             foreground=SetWinEventHook(3,3,IntPtr.Zero,foregroundCallback,0,0,2);
         }
         void OnEvent(IntPtr hook,uint id,IntPtr window,int objectId,int child,uint thread,uint time)

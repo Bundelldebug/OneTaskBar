@@ -1,4 +1,4 @@
-param(
+﻿param(
     [ValidateSet('All','Quick','Media','Launcher','Dock','Notifications','Settings','Startup','Resources','Glass')]
     [string]$Area='All',
     [string[]]$Probe,
@@ -12,7 +12,7 @@ $taskRoot=Split-Path -Parent $PSScriptRoot
 # Only isolated fixtures belong here. Live diagnostic signals and hardware-changing probes do not.
 $taskAreas=[ordered]@{
     Quick=@('self-test','quick9-probe','quick-size-probe')
-    Media=@('self-test','media9-probe','nowbar9-probe','nowbar-probe')
+    Media=@('self-test','media9-probe','nowbar9-probe','nowbar-probe','dynamic-island-probe')
     Launcher=@('self-test','launcher-keyboard-probe','launcher-motion-probe','start-size-probe','deferred-icon-probe')
     Dock=@('self-test','desktop-behavior-probe','window-switcher-probe','window-activation-probe','window-preview-probe','desktop-overview-probe','tray-overflow-probe')
     Notifications=@('self-test','notification-ui-probe','notification-stack-probe','notification-swipe-probe','popup-probe')

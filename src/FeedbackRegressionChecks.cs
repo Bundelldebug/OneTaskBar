@@ -78,6 +78,10 @@ namespace OneTaskBar
             using(var audio=new AudioService())
             {
                 audio.Read();audio.Read();
+                bool available=audio.Available;
+                audio.RefreshDevice();
+                audio.Read();
+                if(available)Require(audio.Available,"Rebinding the output device disabled audio control");
                 int reads=audio.ReadCount;
                 for(int i=0;i<1000;i++)audio.Read();
                 if(audio.Available&&audio.NotificationsRegistered)Require(audio.ReadCount==reads,"Unchanged volume caused repeated endpoint reads");
@@ -85,6 +89,7 @@ namespace OneTaskBar
                 Require(!audio.NotificationsRegistered,"Audio callback survived disposal");
             }
             checks.Add("Unchanged volume reads are coalesced and endpoint callbacks are released without changing volume");
+            AudioMuteChecks.Validate(checks);
         }
         [DllImport("user32.dll")]static extern bool DestroyIcon(IntPtr icon);
     }

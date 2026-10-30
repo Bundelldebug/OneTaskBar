@@ -32,6 +32,9 @@ namespace OneTaskBar
         internal int LayoutPasses {get;private set;}
         internal double BuildMilliseconds {get;private set;}
         readonly Stopwatch transition=new Stopwatch();
+        readonly TranslateTransform headerOffset=new TranslateTransform(),footerOffset=new TranslateTransform();
+        bool chromeTransition;
+        double transitionFrom;
         internal int PageIndex {get{return selected;}}
         internal int PreviewCount {get{return previews.Count;}}
         internal int RegisteredThumbnails {get{return previews.Count(p=>p.Window.Registered);}}
@@ -46,16 +49,16 @@ namespace OneTaskBar
             body.RowDefinitions.Add(new RowDefinition {Height=new GridLength(104)});
             body.RowDefinitions.Add(new RowDefinition());
             body.RowDefinitions.Add(new RowDefinition {Height=new GridLength(48)});
-            var header=new Grid();header.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(64)});header.ColumnDefinitions.Add(new ColumnDefinition());header.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(64)});
+            var header=new Grid {RenderTransform=headerOffset};header.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(64)});header.ColumnDefinitions.Add(new ColumnDefinition());header.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(64)});
             var back=Paint.Button(new Glyph("previous",18),()=>SelectPage(selected-1),"이전 데스크톱");back.Width=back.Height=40;header.Children.Add(back);
             var strip=new ScrollViewer {Content=desktops,HorizontalScrollBarVisibility=ScrollBarVisibility.Hidden,VerticalScrollBarVisibility=ScrollBarVisibility.Disabled};Grid.SetColumn(strip,1);header.Children.Add(strip);
             var add=Paint.Button(Paint.TextBlock("+",25,Paint.Text),()=>Execute(1),"새 데스크톱");add.Width=add.Height=40;Grid.SetColumn(add,2);header.Children.Add(add);body.Children.Add(header);
-            var space=new Border {CornerRadius=new CornerRadius(28),Background=QuickPanel.Card,Padding=new Thickness(16),Margin=new Thickness(0,8,0,12),Child=workspace};Grid.SetRow(space,1);body.Children.Add(space);
+            var space=new Border {CornerRadius=new CornerRadius(28),Background=Brushes.Transparent,Padding=new Thickness(16),Margin=new Thickness(0,8,0,12),Child=workspace};Grid.SetRow(space,1);body.Children.Add(space);
             workspace.Children.Add(cards);empty.HorizontalAlignment=HorizontalAlignment.Center;empty.VerticalAlignment=VerticalAlignment.Center;workspace.Children.Add(empty);
             caption.VerticalAlignment=VerticalAlignment.Top;caption.HorizontalAlignment=HorizontalAlignment.Left;workspace.Children.Add(caption);
             var pageButtons=new StackPanel {Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Top};
             pageButtons.Children.Add(Paint.Button(new Glyph("previous",14),()=>ChangeWindowPage(-1),"이전 창 목록"));pageButtons.Children.Add(Paint.Button(new Glyph("next",14),()=>ChangeWindowPage(1),"다음 창 목록"));workspace.Children.Add(pageButtons);
-            var footer=new Grid();Grid.SetRow(footer,2);body.Children.Add(footer);
+            var footer=new Grid {RenderTransform=footerOffset};Grid.SetRow(footer,2);body.Children.Add(footer);
             var dismiss=Paint.Action("닫기",Dismiss);dismiss.HorizontalAlignment=HorizontalAlignment.Right;footer.Children.Add(dismiss);
             var switchButton=Paint.Action("이 데스크톱으로 전환",()=>Execute(0));switchButton.HorizontalAlignment=HorizontalAlignment.Center;footer.Children.Add(switchButton);
             var remove=Paint.Action("데스크톱 닫기",()=>Execute(2));remove.HorizontalAlignment=HorizontalAlignment.Left;remove.IsEnabled=false;remove.Tag="remove-desktop";footer.Children.Add(remove);
@@ -71,13 +74,21 @@ namespace OneTaskBar
         }
         internal void Present(DesktopSnapshot value,System.Drawing.Rectangle monitor)
         {
-            ++presentation;closing=false;StopTransition();Surface.Opacity=1;
+            bool opening=!IsVisible||(transition.IsRunning&&chromeTransition&&!leaving);
+            double from=IsVisible?Surface.Opacity:0;
+            ++presentation;
+            closing=false;
+            StopTransition();
+            Surface.Opacity=1;
             empty.Text="열려 있는 창이 없습니다";
             snapshot=value;selected=value.CurrentIndex;pageStart=0;
             double dpi=Native.PrepareMonitor(this,monitor);
             ShowAt(monitor,0,0,monitor.Width/dpi,monitor.Height/dpi);Native.BlurOpacity(this,1);
             foreach(var button in ((Grid)body.Children[2]).Children.OfType<Button>())if((string)button.Tag=="remove-desktop")button.IsEnabled=value.Pages.Count>1;
-            RenderDesktops();RenderWindows();Activate();
+            RenderDesktops();
+            RenderWindows();
+            if(opening&&Motion.Enabled)StartTransition(true,false,from);
+            Activate();
         }
         internal void ShowLoading(System.Drawing.Rectangle monitor)
         {
@@ -110,6 +121,9 @@ namespace OneTaskBar
             if(closing||closed||!IsVisible)return;
             var build=Stopwatch.StartNew();
             StopTransition();ReleasePreviews();
+            chromeTransition=false;
+            leaving=false;
+            transitionFrom=0;
             var page=snapshot.Pages[selected];page.Windows.RemoveAll(w=>!Native.IsWindow(w.Window));
             caption.Text=page.Name+" · "+page.Windows.Count+"개 창";empty.Visibility=page.Windows.Count==0?Visibility.Visible:Visibility.Collapsed;
             var owner=new WindowInteropHelper(this).EnsureHandle();
@@ -125,7 +139,8 @@ namespace OneTaskBar
                 previews.Add(new Preview {Anchor=anchor,Card=card,Window=native});
             }
             ArrangePreviews();BuildMilliseconds=build.Elapsed.TotalMilliseconds;
-            if(Motion.Enabled&&previews.Count>0){leaving=false;transition.Restart();CompositionTarget.Rendering+=Animate;Animate(null,EventArgs.Empty);}
+            if(Motion.Enabled)StartTransition(false,false,0);
+            else PlacePreviews(1);
         }
         void ChangeWindowPage(int direction)
         {
@@ -155,11 +170,40 @@ namespace OneTaskBar
         void PlacePreviews(double progress)
         {
             double eased=1-Math.Pow(1-progress,3);
-            if(leaving)eased=1-eased;
-            foreach(var preview in previews){preview.Card.Opacity=eased;preview.Window.SetPreviewOpacity((byte)Math.Round(eased*255));}
-            if(leaving){Surface.Opacity=eased;Native.BlurOpacity(this,eased);}
+            double opacity=leaving?transitionFrom*(1-eased):transitionFrom+(1-transitionFrom)*eased;
+            foreach(var preview in previews)
+            {
+                preview.Card.Opacity=chromeTransition?1:opacity;
+                preview.Window.SetPreviewOpacity((byte)Math.Round(opacity*255));
+            }
+            if(chromeTransition)
+            {
+                Surface.Opacity=opacity;
+                Native.BlurOpacity(this,opacity);
+                headerOffset.Y=-12*(1-opacity);
+                footerOffset.Y=12*(1-opacity);
+            }
+            else
+            {
+                if(Surface.Opacity!=1)
+                {
+                    Surface.Opacity=1;
+                    Native.BlurOpacity(this,1);
+                }
+                headerOffset.Y=footerOffset.Y=0;
+            }
         }
-        void Animate(object sender,EventArgs args){double progress=Math.Min(1,transition.Elapsed.TotalMilliseconds/220);PlacePreviews(progress);if(progress>=1)StopTransition();}
+        void StartTransition(bool chrome,bool leave,double from)
+        {
+            StopTransition();
+            chromeTransition=chrome;
+            leaving=leave;
+            transitionFrom=from;
+            transition.Restart();
+            CompositionTarget.Rendering+=Animate;
+            Animate(null,EventArgs.Empty);
+        }
+        void Animate(object sender,EventArgs args){double progress=Math.Min(1,transition.Elapsed.TotalMilliseconds/(leaving?190:220));PlacePreviews(progress);if(progress>=1)StopTransition();}
         void StopTransition(){transition.Stop();CompositionTarget.Rendering-=Animate;}
         void Execute(int operation,IntPtr window=default(IntPtr))
         {
@@ -169,7 +213,7 @@ namespace OneTaskBar
         internal async void Dismiss()
         {
             if(closed||closing)return;closing=true;int token=presentation;StopTransition();
-            if(Motion.Enabled){leaving=true;transition.Restart();CompositionTarget.Rendering+=Animate;await Task.Delay(230);}
+            if(Motion.Enabled){StartTransition(true,true,Surface.Opacity);await Task.Delay(205);}
             if(!closed&&token==presentation){HideImmediately();closing=false;}
         }
     }

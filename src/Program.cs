@@ -72,6 +72,9 @@ namespace OneTaskBar
             if(args.Contains("--settings-visibility-probe"))return SettingsVisibilityChecks.Run();
             if(args.Contains("--window-switcher-probe"))return WindowSwitcherChecks.Run(args.Contains("--inspect"));
             if(args.Contains("--desktop-overview-probe"))return DesktopOverviewChecks.Run(args.Contains("--inspect"));
+            if(args.Contains("--island-space-fixture"))return IslandSafetyChecks.Hold();
+            if(args.Contains("--dynamic-island-probe"))return DynamicIslandChecks.Run(args.Contains("--inspect"));
+            if(args.Contains("--audio-mute-probe"))return AudioMuteChecks.HardwareProbe();
             if(args.Contains("--tray-overflow-probe"))return TrayOverflowChecks.Run();
             if(args.Contains("--window-activation-probe"))return WindowActivationChecks.Run();
             if(args.Contains("--startup-probe"))return StartupChecks.Run();
@@ -129,7 +132,7 @@ namespace OneTaskBar
             if(args.Contains("--diagnose")) return Diagnose();
             if(args.Contains("--desktop-probe")) return DesktopProbe();
             if(args.Contains("--tray-probe")) return DesktopProbe(true);
-            if(args.Contains("--recover")) {int index=Array.IndexOf(args,"--session");DesktopLease.Recover(index>=0&&index+1<args.Length?args[index+1]:null);NativeOsdGate.Recover();NativeToastGate.Recover();NativeNotificationRoute.Recover();return 0;}
+            if(args.Contains("--recover")) {int index=Array.IndexOf(args,"--session");DesktopLease.Recover(index>=0&&index+1<args.Length?args[index+1]:null);NativeOsdGate.Recover();NativeToastGate.Recover();NativeNotificationRoute.Recover();IslandSafeArea.Recover();return 0;}
             if(args.Contains("--guard-fixture")){Thread.Sleep(Timeout.Infinite);return 0;}
             if(args.Contains("--render")) return Render(args);
             if(args.Contains("--logon")&&DesktopInstanceRunning())return 0;
@@ -137,6 +140,7 @@ namespace OneTaskBar
             bool created;
             using(var mutex=new Mutex(true,@"Local\OneTaskBar.Desktop",out created)) {
                 if(!created) { if(!args.Contains("--logon"))Signal(args.Contains("--connect-notifications")?"ConnectNotifications":"Show"); return 0; }
+                IslandSafeArea.Recover();
                 ShellController shell=null;
                 try {
                     var app=new Application { ShutdownMode=ShutdownMode.OnExplicitShutdown };
@@ -211,9 +215,14 @@ namespace OneTaskBar
                 var restored=serializer.Deserialize<PreferenceData>(serializer.Serialize(options));
                 if(restored.Seconds||restored.ChargeAnimation||!restored.Blur||!restored.Animations||!restored.Hover)throw new Exception("Settings round trip/default migration");
                 checks.Add("Toggle settings preserve false values and keep defaults for newly added options");
-                if(restored.NativeNotifications||restored.NativeQuickSettings)throw new Exception("Old settings must keep custom panels");
-                var panelOptions=serializer.Deserialize<PreferenceData>(serializer.Serialize(new PreferenceData {NativeNotifications=true,NativeQuickSettings=false}));
-                if(!panelOptions.NativeNotifications||panelOptions.NativeQuickSettings)throw new Exception("Panel choices must persist independently");
+                DynamicIslandChecks.Validate();
+                DockDisplays.Check();
+                if(restored.DynamicIsland)throw new Exception("Dynamic Island must remain opt-in");
+                var islandOptions=serializer.Deserialize<PreferenceData>(serializer.Serialize(new PreferenceData {DynamicIsland=true}));
+                if(!islandOptions.DynamicIsland)throw new Exception("Dynamic Island preference round trip");
+                if(restored.NativeNotifications||restored.NativeQuickSettings||restored.NativeTaskView)throw new Exception("Old settings must keep custom panels");
+                var panelOptions=serializer.Deserialize<PreferenceData>(serializer.Serialize(new PreferenceData {NativeNotifications=true,NativeQuickSettings=false,NativeTaskView=true}));
+                if(!panelOptions.NativeNotifications||panelOptions.NativeQuickSettings||!panelOptions.NativeTaskView)throw new Exception("Panel choices must persist independently");
                 checks.Add("Native/custom panel choices persist independently and migrate existing users to their current custom panels");
                 LauncherChecks.Validate(checks);
                 string layoutFolder=Path.Combine(AppLog.Data,"layout-test-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(layoutFolder);

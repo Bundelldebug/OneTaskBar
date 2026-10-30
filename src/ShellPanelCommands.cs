@@ -30,7 +30,7 @@ namespace OneTaskBar
             else if(key=="quick")ToggleQuick(dock);
             else if(key=="start")ToggleStart(dock);
             else if(key=="search")ToggleSearch(dock);
-            else if(key=="desktops")OpenDesktopOverview();
+            else if(key=="desktops")OpenTaskView();
         }
     }
 }

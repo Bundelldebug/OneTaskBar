@@ -19,6 +19,7 @@ namespace OneTaskBar
         }
         void PersonalizeDock(StackPanel rows)
         {
+            DockDisplaySetting(rows);
             DockScaleSetting(rows);
             ClockSetting(rows);
             Row(rows,"패널 색상을 작업표시줄과 맞추기","빠른 설정·알림·시작 메뉴에 선택한 작업표시줄 색상을 사용합니다",Preferences.Current.PanelsUseDockColor,v=>Preferences.Set(p=>p.PanelsUseDockColor=v));

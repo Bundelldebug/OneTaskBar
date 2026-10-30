@@ -9,6 +9,8 @@ namespace OneTaskBar
     {
         public bool Blur=true,Animations=true,ChargeAnimation=true,Hover=true,RunningDots=true,Seconds=true,DesktopMode=true;
         public bool NativeNotifications=false,NativeQuickSettings=false;
+        public bool NativeTaskView=false;
+        public bool DynamicIsland=false;
         public bool NotificationIntegration=true;
         public bool NotificationPopups=true;
         public bool NotificationSoundEnabled=false;
@@ -23,6 +25,7 @@ namespace OneTaskBar
         public bool DockSolidBackground=false;
         public int DockBackgroundKind=0,DockEdge=3;
         public int DockScalePercent=100;
+        public string DockMonitor;
         public int DockClockMode=0;
         public string DockBackgroundColor="#FFBAC1C7",DockBackgroundImage;
         public bool NativeStartKey=true,NativeSearch=false;
