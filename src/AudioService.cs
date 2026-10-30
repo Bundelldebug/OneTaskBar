@@ -48,10 +48,16 @@ namespace OneTaskBar
             Interlocked.Increment(ref deviceRevision);
             Notify();
         }
-        void Ensure()
+        internal void RefreshDevice()
         {
             if(disposed)throw new ObjectDisposedException("AudioService");
-            if(endpoint!=null&&Volatile.Read(ref deviceDirty)==0&&DateTime.UtcNow<nextDeviceCheck)return;
+            DeviceChanged(null,null);
+            Read();
+        }
+        void Ensure(bool forceDeviceCheck=false)
+        {
+            if(disposed)throw new ObjectDisposedException("AudioService");
+            if(!forceDeviceCheck&&endpoint!=null&&Volatile.Read(ref deviceDirty)==0&&DateTime.UtcNow<nextDeviceCheck)return;
             Interlocked.Exchange(ref deviceDirty,0);
             IMMDeviceEnumerator enumerator=null;
             IMMDevice device=null;
@@ -123,10 +129,23 @@ namespace OneTaskBar
         }
         public void Mute(bool muted)
         {
-            Ensure();
-            var context=Guid.Empty;
-            Marshal.ThrowExceptionForHR(endpoint.SetMute(muted,ref context));
+            Ensure(true);
+            CommitMute(muted);
+        }
+        internal void ToggleMute()
+        {
+            Ensure(true);
+            Muted=AudioMute.Toggle(endpoint);
+            Available=true;
             Interlocked.Exchange(ref stateDirty,1);
+            Notify();
+        }
+        void CommitMute(bool muted)
+        {
+            Muted=AudioMute.Write(endpoint,muted);
+            Available=true;
+            Interlocked.Exchange(ref stateDirty,1);
+            Notify();
         }
         void ReleaseEndpoint()
         {

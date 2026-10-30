@@ -15,13 +15,15 @@ namespace OneTaskBar
             DockHost dock=null;
             try
             {
-                Preferences.Current.DockStatusItems=new[]{"bluetooth","buds"};
+                Preferences.Current.DockStatusItems=new[]{"bluetooth","buds","touch-keyboard","cast"};
                 dock=new DockHost(shell,screen);
                 dock.Show();
                 await Task.Delay(180);
                 var buds=dock.StatusShortcut("buds");
                 var bluetooth=dock.StatusShortcut("bluetooth");
                 if(buds==null||bluetooth==null||buds.Kind==bluetooth.Kind)throw new InvalidOperationException("Buds status shortcut must have its own earbud symbol");
+                if(dock.StatusShortcut("touch-keyboard")==null||dock.StatusShortcut("touch-keyboard").Kind!="keyboard"||dock.StatusShortcut("cast")==null||dock.StatusShortcut("cast").Kind!="cast")
+                    throw new InvalidOperationException("Touch keyboard and Cast shortcuts must keep distinct visible symbols");
                 Program.Save(dock.Status.Surface,(int)dock.Status.Width,(int)dock.Status.Height,Path.Combine(AppLog.Data,"status-buds-shortcut.png"));
                 var models=new[]{"Galaxy Buds2 Pro","Galaxy Buds3 Pro","Jiho의 Buds4 Pro"};
                 var expected=new[]{"ic_tws_left_dark.png","ic_buds3_left_dark.png","ic_buds4f_left_dark.png"};

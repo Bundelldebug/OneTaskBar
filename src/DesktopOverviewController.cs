@@ -17,7 +17,12 @@ namespace OneTaskBar
         internal async void OpenDesktopOverview()
         {
             TaskViewRequests++;
-            if(Overview!=null&&Overview.IsVisible&&!Overview.Retiring){overviewRequest++;Overview.Dismiss();return;}
+            if(Overview!=null&&Overview.IsVisible&&!Overview.Retiring)
+            {
+                overviewRequest++;
+                Overview.Dismiss();
+                return;
+            }
             int request=++overviewRequest;
             Switcher.Cancel();PrepareWindowSwitcher(true);
             if(Demo)return;

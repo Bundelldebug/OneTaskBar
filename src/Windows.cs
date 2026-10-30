@@ -320,6 +320,7 @@ namespace OneTaskBar
             if(MediaBar==null)return;
             double start=currentStartX*Zoom,y=(DockGeometry.Vertical(Edge)?12:currentY)*Zoom;
             y+=(1-reveal)*8*Zoom;
+            if(Edge==1)y-=IslandSafeArea.BottomOffsetPixels(Screen.Bounds)/Scale;
             MediaBar.ConstrainDock(start,y);
             MediaBar.Update(controller.Services.Media,Scale,start,y,(visible||visibilityTimer.IsEnabled)&&controller.Desktop&&controller.DisplayAwake&&start-24*Zoom>=44*Zoom);
             MediaBar.Opacity=reveal;

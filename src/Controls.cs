@@ -116,6 +116,7 @@ namespace OneTaskBar
             } else if(kind=="bluetooth") {
                 dc.DrawGeometry(null,pen,Geometry.Parse("M6,6 L18,17 12,22 12,2 18,7 6,18"));
             } else if(kind=="computer") {dc.DrawRoundedRectangle(null,pen,new Rect(2,3,20,13),2,2);line(12,16,12,21);line(7,21,17,21);
+            } else if(kind=="cast") {dc.DrawGeometry(null,pen,Geometry.Parse("M3,8 L3,4 Q3,2 5,2 L21,2 Q23,2 23,4 L23,17 Q23,19 21,19 L16,19 M2,15 A7,7 0 0 1 9,22 M2,10 A12,12 0 0 1 14,22"));dc.DrawEllipse(brush,null,new Point(2.5,21.5),1.3,1.3);
             } else if(kind=="keyboard") {dc.DrawRoundedRectangle(null,pen,new Rect(1,5,22,14),2.5,2.5);for(int y=0;y<2;y++)for(int x=0;x<5;x++)dc.DrawRoundedRectangle(brush,null,new Rect(4+x*3.6,8+y*3.3,1.5,1.5),.2,.2);line(7,16,17,16);
             } else if(kind=="mouse") {dc.DrawRoundedRectangle(null,pen,new Rect(6,2,12,20),6,6);line(12,3,12,9);line(7,10,17,10);
             } else if(kind=="volume" || kind=="mute" || kind=="volume-low") {
@@ -362,7 +363,7 @@ namespace OneTaskBar
             }
             if(!OpaqueSurface&&!(this is NowBar)&&!DockSurface)PanelMaterial.RefreshCards(Surface);
         }
-        internal void RefreshGlassMaterial(){ApplyMaterial();if(DockSurface)Glass95.DockInk(Surface);else Glass95.RefreshColors(Surface);}
+        internal virtual void RefreshGlassMaterial(){ApplyMaterial();if(DockSurface)Glass95.DockInk(Surface);else Glass95.RefreshColors(Surface);}
         internal void MoveGlassHighlight(Point point)
         {
             if(glassEdge==null||!Motion.Enabled||!Preferences.Current.Hover||!IsVisible||IsDismissing||Surface.ActualWidth<1||Surface.ActualHeight<1)return;

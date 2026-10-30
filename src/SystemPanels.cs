@@ -20,6 +20,7 @@ namespace OneTaskBar
         internal static bool Toggle(bool notifications)
         {return Shortcut((ushort)(notifications?0x4e:0x41));}
         internal static bool TaskView(){return Shortcut(0x09);}
+        internal static bool Cast(){return Shortcut(0x4b);}
         internal static bool ContextMenu()
         {
             if(ModifiersHeld())return false;

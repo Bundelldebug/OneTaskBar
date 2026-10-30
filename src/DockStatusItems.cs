@@ -9,12 +9,22 @@ namespace OneTaskBar
 {
     internal static class DockStatusItems
     {
-        internal static readonly string[][] Choices={new[]{"bluetooth","bluetooth","블루투스"},new[]{"buds","earbuds","Galaxy Buds"},new[]{"calendar","calendar","달력"},new[]{"capture","screenshot","화면 캡처"},new[]{"manager","task-manager","작업 관리자"},new[]{"settings","home","One TaskBar 설정"}};
+        internal static readonly string[][] Choices={new[]{"bluetooth","bluetooth","블루투스"},new[]{"buds","earbuds","Galaxy Buds"},new[]{"calendar","calendar","달력"},new[]{"capture","screenshot","화면 캡처"},new[]{"manager","task-manager","작업 관리자"},new[]{"settings","home","One TaskBar 설정"},new[]{"touch-keyboard","keyboard","터치 키보드"},new[]{"cast","cast","캐스트"}};
         internal static string[] Clean(string[] items){return (items??new string[0]).Where(k=>Choices.Any(c=>c[0]==k)).Distinct().Take(4).ToArray();}
         internal static int Count {get{return Clean(Preferences.Current.DockStatusItems).Length;}}
         internal static void Invoke(string key,ShellController shell,GlassWindow anchor)
         {
-            switch(key){case "bluetooth":shell.ShowDetail("bluetooth");break;case "buds":shell.OpenQuickDevices(true);break;case "calendar":shell.ToggleCalendar(anchor);break;case "capture":shell.OpenScreenCapture();break;case "manager":shell.OpenTaskManager();break;case "settings":shell.ShowWelcome();break;}
+            switch(key)
+            {
+                case "bluetooth":shell.ShowDetail("bluetooth");break;
+                case "buds":shell.OpenQuickDevices(true);break;
+                case "calendar":shell.ToggleCalendar(anchor);break;
+                case "capture":shell.OpenScreenCapture();break;
+                case "manager":shell.OpenTaskManager();break;
+                case "settings":shell.ShowWelcome();break;
+                case "touch-keyboard":shell.OpenStatusSystemPanel(false);break;
+                case "cast":shell.OpenStatusSystemPanel(true);break;
+            }
         }
     }
     internal sealed partial class DockHost
