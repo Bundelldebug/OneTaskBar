@@ -7,7 +7,7 @@ namespace OneTaskBar
 {
     internal sealed partial class MediaPlayerView
     {
-        internal readonly bool Modern=Preferences.Current.UIVersion>=90;
+        internal readonly bool Modern;
         internal Button ShuffleButton {get;private set;}
         internal MarqueeTitle CenterTitle {get{return modernTitle;}}
         internal MarqueeTitle CenterArtist {get{return modernArtist;}}
@@ -64,7 +64,8 @@ namespace OneTaskBar
                 art.Visibility=Visibility.Collapsed;posterShade.Visibility=poster?Visibility.Visible:Visibility.Collapsed;modernWords.VerticalAlignment=poster?VerticalAlignment.Bottom:VerticalAlignment.Center;modernWords.Margin=poster?new Thickness(12,0,12,16):new Thickness(0);posterShade.Height=poster?100:0;route.Visibility=timeline.Visibility=transport.Visibility=empty?Visibility.Collapsed:Visibility.Visible;controls.Visibility=Visibility.Visible;compactOutput.Visibility=empty?Visibility.Visible:Visibility.Collapsed;if(fold!=null)fold.Visibility=empty?Visibility.Collapsed:Visibility.Visible;
                 timeline.Margin=new Thickness(0,2,0,0);double times=CompactMedia?10:16;SeekBar.Height=Math.Max(16,rows[2]-times-2);((Grid)timeline.Children[0]).Height=times;
             }
-            modernTitle.Text=!empty&&!poster?InlineCaption(state.Title,state.Artist):state.Title;modernArtist.Text=state.Artist;modernTitle.Running=modernArtist.Running=!empty;ToolTip=InlineCaption(state.Title,state.Artist);LoadSourceLogo(empty?null:state.AppId);
+            modernTitle.Text=!empty&&!poster?InlineCaption(state.Title,state.Artist):state.Title;modernArtist.Text=state.Artist;modernTitle.Running=modernArtist.Running=!empty;ToolTip=InlineCaption(state.Title,state.Artist);
+            LoadSourceLogo(empty?null:state.AppId);
             string output=String.IsNullOrWhiteSpace(outputName)?"오디오 출력":outputName;device.Text=output;device.ToolTip="Windows 기본 미디어 출력 · "+output;deviceGlyph.Update(output.IndexOf("Buds",StringComparison.OrdinalIgnoreCase)>=0||output.IndexOf("헤드",StringComparison.Ordinal)>=0||output.IndexOf("이어",StringComparison.Ordinal)>=0?"headphones":"volume",Paint.ControlWhite);OutputButton.ToolTip=compactOutput.ToolTip="출력 기기 변경 · "+output;
             budsOutput=BudsInfo.IsBuds(output);if(budsOutput&&deviceModel!=BudsDeviceData.SymbolFile(output))LoadDeviceSymbol(output);deviceGlyph.SetDeviceIcon(budsOutput?deviceSymbol:null);
             if(artwork!=state.Artwork||changed){artwork=state.Artwork;var picture=artwork==null?null:new ImageBrush(artwork){Stretch=Stretch.UniformToFill};if(picture!=null)picture.Freeze();art.Background=picture;ArtworkButton.Background=poster?(Brush)picture:Brushes.Transparent;ArtworkButton.Resources["ButtonRadius"]=new CornerRadius(poster?20:11);var palette=ArtworkPalette.Read(state.Artwork);SeekBar.WaveColor=palette.ProgressColor;MediaBackground=palette.PlayerSurface(state.Artwork);if(PaletteChanged!=null)PaletteChanged(palette);}

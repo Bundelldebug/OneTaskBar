@@ -10,6 +10,31 @@ using System.Threading;
 
 internal static class Guard
 {
+    [DllImport("user32.dll")]static extern bool IsWindow(IntPtr window);
+    [DllImport("user32.dll")]static extern uint GetWindowThreadProcessId(IntPtr window,out uint process);
+    [DllImport("dwmapi.dll")]static extern int DwmSetWindowAttribute(IntPtr window,int attribute,ref int value,int size);
+    static void RestoreMedia(string data)
+    {
+        try
+        {
+            string path=Path.Combine(data,"media-window-lease.json");
+            if(!File.Exists(path))return;
+            string json=File.ReadAllText(path);
+            if(json.Length>16384)return;
+            foreach(Match match in Regex.Matches(json,@"\{[^{}]+\}"))
+            {
+                long handle;uint expected,actual;int previous;
+                if(!Int64.TryParse(Field(match.Value,"Window"),out handle)||!UInt32.TryParse(Field(match.Value,"Process"),out expected)||!Int32.TryParse(Field(match.Value,"Transitions"),out previous))continue;
+                var window=new IntPtr(handle);
+                if(!IsWindow(window)||GetWindowThreadProcessId(window,out actual)==0||actual!=expected)continue;
+                int visible=0;
+                if(Regex.IsMatch(match.Value,"\"Hidden\"\\s*:\\s*true"))DwmSetWindowAttribute(window,13,ref visible,4);
+                DwmSetWindowAttribute(window,3,ref previous,4);
+            }
+            File.Delete(path);
+        }
+        catch { }
+    }
     [DllImport("user32.dll")]static extern short GetAsyncKeyState(int key);
     [DllImport("kernel32.dll",SetLastError=true)]static extern uint WaitForSingleObject(IntPtr handle,uint milliseconds);
     [DllImport("kernel32.dll")]static extern IntPtr GetCurrentProcess();
@@ -74,6 +99,7 @@ internal static class Guard
             }finally{UnhookWindowsHookEx(hook);GC.KeepAlive(callback);}
         }}catch(ArgumentException){}catch(Exception error){try{Directory.CreateDirectory(data);File.AppendAllText(Path.Combine(data,"guard.log"),error.Message+Environment.NewLine);}catch{}}
         finally{try{File.Delete(Path.Combine(data,"guard-"+pid+".ready"));}catch{}}
+        RestoreMedia(data);
         string session=null;try{string lease=File.ReadAllText(Path.Combine(data,"desktop-lease.json"));if(Field(lease,"OwnerPid")==pid.ToString()&&Field(lease,"OwnerStarted")==started.ToString()&&Regex.IsMatch(lease,"\"Active\"\\s*:\\s*true"))session=Field(lease,"Session");}catch{}
         if(!String.IsNullOrEmpty(session)&&Regex.IsMatch(session,"^[a-fA-F0-9]{32}$"))try{var start=new ProcessStartInfo(executable,"--recover --session "+session){UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden};start.EnvironmentVariables["ONE_TASKBAR_DATA"]=data;using(var recover=Process.Start(start))WaitForSingleObject(recover.Handle,8000);}catch{}
         return 0;}

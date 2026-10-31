@@ -132,6 +132,7 @@ namespace OneTaskBar
             else if(kind=="search") { dc.DrawEllipse(null,pen,new Point(10,10),6.5,6.5); line(15,15,22,22); }
             else if(kind=="dock-search") {var ring=new Pen(brush,1.9){StartLineCap=PenLineCap.Round,EndLineCap=PenLineCap.Round};dc.DrawEllipse(null,ring,new Point(10.3,10.3),6.8,6.8);dc.DrawLine(ring,new Point(15.3,15.3),new Point(21,21));}
             else if(kind=="dock-desktops") {dc.DrawRoundedRectangle(null,pen,new Rect(7,3,15,18),3,3);dc.DrawRoundedRectangle(null,pen,new Rect(2,6,2,12),1,1);}
+            else if(kind=="show-desktop") {dc.DrawRoundedRectangle(null,pen,new Rect(2,3,20,15),2,2);line(12,18,12,22);line(8,22,16,22);}
             else if(kind=="screenshot") {dc.DrawGeometry(null,pen,Geometry.Parse("M8,3 L3,3 3,8 M16,3 L21,3 21,8 M21,16 L21,21 16,21 M8,21 L3,21 3,16"));dc.DrawRoundedRectangle(null,pen,new Rect(7,7,10,10),2,2);}
             else if(kind=="task-manager") {dc.DrawRoundedRectangle(null,pen,new Rect(2,2,20,20),3,3);dc.DrawRoundedRectangle(brush,null,new Rect(6,12,2.5,6),.6,.6);dc.DrawRoundedRectangle(brush,null,new Rect(10.8,6,2.5,12),.6,.6);dc.DrawRoundedRectangle(brush,null,new Rect(15.5,9,2.5,9),.6,.6);}
             else if(kind=="audio-output") {dc.DrawGeometry(brush,null,Geometry.Parse("M3,6 L12,12 3,18 Z"));dc.DrawGeometry(null,pen,Geometry.Parse("M14,6 A7,7 0 0 1 14,18 M17,2 A11,11 0 0 1 17,22"));}
@@ -289,6 +290,7 @@ namespace OneTaskBar
         public double Radius=28; public bool Dark=true; public bool HasBlur;internal bool SoftCorners=true,OpaqueSurface,DockSurface,DockPalette;
         internal bool StableSurface=true,UnifiedFade,SmoothLauncher;internal FrameworkElement TransitionContent;
         GlassLens lens;
+        BackdropInk backdropInk;
         static readonly DependencyProperty SurfaceFadeProperty=DependencyProperty.Register("SurfaceFade",typeof(double),typeof(GlassWindow),new PropertyMetadata(1.0,(d,e)=>{var window=(GlassWindow)d;if(window.Surface!=null)window.Surface.Opacity=(double)e.NewValue;Native.BlurOpacity(window,(double)e.NewValue);}));
         void ResetFade(){BeginAnimation(SurfaceFadeProperty,null);SetValue(SurfaceFadeProperty,1.0);Surface.Opacity=1;Native.BlurOpacity(this,1);}
         internal Rect? BackdropClip;
@@ -324,7 +326,7 @@ namespace OneTaskBar
             SizeChanged+=(s,e)=> { if(new WindowInteropHelper(this).Handle!=IntPtr.Zero) Native.Round(this,Radius); };
             Preferences.Changed+=ApplyMaterial;
             MouseMove+=(s,e)=>MoveGlassHighlight(e.GetPosition(Surface));MouseLeave+=(s,e)=>MoveGlassHighlight(new Point(Surface.ActualWidth/2,Surface.ActualHeight/2));
-            Loaded+=(s,e)=>{if(lens==null){var layer=AdornerLayer.GetAdornerLayer(Surface);if(layer!=null){lens=new GlassLens(this);layer.Add(lens);}}ApplyMaterial();if(Program.CaptureReview){ShowInTaskbar=true;var h=new WindowInteropHelper(this).Handle;Native.SetWindowLong(h,-20,(Native.GetWindowLong(h,-20)|0x40000)&~(0x80|0x08000000));}};
+            Loaded+=(s,e)=>{if(lens==null){var layer=AdornerLayer.GetAdornerLayer(Surface);if(layer!=null){lens=new GlassLens(this);layer.Add(lens);}}ApplyMaterial();if(backdropInk==null)backdropInk=new BackdropInk(this);if(Program.CaptureReview){ShowInTaskbar=true;var h=new WindowInteropHelper(this).Handle;Native.SetWindowLong(h,-20,(Native.GetWindowLong(h,-20)|0x40000)&~(0x80|0x08000000));}};
             IsVisibleChanged+=(s,e)=> {if(!IsVisible)HiddenSince=DateTime.UtcNow;};
             Closed+=(s,e)=> {closed=true;++motion;LauncherMotion.Cancel(TransitionContent);CompleteDismissal(false);Preferences.Changed-=ApplyMaterial;};
             PreviewKeyDown+=(s,e)=> { if(e.Key==Key.Escape&&!DragReorder.Active) {var overview=this as DesktopOverview;var overflow=this as TrayOverflowWindow;if(overview!=null)overview.Dismiss();else if(overflow!=null)overflow.Dismiss();else Hide(); e.Handled=true; } };
@@ -362,6 +364,7 @@ namespace OneTaskBar
                 else Surface.Background=enabled?glassTint:solidTint??Paint.Brush(Dark?"#FF344139":"#FFE0E5E2");
             }
             if(!OpaqueSurface&&!(this is NowBar)&&!DockSurface)PanelMaterial.RefreshCards(Surface);
+            if(backdropInk!=null)backdropInk.Refresh();
         }
         internal virtual void RefreshGlassMaterial(){ApplyMaterial();if(DockSurface)Glass95.DockInk(Surface);else Glass95.RefreshColors(Surface);}
         internal void MoveGlassHighlight(Point point)

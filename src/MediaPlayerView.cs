@@ -15,6 +15,7 @@ namespace OneTaskBar
         internal readonly Button PlayButton,PreviousButton,NextButton,OutputButton,ArtworkButton;
         internal readonly PillSlider SeekBar=new PillSlider("progress") {Height=22,Light=true,DarkTrack=true,AnimateValue=false,Slim=true,ShowIcon=false};
         internal Action<ArtworkPalette> PaletteChanged;
+        readonly bool islandStyle;
         readonly Grid route,header;readonly DockPanel timeline;readonly StackPanel controls;readonly Button compactOutput;readonly bool condensed,dense;bool modeSet;
         readonly StackPanel words;readonly Border posterShade;double posterEdge;bool usingPoster;
         double widgetWidth,widgetHeight;
@@ -29,8 +30,10 @@ namespace OneTaskBar
         internal void FitWidget(double width,double height){if(!dense)return;if(Modern&&(Math.Abs(widgetWidth-width)>.1||Math.Abs(widgetHeight-height)>.1))modeSet=false;widgetWidth=width;widgetHeight=height;double edge=Math.Min(width-28,height-(Modern?118:86));SetPoster(edge>=120?edge:0);}
         void FitWidgetControls(){if(Modern){FitModernControls();return;}if(!dense||widgetWidth<=0)return;bool narrow=widgetWidth<210;double side=narrow?10:14;Margin=new Thickness(side,Margin.Top,side,Margin.Bottom);PreviousButton.Width=PreviousButton.Height=NextButton.Width=NextButton.Height=narrow?26:30;PlayButton.Margin=new Thickness(narrow?6:24,0,narrow?6:24,0);title.FontSize=narrow?12:13;artist.FontSize=narrow?10:11;device.Visibility=narrow?Visibility.Collapsed:Visibility.Visible;route.ColumnDefinitions[1].Width=narrow?new GridLength(0):new GridLength(1,GridUnitType.Star);header.ColumnDefinitions[2].Width=new GridLength(IsCompact?28:0);}
         async void LoadDeviceSymbol(string name){string model=BudsDeviceData.SymbolFile(name);deviceModel=model;try{var image=await BackgroundWork.Run(()=>BudsDeviceData.ShortcutIcon(name));if(deviceModel!=model)return;deviceSymbol=image;deviceGlyph.SetDeviceIcon(budsOutput?deviceSymbol:null);}catch(Exception error){AppLog.Once("media-device-symbol",error.GetType().Name);}}
-        internal MediaPlayerView(Action<string> command,Func<double,Task<bool>> seek,Action output,Action collapse=null,bool condensed=false,Action<string> openApp=null,bool dense=false,Func<string,AppEntry> sourceApp=null)
+        internal MediaPlayerView(Action<string> command,Func<double,Task<bool>> seek,Action output,Action collapse=null,bool condensed=false,Action<string> openApp=null,bool dense=false,Func<string,AppEntry> sourceApp=null,bool island=false)
         {
+            islandStyle=island;
+            Modern=Preferences.Current.UIVersion>=90&&!island;
             this.condensed=condensed;this.dense=dense;openApplication=openApp;sourceApplication=sourceApp;Height=dense?106:condensed?128:164;Margin=new Thickness(14,dense?4:condensed?6:12,14,dense?4:condensed?6:12);seekCommand=seek;
             foreach(double height in dense?new[]{20.0,32,24,30}:condensed?new[]{20.0,36,34,38}:new[]{20.0,44,44,56})RowDefinitions.Add(new RowDefinition {Height=new GridLength(height)});
             route=new Grid();route.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(22)});route.ColumnDefinitions.Add(new ColumnDefinition());route.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(36)});route.Children.Add(deviceGlyph);device.TextTrimming=TextTrimming.CharacterEllipsis;device.FontWeight=FontWeights.SemiBold;Grid.SetColumn(device,1);route.Children.Add(device);OutputButton=Icon("audio-output",output,"출력 기기 변경",28,19);OutputButton.HorizontalAlignment=HorizontalAlignment.Center;Grid.SetColumn(OutputButton,2);route.Children.Add(OutputButton);Children.Add(route);
@@ -43,7 +46,7 @@ namespace OneTaskBar
             if(Modern)BuildModern(command);
         }
         static Button Icon(string glyph,Action action,string hint,double size,double iconSize){var button=Paint.Button(new Glyph(glyph,iconSize),action,hint);button.Width=button.Height=size;button.Padding=new Thickness(0);button.Background=Brushes.Transparent;return button;}
-        internal void SetPalette(ArtworkPalette palette){playGlyph.Color=Modern?Paint.ControlWhite:palette.Ink;playGlyph.InvalidateVisual();}
+        internal void SetPalette(ArtworkPalette palette){playGlyph.Color=Modern||islandStyle?Paint.ControlWhite:palette.Ink;playGlyph.InvalidateVisual();}
         internal void Update(MediaState media,string outputName)
         {
             bool active=media!=null&&media.Available&&media.Active;var ink=active?Paint.ControlWhite:Paint.Text;foreach(var text in new[]{title,device,elapsed,duration})text.Foreground=ink;artist.Foreground=active?Paint.Brush("#FFE0E7E4"):Paint.Muted;deviceGlyph.Color=ink;deviceGlyph.InvalidateVisual();foreach(var button in new[]{PreviousButton,NextButton,OutputButton,compactOutput}){var glyph=button.Content as Glyph;if(glyph!=null){glyph.Color=ink;glyph.InvalidateVisual();}}
@@ -60,6 +63,29 @@ namespace OneTaskBar
             if(modeChanged){Grid.SetColumnSpan(ArtworkButton,usingPoster?3:1);ArtworkButton.Resources["ButtonRadius"]=new CornerRadius(usingPoster?17:11);}ArtworkButton.Background=usingPoster?art.Background:Brushes.Transparent;
             string stateKind=media.Playing?"pause":"play";if(playGlyph.Kind!=stateKind){playGlyph.Kind=stateKind;playGlyph.InvalidateVisual();}PlayButton.IsEnabled=media.Available&&media.CanPlay;PreviousButton.IsEnabled=media.CanPrevious;NextButton.IsEnabled=media.CanNext;PlayButton.Opacity=PlayButton.IsEnabled?1:.4;PreviousButton.Opacity=PreviousButton.IsEnabled?1:.4;NextButton.Opacity=NextButton.IsEnabled?1:.4;
             var now=DateTime.UtcNow;if(!seeking&&now>seekUntil)SeekBar.Value=media.Duration>0?media.CurrentPosition(now)/media.Duration*100:0;SeekBar.IsEnabled=media.CanSeek&&media.Duration>0;elapsed.Text=media.Duration>0?NowBar.Clock(media.CurrentPosition(now)):"실시간";duration.Text=media.Duration>0?NowBar.Clock(media.Duration):"";FitWidgetControls();
+            if(islandStyle&&!empty&&!usingPoster)FitIslandControls();
+        }
+        void FitIslandControls()
+        {
+            Height=188;
+            Margin=new Thickness(16,12,16,12);
+            double[] rows={0,68,48,72};
+            for(int i=0;i<rows.Length;i++)RowDefinitions[i].Height=new GridLength(rows[i]);
+            route.Visibility=Visibility.Collapsed;
+            compactOutput.Visibility=Visibility.Visible;
+            header.ColumnDefinitions[0].Width=new GridLength(70);
+            art.Width=art.Height=60;
+            art.CornerRadius=new CornerRadius(14);
+            title.FontSize=16;
+            artist.FontSize=12;
+            playGlyph.Color=Paint.ControlWhite;
+            foreach(var button in new[]{PlayButton,PreviousButton,NextButton})
+            {
+                button.Background=controlGlass;
+                button.Resources["ButtonRadius"]=new CornerRadius(28);
+            }
+            PlayButton.Width=PlayButton.Height=52;
+            PlayButton.Margin=new Thickness(24,0,24,0);
         }
         async void OpenArtwork()
         {

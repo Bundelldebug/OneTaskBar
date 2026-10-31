@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -64,7 +64,7 @@ namespace OneTaskBar
                 if(shell.Drawer!=null)shell.Drawer.RefreshApps();
             });
             Group(groups,"시작과 검색",launcher);
-            var nowBar=new StackPanel();ChoiceRow(nowBar,"미디어 플레이어 펼침 스타일","큰 커버는 앨범 이미지를 위로 펼쳐 표시합니다",Preferences.Current.NowBarLargeCover,v=>Preferences.Set(p=>p.NowBarLargeCover=v),"기본","큰 커버");Row(nowBar,"YouTube 고화질 커버",(Preferences.Current.YouTubeArtworkTrack!=null?"현재 영상만 허용됨 · ":"")+"삼성 브라우저의 재생 제목과 일치하는 기록에서 영상 ID만 읽어 YouTube 이미지 서버에서 커버를 가져옵니다",YouTubeArtwork.Enabled,v=>Preferences.Set(p=>{p.YouTubeHighResArtwork=v;p.YouTubeArtworkTrack=null;}));if(ReleaseFeatures.GlassUI)Row(nowBar,"Dynamic Island","상단 안전 영역에 미디어와 충전·음량·밝기 상태를 표시합니다. 전체화면에서는 숨깁니다",Preferences.Current.DynamicIsland,v=>Preferences.Set(p=>p.DynamicIsland=v));Group(groups,"미디어 플레이어",nowBar);
+            var nowBar=new StackPanel();ChoiceRow(nowBar,"미디어 플레이어 펼침 스타일","큰 커버는 앨범 이미지를 위로 펼쳐 표시합니다",Preferences.Current.NowBarLargeCover,v=>Preferences.Set(p=>p.NowBarLargeCover=v),"기본","큰 커버");Row(nowBar,"YouTube 고화질 커버",(Preferences.Current.YouTubeArtworkTrack!=null?"현재 영상만 허용됨 · ":"")+"삼성 브라우저의 재생 제목과 일치하는 기록에서 영상 ID만 읽어 YouTube 이미지 서버에서 커버를 가져옵니다",YouTubeArtwork.Enabled,v=>Preferences.Set(p=>{p.YouTubeHighResArtwork=v;p.YouTubeArtworkTrack=null;}));if(ReleaseFeatures.GlassUI)Row(nowBar,"Dynamic Island","상단 안전 영역에 미디어와 충전·음량·밝기 상태를 표시합니다. 전체화면에서는 숨깁니다",Preferences.Current.DynamicIsland,v=>Preferences.Set(p=>p.DynamicIsland=v));if(ReleaseFeatures.GlassUI){Row(nowBar,"미디어 앱 전환 애니메이션","재생 앱을 최소화하거나 복원할 때 미디어 캡슐로 연결합니다",Preferences.Current.MediaWindowAnimation,v=>Preferences.Set(p=>p.MediaWindowAnimation=v));Row(nowBar,"측면 미디어 세로 캡슐","왼쪽·오른쪽 작업표시줄에서 커버와 재생 표시를 세로로 배치합니다",Preferences.Current.NowBarSideCapsule,v=>Preferences.Set(p=>p.NowBarSideCapsule=v));var fullscreen=Paint.Action("전체화면 미디어 열기",shell.OpenFullscreenMedia);fullscreen.Margin=new Thickness(15,8,15,12);nowBar.Children.Add(fullscreen);}Group(groups,"미디어 플레이어",nowBar);
             var safety=new StackPanel();Row(safety,"긴급 종료 단축키","Ctrl + Shift + Tab + 1 · One TaskBar 종료 및 Windows 작업표시줄 복원",Preferences.Current.EmergencyExit,v=>Preferences.Set(p=>p.EmergencyExit=v));Group(groups,"복구",safety);
             var hardware=new StackPanel();
             var powerRow=new Grid {Margin=new Thickness(15,11,15,11)};powerRow.ColumnDefinitions.Add(new ColumnDefinition());powerRow.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(105)});

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -26,16 +26,18 @@ namespace OneTaskBar
     {
         internal const string AppName="One TaskBar";
         internal static bool Inspectable;
+        internal static bool TestProcess;
         internal static bool CaptureReview;
         [STAThread] static int Main(string[] args){int code=Run(args);Environment.Exit(code);return code;}
         static int Run(string[] args)
         {
             StartupTrace.Mark("entry");
+            TestProcess=args.Any(a=>a=="--self-test"||a.EndsWith("-probe",StringComparison.Ordinal));
             Native.SetProcessDpiAwarenessContext(new IntPtr(-4));
             CaptureReview=args.Contains("--review-ui");Inspectable=CaptureReview||args.Contains("--qa")||File.Exists(Path.Combine(AppLog.Data,"ui-inspection.flag"));
             if(args.Length>0 && args[0]=="--guard") { Guard(args); return 0; }
             if(args.Contains("--stop")) { Signal("Stop"); return 0; }
-            if(args.Length==2&&args[0]=="--open-panel"&&new[]{"notifications","quick","start","search","desktops"}.Contains(args[1])){Signal("Panel-"+args[1]);return 0;}
+            if(args.Length==2&&args[0]=="--open-panel"&&new[]{"notifications","quick","start","search","desktops","media-screen"}.Contains(args[1])){Signal("Panel-"+args[1]);return 0;}
             if(args.Length==2&&args[0]=="--review-edge"&&new[]{"0","1","2","3"}.Contains(args[1])){Signal("Panel-edge"+args[1]);return 0;}
             if(args.Length==2&&args[0]=="--review-background"&&new[]{"0","1","2","3"}.Contains(args[1])){Signal("Panel-background"+args[1]);return 0;}
             if(args.Length==3&&args[0]=="--register-notifications")return NotificationIdentity.RegisterHelper(args[1],args[2]);
@@ -73,6 +75,8 @@ namespace OneTaskBar
             if(args.Contains("--window-switcher-probe"))return WindowSwitcherChecks.Run(args.Contains("--inspect"));
             if(args.Contains("--desktop-overview-probe"))return DesktopOverviewChecks.Run(args.Contains("--inspect"));
             if(args.Contains("--island-space-fixture"))return IslandSafetyChecks.Hold();
+            if(args.Contains("--fullscreen-media-probe"))return FullscreenMediaChecks.Run();
+            if(args.Contains("--adaptive-ink-probe"))return BackdropInkChecks.Run();
             if(args.Contains("--dynamic-island-probe"))return DynamicIslandChecks.Run(args.Contains("--inspect"));
             if(args.Contains("--audio-mute-probe"))return AudioMuteChecks.HardwareProbe();
             if(args.Contains("--tray-overflow-probe"))return TrayOverflowChecks.Run();
@@ -165,6 +169,7 @@ namespace OneTaskBar
             if(args.Length<3 || !Int32.TryParse(args[1],out pid) || !Int64.TryParse(args[2],out started)) return;
             try { using(var p=Process.GetProcessById(pid)) { if(p.StartTime.ToUniversalTime().Ticks!=started) return; p.WaitForExit(); } } catch(ArgumentException) { }
             // Restore Explorer even after Task Manager termination or a native crash.
+            MediaWindowLease.Recover();
             DesktopLease.Recover(args.Length>3?args[3]:null);
         }
         static int SelfTest()

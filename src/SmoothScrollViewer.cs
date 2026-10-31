@@ -16,6 +16,13 @@ namespace OneTaskBar
         internal static double Distance(int delta,int lines,double viewport) {return -delta/120.0*(lines<0?viewport:Math.Max(0,lines)*16);}
         double Clamp(double offset){return Math.Max(0,Math.Min(ScrollableHeight,offset));}
         void Stop(){double current=VerticalOffset;if(animating){BeginAnimation(OffsetProperty,null);SetValue(OffsetProperty,current);}target=current;animating=false;lastPrecision=0;}
+        internal void ResetForNavigation(double offset=0)
+        {
+            Stop();
+            target=Math.Max(0,offset);
+            SetValue(OffsetProperty,target);
+            ScrollToVerticalOffset(target);
+        }
         protected override void OnMouseWheel(MouseWheelEventArgs e)
         {
             if(e.Handled)return;if(ScrollableHeight<=0){base.OnMouseWheel(e);return;}

@@ -23,9 +23,12 @@ namespace OneTaskBar
         readonly List<Section> sections=new List<Section>();readonly List<Category> categories=new List<Category>();readonly List<UIElement> versionElements=new List<UIElement>();
         StackPanel settingsHome,settingsDetail;SmoothScrollViewer settingsScroll;TextBlock settingsHeading,emptySettings;Button settingsBack;TextBox settingsSearch;
         SettingsPageMotion pageMotion;
+        double settingsHomeOffset;
         Border settingsExit;
         internal Button ExitSettingsButton {get;private set;}
         internal bool SettingsAnimating {get{return pageMotion!=null&&pageMotion.Active;}}
+        internal SmoothScrollViewer SettingsViewport {get{return settingsScroll;}}
+        internal bool SettingsSnapshotHeld {get{return pageMotion!=null&&pageMotion.HoldsSnapshot;}}
         internal string SettingsPage {get;private set;}
         internal TextBox SearchSettings {get{return settingsSearch;}}
         internal int SettingsSections {get{return sections.Count;}}
@@ -77,7 +80,9 @@ namespace OneTaskBar
             foreach(var category in categories){category.Rows.Children.Clear();foreach(var section in category.Sections){bool match=!searching||section.Search.IndexOf(term,StringComparison.CurrentCultureIgnoreCase)>=0;section.Entry.Visibility=match?Visibility.Visible:Visibility.Collapsed;if(!match)continue;if(category.Rows.Children.Count>0)category.Rows.Children.Add(SettingSeparator());category.Rows.Children.Add(section.Entry);}category.Card.Visibility=category.Rows.Children.Count==0?Visibility.Collapsed:Visibility.Visible;}
             bool exitMatch=!searching||"종료 Windows 작업표시줄 복원".IndexOf(term,StringComparison.CurrentCultureIgnoreCase)>=0;
             if(settingsExit!=null)settingsExit.Visibility=exitMatch?Visibility.Visible:Visibility.Collapsed;
-            emptySettings.Visibility=searching&&VisibleSettingsSections==0&&!exitMatch?Visibility.Visible:Visibility.Collapsed;if(String.IsNullOrEmpty(SettingsPage))settingsHeading.Text=searching?"검색 결과":"설정";settingsScroll.ScrollToTop();
+            emptySettings.Visibility=searching&&VisibleSettingsSections==0&&!exitMatch?Visibility.Visible:Visibility.Collapsed;if(String.IsNullOrEmpty(SettingsPage))settingsHeading.Text=searching?"검색 결과":"설정";
+            settingsHomeOffset=0;
+            settingsScroll.ResetForNavigation();
         }
         void SettingsPages(DockPanel root,StackPanel groups)
         {
@@ -98,15 +103,46 @@ namespace OneTaskBar
             for(int start=0;start<sections.Count;start+=3){var category=new Category {Rows=new StackPanel(),Sections=sections.Skip(start).Take(3).ToArray()};category.Card=SettingsCard(category.Rows,false);categories.Add(category);groups.Children.Add(category.Card);}
             emptySettings=Paint.TextBlock("검색 결과가 없습니다",16,AppSettingsPalette.Muted);emptySettings.Margin=new Thickness(15,20,15,20);emptySettings.HorizontalAlignment=HorizontalAlignment.Center;emptySettings.Visibility=Visibility.Collapsed;groups.Children.Add(emptySettings);
             settingsExit=SettingsExitRow();groups.Children.Add(settingsExit);
-            pageMotion=new SettingsPageMotion(settingsScroll);root.Children.Add(pageMotion.View);SettingsHome();
+            pageMotion=new SettingsPageMotion(settingsScroll);root.Children.Add(pageMotion.View);FilterSettings();SettingsHome();
         }
         internal void OpenSettings(string name)
         {
-            var section=sections.FirstOrDefault(s=>s.Name==name);if(section==null||SettingsPage==name)return;pageMotion.Cancel();SettingsPage=section.Name;settingsHeading.Text=section.Name;settingsHeading.Margin=new Thickness(48,0,48,0);settingsBack.Visibility=Visibility.Visible;settingsDetail.Children.Clear();if(section.Card==null)section.Card=SettingsCard(section.Content);settingsDetail.Children.Add(section.Card);settingsScroll.Content=settingsDetail;settingsScroll.ScrollToTop();pageMotion.Start(true);
+            var section=sections.FirstOrDefault(s=>s.Name==name);
+            if(section==null||SettingsPage==name)return;
+            if(SettingsPage==null)settingsHomeOffset=settingsScroll.VerticalOffset;
+            pageMotion.Prepare();
+            SettingsPage=section.Name;
+            settingsHeading.Text=section.Name;
+            settingsHeading.Margin=new Thickness(48,0,48,0);
+            settingsBack.Visibility=Visibility.Visible;
+            settingsDetail.Children.Clear();
+            if(section.Card==null)section.Card=SettingsCard(section.Content);
+            settingsDetail.Children.Add(section.Card);
+            settingsScroll.Content=settingsDetail;
+            settingsScroll.ResetForNavigation();
+            pageMotion.Start(true);
         }
         internal void SettingsHome()
         {
-            bool returning=SettingsPage!=null;if(pageMotion!=null)pageMotion.Cancel();SettingsPage=null;if(settingsHeading!=null){settingsHeading.Text="설정";settingsHeading.Margin=new Thickness(7,0,48,0);}if(settingsBack!=null)settingsBack.Visibility=Visibility.Collapsed;if(settingsScroll!=null){settingsScroll.Content=settingsHome;FilterSettings();}if(returning&&pageMotion!=null)pageMotion.Start(false);
+            bool returning=SettingsPage!=null;
+            if(pageMotion!=null)
+            {
+                if(returning)pageMotion.Prepare();
+                else pageMotion.Cancel();
+            }
+            SettingsPage=null;
+            if(settingsHeading!=null)
+            {
+                settingsHeading.Text=settingsSearch!=null&&!String.IsNullOrWhiteSpace(settingsSearch.Text)?"검색 결과":"설정";
+                settingsHeading.Margin=new Thickness(7,0,48,0);
+            }
+            if(settingsBack!=null)settingsBack.Visibility=Visibility.Collapsed;
+            if(settingsScroll!=null)
+            {
+                settingsScroll.Content=settingsHome;
+                settingsScroll.ResetForNavigation(settingsHomeOffset);
+            }
+            if(returning&&pageMotion!=null)pageMotion.Start(false);
         }
         Border SettingsExitRow()
         {

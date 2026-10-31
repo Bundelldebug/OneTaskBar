@@ -5,7 +5,20 @@ $sourceDir=$PSScriptRoot
 if(-not(Test-Path -LiteralPath (Join-Path $sourceDir 'OneTaskBar.exe'))){$sourceDir=Join-Path $sourceDir 'dist'}
 $sourceExe=Join-Path $sourceDir 'OneTaskBar.exe'
 if(-not(Test-Path -LiteralPath $sourceExe)){throw 'Build the app first, or extract the complete release ZIP.'}
-$baseDir=Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'OneTaskBar'
+function Resolve-UserFolder([string]$KnownPath,[string[]]$FallbackPaths=@(),[switch]$Optional) {
+    foreach($candidate in @($KnownPath)+$FallbackPaths){
+        if([string]::IsNullOrWhiteSpace($candidate)){continue}
+        if($candidate -notmatch '^(?:[A-Za-z]:[\\/]|\\\\[^\\/]+[\\/][^\\/]+)'){continue}
+        try{return [IO.Path]::GetFullPath($candidate)}catch [ArgumentException]{continue}
+    }
+    if(-not $Optional){throw 'Windows did not provide a usable user folder. Sign in to a Windows user account and try again.'}
+}
+$profileDir=Resolve-UserFolder ([Environment]::GetFolderPath('UserProfile')) @($env:USERPROFILE) -Optional
+$localFallback=@($env:LOCALAPPDATA)
+if($profileDir){$localFallback+=Join-Path $profileDir 'AppData\Local'}
+$localDir=Resolve-UserFolder ([Environment]::GetFolderPath('LocalApplicationData')) $localFallback
+$documentsDir=Resolve-UserFolder ([Environment]::GetFolderPath('MyDocuments')) -Optional
+$baseDir=Join-Path $localDir 'OneTaskBar'
 $installDir=Join-Path $baseDir 'App'
 $stateDir=Join-Path $baseDir 'Data'
 if($StagingOnly){if(-not $Destination){throw 'StagingOnly requires Destination.'};$installDir=[IO.Path]::GetFullPath($Destination)}
@@ -59,9 +72,9 @@ if(-not $StagingOnly){
     if($NoStartup){$startupEnabled=$false}
     elseif($EnableStartup){$startupEnabled=$true}
     # Upgrade only this product and its known personal predecessor.
-    $legacyExe=Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'Codex\OneUIHome\One UI 홈.exe'
+    $legacyExe=if($documentsDir){Join-Path $documentsDir 'Codex\OneUIHome\One UI 홈.exe'}else{$null}
     foreach($exe in @($installedExe,$legacyExe)){
-        if(Test-Path -LiteralPath $exe){$process=Start-Process -FilePath $exe -ArgumentList '--stop' -WindowStyle Hidden -PassThru;$process.WaitForExit(4000)|Out-Null}
+        if($exe -and (Test-Path -LiteralPath $exe)){$process=Start-Process -FilePath $exe -ArgumentList '--stop' -WindowStyle Hidden -PassThru;$process.WaitForExit(4000)|Out-Null}
     }
     $mainDeadline=(Get-Date).AddSeconds(8)
     do{
@@ -84,10 +97,12 @@ if(-not $StagingOnly){
     }while((Get-Date)-lt $deadline)
     if($owned.Count){throw 'Close One TaskBar before updating. Your running app has not been terminated.'}
     New-Item -ItemType Directory -Path $stateDir -Force|Out-Null
-    $legacyData=Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'Codex\OneUIHomeData'
-    foreach($name in @('settings.json','layout.json','dock-pins.json','search-history.json','explorer-pins.json')){
-        $from=Join-Path $legacyData $name;$to=Join-Path $stateDir $name
-        if((Test-Path -LiteralPath $from)-and -not(Test-Path -LiteralPath $to)){Copy-Item -LiteralPath $from -Destination $to}
+    if($documentsDir){
+        $legacyData=Join-Path $documentsDir 'Codex\OneUIHomeData'
+        foreach($name in @('settings.json','layout.json','dock-pins.json','search-history.json','explorer-pins.json')){
+            $from=Join-Path $legacyData $name;$to=Join-Path $stateDir $name
+            if((Test-Path -LiteralPath $from)-and -not(Test-Path -LiteralPath $to)){Copy-Item -LiteralPath $from -Destination $to}
+        }
     }
     # Windows notifications stay native until the user enables the optional in-app connection.
     $settings=Join-Path $stateDir 'settings.json'
@@ -133,10 +148,18 @@ try{
 }finally{$run.Dispose()}
 $shortcutShell=New-Object -ComObject WScript.Shell
 try{
-    $programs=Join-Path ([Environment]::GetFolderPath('Programs')) 'One TaskBar'
+    $programFallback=@()
+    $roamingFallback=@($env:APPDATA)
+    if($profileDir){$roamingFallback+=Join-Path $profileDir 'AppData\Roaming'}
+    $roamingDir=Resolve-UserFolder ([Environment]::GetFolderPath('ApplicationData')) $roamingFallback -Optional
+    if($roamingDir){$programFallback+=Join-Path $roamingDir 'Microsoft\Windows\Start Menu\Programs'}
+    $programs=Join-Path (Resolve-UserFolder ([Environment]::GetFolderPath('Programs')) $programFallback) 'One TaskBar'
     New-Item -ItemType Directory -Path $programs -Force|Out-Null
     $links=@((Join-Path $programs 'One TaskBar.lnk'))
-    if(-not $NoShortcut){$links+=Join-Path ([Environment]::GetFolderPath('Desktop')) 'One TaskBar.lnk'}
+    if(-not $NoShortcut){
+        $desktopDir=Resolve-UserFolder ([Environment]::GetFolderPath('Desktop')) -Optional
+        if($desktopDir){$links+=Join-Path $desktopDir 'One TaskBar.lnk'}
+    }
     foreach($path in $links){$link=$shortcutShell.CreateShortcut($path);$link.TargetPath=$launchExe;$link.Arguments='--desktop';$link.WorkingDirectory=$launchDir;$link.IconLocation=$launchExe+',0';$link.Save()}
 }finally{[Runtime.InteropServices.Marshal]::FinalReleaseComObject($shortcutShell)|Out-Null}
 $uninstall=[Microsoft.Win32.Registry]::CurrentUser.CreateSubKey('Software\Microsoft\Windows\CurrentVersion\Uninstall\OneTaskBar')

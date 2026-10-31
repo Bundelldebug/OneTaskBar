@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Web.Script.Serialization;
 using Microsoft.Win32;
@@ -41,6 +41,8 @@ namespace OneTaskBar
         public int QuickToggleColumns,QuickToggleRows;
         public bool ChargeSoundEnabled=false;
         public string ChargeSoundFile;
+        public bool MediaWindowAnimation=true;
+        public bool NowBarSideCapsule=false;
         public bool NowBarLargeCover=false;
         public bool YouTubeHighResArtwork=false;
         public string YouTubeArtworkTrack;

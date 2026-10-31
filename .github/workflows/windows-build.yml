@@ -17,6 +17,9 @@ jobs:
       - name: Compile
         shell: pwsh
         run: ./Build.ps1 -SkipTests
+      - name: Validate installer folder fallbacks
+        shell: pwsh
+        run: ./tools/Test-InstallFolders.ps1
       - name: Validate isolated UI and lifecycle fixtures
         shell: pwsh
         run: ./tools/Test-UI.ps1 -Area All -OutputDirectory (Join-Path $env:RUNNER_TEMP 'OneTaskBar-tests')

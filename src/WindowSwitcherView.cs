@@ -24,6 +24,7 @@ namespace OneTaskBar
         internal int PositionChanges {get;private set;}
         internal bool ClearBackground {get;private set;}
         internal bool Registered {get{return thumbnail!=IntPtr.Zero;}}
+        internal bool MotionPreview;
         internal void SetPreviewOpacity(byte value)
         {
             if(previewOpacity==value)return;previewOpacity=value;
@@ -42,18 +43,24 @@ namespace OneTaskBar
             if(closed||anchor.ActualWidth<1||anchor.ActualHeight<1)return;
             var point=anchor.PointToScreen(new Point());var dpi=VisualTreeHelper.GetDpi(anchor).DpiScaleX;
             int x=(int)Math.Round(point.X),y=(int)Math.Round(point.Y),width=Math.Max(1,(int)Math.Round(anchor.ActualWidth*dpi)),height=Math.Max(1,(int)Math.Round(anchor.ActualHeight*dpi));
+            PlacePixels(x,y,width,height);
+        }
+        internal void PlacePixels(int x,int y,int width,int height)
+        {
+            if(closed||width<1||height<1)return;
             if(IsVisible&&thumbnail!=IntPtr.Zero&&x==lastX&&y==lastY&&width==lastWidth&&height==lastHeight)return;
             bool resized=width!=lastWidth||height!=lastHeight;
             var handle=new WindowInteropHelper(this).EnsureHandle();
+            if(MotionPreview){int disabled=1;DwmSetWindowAttribute(handle,3,ref disabled,4);}
             Native.SetWindowPos(handle,new IntPtr(-1),x,y,width,height,0x10);
-            if(!IsVisible){Show();Native.SetWindowPos(handle,new IntPtr(-1),x,y,width,height,0x10);}
+            if(!IsVisible){Show();if(closed)return;Native.SetWindowPos(handle,new IntPtr(-1),x,y,width,height,0x10);}
             PositionChanges++;lastX=x;lastY=y;lastWidth=width;lastHeight=height;
             if(thumbnail==IntPtr.Zero&&DwmRegisterThumbnail(handle,source,out thumbnail)==0){Content=null;resized=true;}
             if(resized)Update(width,height);
         }
         void Update(int width,int height)
         {
-            if(thumbnail==IntPtr.Zero)return;SizeI size;if(DwmQueryThumbnailSourceSize(thumbnail,out size)!=0||size.Width<=0||size.Height<=0)return;double scale=Math.Min(width/(double)size.Width,height/(double)size.Height),w=size.Width*scale,h=size.Height*scale;var properties=new Properties {Flags=1|4|8|16,Destination=new Native.RectI {Left=(int)Math.Round((width-w)/2),Top=(int)Math.Round((height-h)/2),Right=(int)Math.Round((width+w)/2),Bottom=(int)Math.Round((height+h)/2)},Opacity=previewOpacity,Visible=true,ClientOnly=true};DwmUpdateThumbnailProperties(thumbnail,ref properties);
+            if(thumbnail==IntPtr.Zero)return;SizeI size;if(DwmQueryThumbnailSourceSize(thumbnail,out size)!=0||size.Width<=0||size.Height<=0)return;double scale=Math.Min(width/(double)size.Width,height/(double)size.Height),w=size.Width*scale,h=size.Height*scale;var properties=new Properties {Flags=1|4|8|16,Destination=new Native.RectI {Left=(int)Math.Round((width-w)/2),Top=(int)Math.Round((height-h)/2),Right=(int)Math.Round((width+w)/2),Bottom=(int)Math.Round((height+h)/2)},Opacity=previewOpacity,Visible=true,ClientOnly=!MotionPreview};DwmUpdateThumbnailProperties(thumbnail,ref properties);
         }
         void Release(){if(thumbnail!=IntPtr.Zero){DwmUnregisterThumbnail(thumbnail);thumbnail=IntPtr.Zero;}}
     }

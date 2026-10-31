@@ -9,7 +9,7 @@ namespace OneTaskBar
 {
     internal static class DockStatusItems
     {
-        internal static readonly string[][] Choices={new[]{"bluetooth","bluetooth","블루투스"},new[]{"buds","earbuds","Galaxy Buds"},new[]{"calendar","calendar","달력"},new[]{"capture","screenshot","화면 캡처"},new[]{"manager","task-manager","작업 관리자"},new[]{"settings","home","One TaskBar 설정"},new[]{"touch-keyboard","keyboard","터치 키보드"},new[]{"cast","cast","캐스트"}};
+        internal static readonly string[][] Choices={new[]{"bluetooth","bluetooth","블루투스"},new[]{"buds","earbuds","Galaxy Buds"},new[]{"calendar","calendar","달력"},new[]{"capture","screenshot","화면 캡처"},new[]{"manager","task-manager","작업 관리자"},new[]{"settings","home","One TaskBar 설정"},new[]{"touch-keyboard","keyboard","터치 키보드"},new[]{"cast","cast","캐스트"},new[]{"desktop","show-desktop","바탕화면 보기"}};
         internal static string[] Clean(string[] items){return (items??new string[0]).Where(k=>Choices.Any(c=>c[0]==k)).Distinct().Take(4).ToArray();}
         internal static int Count {get{return Clean(Preferences.Current.DockStatusItems).Length;}}
         internal static void Invoke(string key,ShellController shell,GlassWindow anchor)
@@ -24,7 +24,20 @@ namespace OneTaskBar
                 case "settings":shell.ShowWelcome();break;
                 case "touch-keyboard":shell.OpenStatusSystemPanel(false);break;
                 case "cast":shell.OpenStatusSystemPanel(true);break;
+                case "desktop":shell.ShowDesktop();break;
             }
+        }
+    }
+    internal sealed partial class ShellController
+    {
+        internal async void ShowDesktop()
+        {
+            CloseTrayOverflow();
+            CloseDesktopOverview();
+            Previews.Close();
+            foreach(var panel in new GlassWindow[]{Quick,Center,Detail,Drawer,Finder,StartMenu})
+                if(panel!=null)panel.HideImmediately();
+            await BackgroundWork.Run(()=>SystemPanels.ShowDesktop());
         }
     }
     internal sealed partial class DockHost

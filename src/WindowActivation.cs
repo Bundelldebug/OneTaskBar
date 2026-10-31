@@ -6,6 +6,7 @@ namespace OneTaskBar
 {
     internal static partial class WindowActivation
     {
+        internal static event Action<IntPtr> Restoring;
         [DllImport("kernel32.dll")]static extern uint GetCurrentThreadId();
         [DllImport("user32.dll",SetLastError=true)]static extern bool AttachThreadInput(uint first,uint second,bool attach);
         [DllImport("user32.dll")]static extern bool BringWindowToTop(IntPtr window);
@@ -57,7 +58,16 @@ namespace OneTaskBar
             window=Target(window);if(window==IntPtr.Zero)return false;
             var original=Native.GetForegroundWindow();if(original==IntPtr.Zero)return false;
             if(!Responsive(window)||original!=window&&!Responsive(original))return false;
-            if(Native.IsIconic(window))ShowWindowAsync(window,9);
+            if(Native.IsIconic(window))
+            {
+                var restoring=Restoring;
+                if(restoring!=null)
+                {
+                    try {restoring(window);}
+                    catch(Exception error) {AppLog.Once("window-restore-preview",error.GetType().Name);}
+                }
+                ShowWindowAsync(window,9);
+            }
             BringWindowToTop(window);Native.SetForegroundWindow(window);
             if(!ForegroundIs(window))ActivateHostedContent(window);
             if(ForegroundIs(window)){Native.SetWindowPos(window,IntPtr.Zero,0,0,0,0,0x13);BringWindowToTop(window);Responsive(window);if(ForegroundIs(window)){RestoreContentFocus(window);return true;}}
