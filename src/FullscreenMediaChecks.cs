@@ -14,8 +14,13 @@ namespace OneTaskBar
         internal static int Run()
         {
             var application=new Application();int result=1;FullscreenMedia view=null;
+            IDisposable animations=null;
+            bool previousAnimations=Preferences.Current.Animations;
             application.Dispatcher.BeginInvoke(new Action(async()=>{
                 try{
+                    Program.Inspectable=true;
+                    animations=Motion.WithAnimationsForFixture();
+                    Preferences.Current.Animations=true;
                     bool locked=false;string command=null;
                     view=new FullscreenMedia(c=>command=c,p=>Task.FromResult(true),()=>{},()=>locked=true);
                     view.Width=760;view.Height=900;view.Show();
@@ -133,7 +138,13 @@ namespace OneTaskBar
                     }
                     AppLog.Json("fullscreen-media-probe.json",new {passed=true,responsive=true,separateLock=true,commands=true,morphReversal=true,hiddenClockReleased=true});result=0;
                 }catch(Exception error){AppLog.Json("fullscreen-media-probe.json",new {passed=false,error=error.ToString()});}
-                finally{if(view!=null)view.Close();application.Shutdown(result);}
+                finally
+                {
+                    if(view!=null)view.Close();
+                    Preferences.Current.Animations=previousAnimations;
+                    if(animations!=null)animations.Dispose();
+                    application.Shutdown(result);
+                }
             }),DispatcherPriority.ApplicationIdle);return application.Run();
         }
     }
