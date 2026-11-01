@@ -108,7 +108,7 @@ namespace OneTaskBar
             var decorator=(AdornerDecorator)Content;
             decorator.Child=null;
             canvas.Children.Add(Surface);decorator.Child=canvas;
-            expiry.Tick+=(s,e)=>{expiry.Stop();if(!closed&&IsVisible)RefreshPresentation();};
+            expiry.Tick+=(s,e)=>ExpireFeedback();
             SourceInitialized+=(s,e)=>
             {
                 var handle=new WindowInteropHelper(this).Handle;
@@ -189,6 +189,21 @@ namespace OneTaskBar
             if(!IsVisible||closed)return;
             state.Feedback(kind,value,muted,DateTime.UtcNow);
             expiry.Stop();expiry.Interval=TimeSpan.FromSeconds(kind=="charge"?3:1.6);expiry.Start();
+            RefreshPresentation();
+        }
+        internal void ExpireFeedback()
+        {
+            expiry.Stop();
+            if(closed||!IsVisible)return;
+            // Dispatcher timers may fire just before the UTC deadline on a coarse clock.
+            // Keep the one-shot wakeup until the feedback really expires.
+            var remaining=state.FeedbackUntil-DateTime.UtcNow;
+            if(remaining>TimeSpan.Zero)
+            {
+                expiry.Interval=TimeSpan.FromMilliseconds(Math.Max(1,remaining.TotalMilliseconds));
+                expiry.Start();
+                return;
+            }
             RefreshPresentation();
         }
         void RefreshPresentation()

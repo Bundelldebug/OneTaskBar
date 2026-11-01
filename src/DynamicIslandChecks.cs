@@ -88,8 +88,11 @@ namespace OneTaskBar
                     Require(!view.Expanded&&Native.GetForegroundWindow()==new WindowInteropHelper(source).Handle,"collapse returns focus to the previous fixture window");
                     view.ShowFeedback("volume",43,false);await Task.Delay(280);
                     Require(view.FeedbackVisible&&view.ExpiryActive&&view.Shape.Width==240,"volume feedback replaces the compact media row");
+                    view.ExpireFeedback();
+                    Require(view.FeedbackVisible&&view.ExpiryActive,"an early timer tick retains the expiry wakeup");
                     Program.Save(view.Surface,240,28,Path.Combine(AppLog.Data,"island-volume.png"));
-                    await Task.Delay(1700);
+                    var expiryDeadline=DateTime.UtcNow.AddSeconds(3);
+                    while((view.FeedbackVisible||view.ExpiryActive||view.Animating)&&DateTime.UtcNow<expiryDeadline)await Task.Delay(25);
                     Require(!view.FeedbackVisible&&!view.ExpiryActive&&!view.Animating&&view.Shape.Width==112,"feedback expires once and restores media without polling");
                     for(int i=0;i<6;i++){view.SetExpanded(true);await Task.Delay(25);view.SetExpanded(false);await Task.Delay(25);}
                     await Task.Delay(300);
@@ -106,7 +109,7 @@ namespace OneTaskBar
                     AppLog.Json("dynamic-island-probe.json",new {passed=true,betaOnly=true,disabledByDefault=true,sharedMediaCommands=true,persistentTopSafeArea=true,nativeSafeAreaVerified=safeAreaVerified,fullscreenReleasesWorkspace=safeAreaVerified,crashRestoresWorkspace=safeAreaVerified,mixedDpiAndFourEdges=true,compactDoesNotStealFocus=true,rapidReversalsSettle=true,expiryTimerStops=true,hiddenInputAndMotionReleased=true,noLiveBackdrop=true,deviceValuesChanged=false});
                     result=0;
                 }
-                catch(Exception error){AppLog.Json("dynamic-island-probe.json",new {passed=false,error=error.ToString()});}
+                catch(Exception error){AppLog.Json("dynamic-island-probe.json",new {passed=false,error=error.ToString(),island=view==null?null:view.Inspect()});}
                 finally{if(view!=null)view.Close();if(source!=null)source.Close();if(motion!=null)motion.Dispose();app.Shutdown(result);}
             }),DispatcherPriority.ApplicationIdle);
             app.Run();return result;
