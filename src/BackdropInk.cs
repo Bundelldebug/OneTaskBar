@@ -1,11 +1,11 @@
 using System;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
-using System.Windows.Media.Animation;
 using System.Windows.Threading;
 
 namespace OneTaskBar
@@ -17,22 +17,22 @@ namespace OneTaskBar
         readonly GlassWindow owner;
         readonly Func<Task<double?>> fixtureSample;
         readonly DispatcherTimer timer;
-        internal readonly SolidColorBrush Primary=new SolidColorBrush();
-        internal readonly SolidColorBrush Secondary=new SolidColorBrush();
-        static readonly Color dark=Color.FromRgb(23,35,54),light=Color.FromRgb(245,247,252);
-        bool disposed,busy,hasSample,darkInk;
+        readonly BackdropInkPalette palette=new BackdropInkPalette();
+        readonly BackdropInkTone tone=new BackdropInkTone();
+        readonly Stopwatch elapsed=Stopwatch.StartNew();
+        internal SolidColorBrush Primary {get{return palette.Primary;}}
+        internal SolidColorBrush Secondary {get{return palette.Secondary;}}
+        bool disposed,busy;
         int generation;
         internal int SampleCount {get;private set;}
         internal bool Running {get{return timer.IsEnabled;}}
-        internal bool DarkInk {get{return darkInk;}}
+        internal bool DarkInk {get{return tone.Dark;}}
 
         internal BackdropInk(GlassWindow owner,Func<Task<double?>> fixtureSample=null)
         {
             if(fixtureSample!=null&&!Program.Inspectable)throw new InvalidOperationException("Fixture sampler requires inspectable mode");
             this.owner=owner;
             this.fixtureSample=fixtureSample;
-            Primary.Color=light;
-            Secondary.Color=Color.FromRgb(209,217,231);
             timer=new DispatcherTimer(DispatcherPriority.Background,owner.Dispatcher) {Interval=TimeSpan.FromMilliseconds(90)};
             timer.Tick+=Tick;
             owner.IsVisibleChanged+=VisibilityChanged;
@@ -50,23 +50,23 @@ namespace OneTaskBar
         internal void Refresh()
         {
             if(disposed)return;
-            if(!owner.IsVisible)
+            if(!owner.IsVisible||owner.IsDismissing)
             {
                 ++generation;
                 timer.Stop();
-                Primary.BeginAnimation(SolidColorBrush.ColorProperty,null);
-                Secondary.BeginAnimation(SolidColorBrush.ColorProperty,null);
+                tone.CancelPending();
+                palette.Stop();
                 return;
             }
             if(!Eligible)
             {
                 ++generation;
                 timer.Stop();
-                if(hasSample)Apply(owner.Surface,true);
-                hasSample=false;
+                if(tone.HasSample)Apply(owner.Surface,true);
+                tone.Reset();
                 return;
             }
-            if(hasSample)Apply(owner.Surface,false);
+            if(tone.HasSample)Apply(owner.Surface,false);
             if(!timer.IsEnabled)
             {
                 timer.Interval=TimeSpan.FromMilliseconds(90);
@@ -78,8 +78,16 @@ namespace OneTaskBar
         async void Tick(object sender,EventArgs args)
         {
             if(disposed||!owner.IsVisible||owner.IsDismissing||!Eligible){Refresh();return;}
-            timer.Interval=TimeSpan.FromMilliseconds(1200);
+            timer.Interval=TimeSpan.FromMilliseconds(950);
             if(busy)return;
+            // A fading panel includes the desktop in the readback. It is not
+            // the final material that its text must contrast against.
+            if(owner.Opacity<.98||owner.Surface.Opacity<.98)
+            {
+                timer.Interval=TimeSpan.FromMilliseconds(90);
+                tone.CancelPending();
+                return;
+            }
             var handle=new WindowInteropHelper(owner).Handle;
             Native.RectI bounds;
             if(handle==IntPtr.Zero||!Native.GetWindowRect(handle,out bounds)||bounds.Right-bounds.Left<80||bounds.Bottom-bounds.Top<60)return;
@@ -88,31 +96,25 @@ namespace OneTaskBar
             try
             {
                 var luminance=fixtureSample!=null?await fixtureSample():await BackgroundWork.Run(()=>Sample(bounds));
-                if(disposed||token!=generation||!owner.IsVisible||owner.IsDismissing||!luminance.HasValue)return;
-                ++SampleCount;
-                bool next=ChooseDark(luminance.Value,hasSample?(bool?)darkInk:null);
-                if(!hasSample||next!=darkInk)
+                if(disposed||token!=generation||!owner.IsVisible||owner.IsDismissing||!Eligible||!luminance.HasValue)return;
+                Native.RectI current;
+                if(!Native.GetWindowRect(handle,out current)||current.Left!=bounds.Left||current.Top!=bounds.Top||current.Right!=bounds.Right||current.Bottom!=bounds.Bottom||owner.Opacity<.98||owner.Surface.Opacity<.98)
                 {
-                    darkInk=next;
-                    SetColor(Primary,next?dark:light,hasSample);
-                    SetColor(Secondary,next?Color.FromRgb(49,63,79):Color.FromRgb(218,225,235),hasSample);
+                    tone.CancelPending();
+                    timer.Interval=TimeSpan.FromMilliseconds(90);
+                    return;
                 }
-                hasSample=true;
+                ++SampleCount;
+                if(tone.Observe(luminance.Value,elapsed.Elapsed.TotalMilliseconds))palette.Set(tone.Dark,true);
+                if(tone.Pending)timer.Interval=TimeSpan.FromMilliseconds(200);
                 Apply(owner.Surface,false);
             }
-            catch(Exception error){AppLog.Once("backdrop-ink",error.GetType().Name);}
+            catch(Exception error){AppLog.Once("backdrop-ink",error.ToString());}
             finally{busy=false;}
         }
         internal static bool ChooseDark(double luminance,bool? previous)
         {
-            return previous.HasValue?(previous.Value?luminance>.18:luminance>.22):luminance>.20;
-        }
-        static void SetColor(SolidColorBrush brush,Color target,bool animate)
-        {
-            Color current=brush.Color;
-            brush.BeginAnimation(SolidColorBrush.ColorProperty,null);
-            brush.Color=target;
-            if(animate&&Motion.Enabled)brush.BeginAnimation(SolidColorBrush.ColorProperty,new ColorAnimation(current,target,TimeSpan.FromMilliseconds(220)) {FillBehavior=FillBehavior.Stop});
+            return BackdropInkTone.ChooseDark(luminance,previous);
         }
         Brush Convert(Brush brush,bool restore)
         {
@@ -189,8 +191,8 @@ namespace OneTaskBar
             timer.Tick-=Tick;
             owner.IsVisibleChanged-=VisibilityChanged;
             owner.Closed-=Closed;
-            Primary.BeginAnimation(SolidColorBrush.ColorProperty,null);
-            Secondary.BeginAnimation(SolidColorBrush.ColorProperty,null);
+            tone.CancelPending();
+            palette.Stop();
         }
         [DllImport("user32.dll")]static extern IntPtr GetDC(IntPtr window);
         [DllImport("user32.dll")]static extern int ReleaseDC(IntPtr window,IntPtr dc);

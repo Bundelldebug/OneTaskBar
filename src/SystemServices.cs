@@ -49,6 +49,7 @@ namespace OneTaskBar
         }
         Radio wifi,bluetooth;
         GlobalSystemMediaTransportControlsSessionManager manager;
+        MediaSessionCatalog mediaSessions;
         GlobalSystemMediaTransportControlsSession session;
         internal bool? WifiOn,BluetoothOn;
         internal bool? WifiPresent,BluetoothPresent;internal bool NetworkConnected;internal NetworkRoute NetworkRoute;DateTime radioProbeAt,networkAt;int networkDirty=1;
@@ -64,17 +65,16 @@ namespace OneTaskBar
         internal int ArtworkReads {get{return artwork.Reads;}}internal int ArtworkDecodes {get{return artwork.Decodes;}}
         void Notify(){Interlocked.Exchange(ref playbackDirty,1);var changed=Changed;if(!disposed&&changed!=null)changed();}
         void PropertiesChanged(GlobalSystemMediaTransportControlsSession sender,MediaPropertiesChangedEventArgs args){Interlocked.Exchange(ref propertiesDirty,1);Notify();}
-        void PlaybackChanged(GlobalSystemMediaTransportControlsSession sender,PlaybackInfoChangedEventArgs args){Notify();}
         void TimelineChanged(GlobalSystemMediaTransportControlsSession sender,TimelinePropertiesChangedEventArgs args){Notify();}
         void CurrentChanged(GlobalSystemMediaTransportControlsSessionManager sender,CurrentSessionChangedEventArgs args){Interlocked.Exchange(ref propertiesDirty,1);Notify();}
         void SelectSession(GlobalSystemMediaTransportControlsSession value)
         {
             if(Object.ReferenceEquals(session,value))return;
-            if(session!=null)try{session.MediaPropertiesChanged-=PropertiesChanged;session.PlaybackInfoChanged-=PlaybackChanged;session.TimelinePropertiesChanged-=TimelineChanged;}catch{}
+            if(session!=null)try{session.MediaPropertiesChanged-=PropertiesChanged;session.TimelinePropertiesChanged-=TimelineChanged;}catch{}
             session=value;artwork.Clear();highArtwork.Clear();artworkUpgrade.Clear();highAttempt=null;Interlocked.Exchange(ref propertiesDirty,1);metadataAt=DateTime.MinValue;
-            if(session!=null)try{session.MediaPropertiesChanged+=PropertiesChanged;session.PlaybackInfoChanged+=PlaybackChanged;session.TimelinePropertiesChanged+=TimelineChanged;}catch{}
+            if(session!=null)try{session.MediaPropertiesChanged+=PropertiesChanged;session.TimelinePropertiesChanged+=TimelineChanged;}catch{}
         }
-        public void Dispose(){disposed=true;try{NetworkInformation.NetworkStatusChanged-=NetworkChanged;}catch{}SelectSession(null);if(manager!=null)try{manager.CurrentSessionChanged-=CurrentChanged;}catch{}manager=null;}
+        public void Dispose(){disposed=true;try{NetworkInformation.NetworkStatusChanged-=NetworkChanged;}catch{}SelectSession(null);if(mediaSessions!=null)mediaSessions.Dispose();mediaSessions=null;if(manager!=null)try{manager.CurrentSessionChanged-=CurrentChanged;}catch{}manager=null;}
         internal async Task Refresh()
         {
             if(disposed)return;if(Interlocked.Exchange(ref outputDirty,0)!=0||DateTime.UtcNow>=outputAt){outputAt=DateTime.UtcNow.AddSeconds(Interactive?10:60);try{OutputName=await BackgroundWork.Run(()=>Native.DefaultAudioOutputName());}catch{OutputName="오디오 출력";}}
@@ -96,11 +96,15 @@ namespace OneTaskBar
             }
             if(Interlocked.Exchange(ref networkDirty,0)!=0||DateTime.UtcNow>=networkAt){networkAt=DateTime.UtcNow.AddSeconds(30);try{NetworkRoute=NetworkRouteInfo.Read();NetworkConnected=NetworkRoute!=NetworkRoute.None;}catch{try{NetworkConnected=System.Net.NetworkInformation.NetworkInterface.GetIsNetworkAvailable();NetworkRoute=NetworkConnected?NetworkRoute.Other:NetworkRoute.None;}catch{}}}
             try {
-                if(manager==null){manager=await Wait(GlobalSystemMediaTransportControlsSessionManager.RequestAsync());manager.CurrentSessionChanged+=CurrentChanged;}
+                if(manager==null){manager=await Wait(GlobalSystemMediaTransportControlsSessionManager.RequestAsync());if(disposed)return;manager.CurrentSessionChanged+=CurrentChanged;mediaSessions=new MediaSessionCatalog(manager,Notify);}
                 if(Interlocked.Exchange(ref playbackDirty,0)==0&&Volatile.Read(ref propertiesDirty)==0&&DateTime.UtcNow<playbackAt&&DateTime.UtcNow<metadataAt&&!artwork.Due(DateTime.UtcNow)&&!artworkUpgrade.Pending(DateTime.UtcNow))return;
                 playbackAt=DateTime.UtcNow.AddSeconds(Interactive?2:30);
-                if(disposed)return;SelectSession(manager.GetCurrentSession()); if(session==null) {if(Media.Available)Media=new MediaState();artwork.Clear();Interlocked.Exchange(ref propertiesDirty,0);metadataAt=DateTime.UtcNow.AddSeconds(60);return;}
-                var info=session.GetPlaybackInfo();var previous=Media;
+                if(disposed)return;
+                var selected=mediaSessions.Select(manager.GetCurrentSession(),session);
+                bool sessionChanged=selected==null?session!=null:!Object.ReferenceEquals(session,selected.Session);
+                SelectSession(selected==null?null:selected.Session);
+                if(session==null) {if(Media.Available)Media=new MediaState();artwork.Clear();Interlocked.Exchange(ref propertiesDirty,0);metadataAt=DateTime.UtcNow.AddSeconds(60);return;}
+                var info=selected.Info;var previous=sessionChanged?new MediaState():Media;
                 var state=new MediaState {Available=true,Title=previous.Title,Artist=previous.Artist,AppId=session.SourceAppUserModelId,
                     Playing=info.PlaybackStatus==GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing,Active=info.PlaybackStatus==GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing||info.PlaybackStatus==GlobalSystemMediaTransportControlsSessionPlaybackStatus.Paused,
                     CanPlay=info.Controls.IsPlayPauseToggleEnabled,CanNext=info.Controls.IsNextEnabled,CanPrevious=info.Controls.IsPreviousEnabled,CanShuffle=info.Controls.IsShuffleEnabled,Shuffling=info.IsShuffleActive??false,Artwork=highArtwork.Image??artwork.Image};

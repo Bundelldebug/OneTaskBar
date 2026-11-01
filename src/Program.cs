@@ -103,6 +103,7 @@ namespace OneTaskBar
             if(args.Contains("--network-route-probe"))return NetworkRouteInfo.Probe();
             if(args.Contains("--memory-lifecycle-probe"))return MemoryChecks.Run();
             if(args.Contains("--media-source-probe"))return MediaArtwork.Probe();
+            if(args.Contains("--media-sessions-probe"))return MediaSessionCatalog.Probe();
             if(args.Contains("--artwork-resolver-probe"))return YouTubeArtworkChecks.Run();
             if(args.Contains("--start-menu-probe"))return StartChecks.Run();
             if(args.Contains("--start-key-probe"))return StartKeyChecks.Run();
@@ -176,6 +177,8 @@ namespace OneTaskBar
         {
             var checks=new List<string>();
             try {
+                MediaSessionPolicy.Check();
+                checks.Add("playing-media-session-selection");
                 Update950Checks.Validate(checks);WindowSwitchGesture.Check();checks.Add("alt-tab-shortcuts-window-filter-monitor-layout");StartMenuLayout.Check();checks.Add("responsive-start-work-area");MediaWave.Check();checks.Add("bounded-media-waves");BatteryPill.Check();checks.Add("low-battery-red-excludes-charging");
                 EfficiencyChecks.Validate(checks);RuntimeCadence.Check(checks);RuntimeDockOrder.Check();checks.Add("stable-launch-order");LauncherLayout.Check();checks.Add("compact-launcher-layout");NowBarLayout.Check();checks.Add("nowbar-monitor-layout");ArtworkPalette.Check();checks.Add("artwork-color-contrast");MediaArtwork.Check(checks);StartDataChecks.Validate(checks);NotificationAssetChecks.Validate(checks);NotificationStackChecks.Validate(checks);QuickSizeChecks.Validate(checks);SamsungPerformanceChecks.Validate(checks);NetworkRouteInfo.Validate(checks);LauncherInputChecks.Validate(checks);DesktopBehaviorChecks.Validate(checks);TaskbarLogoChecks.Validate(checks);Feature856Checks.Validate(checks);Feature857Checks.Validate(checks);QuickWidgetChecks.Validate(checks);AppMetadataChecks.Validate(checks);Glass95Checks.Validate(checks);BetaFeedbackChecks.Validate(checks);
                 foreach(double width in new double[] { 1,200,288,344,600 }) foreach(double value in new double[] { -20,0,1,33,99,100,120 }) {
