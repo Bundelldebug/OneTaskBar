@@ -15,6 +15,8 @@ namespace OneTaskBar
     internal sealed partial class TrayIconSession
     {
         readonly Dictionary<TrayIconItem, byte[]> lastPixels = new Dictionary<TrayIconItem, byte[]>();
+        readonly Dictionary<TrayIconItem, TrayIconQuality> quality = new Dictionary<TrayIconItem, TrayIconQuality>();
+        readonly HashSet<TrayIconItem> originalPixels = new HashSet<TrayIconItem>();
         bool reportedPixels;
 
         internal TrayIconUpdate[] ReadUpdates()
@@ -35,9 +37,19 @@ namespace OneTaskBar
                     byte[] pixels;
                     byte[] previous;
                     lastPixels.TryGetValue(item,out previous);
-                    var image = TrayIconPixels.Extract(frame, current.BoundingRectangle, out pixels, previous);
+                    System.Windows.Media.Color matte;
+                    var image = TrayIconPixels.Extract(frame, current.BoundingRectangle, out pixels, out matte, previous);
                     bool changed = image != null;
-                    if (changed) lastPixels[item] = pixels;
+                    if (changed)
+                    {
+                        lastPixels[item] = pixels;
+                        TrayIconQuality choice;
+                        if(!quality.TryGetValue(item,out choice))quality.Add(item,choice=new TrayIconQuality(item.OriginalIcon));
+                        image=choice.Choose(image,matte);
+                        if(Object.ReferenceEquals(image,item.OriginalIcon))originalPixels.Add(item);
+                        else originalPixels.Remove(item);
+                        changed=!Object.ReferenceEquals(image,item.Icon);
+                    }
                     string name = current.Name ?? item.Name;
                     if (changed || name != item.Name)
                         updates.Add(new TrayIconUpdate {Item = item, Name = name, Image = changed ? image : null});
@@ -47,7 +59,7 @@ namespace OneTaskBar
             if(!reportedPixels&&lastPixels.Count>0)
             {
                 reportedPixels=true;
-                AppLog.Write("tray-live-icons","Current source pixels: "+lastPixels.Count+" icons");
+                AppLog.Write("tray-live-icons","Current source pixels: "+lastPixels.Count+" icons; original resolution: "+originalPixels.Count);
             }
             return updates.ToArray();
         }

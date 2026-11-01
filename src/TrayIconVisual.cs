@@ -10,14 +10,37 @@ namespace OneTaskBar
         readonly ImageSource source;
         readonly ImageBrush mask;
         readonly Brush ink;
+        static readonly Brush lightPlate=Paint.Brush("#FFF0F3F6");
+        readonly bool plate;
         internal bool Monochrome {get{return mask!=null;}}
+        internal bool LightPlate {get{return plate;}}
         internal TrayIconVisual(ImageSource image,Brush foreground=null)
         {
             source=image;ink=foreground??Paint.Text;Width=Height=26;IsHitTestVisible=false;
+            RenderOptions.SetBitmapScalingMode(this,BitmapScalingMode.HighQuality);
             var bitmap=image as BitmapSource;
             if(bitmap!=null&&IsMonochrome(bitmap)){
                 mask=new ImageBrush(image) {Stretch=Stretch.Uniform};mask.Freeze();
             }
+            else if(bitmap!=null)plate=NeedsLightPlate(bitmap);
+        }
+        static bool NeedsLightPlate(BitmapSource bitmap)
+        {
+            if(bitmap.PixelWidth>256||bitmap.PixelHeight>256)return false;
+            var image=new FormatConvertedBitmap(bitmap,PixelFormats.Bgra32,null,0);
+            var pixels=new byte[image.PixelWidth*image.PixelHeight*4];
+            image.CopyPixels(pixels,image.PixelWidth*4,0);
+            int visible=0,dark=0;
+            double light=0;
+            for(int i=0;i<pixels.Length;i+=4)
+            {
+                if(pixels[i+3]<128)continue;
+                visible++;
+                int value=(pixels[i]*114+pixels[i+1]*587+pixels[i+2]*299)/1000;
+                light+=value;
+                if(value<90)dark++;
+            }
+            return visible>0&&dark>visible*.55&&light/visible<145;
         }
         internal static bool IsMonochrome(BitmapSource bitmap)
         {
@@ -39,7 +62,16 @@ namespace OneTaskBar
         protected override void OnRender(DrawingContext dc)
         {
             var bounds=new Rect(0,0,ActualWidth,ActualHeight);
-            if(mask==null){dc.DrawImage(source,bounds);return;}
+            if(mask==null)
+            {
+                if(plate)
+                {
+                    dc.DrawRoundedRectangle(lightPlate,null,bounds,6,6);
+                    bounds.Inflate(-2,-2);
+                }
+                dc.DrawImage(source,bounds);
+                return;
+            }
             dc.PushOpacityMask(mask);dc.DrawRectangle(ink,null,bounds);dc.Pop();
         }
     }

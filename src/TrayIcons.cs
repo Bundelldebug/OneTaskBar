@@ -14,6 +14,7 @@ namespace OneTaskBar
     {
         internal string Name;
         internal ImageSource Icon;
+        internal ImageSource OriginalIcon;
         internal AutomationElement Element;
         internal string Executable;
         internal string Fallback="window";
@@ -64,7 +65,20 @@ namespace OneTaskBar
         internal static ImageSource Decode(byte[] bytes)
         {
             if(bytes==null||bytes.Length<8||bytes.Length>1024*1024)return null;
-            try{using(var stream=new MemoryStream(bytes,false)){var image=new BitmapImage();image.BeginInit();image.CacheOption=BitmapCacheOption.OnLoad;image.DecodePixelWidth=64;image.StreamSource=stream;image.EndInit();image.Freeze();return image;}}catch{return null;}
+            try
+            {
+                using(var stream=new MemoryStream(bytes,false))
+                {
+                    var decoder=BitmapDecoder.Create(stream,BitmapCreateOptions.PreservePixelFormat,BitmapCacheOption.OnLoad);
+                    BitmapSource image=decoder.Frames.OrderByDescending(frame=>(long)frame.PixelWidth*frame.PixelHeight).FirstOrDefault();
+                    if(image==null||image.PixelWidth>4096||image.PixelHeight>4096)return null;
+                    double scale=Math.Min(1,64.0/Math.Max(image.PixelWidth,image.PixelHeight));
+                    if(scale<1)image=new TransformedBitmap(image,new ScaleTransform(scale,scale));
+                    image.Freeze();
+                    return image;
+                }
+            }
+            catch{return null;}
         }
         static string Normalize(string value){return new String((value??"").Where(Char.IsLetterOrDigit).Select(Char.ToLowerInvariant).ToArray());}
         static List<SavedIcon> ReadSaved()
@@ -103,7 +117,7 @@ namespace OneTaskBar
                         if(app!=null&&LabelScore(normalized,app.Name)>0)image=AppIcons.Get(app);
                     }
                     if(diagnostics!=null)diagnostics.Add(new {name=name,automationId=id,matched=match==null?null:match.Name,executable=match==null?null:Path.GetFileName(match.Path),snapshot=image!=null});
-                    result.Add(new TrayIconItem {Name=name,Element=element,Icon=image,Executable=match==null?null:match.Path,Fallback=Fallback(normalized)});
+                    result.Add(new TrayIconItem {Name=name,Element=element,Icon=image,OriginalIcon=image,Executable=match==null?null:match.Path,Fallback=Fallback(normalized)});
                 }
                 if(diagnostics!=null)AppLog.Json("tray-provider-review.json",diagnostics);
                 if(result.Count==0)return null;

@@ -9,9 +9,10 @@ namespace OneTaskBar
 {
     internal static class TrayIconPixels
     {
-        internal static BitmapSource Extract(TrayFrame frame, Rect button, out byte[] bytes, byte[] previous=null)
+        internal static BitmapSource Extract(TrayFrame frame, Rect button, out byte[] bytes, out Color matte, byte[] previous=null)
         {
             bytes = null;
+            matte=Colors.Transparent;
             if (button.IsEmpty || !frame.Bounds.Contains(button)) return null;
             int side = (int)Math.Floor(Math.Min(button.Width, button.Height) * .82);
             if (side < 8 || side > 256) return null;
@@ -22,6 +23,7 @@ namespace OneTaskBar
             var image = new FormatConvertedBitmap(frame.Image, PixelFormats.Bgra32, null, 0);
             bytes = new byte[side * side * 4];
             image.CopyPixels(crop, bytes, side * 4, 0);
+            matte=Color.FromRgb(bytes[2],bytes[1],bytes[0]);
             RemoveBackground(bytes, side);
             if(previous!=null&&bytes.SequenceEqual(previous))return null;
             int visible = 0;

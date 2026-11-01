@@ -27,6 +27,7 @@ namespace OneTaskBar
             app.Dispatcher.BeginInvoke(new Action(async()=>{try{
                 Program.Inspectable=true;
                 await TrayFrameChecks.Run();
+                TrayIconQualityChecks.Run();
                 foreach(double dpi in new[]{1.0,1.5,2.0})foreach(double zoom in new[]{.6,1,1.4})foreach(int edge in new[]{0,1,2,3})
                 {
                     var monitor=new System.Drawing.Rectangle(-2560,-600,(int)(1600*dpi),(int)(900*dpi));
