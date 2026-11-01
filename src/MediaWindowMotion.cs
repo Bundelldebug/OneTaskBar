@@ -25,6 +25,8 @@ namespace OneTaskBar
         readonly MediaWindowLease lease=new MediaWindowLease();
         SwitchThumbnail preview;
         MediaWindowPlane plane,prepared;
+        NowBar.FlightHandoff handoff;
+        MediaFlightTrace trace;
         BitmapSource snapshot,preparedImage;
         IntPtr snapshotWindow,proactiveRestore,observedForeground;
         DateTime proactiveRestoreUntil;
@@ -37,6 +39,7 @@ namespace OneTaskBar
         internal int FrameCount {get;private set;}
         internal double FirstProgress {get;private set;}
         internal double MaximumFrameGap {get;private set;}
+        internal object LastTiming {get;private set;}
         internal IntPtr PreviewHandle
         {
             get
@@ -79,7 +82,11 @@ namespace OneTaskBar
                 return;
             }
             if(snapshotWindow!=IntPtr.Zero&&!app.Windows.Contains(snapshotWindow))Retire();
-            if(!app.Windows.Contains(foreground)||Native.IsIconic(foreground))return;
+            if(!app.Windows.Contains(foreground)||Native.IsIconic(foreground))
+            {
+                DropPrepared();
+                return;
+            }
             Rect capsule;
             IntPtr capsuleOwner;
             if(!Capsule(foreground,out capsule,out capsuleOwner))
@@ -216,14 +223,16 @@ namespace OneTaskBar
             {
                 bounds=new Rect(restored.Left,restored.Top,restored.Right-restored.Left,restored.Bottom-restored.Top);
             }
-            Begin(window,app,owner,minimize?bounds:capsule,minimize?capsule:bounds,!minimize||!Native.IsIconic(window),!minimize);
+            Begin(window,app,owner,minimize?bounds:capsule,minimize?capsule:bounds,!minimize||!Native.IsIconic(window),!minimize,
+                recipient:shell.MediaMotionTarget(window));
             return Active;
         }
 
-        internal void Begin(IntPtr source,AppEntry app,IntPtr owner,Rect start,Rect end,bool hideSource=false,bool restoring=false,BitmapSource fixture=null)
+        internal void Begin(IntPtr source,AppEntry app,IntPtr owner,Rect start,Rect end,bool hideSource=false,bool restoring=false,BitmapSource fixture=null,NowBar recipient=null)
         {
             if(disposed)return;
             Stop();
+            trace=new MediaFlightTrace();
             from=start;
             to=end;
             restore=restoring;
@@ -250,12 +259,13 @@ namespace OneTaskBar
                 }
                 // Construct and lay out before hiding the real window. Disk
                 // journaling still precedes cloaking, preserving crash recovery.
-                if(hideSource&&(!lease.Arm(source)||!lease.HideRepresentation(source)))
+                if(hideSource&&(!lease.Arm(source)||!lease.HideRepresentation(source))&&
+                    !(restore&&plane!=null&&plane.CoverRestoringWindow(source)))
                 {
                     Stop();
                     return;
                 }
-                if(plane!=null)plane.Present();
+                if(plane!=null)plane.Present(recipient==null?IntPtr.Zero:new WindowInteropHelper(recipient).Handle);
                 else
                 {
                     preview=new SwitchThumbnail(new SwitchItem {Window=source,App=app},owner,()=>{},()=>{},n=>{});
@@ -268,7 +278,11 @@ namespace OneTaskBar
                     preview.IsHitTestVisible=false;
                     Place(0);
                 }
-                if(Active)CompositionTarget.Rendering+=Frame;
+                if(Active)
+                {
+                    if(recipient!=null)handoff=recipient.ReceiveFlight(initial);
+                    CompositionTarget.Rendering+=Frame;
+                }
             }
             catch(Exception error)
             {
@@ -293,10 +307,15 @@ namespace OneTaskBar
             double duration=plane==null?360:restore?MediaFlightTiming.RestoreMilliseconds:MediaFlightTiming.MinimizeMilliseconds;
             double p=Math.Min(1,(rendering.RenderingTime-started.Value).TotalMilliseconds/duration);
             if(FrameCount++==0)FirstProgress=p;
+            trace.Frame();
+            long frameStamp=System.Diagnostics.Stopwatch.GetTimestamp();
             try
             {
-                if(plane!=null)plane.Frame(restore?to:from,restore?from:to,MediaFlightTiming.Position(p,restore));
+                double position=MediaFlightTiming.Position(p,restore);
+                if(plane!=null)plane.Frame(restore?to:from,restore?from:to,position);
                 else Place(p);
+                if(handoff!=null)handoff.Apply(position);
+                trace.Work(frameStamp);
             }
             catch(Exception error)
             {
@@ -335,6 +354,9 @@ namespace OneTaskBar
         internal void Stop()
         {
             CompositionTarget.Rendering-=Frame;
+            if(trace!=null)trace.Detach();
+            if(handoff!=null)handoff.Dispose();
+            handoff=null;
             lease.RevealAll();
             var previous=preview;
             var oldPlane=plane;
@@ -343,6 +365,12 @@ namespace OneTaskBar
             if(previous!=null||oldPlane!=null)MediaWindowLease.FlushFirstFrame();
             if(previous!=null)previous.Close();
             if(oldPlane!=null)oldPlane.Close();
+            if(trace!=null&&FrameCount>1)
+            {
+                LastTiming=trace.Finish(restore,FrameCount,MaximumFrameGap);
+                MediaFlightTrace.Save(LastTiming);
+            }
+            trace=null;
         }
 
         void DropPrepared()

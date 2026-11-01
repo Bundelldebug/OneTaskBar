@@ -76,7 +76,6 @@ namespace OneTaskBar
             if(args.Contains("--desktop-overview-probe"))return DesktopOverviewChecks.Run(args.Contains("--inspect"));
             if(args.Contains("--island-space-fixture"))return IslandSafetyChecks.Hold();
             if(args.Contains("--fullscreen-media-probe"))return FullscreenMediaChecks.Run();
-            if(args.Contains("--adaptive-ink-probe"))return BackdropInkChecks.Run();
             if(args.Contains("--dynamic-island-probe"))return DynamicIslandChecks.Run(args.Contains("--inspect"));
             if(args.Contains("--audio-mute-probe"))return AudioMuteChecks.HardwareProbe();
             if(args.Contains("--tray-overflow-probe"))return TrayOverflowChecks.Run();
@@ -228,9 +227,9 @@ namespace OneTaskBar
                 if(restored.DynamicIsland)throw new Exception("Dynamic Island must remain opt-in");
                 var islandOptions=serializer.Deserialize<PreferenceData>(serializer.Serialize(new PreferenceData {DynamicIsland=true}));
                 if(!islandOptions.DynamicIsland)throw new Exception("Dynamic Island preference round trip");
-                if(restored.NativeNotifications||restored.NativeQuickSettings||restored.NativeTaskView)throw new Exception("Old settings must keep custom panels");
-                var panelOptions=serializer.Deserialize<PreferenceData>(serializer.Serialize(new PreferenceData {NativeNotifications=true,NativeQuickSettings=false,NativeTaskView=true}));
-                if(!panelOptions.NativeNotifications||panelOptions.NativeQuickSettings||!panelOptions.NativeTaskView)throw new Exception("Panel choices must persist independently");
+                if(restored.NativeNotifications||restored.NativeQuickSettings||restored.NativeTaskView||restored.NativeTrayOverflow)throw new Exception("Old settings must keep custom panels");
+                var panelOptions=serializer.Deserialize<PreferenceData>(serializer.Serialize(new PreferenceData {NativeNotifications=true,NativeQuickSettings=false,NativeTaskView=true,NativeTrayOverflow=true}));
+                if(!panelOptions.NativeNotifications||panelOptions.NativeQuickSettings||!panelOptions.NativeTaskView||!panelOptions.NativeTrayOverflow)throw new Exception("Panel choices must persist independently");
                 checks.Add("Native/custom panel choices persist independently and migrate existing users to their current custom panels");
                 LauncherChecks.Validate(checks);
                 string layoutFolder=Path.Combine(AppLog.Data,"layout-test-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(layoutFolder);

@@ -48,6 +48,7 @@ namespace OneTaskBar
             var notificationLink=Paint.Action("Windows 알림 연결 · 권한 관리",()=>shell.ShowNotificationConnection());notificationLink.HorizontalContentAlignment=HorizontalAlignment.Left;notificationLink.Margin=new Thickness(12,5,12,12);panels.Children.Add(notificationLink);
             ChoiceRow(panels,"빠른 설정","Wi-Fi·소리·배터리 버튼에서 열 화면",Preferences.Current.NativeQuickSettings,v=>Preferences.Set(p=>p.NativeQuickSettings=v));
             ChoiceRow(panels,"데스크톱 전환","독 버튼과 Win+Tab에서 열 화면",Preferences.Current.NativeTaskView,v=>Preferences.Set(p=>p.NativeTaskView=v));
+            ChoiceRow(panels,"숨겨진 트레이 아이콘","상태 영역의 화살표에서 열 화면",Preferences.Current.NativeTrayOverflow,v=>Preferences.Set(p=>p.NativeTrayOverflow=v));
             var legacyBuds=Row(panels,"8.5에서 주변 기기 연결 대신 Galaxy Buds 열기","Galaxy Buds 앱 설치가 필요합니다",Preferences.Current.QuickGalaxyBuds,v=>Preferences.Set(p=>p.QuickGalaxyBuds=v));legacyBudsOption=(FrameworkElement)legacyBuds.Parent;var budsHint=Paint.TextBlock("9.0에서는 주변 기기 연결과 Galaxy Buds를 각각 배치할 수 있습니다. 빠른 설정의 배치 편집 → 항목 추가에서 선택하세요.",12.5,AppSettingsPalette.Muted);budsHint.TextWrapping=TextWrapping.Wrap;budsHint.Margin=new Thickness(15,12,15,12);independentBudsHint=budsHint;panels.Children.Add(budsHint);RefreshVersionOptions();
             Row(panels,"슬라이더 스크롤 조절","밝기·음량·재생 위치 위에서 휠이나 트랙패드 스크롤로 값을 바꿉니다. 기본은 꺼짐입니다",Preferences.Current.QuickSliderScroll,v=>Preferences.Set(p=>p.QuickSliderScroll=v));
             Group(groups,"패널 선택",panels);

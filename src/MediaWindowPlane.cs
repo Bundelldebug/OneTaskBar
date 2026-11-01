@@ -14,11 +14,15 @@ namespace OneTaskBar
     internal sealed class MediaWindowPlane : Window
     {
         readonly Viewport3D viewport=new Viewport3D();
+        readonly Image occlusion=new Image {Stretch=Stretch.Fill,IsHitTestVisible=false};
+        readonly Image defocused=new Image {Stretch=Stretch.Fill,IsHitTestVisible=false,Opacity=0};
         readonly ScaleTransform3D scale=new ScaleTransform3D();
         readonly AxisAngleRotation3D tilt=new AxisAngleRotation3D(new Vector3D(0,1,0),0);
         readonly AxisAngleRotation3D turn=new AxisAngleRotation3D(new Vector3D(0,0,1),0);
         readonly TranslateTransform3D translation=new TranslateTransform3D();
+        readonly MeshGeometry3D mesh=new MeshGeometry3D();
         readonly Rect host;
+        readonly Rect sourceBounds;
         readonly double dpi;
         LiveBackdrop backdrop;
 
@@ -34,25 +38,36 @@ namespace OneTaskBar
             Topmost=true;
             IsHitTestVisible=false;
             var screen=System.Windows.Forms.Screen.FromPoint(new System.Drawing.Point((int)(initial.X+initial.Width/2),(int)(initial.Y+initial.Height/2)));
-            host=new Rect(screen.Bounds.X,screen.Bounds.Y,screen.Bounds.Width,screen.Bounds.Height);
-            Content=viewport;
+            var area=Rect.Union(initial,capsule);
+            area.Inflate(Math.Min(96,Math.Max(initial.Width,initial.Height)*.08),
+                Math.Min(96,Math.Max(initial.Width,initial.Height)*.08));
+            var desktop=System.Windows.Forms.SystemInformation.VirtualScreen;
+            area.Intersect(new Rect(desktop.X,desktop.Y,desktop.Width,desktop.Height));
+            host=new Rect(Math.Floor(area.Left),Math.Floor(area.Top),Math.Ceiling(area.Right)-Math.Floor(area.Left),
+                Math.Ceiling(area.Bottom)-Math.Floor(area.Top));
+            sourceBounds=initial;
+            var root=new Grid();
+            root.Children.Add(occlusion);
+            root.Children.Add(defocused);
+            root.Children.Add(viewport);
+            Content=root;
             double distance=host.Width/(2*Math.Tan(Math.PI/8));
             viewport.Camera=new PerspectiveCamera(new Point3D(0,0,distance),new Vector3D(0,0,-distance),new Vector3D(0,1,0),45);
-            var mesh=new MeshGeometry3D {
-                Positions=new Point3DCollection {new Point3D(-.5,-.5,0),new Point3D(.5,-.5,0),new Point3D(.5,.5,0),new Point3D(-.5,.5,0)},
-                TextureCoordinates=new PointCollection {new Point(0,1),new Point(1,1),new Point(1,0),new Point(0,0)},
-                TriangleIndices=new Int32Collection {0,1,2,0,2,3}
-            };
-            mesh.Freeze();
+            mesh.Positions.Add(new Point3D());
+            mesh.TextureCoordinates.Add(new Point(.5,.5));
+            for(int i=0;i<52;i++)
+            {
+                mesh.Positions.Add(new Point3D());
+                mesh.TextureCoordinates.Add(new Point());
+                mesh.TriangleIndices.Add(0);
+                mesh.TriangleIndices.Add(i+1);
+                mesh.TriangleIndices.Add((i+1)%52+1);
+            }
             var image=new ImageBrush(snapshot) {Stretch=Stretch.Fill};
             image.Freeze();
-            // Transparent rounded corners are in the texture, rather than a
-            // screen-aligned clip that cuts off the rotated plane.
-            var drawing=new GeometryDrawing(image,null,new RectangleGeometry(new Rect(0,0,initial.Width,initial.Height),18,18));
-            drawing.Freeze();
-            var texture=new DrawingBrush(drawing) {Stretch=Stretch.Fill};
-            texture.Freeze();
-            var material=new DiffuseMaterial(texture);
+            // Round the small mesh instead of repainting a large texture while
+            // its corners morph. The artwork stays one frozen GPU resource.
+            var material=new DiffuseMaterial(image);
             material.Freeze();
             var transforms=new Transform3DGroup();
             transforms.Children.Add(scale);
@@ -83,6 +98,8 @@ namespace OneTaskBar
                 if(backdrop!=null)backdrop.Dispose();
                 backdrop=null;
                 viewport.Children.Clear();
+                occlusion.Source=null;
+                defocused.Source=null;
                 Content=null;
             };
             dpi=Native.PrepareMonitor(this,screen.Bounds);
@@ -93,11 +110,35 @@ namespace OneTaskBar
             UpdateLayout();
         }
 
-        internal void Present()
+        internal void Present(IntPtr recipient=default(IntPtr))
         {
             Show();
-            Native.SetWindowPos(new WindowInteropHelper(this).Handle,new IntPtr(-1),(int)host.X,(int)host.Y,(int)host.Width,(int)host.Height,0x10);
+            // Order the temporary plane below the recipient instead of raising
+            // the recipient and its separate blur HWND through the new plane.
+            Native.SetWindowPos(new WindowInteropHelper(this).Handle,recipient==IntPtr.Zero?new IntPtr(-1):recipient,
+                (int)host.X,(int)host.Y,(int)host.Width,(int)host.Height,0x10|0x200);
         }
+
+        internal bool CoverRestoringWindow(IntPtr source)
+        {
+            // A foreign app cannot be DWM-cloaked. While it is still minimized,
+            // retain the desktop behind it and cover its native restore. Input,
+            // placement and opacity of that app remain untouched.
+            if(!Native.IsIconic(source))return false;
+            occlusion.Source=MediaWindowSnapshot.CaptureBackdrop(source,host);
+            defocused.Source=MediaFlightBackdrop.Blur(occlusion.Source as BitmapSource,host.Width/dpi);
+            // Never bake a stationary copy of the dock into its receiving
+            // animation. Cover only the native window that is being restored.
+            var visible=Rect.Intersect(sourceBounds,host);
+            var clip=new RectangleGeometry(new Rect((visible.X-host.X)/dpi,(visible.Y-host.Y)/dpi,
+                visible.Width/dpi,visible.Height/dpi));
+            clip.Freeze();
+            occlusion.Clip=clip;
+            defocused.Clip=clip;
+            return occlusion.Source!=null;
+        }
+
+        internal bool HasOcclusion {get{return occlusion.Source!=null;}}
 
         [DllImport("dwmapi.dll")]
         static extern int DwmSetWindowAttribute(IntPtr window,int attribute,ref int value,int size);
@@ -105,6 +146,7 @@ namespace OneTaskBar
         internal void Frame(Rect initial,Rect capsule,double progress)
         {
             var pose=MediaWindowPose.At(initial,capsule,progress);
+            Shape(pose.Radius/pose.Width,pose.Radius/pose.Height);
             scale.ScaleX=pose.Width;
             scale.ScaleY=pose.Height;
             translation.OffsetX=pose.Center.X-host.X-host.Width/2;
@@ -112,36 +154,28 @@ namespace OneTaskBar
             tilt.Angle=pose.Tilt;
             turn.Angle=pose.Turn;
             viewport.Opacity=pose.Opacity;
-            if(backdrop!=null)backdrop.SetOpacity(.72*Math.Sin(Math.PI*progress));
+            if(HasOcclusion)defocused.Opacity=pose.Defocus;
+            else if(backdrop!=null)backdrop.SetOpacity(pose.Defocus);
+        }
+
+        void Shape(double rx,double ry)
+        {
+            for(int corner=0;corner<4;corner++)
+            {
+                double cx=corner==0||corner==3?.5-rx:-.5+rx;
+                double cy=corner<2?.5-ry:-.5+ry;
+                for(int step=0;step<=12;step++)
+                {
+                    double angle=(corner+step/12.0)*Math.PI/2;
+                    double x=cx+Math.Cos(angle)*rx,y=cy+Math.Sin(angle)*ry;
+                    int index=corner*13+step+1;
+                    mesh.Positions[index]=new Point3D(x,y,0);
+                    mesh.TextureCoordinates[index]=new Point(x+.5,.5-y);
+                }
+            }
         }
 
         internal FrameworkElement Scene {get{return viewport;}}
     }
 
-    internal sealed class MediaWindowPose
-    {
-        internal Point Center;
-        internal double Width,Height,Tilt,Turn,Opacity;
-
-        // Geometric path only. Timing is directional, so the real window is
-        // reached at rest on restore rather than at maximum velocity.
-        internal static MediaWindowPose At(Rect window,Rect capsule,double progress)
-        {
-            double p=Math.Max(0,Math.Min(1,progress));
-            double t=p;
-            var a=new Point(window.X+window.Width/2,window.Y+window.Height/2);
-            var b=new Point(capsule.X+capsule.Width/2,capsule.Y+capsule.Height/2);
-            double direction=b.X>=a.X?1:-1;
-            double u=1-t;
-            var control=new Point(a.X+(b.X-a.X)*.66,a.Y+(b.Y-a.Y)*.18);
-            var center=new Point(u*u*a.X+2*u*t*control.X+t*t*b.X,u*u*a.Y+2*u*t*control.Y+t*t*b.Y);
-            double end=Math.Max(.006,Math.Min(capsule.Width/window.Width,capsule.Height/window.Height)*.8);
-            // Interpolate visible size, not its logarithm. Logarithmic scaling
-            // spends most of the flight almost invisible and balloons on restore.
-            double zoom=1+(end-1)*t;
-            double envelope=Math.Sin(Math.PI*p);
-            double fade=Math.Max(0,Math.Min(1,(p-.92)/.08));
-            return new MediaWindowPose {Center=center,Width=window.Width*zoom,Height=window.Height*zoom,Tilt=-18*direction*envelope,Turn=-18*direction*envelope,Opacity=1-fade*fade*(3-2*fade)};
-        }
-    }
 }

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace OneTaskBar
@@ -22,9 +23,12 @@ namespace OneTaskBar
                     bar.Update(state,scale,340,screen.Bounds.Height/scale-56,true);
                     await Task.Delay(350);
                     if(bar.Shape.Width!=44||bar.Shape.Height!=88)throw new Exception("Side capsule does not retain its vertical proportions");
+                    CheckArtworkTint(bar);
                     bar.SetExpanded(true);
                     await Task.Delay(350);
-                    if(bar.Shape.Height!=212)throw new Exception("Side capsule does not open its compact black player");
+                    var player=((System.Windows.Controls.Grid)bar.Surface.Child).Children.OfType<MediaPlayerView>().Single();
+                    if(bar.Shape.Height!=130||!player.Modern)throw new Exception("Side capsule must open the standard UI 9 media player");
+                    CheckArtworkTint(bar);
                     Program.Save(bar.Surface,(int)bar.Surface.ActualWidth,(int)bar.Surface.ActualHeight,System.IO.Path.Combine(AppLog.Data,"side-media-card.png"));
                     bar.SetExpanded(false);
                     await Task.Delay(350);
@@ -38,6 +42,15 @@ namespace OneTaskBar
                 Preferences.Current.NowBarSideCapsule=side;
                 Preferences.Current.NowBarLargeCover=large;
             }
+        }
+
+        static void CheckArtworkTint(NowBar bar)
+        {
+            var field=typeof(GlassWindow).GetField("glassTint",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic);
+            var actual=field.GetValue(bar) as System.Windows.Media.LinearGradientBrush;
+            var expected=bar.Palette.Glass as System.Windows.Media.LinearGradientBrush;
+            if(actual==null||expected==null||actual.GradientStops[0].Color!=expected.GradientStops[0].Color)
+                throw new Exception("Side capsule must retain its artwork-derived background in compact and expanded states");
         }
     }
 }

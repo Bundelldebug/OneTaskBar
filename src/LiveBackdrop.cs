@@ -44,6 +44,7 @@ namespace OneTaskBar
         Rect refractedClip;
         bool refractionConfigured;
         bool refractionUnavailable;
+        bool motionTransform;
         readonly Window window;
         readonly ContextMenu menu;
         readonly IntPtr popupHandle;
@@ -85,7 +86,7 @@ namespace OneTaskBar
             }
             // WPF owns its HWND's compositor target. Put the backdrop in a separate, non-input,
             // no-redirection HWND and make the transparent WPF window its owner-ordered overlay.
-            bool passThrough=window is TransientGlass;
+            bool passThrough=window is TransientGlass||window is NowBar;
             background=CreateWindowEx(0x00200000|0x08000000|0x80|0x20|(passThrough?0x80000:0)|(topmost?0x8:0),"static","One TaskBar · 블러",0x88000000,0,0,1,1,IntPtr.Zero,IntPtr.Zero,IntPtr.Zero,IntPtr.Zero);
             if(background==IntPtr.Zero)throw new System.ComponentModel.Win32Exception();
             // The composition host is visual-only. WS_EX_TRANSPARENT alone does
@@ -120,6 +121,7 @@ namespace OneTaskBar
         void ApplyOpacity(){if(root!=null)root.Opacity=enabled?(float)opacity:0;}
         internal void Resize()
         {
+            if(motionTransform)return;
             if(target==null)return;Native.RectI bounds;var handle=Overlay;
             if(!Bounds(out bounds))return;
             backdropScale=Math.Max(96,Native.GetDpiForWindow(handle))/96.0;
@@ -129,13 +131,14 @@ namespace OneTaskBar
             popupX=bounds.Left;popupY=bounds.Top;lastClip=clip;
             if(w!=width||h!=height){var size=new Vector2(w,h);root.Size=size;blur.Size=size;}width=w;height=h;corner=c;
             double scale=backdropScale;float cw=clip.HasValue?(float)(clip.Value.Width*scale):w,ch=clip.HasValue?(float)(clip.Value.Height*scale):h;
-            if(clip.HasValue){var boundsClip=Native.InputBounds(clip.Value,scale);if(!inputClip.HasValue||!inputClip.Value.Equals(boundsClip)){if(Native.ClipWindow(background,boundsClip))inputClip=boundsClip;}}
+            if(clip.HasValue){var boundsClip=Native.InputBounds(clip.Value,scale);if(glass is NowBar&&ReleaseFeatures.GlassUI)boundsClip=new Native.RectI {Right=w,Bottom=h};if(!inputClip.HasValue||!inputClip.Value.Equals(boundsClip)){if(Native.ClipWindow(background,boundsClip))inputClip=boundsClip;}}
             shape.Offset=clip.HasValue?new Vector2((float)(clip.Value.X*scale),(float)(clip.Value.Y*scale)):Vector2.Zero;shape.Size=new Vector2(cw,ch);shape.CornerRadius=new Vector2(Math.Min(c,cw/2f),Math.Min(c,ch/2f));
             Sync();
             RefreshRefraction(null,EventArgs.Empty);
         }
         void RefreshRefraction(object sender,EventArgs args)
         {
+            if(motionTransform)return;
             var glass=window as GlassWindow;
             bool active=root!=null&&glass!=null&&glass.IsVisible&&!(glass is DesktopOverview)&&glass.GlassMaterial&&Glass95.Enabled&&Glass95.Transparent&&enabled;
             if(!active){if(refractionConfigured&&refraction!=null){refraction.Begin();refraction.End();}refractionConfigured=false;return;}
@@ -176,6 +179,32 @@ namespace OneTaskBar
             }
         }
         internal void RefreshOptics(){RefreshRefraction(null,EventArgs.Empty);}
+        internal void BeginMotionTransform()
+        {
+            motionTransform=true;
+            if(background!=IntPtr.Zero)
+            {
+                var input=new Native.RectI {Right=width,Bottom=height};
+                if(!inputClip.HasValue||!inputClip.Value.Equals(input))
+                    if(Native.ClipWindow(background,input))inputClip=input;
+            }
+        }
+        internal void TransformMotion(Rect source,Rect destination,double scale)
+        {
+            if(root==null||!motionTransform)return;
+            var center=new Vector2((float)((source.X+source.Width/2)*scale),(float)((source.Y+source.Height/2)*scale));
+            var move=new Vector2((float)((destination.X+destination.Width/2-source.X-source.Width/2)*scale),
+                (float)((destination.Y+destination.Height/2-source.Y-source.Height/2)*scale));
+            root.TransformMatrix=Matrix4x4.CreateScale((float)(destination.Width/source.Width),
+                (float)(destination.Height/source.Height),1,new Vector3(center,0))*Matrix4x4.CreateTranslation(new Vector3(move,0));
+        }
+        internal void EndMotionTransform()
+        {
+            if(!motionTransform)return;
+            motionTransform=false;
+            if(root!=null)root.TransformMatrix=Matrix4x4.Identity;
+            Resize();
+        }
         public void Dispose() {instances.Remove(this);if(window!=null)window.LayoutUpdated-=RefreshRefraction;if(popupTimer!=null)popupTimer.Stop();if(refraction!=null){refraction.Dispose();refraction=null;}if(target!=null){target.Root=null;target.Dispose();target=null;}if(root!=null)root.Children.RemoveAll();if(blur!=null){var brush=blur.Brush;blur.Brush=null;blur.Dispose();blur=null;if(brush!=null)brush.Dispose();}if(root!=null){root.Dispose();root=null;}if(shape!=null){shape.Dispose();shape=null;}if(background!=IntPtr.Zero){DestroyWindow(background);background=IntPtr.Zero;}}
     }
 }

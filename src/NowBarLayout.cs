@@ -14,7 +14,7 @@ namespace OneTaskBar
                 double sideWidth=Math.Max(1,Math.Min(400,screenWidth-inset-24));
                 double sideCover=largeCover?Math.Max(0,Math.Min(288,Math.Min(sideWidth-56,screenHeight-24-(modern?178:148)))):0;
                 if(sideCover<120)sideCover=0;
-                double sideHeight=sideCover>0?sideCover+(modern?178:148):Math.Min(sideCapsule?212:modern?130:188,screenHeight-24);
+                double sideHeight=sideCover>0?sideCover+(modern?178:148):Math.Min(modern?130:188,screenHeight-24);
                 double sideX=expanded?(edge==0?inset:screenWidth-inset-sideWidth):(edge==0?margin:screenWidth-margin-compactHeight);
                 double sideY=expanded?Math.Max(12,Math.Min(screenHeight-sideHeight-12,margin+compactHeight/2-sideHeight/2)):margin;
                 return new NowBarLayout {Bounds=new Rect(sideX,sideY,expanded?sideWidth:compactHeight,expanded?sideHeight:sideCapsule?88*dockZoom:compactHeight),CompactY=margin,CompactWidth=compactHeight,PosterEdge=sideCover,PopupHeight=sideHeight};

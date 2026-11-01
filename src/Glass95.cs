@@ -71,7 +71,6 @@ namespace OneTaskBar
         static Brush Recolor(Brush brush)
         {
             if(brush==null)return null;
-            if(BackdropInkPalette.Owns(brush))return brush;
             foreach(var old in new[]{light,dark}){
                 if(Same(brush,old.Text))return Text;if(Same(brush,old.Muted))return Muted;if(Same(brush,old.Surface))return Surface;if(Same(brush,old.Card))return Card;if(Same(brush,old.Solid))return Solid;if(Same(brush,old.Toggle))return Toggle;if(Same(brush,old.Rim))return Rim;
             }return brush;

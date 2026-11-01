@@ -92,6 +92,7 @@ namespace OneTaskBar
             // Capsules and panels already have per-pixel WPF alpha and a matching composition clip.
             var glass=window as GlassWindow;
             if(glass!=null&&glass.BackdropClip.HasValue){var bounds=InputBounds(glass.BackdropClip.Value,scale);
+                if(glass is NowBar&&ReleaseFeatures.GlassUI)bounds=new RectI {Right=rect.Right-rect.Left,Bottom=rect.Bottom-rect.Top};
                 if(!state.InputClip.HasValue||!state.InputClip.Value.Equals(bounds)){if(ClipWindow(handle,bounds))state.InputClip=bounds;}state.Soft=false;return;}
             if(state.InputClip.HasValue){SetWindowRgn(handle,IntPtr.Zero,true);state.InputClip=null;state.Width=0;}
             if(glass!=null&&glass.SoftCorners){if(!state.Soft){SetWindowRgn(handle,IntPtr.Zero,true);state.Soft=true;}state.Width=width;state.Height=height;state.Radius=curve;return;}
@@ -113,6 +114,27 @@ namespace OneTaskBar
         internal static void BlurOpacity(Window window,double value){RegionState state;if(regions.TryGetValue(window,out state)&&state.Backdrop!=null)state.Backdrop.SetOpacity(value);}
         internal static double BlurOpacity(Window window){RegionState state;return regions.TryGetValue(window,out state)&&state.Backdrop!=null?state.Backdrop.Opacity:0;}
         internal static void RefreshOptics(Window window){RegionState state;if(regions.TryGetValue(window,out state)&&state.Backdrop!=null)state.Backdrop.RefreshOptics();}
+        internal static void BeginBackdropMotion(Window window)
+        {
+            var handle=new WindowInteropHelper(window).Handle;
+            RectI bounds;
+            if(!GetWindowRect(handle,out bounds))return;
+            var input=new RectI {Right=bounds.Right-bounds.Left,Bottom=bounds.Bottom-bounds.Top};
+            var state=regions.GetValue(window,w=>new RegionState());
+            if((!state.InputClip.HasValue||!state.InputClip.Value.Equals(input))&&ClipWindow(handle,input))state.InputClip=input;
+            if(state.Backdrop!=null)state.Backdrop.BeginMotionTransform();
+        }
+        internal static void TransformBackdropMotion(Window window,Rect source,Rect destination,double scale)
+        {
+            RegionState state;
+            if(regions.TryGetValue(window,out state)&&state.Backdrop!=null)state.Backdrop.TransformMotion(source,destination,scale);
+        }
+        internal static void EndBackdropMotion(Window window,double radius)
+        {
+            RegionState state;
+            if(regions.TryGetValue(window,out state)&&state.Backdrop!=null)state.Backdrop.EndMotionTransform();
+            Round(window,radius);
+        }
         internal static void EnsureDockVisible(Window window,bool raise=false)
         {
             // Explorer can hide or minimize an HWND without changing WPF Visibility.

@@ -63,5 +63,43 @@ namespace OneTaskBar
                 finally {DeleteObject(handle);}
             }
         }
+
+        internal static BitmapSource CaptureBackdrop(IntPtr sourceWindow,Rect bounds)
+        {
+            if(!Native.IsIconic(sourceWindow)||bounds.IsEmpty||bounds.Width<1||bounds.Height<1||
+                bounds.Width*bounds.Height>24000000)return null;
+            double scale=Math.Min(1,1536/Math.Max(bounds.Width,bounds.Height));
+            int width=Math.Max(1,(int)Math.Round(bounds.Width*scale));
+            int height=Math.Max(1,(int)Math.Round(bounds.Height*scale));
+            using(var bitmap=new Bitmap(width,height,System.Drawing.Imaging.PixelFormat.Format24bppRgb))
+            {
+                using(var graphics=Graphics.FromImage(bitmap))
+                {
+                    var source=GetDC(IntPtr.Zero);
+                    if(source==IntPtr.Zero)return null;
+                    var target=graphics.GetHdc();
+                    try
+                    {
+                        SetStretchBltMode(target,4);
+                        if(!StretchBlt(target,0,0,width,height,source,(int)bounds.X,(int)bounds.Y,
+                            (int)bounds.Width,(int)bounds.Height,0x00CC0020))return null;
+                    }
+                    finally
+                    {
+                        graphics.ReleaseHdc(target);
+                        ReleaseDC(IntPtr.Zero,source);
+                    }
+                }
+                if(!Native.IsIconic(sourceWindow))return null;
+                var handle=bitmap.GetHbitmap();
+                try
+                {
+                    var image=Imaging.CreateBitmapSourceFromHBitmap(handle,IntPtr.Zero,Int32Rect.Empty,BitmapSizeOptions.FromEmptyOptions());
+                    image.Freeze();
+                    return image;
+                }
+                finally {DeleteObject(handle);}
+            }
+        }
     }
 }

@@ -13,6 +13,7 @@ namespace OneTaskBar
         internal static async Task Run()
         {
             int version=Preferences.Current.UIVersion,kind=Preferences.Current.DockBackgroundKind;
+            string color=Preferences.Current.DockBackgroundColor;
             bool blur=Preferences.Current.Blur,solid=Preferences.Current.DockSolidBackground;
             GlassWindow window=null;
             try{
@@ -32,11 +33,17 @@ namespace OneTaskBar
                     Require(label.Foreground==Paint.ControlWhite&&glyph.Color==Paint.ControlWhite&&label.Effect!=null&&label.Effect.IsFrozen&&Object.ReferenceEquals(label.Effect,glyph.Effect),"small foreground outlines are frozen, shared and independent of theme");
                     Preferences.Current.DockBackgroundKind=1;window.RefreshGlassMaterial();
                     Require(window.Surface.Background==DockAppearance.Background&&Native.BlurOpacity(window)==0&&label.Effect==null,"explicit solid mode remains available and removes icon-only outlines");
+                    foreach(string background in new[]{"#000000","#FFFFFF"})
+                    {
+                        Preferences.Current.DockBackgroundColor=background;
+                        window.RefreshGlassMaterial();
+                        Require(glyph.Color==(dark?Paint.ControlWhite:Paint.OnLight),"custom background brightness cannot change the selected theme's icon color");
+                    }
                     Preferences.Current.DockBackgroundKind=0;window.RefreshGlassMaterial();
                     Require(window.Surface.Background==LightPanel.DockGlass&&Native.BlurOpacity(window)>.99&&glyph.Effect==null,"returning from custom modes restores live glass without recreating the dock");
                     window.Close();window=null;
                 }
-            }finally{if(window!=null)window.Close();Preferences.Current.UIVersion=version;Preferences.Current.DockBackgroundKind=kind;Preferences.Current.Blur=blur;Preferences.Current.DockSolidBackground=solid;}
+            }finally{if(window!=null)window.Close();Preferences.Current.UIVersion=version;Preferences.Current.DockBackgroundKind=kind;Preferences.Current.DockBackgroundColor=color;Preferences.Current.Blur=blur;Preferences.Current.DockSolidBackground=solid;}
         }
     }
 }

@@ -56,6 +56,9 @@ namespace OneTaskBar
         {
             Entry entry;
             if(!entries.TryGetValue(window,out entry))return false;
+            // DWMWA_CLOAK is restricted to windows in the calling process. The
+            // flight host supplies a visual cover for foreign-window restores.
+            if(entry.Process!=(uint)System.Diagnostics.Process.GetCurrentProcess().Id)return false;
             int cloaked;
             int read=Native.DwmGetWindowAttribute(window,14,out cloaked,4);
             if(read!=0||cloaked!=0){AppLog.Write("media-cloak","read="+read+" state="+cloaked);return false;}
@@ -117,7 +120,7 @@ namespace OneTaskBar
             }
             catch(Exception error)
             {
-                AppLog.Once("media-window-journal",error.GetType().Name);
+                AppLog.Once("media-window-journal",error.GetType().Name+" 0x"+error.HResult.ToString("X8")+": "+error.Message);
                 return false;
             }
             finally

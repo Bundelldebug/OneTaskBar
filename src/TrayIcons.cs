@@ -18,11 +18,13 @@ namespace OneTaskBar
         internal string Executable;
         internal string Fallback="window";
     }
-    internal sealed class TrayIconSession : IDisposable
+    internal sealed partial class TrayIconSession : IDisposable
     {
         internal readonly List<TrayIconItem> Items;
         readonly IntPtr source;
-        bool masked,disposed,keepNative;
+        bool masked,keepNative;
+        volatile bool disposed;
+        readonly object itemGate=new object();
         internal bool SourceVisible {get{return !disposed&&Native.IsWindow(source)&&Native.IsWindowVisible(source);}}
         internal TrayIconSession(IntPtr source,List<TrayIconItem> items){this.source=source;Items=items;}
         internal bool Mask()
@@ -53,7 +55,7 @@ namespace OneTaskBar
             if(disposed)return;disposed=true;
             if(!keepNative&&source!=IntPtr.Zero)Native.ShowWindow(source,0);
             if(masked)Restore(source);
-            Items.Clear();
+            lock(itemGate)Items.Clear();
         }
     }
     internal static class TrayIcons
@@ -105,7 +107,13 @@ namespace OneTaskBar
                 }
                 if(diagnostics!=null)AppLog.Json("tray-provider-review.json",diagnostics);
                 if(result.Count==0)return null;
-                return new TrayIconSession(source,result);
+                var session=new TrayIconSession(source,result);
+                foreach(var update in session.ReadUpdates())
+                {
+                    if(update.Image!=null)update.Item.Icon=update.Image;
+                    update.Item.Name=update.Name;
+                }
+                return session;
             }catch(Exception error){AppLog.Once("tray-icons",error.GetType().Name);return null;}
         }
         internal static int Score(string name,string automationId,string id,string tooltip,string path)

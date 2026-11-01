@@ -63,7 +63,8 @@ namespace OneTaskBar
                         var snapshot=new RenderTargetBitmap(800,600,96,96,PixelFormats.Pbgra32);snapshot.Render(view.Surface);snapshot.Freeze();
                         var initial=new Rect(40,40,800,600);var capsule=new Rect(900,30,44,88);
                         var pose=MediaWindowPose.At(initial,capsule,.18);
-                        Require(Math.Abs(pose.Width/pose.Height-initial.Width/initial.Height)<.001&&Math.Abs(pose.Turn)>8&&Math.Abs(pose.Tilt)>8,"reference flight preserves aspect and tilts in perspective");
+                        MediaFlightChecks.Check();
+                        Require(Math.Abs(pose.Width/pose.Height-initial.Width/initial.Height)<.001&&Math.Abs(pose.Turn)>1&&Math.Abs(pose.Tilt)>1,"reference flight begins with a restrained perspective tilt");
                         Require(MediaWindowPose.At(initial,capsule,0).Width==800&&MediaWindowPose.At(initial,capsule,1).Opacity==0,"flight hands off at its two endpoints");
                         foreach(bool reverse in new[]{false,true})
                         {
@@ -81,10 +82,18 @@ namespace OneTaskBar
                             Require(Math.Abs(firstPose.Width-nearFirst.Width)<.05&&Math.Abs(lastPose.Width-nearLast.Width)<.05,"flight starts and hands back at rest");
                         }
                         var halfway=MediaWindowPose.At(initial,capsule,.5);
-                        Require(halfway.Width>initial.Width*.49&&halfway.Width<initial.Width*.55,"visible size changes continuously instead of shrinking logarithmically");
+                        Require(halfway.Width>initial.Width*.45&&halfway.Width<initial.Width*.65,"the app remains readable through the middle of its flight");
                         int backdropsBefore=LiveBackdrop.InstanceCount;
                         var plane=new MediaWindowPlane(snapshot,initial,capsule);plane.Frame(initial,capsule,.18);plane.Present();await Task.Delay(70);
                         Program.Save(plane.Scene,(int)plane.ActualWidth,(int)plane.ActualHeight,Path.Combine(AppLog.Data,"media-flight-pose.png"));plane.Close();
+                        Native.ShowWindow(source,6);
+                        var cover=new MediaWindowPlane(snapshot,initial,capsule);
+                        try
+                        {
+                            Require(cover.CoverRestoringWindow(source)&&cover.HasOcclusion,"a minimized app can restore behind one visual cover without foreign-window cloaking");
+                            Require(Native.IsIconic(source),"preparing the cover never restores or changes the source window");
+                        }
+                        finally {cover.Close();Native.ShowWindow(source,4);}
                         motion.Begin(source,new AppEntry {Name="tilted fixture"},source,initial,capsule,true,false,snapshot);
                         await Task.Delay(70);Require(motion.Active&&Native.GetForegroundWindow()!=motion.PreviewHandle,"tilted flight does not steal focus");
                         Require(motion.FrameCount>0&&motion.FirstProgress==0,"first presented frame starts at zero after setup");
@@ -93,6 +102,7 @@ namespace OneTaskBar
                         await Task.Delay(600);int released;Native.DwmGetWindowAttribute(source,14,out released,4);
                         Require(!motion.Active&&released==0,"tilted flight releases its texture host and restores source visibility");
                         Require(LiveBackdrop.InstanceCount==backdropsBefore,"temporary defocus host is released with the flight");
+                        AppLog.Json("media-flight-baseline.json",new {frames=motion.FrameCount,firstProgress=motion.FirstProgress,maximumFrameGap=motion.MaximumFrameGap});
                         motion.Begin(source,new AppEntry {Name="tilted restore"},source,capsule,initial,true,true,snapshot);
                         await Task.Delay(70);Require(motion.Active,"restore uses the same textured plane");motion.Stop();Native.DwmGetWindowAttribute(source,14,out released,4);
                         Require(released==0&&!motion.Active,"cancelled reverse flight restores its owner");

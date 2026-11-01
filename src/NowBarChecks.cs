@@ -59,6 +59,63 @@ namespace OneTaskBar
                 Preferences.Current.Animations=false;foreach(int edge in new[]{0,1,2}){Preferences.Current.DockEdge=edge;var media=new NowBar(shell,screen);try{var dock=DockLayout.Compute(screen.Bounds,scale,8,58,true,68,edge);double y=DockGeometry.Vertical(edge)?Math.Max(12,dock.StartX-56):dock.Y;media.Update(Track("Side media",true),scale,dock.StartX,y,true);await Task.Delay(40);foreach(bool expanded in new[]{false,true,false}){media.SetExpanded(expanded);media.UpdateLayout();var surface=media.Surface.TransformToAncestor((FrameworkElement)media.Content).Transform(new Point());if(surface.X<-.1||surface.Y<-.1||surface.X+media.Surface.ActualWidth>media.Width+.1||surface.Y+media.Surface.ActualHeight>media.Height+.1)throw new Exception("Media content is outside its native host at edge "+edge+" expanded="+expanded+" origin="+surface+" surface="+media.Surface.ActualWidth+"x"+media.Surface.ActualHeight+" host="+media.Width+"x"+media.Height+" shape="+media.Shape);if(DockGeometry.Vertical(edge)&&!expanded&&Math.Abs(media.Shape.X-(edge==0?12:screen.Bounds.Width/scale-56))>.1)throw new Exception("Side media is not attached to its dock edge");}}finally{media.Close();}}
             }finally{Preferences.Current.DockEdge=original;Preferences.Current.Animations=animations;}
         }
+        static async Task CheckFlightHandoff(NowBar bar,double scale)
+        {
+            var original=bar.Shape;
+            var transform=bar.Surface.RenderTransform;
+            var incoming=new Rect(300,80,800,600);
+            var handoff=bar.ReceiveFlight(incoming);
+            if(handoff==null)throw new Exception("Settled capsule must accept a media flight");
+            Native.RectI host;
+            var handle=new WindowInteropHelper(bar).Handle;
+            Native.GetWindowRect(handle,out host);
+            try
+            {
+                foreach(double progress in new[]{.50,.65,.75,.88,.98,1.0})
+                {
+                    handoff.Apply(progress);
+                    await Task.Delay(20);
+                    var point=bar.Surface.PointToScreen(new Point());
+                    var clip=bar.BackdropClip.Value;
+                    Native.RectI actual;
+                    Native.GetWindowRect(handle,out actual);
+                    if(!actual.Equals(host)||Math.Abs(point.X-host.Left-clip.X*scale)>.6||
+                        Math.Abs(point.Y-host.Top-clip.Y*scale)>.6)
+                        throw new Exception("Capsule pixels and live blur must share a fixed native host through the handoff");
+                    if(progress==.75&&Math.Abs(bar.FlightShape.Width-original.Width)<1)
+                        throw new Exception("Receiving capsule must visibly respond to the same flight progress");
+                }
+                if(bar.Shape!=original||bar.FlightShape!=original)throw new Exception("Flight must settle on the original capsule layout");
+            }
+            finally {handoff.Dispose();}
+            if(bar.FlightMotion||bar.Surface.RenderTransform!=transform)throw new Exception("Flight cancellation must release its transform and retain the original controls");
+            var screen=System.Windows.Forms.Screen.PrimaryScreen;
+            var origin=bar.Surface.PointToScreen(new Point());
+            var capsule=new Rect(origin.X,origin.Y,bar.Surface.ActualWidth*scale,bar.Surface.ActualHeight*scale);
+            var full=new Rect(screen.Bounds.Left,screen.Bounds.Top,screen.Bounds.Width,screen.Bounds.Height-80*scale);
+            using(var motion=new MediaWindowMotion(null))
+            {
+                motion.Begin(IntPtr.Zero,new AppEntry {Name="flight timing fixture"},IntPtr.Zero,full,capsule,
+                    fixture:ArtworkPalette.Sample(Colors.SteelBlue),recipient:bar);
+                await Task.Delay(750);
+                if(motion.Active||bar.FlightMotion||bar.Surface.RenderTransform!=transform)
+                    throw new Exception("Full-display flight must release the receiving capsule and its temporary backdrop transform");
+                AppLog.Json("media-flight-full-display.json",motion.LastTiming);
+            }
+            var cancelled=bar.ReceiveFlight(incoming);
+            cancelled.Apply(.75);
+            bar.SetExpanded(true);
+            if(bar.FlightMotion)throw new Exception("Opening media controls must cancel the capsule deformation");
+            await Task.Delay(350);
+            var collapse=bar.CollapseForLaunchAsync();
+            if(collapse.IsCompleted)throw new Exception("Artwork restore must wait for the expanded player to collapse");
+            if(!await collapse||bar.Expanded||bar.Shape.Height>44.1)
+                throw new Exception("Artwork restore must start from the settled capsule");
+            var restoring=bar.ReceiveFlight(incoming);
+            if(restoring==null)throw new Exception("Settled artwork restore accepts a continuous reverse flight");
+            restoring.Dispose();
+        }
+
         internal static int Run(bool modern=false)
         {
             var app=new Application {ShutdownMode=ShutdownMode.OnExplicitShutdown};int result=1;ShellController shell=null;NowBar bar=null;InputTarget behind=null;int oldUI=Preferences.Current.UIVersion;double expectedHeight=modern?130:188;bool oldCover=Preferences.Current.NowBarLargeCover,oldAnimations=Preferences.Current.Animations;IDisposable animationFixture=null,pointerFixture=null;
@@ -78,7 +135,7 @@ namespace OneTaskBar
                     Preferences.Current.NowBarLargeCover=true;bar.Update(shortTrack,scale,start,y,true);bar.SetExpanded(true);await Task.Delay(380);bool poster=bar.LargeCoverVisible&&bar.Shape.Height>300&&bar.Shape.Bottom<y;Save(bar,"nowbar-large-cover.png");bool posterCollapse=await StableCollapse(bar,behind.Handle);bar.SetExpanded(true);await Task.Delay(100);Preferences.Current.NowBarLargeCover=false;bar.Update(shortTrack,scale,start,y,true);await Task.Delay(380);bool styleSwitch=bar.Shape.Height==expectedHeight&&!bar.LargeCoverVisible;bar.SetExpanded(false);await Task.Delay(330);var missing=Track("커버 없는 미디어",true);missing.Artwork=null;Preferences.Current.NowBarLargeCover=true;bar.Update(missing,scale,start,y,true);bar.SetExpanded(true);await Task.Delay(350);bool missingCover=!bar.LargeCoverVisible&&bar.Shape.Height==expectedHeight;bar.SetExpanded(false);await Task.Delay(330);Preferences.Current.NowBarLargeCover=false;bar.Update(shortTrack,scale,start,y,true);
                     int style=Native.GetWindowLong(new WindowInteropHelper(bar).Handle,-20);bool tool=(style&0x80)!=0&&(style&0x40000)==0;await Task.Delay(950);bar.Update(new MediaState(),scale,start,y,true);await Task.Delay(220);bool gone=!bar.IsVisible&&!bar.HasRetainedArtwork;bar.Update(shortTrack,scale,start,y,true);await Task.Delay(400);bool reappears=bar.IsVisible&&bar.Shape.Width>44&&bar.Shape.Height==44;bool color=bar.Palette.Dominant.R>bar.Palette.Dominant.G+80&&bar.Palette.MinimumContrast>=5.4;
                     Preferences.Current.Animations=false;bar.SetExpanded(true);bool disabledInstant=bar.Shape.Height==expectedHeight;bar.SetExpanded(false);disabledInstant&=bar.Shape.Height==44;Preferences.Current.Animations=true;result=shortShape.Width<longShape.Width&&longShape.Width<=DockLayout.StatusSize(screen.Bounds.Width/scale)+.01&&shortLeft&&longLeft&&marquee&&grew&&transport&&paused&&continuous&&shrank&&soft&&tool&&gone&&reappears&&color&&clickThrough&&smoothCollapse&&automaticRenderer&&synchronized&&noBitmapCache&&stableCollapse&&originCollapses&&poster&&posterCollapse&&styleSwitch&&missingCover&&disabledInstant?0:1;
-                    await CheckEdges(shell,screen,scale);AppLog.Json(modern?"nowbar9-probe.json":"nowbar-probe.json",new {passed=result==0,sideEdgesAndNativeHost=true,collapseKeepsNativeHostsStable=stableCollapse,shortTitleLeftAligned=shortLeft,longTitleLeftAligned=longLeft,automaticRenderer=automaticRenderer,contentAndBlurSynchronized=synchronized,noStaleBitmapCache=noBitmapCache,originalSlotClickCollapses=originCollapses,largeCoverStyle=poster,largeCoverCollapse=posterCollapse,switchStyleDuringAnimation=styleSwitch,missingCoverHasNoLargePlaceholder=missingCover,shortWidth=shortShape.Width,cappedWidth=longShape.Width,collapsedHeight=shortShape.Height,marqueeMoves=marquee,expandedHeight=expectedHeight,actualGrowthFrames=heights.ToArray(),actualCollapseFrames=collapse.ToArray(),collapseFrames=collapseFrames,maximumPlaceMilliseconds=placeTime,maximumCollapseGap=gaps.Max(),clicksPassThroughOutsideCapsule=clickThrough,smoothCollapse=smoothCollapse,singleWindowMorph=grew,transportDispatch=commands.ToArray(),seekDispatch=seeks.ToArray(),pausedIcon=paused,interruptedMorphContinuous=continuous,shrinks=shrank,edgeAlphaLevels=alpha.Count,softCorners=soft,excludedFromAltTab=tool,hidesAfterSessionEnds=gone,inactiveArtworkReleased=gone,reappearsAtFullWidth=reappears,artworkColor=color,titleContrast=bar.Palette.MinimumContrast,realPlayerChanged=false});
+                    await CheckFlightHandoff(bar,scale);await CheckEdges(shell,screen,scale);AppLog.Json(modern?"nowbar9-probe.json":"nowbar-probe.json",new {passed=result==0,sideEdgesAndNativeHost=true,collapseKeepsNativeHostsStable=stableCollapse,shortTitleLeftAligned=shortLeft,longTitleLeftAligned=longLeft,automaticRenderer=automaticRenderer,contentAndBlurSynchronized=synchronized,noStaleBitmapCache=noBitmapCache,originalSlotClickCollapses=originCollapses,largeCoverStyle=poster,largeCoverCollapse=posterCollapse,switchStyleDuringAnimation=styleSwitch,missingCoverHasNoLargePlaceholder=missingCover,shortWidth=shortShape.Width,cappedWidth=longShape.Width,collapsedHeight=shortShape.Height,marqueeMoves=marquee,expandedHeight=expectedHeight,actualGrowthFrames=heights.ToArray(),actualCollapseFrames=collapse.ToArray(),collapseFrames=collapseFrames,maximumPlaceMilliseconds=placeTime,maximumCollapseGap=gaps.Max(),clicksPassThroughOutsideCapsule=clickThrough,smoothCollapse=smoothCollapse,singleWindowMorph=grew,transportDispatch=commands.ToArray(),seekDispatch=seeks.ToArray(),pausedIcon=paused,interruptedMorphContinuous=continuous,shrinks=shrank,edgeAlphaLevels=alpha.Count,softCorners=soft,excludedFromAltTab=tool,hidesAfterSessionEnds=gone,inactiveArtworkReleased=gone,reappearsAtFullWidth=reappears,artworkColor=color,titleContrast=bar.Palette.MinimumContrast,realPlayerChanged=false});
                 }catch(Exception error){result=1;AppLog.Json(modern?"nowbar9-probe.json":"nowbar-probe.json",new {passed=false,error=error.ToString()});}
                 finally {Preferences.Current.UIVersion=oldUI;Preferences.Current.NowBarLargeCover=oldCover;Preferences.Current.Animations=oldAnimations;if(animationFixture!=null)animationFixture.Dispose();if(pointerFixture!=null)pointerFixture.Dispose();if(bar!=null)bar.Close();if(behind!=null)behind.Dispose();if(shell!=null)shell.Dispose();app.Shutdown(result);}
             }),DispatcherPriority.ApplicationIdle);return app.Run();

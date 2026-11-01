@@ -19,7 +19,7 @@ $taskAreas=[ordered]@{
     Settings=@('self-test','panel-theme-probe','settings-visibility-probe','beta-feedback-probe','update950-probe')
     Startup=@('self-test','startup-probe')
     Resources=@('self-test','memory-lifecycle-probe')
-    Glass=@('self-test','glass95-probe','adaptive-ink-probe')
+    Glass=@('self-test','glass95-probe')
 }
 $taskKnown=@($taskAreas.Values | ForEach-Object { $_ } | Select-Object -Unique)
 if($List){$taskAreas.GetEnumerator() | ForEach-Object { $_.Key+': '+($_.Value -join ', ') };return}

@@ -10,6 +10,7 @@ namespace OneTaskBar
         public bool Blur=true,Animations=true,ChargeAnimation=true,Hover=true,RunningDots=true,Seconds=true,DesktopMode=true;
         public bool NativeNotifications=false,NativeQuickSettings=false;
         public bool NativeTaskView=false;
+        public bool NativeTrayOverflow=false;
         public bool DynamicIsland=false;
         public bool NotificationIntegration=true;
         public bool NotificationPopups=true;

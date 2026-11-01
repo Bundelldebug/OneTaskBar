@@ -381,7 +381,13 @@ namespace OneTaskBar
         internal async void OpenMediaApplication(string appId)
         {
             if(disposed||externalLaunching)return;var app=MediaApplication.Resolve(appId,Running.Concat(Apps));if(app==null){if(Quick!=null&&Quick.IsVisible)Quick.Feedback("현재 재생 앱의 창을 찾지 못했습니다.");AppLog.Once("media-app-open",appId??"unknown");return;}externalLaunching=true;
-            try{bool dismissed=Quick==null||!Quick.IsVisible||await Quick.DismissAsync();foreach(var dock in docks)if(dock.MediaBar!=null)dock.MediaBar.SetExpanded(false);if(Motion.Enabled)await Task.Delay(130);if(dismissed&&!disposed)app.Launch();}
+            try
+            {
+                bool dismissed=Quick==null||!Quick.IsVisible||await Quick.DismissAsync();
+                await Task.WhenAll(docks.Where(d=>d.MediaBar!=null&&d.MediaBar.IsVisible)
+                    .Select(d=>d.MediaBar.CollapseForLaunchAsync()));
+                if(dismissed&&!disposed)app.Launch();
+            }
             catch(Exception error){AppLog.Write("media-app-open",error.Message);}finally{externalLaunching=false;}
         }
         internal void PrepareWindowSwitcher(bool keepOverview=false){CloseTrayOverflow();if(!keepOverview)CloseDesktopOverview();Previews.Close();foreach(var panel in new GlassWindow[]{Quick,Center,Detail,Drawer,Finder,StartMenu})if(panel!=null)panel.HideImmediately();foreach(var dock in docks)if(dock.MediaBar!=null)dock.MediaBar.SetExpanded(false);}
@@ -598,6 +604,10 @@ namespace OneTaskBar
         void Tick()
         {
             if(disposed || Demo || !startupReady) return;
+            // A flight lasts less than one service-refresh interval. Resume
+            // polling afterward instead of rebuilding docks in its render budget.
+            // Input, power/display events and shutdown keep their normal handlers.
+            if(mediaMotion!=null&&mediaMotion.Active&&DisplayAwake)return;
             var now=DateTime.UtcNow;
             if(Interlocked.Exchange(ref servicesDirty,0)!=0)servicesAt=DateTime.MinValue;
             if(FocusUntil!=DateTime.MinValue&&now>=FocusUntil){FocusUntil=DateTime.MinValue;System.Media.SystemSounds.Asterisk.Play();if(tray!=null)tray.ShowBalloonTip(5000,Program.AppName,"집중 타이머가 끝났습니다",Forms.ToolTipIcon.Info);}

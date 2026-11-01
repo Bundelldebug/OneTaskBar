@@ -19,7 +19,6 @@ namespace OneTaskBar
         readonly ShellController shell;readonly Forms.Screen screen;readonly Action<string> command;readonly Func<double,Task<bool>> seekCommand;
         readonly Button compact;readonly MediaPlayerView expandedContent;readonly MarqueeTitle title=new MarqueeTitle();
         readonly Grid compactRow;bool circle,retainedHost,sideMaterial;
-        static readonly Brush SideBlack=Paint.Brush("#FF08090B");
         readonly double dockZoom=DockSizing.Zoom;
         bool SideCapsule {get{return ReleaseFeatures.GlassUI&&Preferences.Current.NowBarSideCapsule&&DockGeometry.Vertical(DockGeometry.Edge);}}
         internal readonly bool SideCapsuleStyle;
@@ -54,10 +53,11 @@ namespace OneTaskBar
             if(dockZoom!=1)small.LayoutTransform=new ScaleTransform(dockZoom,dockZoom);
             Grid.SetColumnSpan(sideActivity,2);small.Children.Add(sideActivity);
             compact=Paint.Button(small,()=>SetExpanded(true),"미디어 플레이어 · 재생 컨트롤 열기");compact.Background=Brushes.Transparent;compact.Padding=new Thickness(0);compact.Height=CompactHeight;compact.HorizontalContentAlignment=HorizontalAlignment.Stretch;compact.VerticalAlignment=VerticalAlignment.Bottom;root.Children.Add(compact);
-            expandedContent=new MediaPlayerView(command,seekCommand,()=>{SetExpanded(false);shell.ShowDetail("sound");},SideCapsule?null:(Action)(()=>SetExpanded(false)),openApp:shell.OpenMediaApplication,sourceApp:id=>MediaApplication.Resolve(id,System.Linq.Enumerable.Concat(shell.Running,shell.Apps)),island:SideCapsule) {VerticalAlignment=VerticalAlignment.Bottom,Visibility=Visibility.Collapsed,Opacity=0};
+            expandedContent=new MediaPlayerView(command,seekCommand,()=>{SetExpanded(false);shell.ShowDetail("sound");},()=>SetExpanded(false),openApp:shell.OpenMediaApplication,sourceApp:id=>MediaApplication.Resolve(id,System.Linq.Enumerable.Concat(shell.Running,shell.Apps))) {VerticalAlignment=VerticalAlignment.Bottom,Visibility=Visibility.Collapsed,Opacity=0};
             if(ReleaseFeatures.GlassUI){var menu=new ContextMenu();var fullscreen=new MenuItem {Header="전체화면 미디어"};fullscreen.Click+=(s,e)=>shell.OpenFullscreenMedia();menu.Items.Add(fullscreen);compact.ContextMenu=menu;expandedContent.ContextMenu=menu;}root.Children.Add(expandedContent);Surface.Child=root;var decorator=(AdornerDecorator)Content;decorator.Child=null;hostCanvas.Children.Add(Surface);decorator.Child=hostCanvas;Surface.Clip=capsuleClip;compact.HorizontalAlignment=HorizontalAlignment.Left;expandedContent.HorizontalAlignment=HorizontalAlignment.Left;
             SourceInitialized+=(s,e)=>{var h=new WindowInteropHelper(this).Handle;Native.SetWindowLong(h,-20,(Native.GetWindowLong(h,-20)|0x80|0x08000000)&~0x40000);var source=HwndSource.FromHwnd(h);source.AddHook((IntPtr hwnd,int msg,IntPtr wp,IntPtr lp,ref bool handled)=>{if(msg==0x21&&!expanded){handled=true;return new IntPtr(3);}return IntPtr.Zero;});};
-            Deactivated+=(s,e)=> {if(expanded&&!Program.Inspectable&&!IsMouseOver)CollapseOutside();};Closed+=(s,e)=> {closed=true;sideActivity.SetPlaying(false);StopOutsideClick();StopMotion();title.Running=false;compactArt.Background=glow.Background=null;media=null;};
+            Deactivated+=(s,e)=> {if(expanded&&!Program.Inspectable&&!IsMouseOver)CollapseOutside();};Closed+=(s,e)=> {closed=true;if(flight!=null)flight.Dispose();sideActivity.SetPlaying(false);StopOutsideClick();StopMotion();title.Running=false;compactArt.Background=glow.Background=null;media=null;};
+            IsVisibleChanged+=(s,e)=>{if(!IsVisible&&flight!=null)flight.Dispose();};
             IsVisibleChanged+=(s,e)=>{if(!IsVisible&&!wanted){media=null;artwork=null;compactArt.Background=glow.Background=null;compactArt.Child=null;expandedContent.SetPoster(0);expandedContent.Update(new MediaState(),null);}};
             MouseEnter+=(s,e)=>title.Engaged=true;MouseLeave+=(s,e)=>title.Engaged=false;
         }
@@ -76,7 +76,7 @@ namespace OneTaskBar
             sideActivity.Visibility=SideCapsule?Visibility.Visible:Visibility.Collapsed;
             sideActivity.SetPlaying(SideCapsule&&!expanded&&media.Playing&&Motion.Enabled);
             if(sideMaterial!=SideCapsule){sideMaterial=SideCapsule;ApplyPalette(artwork as System.Windows.Media.Imaging.BitmapSource);glow.Opacity=SideCapsule?0:.2;}
-            layout=Fit(expanded);expandedContent.SetPoster(layout.PosterEdge);expandedContent.FitPopup(layout.PopupHeight);if(expanded)expandedContent.Update(media,shell.Services.OutputName);title.ConservePower=shell.Power.Known&&!shell.Power.Connected;title.Running=!expanded&&!animating&&Motion.Enabled;
+            layout=Fit(expanded);expandedContent.SetPoster(layout.PosterEdge);expandedContent.FitPopup(layout.PopupHeight);if(expanded)expandedContent.Update(media,shell.Services.OutputName);title.ConservePower=shell.Power.Known&&!shell.Power.Connected;title.Running=!expanded&&!animating&&!FlightMotion&&Motion.Enabled;
             if(!wanted||!IsVisible){wanted=true;expanded=false;retainedHost=false;layout=Fit(false);compact.Opacity=1;compact.IsHitTestVisible=true;expandedContent.Visibility=Visibility.Collapsed;SetActivation(false);new WindowInteropHelper(this).EnsureHandle();Native.SetWindowPos(new WindowInteropHelper(this).Handle,IntPtr.Zero,screen.Bounds.Left+12,screen.Bounds.Top+12,0,0,0x1|0x4|0x10);current=new Rect(layout.Bounds.X,layout.Bounds.Y,Motion.Enabled&&!SideCapsule?CompactHeight:layout.CompactWidth,CompactHeight);target=Rect.Empty;EnsureHost(true);Place();}
             compact.Width=layout.CompactWidth;bool smallCover=layout.CompactWidth<84*dockZoom;if(circle!=smallCover){circle=smallCover;compactRow.Margin=new Thickness(circle?8:10,0,circle?8:10,0);compactRow.ColumnDefinitions[0].Width=new GridLength(circle?28:36);title.Visibility=circle?Visibility.Collapsed:Visibility.Visible;compactArt.CornerRadius=new CornerRadius(circle?14:8);}EnsureHost(false);Resize(layout.Bounds);
         }
@@ -87,7 +87,7 @@ namespace OneTaskBar
         }
         internal void SetExpanded(bool value)
         {
-            if(closed||!wanted||layout==null||expanded==value)return;expanded=value;if(value)retainedHost=true;layout=Fit(value);expandedContent.SetPoster(layout.PosterEdge);expandedContent.FitPopup(layout.PopupHeight);EnsureHost(false);StopOutsideClick();if(value){expandedContent.Update(media,shell.Services.OutputName);outsideClick=MenuDismiss.Watch(ContainsScreenPoint,CollapseOutside);previousWindow=Native.GetForegroundWindow();shell.NowBarOpening(this);}title.Running=false;compact.IsHitTestVisible=!value;expandedContent.IsHitTestVisible=value;expandedContent.Visibility=Visibility.Visible;
+            if(closed||!wanted||layout==null||expanded==value)return;if(flight!=null)flight.Dispose();expanded=value;if(value)retainedHost=true;layout=Fit(value);expandedContent.SetPoster(layout.PosterEdge);expandedContent.FitPopup(layout.PopupHeight);EnsureHost(false);StopOutsideClick();if(value){expandedContent.Update(media,shell.Services.OutputName);outsideClick=MenuDismiss.Watch(ContainsScreenPoint,CollapseOutside);previousWindow=Native.GetForegroundWindow();shell.NowBarOpening(this);}title.Running=false;compact.IsHitTestVisible=!value;expandedContent.IsHitTestVisible=value;expandedContent.Visibility=Visibility.Visible;
             Motion.Fade(compact,compact.Opacity,value?0:1,value?90:160);
             if(value)Motion.Fade(expandedContent,expandedContent.Opacity,1,210);else{double before=expandedContent.Opacity;expandedContent.BeginAnimation(OpacityProperty,null);expandedContent.Opacity=0;if(Motion.Enabled){var fade=Motion.Tween(before,0,90);fade.Completed+=(s,e)=>{if(!expanded)expandedContent.Visibility=Visibility.Collapsed;};expandedContent.BeginAnimation(OpacityProperty,fade);}else expandedContent.Visibility=Visibility.Collapsed;}
             glow.Opacity=SideCapsule?0:value?1:.2;
@@ -102,6 +102,7 @@ namespace OneTaskBar
         void Resize(Rect bounds)
         {
             if(Math.Abs(target.X-bounds.X)<.1&&Math.Abs(target.Y-bounds.Y)<.1&&Math.Abs(target.Width-bounds.Width)<.1&&Math.Abs(target.Height-bounds.Height)<.1)return;
+            if(flight!=null)flight.Dispose();
             from=current;
             target=bounds;
             StopMotion();
@@ -126,6 +127,7 @@ namespace OneTaskBar
             CompositionTarget.Rendering-=Rendering;
             animating=false;
             watch.Stop();
+            CompleteLaunchCollapse();
         }
         void Rendering(object sender,EventArgs args)
         {
@@ -164,7 +166,15 @@ namespace OneTaskBar
             // HWND at the last frame can present its old pixels before WPF repaints,
             // while the separate blur HWND has already moved. The input clips still
             // cover only the capsule; a hidden/reopened player starts compact again.
-            if(layout==null)return;bool smallHost=!retainedHost&&!expanded&&!animating&&current.Height<=CompactHeight+.01;var folded=Fit(false).Bounds;var opened=Fit(true).Bounds;double popupWidth=opened.Width;var next=smallHost?Rect.Union(folded,current):Rect.Union(Rect.Union(folded,opened),current);
+            if(layout==null||flight!=null)return;bool smallHost=!retainedHost&&!expanded&&!animating&&current.Height<=CompactHeight+.01;var folded=Fit(false).Bounds;var opened=Fit(true).Bounds;double popupWidth=opened.Width;var next=smallHost?Rect.Union(folded,current):Rect.Union(Rect.Union(folded,opened),current);
+            // The receiving capsule already has transparent room at rest. Growing
+            // this layered HWND when the flight starts would re-present old pixels.
+            if(ReleaseFeatures.GlassUI)
+            {
+                double padding=MediaCapsulePose.HostPadding(next);
+                next.Inflate(padding,padding);
+                next.Intersect(new Rect(0,0,screen.Bounds.Width/monitorScale,screen.Bounds.Height/monitorScale));
+            }
             next=new Rect(new Point(Math.Floor(next.Left*monitorScale)/monitorScale,Math.Floor(next.Top*monitorScale)/monitorScale),new Point(Math.Ceiling(next.Right*monitorScale)/monitorScale,Math.Ceiling(next.Bottom*monitorScale)/monitorScale));
             expandedContent.Width=Math.Max(1,popupWidth-28);
             if(show||next!=hostBox){hostBox=next;Width=hostBox.Width;Height=hostBox.Height;Canvas.SetLeft(Surface,current.X-hostBox.X);Canvas.SetTop(Surface,current.Y-hostBox.Y);Surface.Width=current.Width;Surface.Height=current.Height;BackdropClip=new Rect(current.X-hostBox.X,current.Y-hostBox.Y,current.Width,current.Height);
@@ -197,7 +207,7 @@ namespace OneTaskBar
         {
             Palette=ArtworkPalette.Read(source);var previous=Surface.Background as LinearGradientBrush;var tint=(LinearGradientBrush)Palette.Glass.Clone();
             if(previous!=null&&previous.GradientStops.Count==tint.GradientStops.Count&&Motion.Enabled&&IsVisible)for(int i=0;i<tint.GradientStops.Count;i++)tint.GradientStops[i].BeginAnimation(GradientStop.ColorProperty,new ColorAnimation(previous.GradientStops[i].Color,tint.GradientStops[i].Color,TimeSpan.FromMilliseconds(260)){FillBehavior=FillBehavior.Stop});
-            SetMaterial(SideCapsule?SideBlack:tint,SideCapsule?SideBlack:Palette.Solid);expandedContent.SetPalette(Palette);
+            SetMaterial(tint,Palette.Solid);expandedContent.SetPalette(Palette);
         }
         internal static string Clock(double seconds){seconds=Double.IsNaN(seconds)||Double.IsInfinity(seconds)?0:Math.Max(0,seconds);var t=TimeSpan.FromSeconds(seconds);return t.TotalHours>=1?((int)t.TotalHours)+":"+t.Minutes.ToString("00")+":"+t.Seconds.ToString("00"):((int)t.TotalMinutes)+":"+t.Seconds.ToString("00");}
     }

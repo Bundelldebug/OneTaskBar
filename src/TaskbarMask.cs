@@ -22,11 +22,11 @@ namespace OneTaskBar
             uint color,flags;byte alpha;
             return h!=IntPtr.Zero&&(GetProp(h,State).ToInt64()&Marker)!=0&&(Native.GetWindowLong(h,-20)&Layered)!=0&&GetLayeredWindowAttributes(h,out color,out alpha,out flags)&&alpha==0&&(flags&2)!=0;
         }
-        internal static bool Hide(IntPtr h)
+        internal static bool Hide(IntPtr h, bool show = true)
         {
-            lock(Gate){if(!Active)return false;bool hidden=HideCore(h);if(!hidden)Native.ShowWindow(h,0);return hidden;}
+            lock(Gate){if(!Active)return false;bool hidden=HideCore(h, show);if(!hidden)Native.ShowWindow(h,0);return hidden;}
         }
-        static bool HideCore(IntPtr h)
+        static bool HideCore(IntPtr h, bool show)
         {
             if(!Native.IsWindow(h))return false;
             if(!Protected(h)) {
@@ -42,7 +42,7 @@ namespace OneTaskBar
                 if(!SetLayeredWindowAttributes(h,0,0,2)||!Protected(h)){Restore(h);return false;}
             }
             // Keep Explorer's real tray host alive; alpha zero prevents any taskbar flash.
-            if(!Native.IsWindowVisible(h))Native.ShowWindow(h,8);
+            if(show&&!Native.IsWindowVisible(h))Native.ShowWindow(h,8);
             return true;
         }
         internal static bool Restore(IntPtr h)
