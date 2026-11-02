@@ -19,6 +19,7 @@ namespace OneTaskBar
         }
         void PersonalizeDock(StackPanel rows)
         {
+            MaterialSetting(rows,true);
             DockDisplaySetting(rows);
             DockScaleSetting(rows);
             ClockSetting(rows);

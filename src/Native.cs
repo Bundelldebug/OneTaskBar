@@ -108,6 +108,9 @@ namespace OneTaskBar
         // repaint here duplicates that work on every media morph frame.
         internal static bool ClipWindow(IntPtr window,RectI bounds){var region=CreateRectRgn(bounds.Left,bounds.Top,bounds.Right,bounds.Bottom);if(SetWindowRgn(window,region,false)!=0)return true;DeleteObject(region);return false;}
         internal static void EnableBlur(Window window,bool enabled){RegionState state;if(regions.TryGetValue(window,out state)&&state.Backdrop!=null)state.Backdrop.Enable(enabled);}
+        internal static void SurfaceBlur(Window window,double radius){RegionState state;if(regions.TryGetValue(window,out state)&&state.Backdrop!=null)state.Backdrop.SetBlurRadius(radius);}
+        internal static double SurfaceBlur(Window window){RegionState state;return regions.TryGetValue(window,out state)&&state.Backdrop!=null?state.Backdrop.BlurRadius:-1;}
+        internal static bool CustomSurfaceBlur(Window window){RegionState state;return regions.TryGetValue(window,out state)&&state.Backdrop!=null&&state.Backdrop.CustomBlurAvailable;}
         internal static bool RealtimeBackdrop(Window window){RegionState state;return regions.TryGetValue(window,out state)&&state.Backdrop!=null&&state.Backdrop.Realtime;}
         internal static int RefractedRegions(Window window){RegionState state;return regions.TryGetValue(window,out state)&&state.Backdrop!=null?state.Backdrop.RefractedRegions:0;}
         internal static int RefractionLayers(Window window){RegionState state;return regions.TryGetValue(window,out state)&&state.Backdrop!=null?state.Backdrop.RefractionLayers:0;}

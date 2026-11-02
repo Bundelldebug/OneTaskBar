@@ -44,6 +44,7 @@ namespace OneTaskBar
         }
         void FitModernControls()
         {
+            if(FullscreenPill){FitFullscreenPillControls();return;}
             if(titleLine==null)return;double width=header.ActualWidth>1?header.ActualWidth:Math.Max(1,(widgetWidth>0?widgetWidth:ActualWidth)-28);bool narrow=width<210;
             double font=usingPoster?Math.Max(14,Math.Min(20,posterEdge/15)):CompactMedia?(narrow?11:13):15;
             modernTitle.TextSize=font;modernTitle.Height=modernTitle.LineHeight;modernArtist.TextSize=usingPoster?12:CompactMedia?10:11;modernArtist.Height=modernArtist.LineHeight;modernArtist.Margin=new Thickness(0,showArtist?3:0,0,0);modernArtist.Visibility=showArtist?Visibility.Visible:Visibility.Collapsed;modernWords.Height=modernTitle.Height+(showArtist?modernArtist.Height+3:0);
@@ -56,6 +57,7 @@ namespace OneTaskBar
         {
             state=state??new MediaState();modernState=state;bool empty=!state.Available||!state.Active,poster=!empty&&posterEdge>=120&&state.Artwork!=null;
             bool changed=!modeSet||empty!=IsCompact||usingPoster!=poster;IsCompact=empty;usingPoster=poster;modeSet=true;applicationId=state.AppId;
+            if(fullscreenMode&&changed)fullscreenLayoutDirty=true;
             if(changed){
                 double contentHeight=CompactMedia?Math.Max(98,Math.Min(196,widgetHeight-16)):Math.Max(100,popupHeight-24);showArtist=empty||poster;
                 Height=empty?48:poster?posterEdge+(CompactMedia?102:154):contentHeight;Margin=empty?new Thickness(14,7,14,7):new Thickness(14,CompactMedia?8:12,14,CompactMedia?8:12);

@@ -48,7 +48,7 @@ namespace OneTaskBar
         internal void Update(MediaState media,string outputName)
         {
             bool active=media!=null&&media.Available&&media.Active;var ink=active?Paint.ControlWhite:Paint.Text;foreach(var text in new[]{title,device,elapsed,duration})text.Foreground=ink;artist.Foreground=active?Paint.Brush("#FFE0E7E4"):Paint.Muted;deviceGlyph.Color=ink;deviceGlyph.InvalidateVisual();foreach(var button in new[]{PreviousButton,NextButton,OutputButton,compactOutput}){var glyph=button.Content as Glyph;if(glyph!=null){glyph.Color=ink;glyph.InvalidateVisual();}}
-            if(Modern){UpdateModern(media,outputName);return;}
+            if(Modern){UpdateModern(media,outputName);ApplyFullscreenLayout();return;}
             media=media??new MediaState();bool empty=!media.Available||!media.Active;bool poster=!empty&&posterEdge>=120&&media.Artwork!=null;bool modeChanged=!modeSet||empty!=IsCompact||usingPoster!=poster;
             applicationId=media.AppId;ArtworkButton.IsEnabled=!opening&&!empty&&media.Artwork!=null&&openApplication!=null&&!String.IsNullOrEmpty(applicationId);
             SeekBar.WheelAdjust=!condensed||Preferences.Current.QuickSliderScroll;
@@ -61,6 +61,8 @@ namespace OneTaskBar
             if(modeChanged){Grid.SetColumnSpan(ArtworkButton,usingPoster?3:1);ArtworkButton.Resources["ButtonRadius"]=new CornerRadius(usingPoster?17:11);}ArtworkButton.Background=usingPoster?art.Background:Brushes.Transparent;
             string stateKind=media.Playing?"pause":"play";if(playGlyph.Kind!=stateKind){playGlyph.Kind=stateKind;playGlyph.InvalidateVisual();}PlayButton.IsEnabled=media.Available&&media.CanPlay;PreviousButton.IsEnabled=media.CanPrevious;NextButton.IsEnabled=media.CanNext;PlayButton.Opacity=PlayButton.IsEnabled?1:.4;PreviousButton.Opacity=PreviousButton.IsEnabled?1:.4;NextButton.Opacity=NextButton.IsEnabled?1:.4;
             var now=DateTime.UtcNow;if(!seeking&&now>seekUntil)SeekBar.Value=media.Duration>0?media.CurrentPosition(now)/media.Duration*100:0;SeekBar.IsEnabled=media.CanSeek&&media.Duration>0;elapsed.Text=media.Duration>0?NowBar.Clock(media.CurrentPosition(now)):"실시간";duration.Text=media.Duration>0?NowBar.Clock(media.Duration):"";FitWidgetControls();
+            if(fullscreenMode&&modeChanged)fullscreenLayoutDirty=true;
+            ApplyFullscreenLayout();
         }
         async void OpenArtwork()
         {

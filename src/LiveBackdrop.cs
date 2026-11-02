@@ -35,6 +35,10 @@ namespace OneTaskBar
         DesktopWindowTarget target;
         ContainerVisual root;
         SpriteVisual blur;
+        CompositionBrush originalBackdrop;
+        CompositionEffectBrush customBlur;
+        double customRadius=-1;
+        bool customBlurUnavailable;
         CompositionRoundedRectangleGeometry shape;
         GlassRefraction refraction;
         readonly System.Collections.Generic.List<Rect> refractionRegions=new System.Collections.Generic.List<Rect>();
@@ -53,7 +57,9 @@ namespace OneTaskBar
         int width,height,corner,popupX=Int32.MinValue,popupY=Int32.MinValue;
         Native.RectI placedBounds;bool shown,enabled=true;double opacity=1;Rect? lastClip;
         Native.RectI? inputClip;
-        internal bool Realtime {get{return blur!=null&&blur.Brush is CompositionBackdropBrush;}}
+        internal bool Realtime {get{return blur!=null&&(blur.Brush is CompositionBackdropBrush||blur.Brush==customBlur);}}
+        internal double BlurRadius {get{return customRadius;}}
+        internal bool CustomBlurAvailable {get{return customBlur!=null;}}
         internal int RefractedRegions {get{return refraction==null?0:refraction.Count;}}
         internal int RefractionLayers {get{return refraction==null?0:refraction.LayerCount;}}
         internal LiveBackdrop(Window window,double radius)
@@ -118,6 +124,27 @@ namespace OneTaskBar
         internal double Opacity {get{return root!=null?root.Opacity:0;}}
         internal void Enable(bool value){enabled=value;ApplyOpacity();}
         internal void SetOpacity(double value){opacity=Math.Max(0,Math.Min(1,value));ApplyOpacity();}
+        internal void SetBlurRadius(double value)
+        {
+            if(blur==null||value==customRadius)return;
+            customRadius=value;
+            if(value<0){
+                if(originalBackdrop!=null)blur.Brush=originalBackdrop;
+                if(customBlur!=null){customBlur.Dispose();customBlur=null;}
+                return;
+            }
+            if(customBlurUnavailable)return;
+            try{
+                if(originalBackdrop==null)originalBackdrop=blur.Brush;
+                if(customBlur==null)customBlur=CompositionBlur.Create(compositor,originalBackdrop);
+                customBlur.Properties.InsertScalar("SurfaceBlur.BlurAmount",(float)Math.Max(0,Math.Min(40,value)));
+                blur.Brush=customBlur;
+            }catch(Exception error){
+                blur.Brush=originalBackdrop;
+                if(customBlur!=null){customBlur.Dispose();customBlur=null;}
+                customBlurUnavailable=true;AppLog.Once("surface-blur",error.GetType().Name+": "+error.Message);
+            }
+        }
         void ApplyOpacity(){if(root!=null)root.Opacity=enabled?(float)opacity:0;}
         internal void Resize()
         {
@@ -205,6 +232,22 @@ namespace OneTaskBar
             if(root!=null)root.TransformMatrix=Matrix4x4.Identity;
             Resize();
         }
-        public void Dispose() {instances.Remove(this);if(window!=null)window.LayoutUpdated-=RefreshRefraction;if(popupTimer!=null)popupTimer.Stop();if(refraction!=null){refraction.Dispose();refraction=null;}if(target!=null){target.Root=null;target.Dispose();target=null;}if(root!=null)root.Children.RemoveAll();if(blur!=null){var brush=blur.Brush;blur.Brush=null;blur.Dispose();blur=null;if(brush!=null)brush.Dispose();}if(root!=null){root.Dispose();root=null;}if(shape!=null){shape.Dispose();shape=null;}if(background!=IntPtr.Zero){DestroyWindow(background);background=IntPtr.Zero;}}
+        public void Dispose()
+        {
+            instances.Remove(this);
+            if(window!=null)window.LayoutUpdated-=RefreshRefraction;
+            if(popupTimer!=null)popupTimer.Stop();
+            if(refraction!=null){refraction.Dispose();refraction=null;}
+            if(target!=null){target.Root=null;target.Dispose();target=null;}
+            if(root!=null)root.Children.RemoveAll();
+            if(blur!=null){
+                var brush=originalBackdrop??blur.Brush;blur.Brush=null;blur.Dispose();blur=null;
+                if(customBlur!=null){customBlur.Dispose();customBlur=null;}
+                if(brush!=null)brush.Dispose();originalBackdrop=null;
+            }
+            if(root!=null){root.Dispose();root=null;}
+            if(shape!=null){shape.Dispose();shape=null;}
+            if(background!=IntPtr.Zero){DestroyWindow(background);background=IntPtr.Zero;}
+        }
     }
 }

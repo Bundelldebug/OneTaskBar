@@ -61,6 +61,7 @@ namespace OneTaskBar
         static Brush WaveBrush(Color color,byte alpha){var brush=new SolidColorBrush(Color.FromArgb(alpha,color.R,color.G,color.B));brush.Freeze();return brush;}
         internal Color WaveColor {get{return waveColor;}set{if(waveColor==value)return;waveColor=value;waveAccent=WaveBrush(value,255);var light=Color.FromRgb((byte)((value.R+255)/2),(byte)((value.G+255)/2),(byte)((value.B+255)/2));waves=new[]{WaveBrush(light,112),WaveBrush(Colors.White,144),WaveBrush(value,144)};glow=new[]{WaveBrush(value,15),WaveBrush(value,36),WaveBrush(value,64)};InvalidateVisual();}}
         internal Func<double> WaveProgress;
+        internal bool WaveDecoration;
         internal bool WaveMode
         {
             get{return waveMode;}
@@ -97,12 +98,21 @@ namespace OneTaskBar
             if(now==lastWaveFrame)return;lastWaveFrame=now;
             double t=Math.Min(1,(now-waveAt)/.26),ease=t*t*(3-2*t);
             waveStrength=waveFrom+(waveTarget-waveFrom)*ease;
-            if(!dragging&&WaveProgress!=null)Value=WaveProgress();
+            if(!dragging&&WaveProgress!=null&&!WaveDecoration)Value=WaveProgress();
             WaveFrames++;InvalidateVisual();
             if(!wavePlaying&&t>=1)StopWave();
         }
         void DrawWave(DrawingContext dc,double width,double height)
         {
+            if(WaveDecoration){
+                if(waveStrength>.001&&Motion.Enabled){
+                    double phase=waveClock.Elapsed.TotalSeconds*2.7;
+                    for(int layer=0;layer<3;layer++){
+                        dc.DrawGeometry(waves[layer],null,MediaWave.Shape(Math.Max(0,width-16),height,height*.86*(1-layer*.14)*waveStrength,phase,layer));
+                    }
+                }
+                return;
+            }
             double y=Math.Max(6,height-7),span=Math.Max(0,width-16),length=span*Value/100,x=8+length;
             dc.PushClip(new RectangleGeometry(new Rect(0,0,width,height)));
             dc.DrawRoundedRectangle(waveTrack,null,new Rect(8,y-1.6,span,3.2),1.6,1.6);

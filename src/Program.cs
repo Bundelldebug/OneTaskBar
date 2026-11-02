@@ -76,6 +76,7 @@ namespace OneTaskBar
             if(args.Contains("--desktop-overview-probe"))return DesktopOverviewChecks.Run(args.Contains("--inspect"));
             if(args.Contains("--island-space-fixture"))return IslandSafetyChecks.Hold();
             if(args.Contains("--fullscreen-media-probe"))return FullscreenMediaChecks.Run();
+            if(args.Contains("--surface-material-probe"))return SurfaceMaterialChecks.Run();
             if(args.Contains("--dynamic-island-probe"))return DynamicIslandChecks.Run(args.Contains("--inspect"));
             if(args.Contains("--audio-mute-probe"))return AudioMuteChecks.HardwareProbe();
             if(args.Contains("--tray-overflow-probe"))return TrayOverflowChecks.Run();

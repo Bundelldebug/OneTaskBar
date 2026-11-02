@@ -21,25 +21,58 @@ namespace OneTaskBar
                     Program.Inspectable=true;
                     animations=Motion.WithAnimationsForFixture();
                     Preferences.Current.Animations=true;
+                    Preferences.Current.UIVersion=95;
                     bool locked=false;string command=null;
                     view=new FullscreenMedia(c=>command=c,p=>Task.FromResult(true),()=>{},()=>locked=true);
                     view.Width=760;view.Height=900;view.Show();
                     var art=BitmapSource.Create(2,2,96,96,PixelFormats.Bgra32,null,new byte[]{160,80,30,255,160,80,30,255,160,80,30,255,160,80,30,255},8);art.Freeze();
-                    var media=new MediaState {Available=true,Active=true,Playing=true,CanPlay=true,CanSeek=true,Duration=210,Position=50,Title="테스트 미디어",Artist="테스트 아티스트",Artwork=art};
+                    var media=new MediaState {Available=true,Active=true,Playing=true,CanPlay=true,CanNext=true,CanSeek=true,Duration=210,Position=50,Title="테스트 미디어",Artist="테스트 아티스트",Artwork=art};
                     string opened=null;
                     media.AppId="OneTaskBar.MediaFixture";
                     var ordinary=new MediaPlayerView(c=>{},p=>Task.FromResult(true),()=>{},openApp:id=>opened=id);
                     ordinary.Update(media,"Fixture output");
                     ordinary.ArtworkButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                     Require(opened==media.AppId,"ordinary artwork opens its app instead of resizing the player");
-                    view.Update(media);await Task.Delay(60);
+                    view.Update(media,"Fixture output");await Task.Delay(60);
                     Require(view.CoverBounds.Width>300&&view.CoverBounds.Bottom<view.CardBounds.Top,"cover and controls do not overlap");
+                    Require(view.Player.ArtworkButton.Visibility==Visibility.Collapsed,"fullscreen renders one artwork visual, not a duplicate shared thumbnail");
+                    Require(view.SeekBar.WaveMode&&view.SeekBar.WavePlaying&&view.Player.OutputName=="Fixture output","fullscreen uses the shared wave and output controls");
                     view.Transport.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Require(command=="play","transport dispatches media commands");
                     view.LockButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Require(locked,"PC lock is a separate explicit action");
                     Program.Save(view.Surface,760,900,Path.Combine(AppLog.Data,"fullscreen-media.png"));
+                    int geometryPasses=view.LayoutPasses;
+                    for(int n=0;n<12;n++)view.Update(media,"Fixture output");
+                    Require(view.LayoutPasses==geometryPasses,"timeline refreshes do not force full-screen layout");
                     view.CoverButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));await Task.Delay(90);Require(view.Morphing&&!view.LargeCover,"cover animates into the compact card");
+                    view.Update(media,"Fixture output");Require(view.Morphing,"an in-flight media refresh preserves the cover animation");
                     view.ToggleArtwork();await Task.Delay(500);Require(!view.Morphing&&view.LargeCover,"rapid reversals settle without stale callbacks");
+                    view.ToggleArtwork();await Task.Delay(420);view.Update(media,"Fixture output");
+                    Require(view.CoverBounds.Width==54&&view.CoverBounds.Top>=view.CardBounds.Top&&view.CoverBounds.Bottom<=view.CardBounds.Bottom,"compact cover stays inside its reserved pill slot");
+                    Require(view.CardBounds.Height==104&&view.CardBounds.Width<=440&&view.Player.FullscreenPill,"collapsed media uses a short pill instead of the full controller");
+                    Require(view.Player.PreviousButton.Visibility==Visibility.Collapsed&&view.SeekBar.WaveDecoration,"pill keeps play/next and a decorative bottom wave");
+                    view.Player.NextButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Require(command=="next","pill next button keeps the shared media command");
+                    int pillPasses=view.LayoutPasses;
+                    for(int n=0;n<12;n++)view.Update(media,"Fixture output");
+                    Require(view.LayoutPasses==pillPasses&&!view.Morphing,"unchanged pill refreshes do not start layout or animations");
+                    Require(view.WallpaperBrush!=null&&view.WallpaperBrush.IsFrozen,"collapsed mode loads a frozen desktop wallpaper surface");
+                    Program.Save(view.Surface,760,900,Path.Combine(AppLog.Data,"fullscreen-media-collapsed.png"));
+                    media.Playing=false;view.Update(media);Require(!view.SeekBar.WavePlaying,"pausing uses the shared wave decay");media.Playing=true;
+                    view.ToggleArtwork();await Task.Delay(420);
+                    Require(!view.Player.FullscreenPill&&!view.SeekBar.WaveDecoration&&view.Player.PreviousButton.Visibility==Visibility.Visible,"expanding restores the full shared controller");
                     foreach(var size in new[]{new Size(640,480),new Size(1280,720),new Size(2160,1440)}){view.Width=size.Width;view.Height=size.Height;await Task.Delay(30);view.Update(media);Require(view.CoverBounds.Left>=0&&view.CoverBounds.Right<=size.Width&&view.CoverBounds.Bottom<view.CardBounds.Top,"responsive cover remains clear of transport");}
+                    foreach(int version in new[]{85,90}){
+                        Preferences.Current.UIVersion=version;
+                        var alternate=new FullscreenMedia(c=>command=c,p=>Task.FromResult(true),()=>{},()=>{});
+                        try{
+                            alternate.Width=640;alternate.Height=480;alternate.Show();alternate.Update(media,"Fixture output");
+                            alternate.ToggleArtwork();await Task.Delay(420);alternate.Update(media,"Fixture output");
+                            Require(alternate.Player.FullscreenPill&&alternate.CardBounds.Height==104&&alternate.CoverBounds.Width==54,"older UI versions use the same compact pill geometry");
+                            alternate.ToggleArtwork();await Task.Delay(420);alternate.Update(media,"Fixture output");
+                            Require(!alternate.Player.FullscreenPill&&alternate.Player.PreviousButton.Visibility==Visibility.Visible,"older UI versions restore full controls after a pill transition");
+                        }
+                        finally{alternate.Close();}
+                    }
+                    Preferences.Current.UIVersion=95;
                     view.ToggleArtwork();view.HideImmediately();await Task.Delay(40);Require(!view.Morphing,"hidden fullscreen surface stops rendering");
                     view.Show();await Task.Delay(30);
                     var sourceWindow=new System.Windows.Interop.WindowInteropHelper(view).Handle;

@@ -30,6 +30,10 @@ namespace OneTaskBar
         public string DockMonitor;
         public int DockClockMode=0;
         public string DockBackgroundColor="#FFBAC1C7",DockBackgroundImage;
+        public bool DockMaterialCustom=false,StartMaterialCustom=false;
+        public string DockMaterialColor="#FF52616D",StartMaterialColor="#FF3D4854";
+        public int DockMaterialOpacity=30,StartMaterialOpacity=30;
+        public int DockMaterialBlur=16,StartMaterialBlur=16;
         public bool NativeStartKey=true,NativeSearch=false;
         public bool NativeStartButton=false;
         public bool GroupAppsByStartMenu=false;
@@ -56,11 +60,17 @@ namespace OneTaskBar
         static readonly string file=Path.Combine(AppLog.Data,"settings.json");
         internal static readonly PreferenceData Current=Load();
         internal static event Action Changed;
-        internal static PreferenceData Normalize(PreferenceData value){if(!ReleaseFeatures.GlassUI&&value.UIVersion>=95)value.UIVersion=90;value.UITheme=Math.Max(0,Math.Min(2,value.UITheme));value.DockTheme=Math.Max(0,Math.Min(2,value.DockTheme));value.DockScalePercent=DockSizing.Clamp(value.DockScalePercent);return value;}
+        internal static event Action AppearanceChanged;
+        internal static PreferenceData Normalize(PreferenceData value){if(!ReleaseFeatures.GlassUI&&value.UIVersion>=95)value.UIVersion=90;value.UITheme=Math.Max(0,Math.Min(2,value.UITheme));value.DockTheme=Math.Max(0,Math.Min(2,value.DockTheme));value.DockScalePercent=DockSizing.Clamp(value.DockScalePercent);SurfaceMaterial.Normalize(value);return value;}
         static PreferenceData Load(){try{if(File.Exists(file))return Normalize(new JavaScriptSerializer().Deserialize<PreferenceData>(File.ReadAllText(file))??new PreferenceData());}catch(Exception e){AppLog.Once("settings-read",e.Message);}return Normalize(new PreferenceData());}
         internal static void Set(Action<PreferenceData> change)
         {
             change(Current);Normalize(Current);Save();var notify=Changed;if(notify!=null)notify();
+        }
+        // Material edits do not rescan devices, reload artwork, or rebuild dock icons.
+        internal static void SetAppearance(Action<PreferenceData> change)
+        {
+            change(Current);Normalize(Current);Save();var notify=AppearanceChanged;if(notify!=null)notify();
         }
         internal static void Save()
         {

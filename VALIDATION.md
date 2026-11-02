@@ -1,5 +1,12 @@
 # Validation
 
+## 9.5.1
+
+- Fullscreen media uses the shared player controls and a single artwork visual. Its collapsed presentation is a 440 × 104 DIP pill with play/next buttons and a decorative wave; expanded playback retains the full controller. Isolated fixtures cover UI 8.5/9.0/9.5, rapid reversal, live updates during a transition, compact commands, small displays and hidden-window cleanup.
+- The desktop wallpaper is loaded off the UI thread with bounded decoding and frozen brushes. Dock and Start material profiles use independent, persisted color/opacity/blur values; color fallback, scoped updates and real compositor blur are covered by the material fixture.
+- Timeline updates do not restart fullscreen layout or transition callbacks. The pill's decorative wave does not request per-frame seek-position/time updates. Existing render cadence and visual quality are retained; these checks do not establish a battery-drain percentage or the 150 MB total-RAM target.
+- Builds remain unsigned. Existing notification identity, settings and pin/layout keys are retained.
+
 ## 9.5.0
 
 - Stable 9.5.0 includes the complete former beta feature set and UI 8.5/9.0/9.5. The clean-install Duo default is off; explicit saved choices remain unchanged.

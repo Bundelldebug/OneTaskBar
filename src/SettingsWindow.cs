@@ -64,6 +64,7 @@ namespace OneTaskBar
                 shell.AppScreen.ApplyWindowsFolders(shell.Apps,v);
                 if(shell.Drawer!=null)shell.Drawer.RefreshApps();
             });
+            MaterialSetting(launcher,false);
             Group(groups,"시작과 검색",launcher);
             var nowBar=new StackPanel();
             Row(nowBar,"작업표시줄 미디어 캡슐 표시","작업표시줄 옆에 재생 중인 미디어를 표시합니다",

@@ -324,12 +324,14 @@ namespace OneTaskBar
             };
             SizeChanged+=(s,e)=> { if(new WindowInteropHelper(this).Handle!=IntPtr.Zero) Native.Round(this,Radius); };
             Preferences.Changed+=ApplyMaterial;
+            Preferences.AppearanceChanged+=ApplyAppearance;
             MouseMove+=(s,e)=>MoveGlassHighlight(e.GetPosition(Surface));MouseLeave+=(s,e)=>MoveGlassHighlight(new Point(Surface.ActualWidth/2,Surface.ActualHeight/2));
             Loaded+=(s,e)=>{if(lens==null){var layer=AdornerLayer.GetAdornerLayer(Surface);if(layer!=null){lens=new GlassLens(this);layer.Add(lens);}}ApplyMaterial();if(Program.CaptureReview){ShowInTaskbar=true;var h=new WindowInteropHelper(this).Handle;Native.SetWindowLong(h,-20,(Native.GetWindowLong(h,-20)|0x40000)&~(0x80|0x08000000));}};
             IsVisibleChanged+=(s,e)=> {if(!IsVisible)HiddenSince=DateTime.UtcNow;};
-            Closed+=(s,e)=> {closed=true;++motion;LauncherMotion.Cancel(TransitionContent);CompleteDismissal(false);Preferences.Changed-=ApplyMaterial;};
+            Closed+=(s,e)=> {closed=true;++motion;LauncherMotion.Cancel(TransitionContent);CompleteDismissal(false);Preferences.Changed-=ApplyMaterial;Preferences.AppearanceChanged-=ApplyAppearance;};
             PreviewKeyDown+=(s,e)=> { if(e.Key==Key.Escape&&!DragReorder.Active) {var overview=this as DesktopOverview;var overflow=this as TrayOverflowWindow;if(overview!=null)overview.Dismiss();else if(overflow!=null)overflow.Dismiss();else Hide(); e.Handled=true; } };
         }
+        void ApplyAppearance(){if(DockSurface||this is StartWindow)ApplyMaterial();}
         void ApplyMaterial()
         {
             if(closed)return;
@@ -338,15 +340,22 @@ namespace OneTaskBar
             if(glassTint==null)return;
             if(DockSurface){
                 bool custom=DockAppearance.Custom,useBlur=!custom&&HasBlur&&Preferences.Current.Blur&&(!Glass95.Enabled||Glass95.Transparent);
+                bool tuned=!custom&&SurfaceMaterial.Enabled(true);
+                if(tuned&&SurfaceMaterial.Blur(true)==0)useBlur=false;
+                Native.SurfaceBlur(this,tuned&&useBlur?SurfaceMaterial.Blur(true):-1);
                 Native.EnableBlur(this,useBlur);
                 if(Glass95.Enabled&&!custom){if(glassEdge==null||edgeDark!=Dark){edgeDark=Dark;glassEdge=Glass95.Edge(Dark);}}
                 else glassEdge=null;
                 Surface.Background=custom?DockAppearance.Background:useBlur?LightPanel.DockGlass:Dark?Paint.Brush("#FF29302D"):LightPanel.DockSolid;
+                if(tuned)Surface.Background=SurfaceMaterial.Tint(true,!Preferences.Current.Blur||!HasBlur);
                 Surface.BorderBrush=custom?Glass95.Enabled&&!DockAppearance.IconsOnly?Glass95.Rim:Brushes.Transparent:glassEdge??(Brush)Brushes.Transparent;
                 Surface.BorderThickness=new Thickness(custom&&Glass95.Enabled&&!DockAppearance.IconsOnly?.7:0);
                 return;
             }
             bool enabled=HasBlur&&Preferences.Current.Blur&&!(DockSurface&&Preferences.Current.DockSolidBackground)&&(!Glass95.Enabled||Glass95.Transparent);Native.EnableBlur(this,enabled);
+            bool tunedStart=this is StartWindow&&SurfaceMaterial.Enabled(false);
+            if(tunedStart&&SurfaceMaterial.Blur(false)==0){enabled=false;Native.EnableBlur(this,false);}
+            Native.SurfaceBlur(this,tunedStart&&enabled?SurfaceMaterial.Blur(false):-1);
             bool panel=PanelMaterial.ReadablePanel(this),popup=PanelMaterial.NotificationPopup(this);
             var center=this as NotificationWindow;
             if(center!=null){Dark=Glass95.Dark;Surface.Background=enabled?NotificationStyle.Surface:NotificationStyle.Solid;Surface.BorderBrush=Glass95.Enabled?Glass95.Rim:Paint.Brush("#28FFFFFF");Surface.BorderThickness=new Thickness(.7);center.RefreshChrome();return;}
@@ -362,6 +371,7 @@ namespace OneTaskBar
                 else if(panel){Dark=Glass95.Dark;Surface.Background=enabled?PanelMaterial.PanelSurface(Dark,false):PanelMaterial.Solid(Dark);}
                 else Surface.Background=enabled?glassTint:solidTint??Paint.Brush(Dark?"#FF344139":"#FFE0E5E2");
             }
+            if(tunedStart)Surface.Background=SurfaceMaterial.Tint(false,!Preferences.Current.Blur||!HasBlur);
             if(!OpaqueSurface&&!(this is NowBar)&&!DockSurface)PanelMaterial.RefreshCards(Surface);
         }
         internal virtual void RefreshGlassMaterial(){ApplyMaterial();if(DockSurface)Glass95.DockInk(Surface);else Glass95.RefreshColors(Surface);}
