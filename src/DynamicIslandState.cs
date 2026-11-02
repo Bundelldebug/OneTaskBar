@@ -34,18 +34,18 @@ namespace OneTaskBar
     internal static class DynamicIslandLayout
     {
         internal const double MaximumWidth=360,MaximumHeight=204,TopInset=2;
-        internal static Rect Host(System.Drawing.Rectangle screen,System.Drawing.Rectangle work,double scale)
+        internal static Rect Host(System.Drawing.Rectangle screen,System.Drawing.Rectangle work,double scale,bool bottom=false)
         {
             scale=Math.Max(1,scale);
             double width=Math.Min(MaximumWidth,Math.Max(1,work.Width/scale-24));
             double height=Math.Min(MaximumHeight,Math.Max(1,work.Height/scale-16));
             return new Rect((work.Left-screen.Left)/scale+(work.Width/scale-width)/2,
-                (work.Top-screen.Top)/scale+TopInset,width,height);
+                bottom?(work.Bottom-screen.Top)/scale-height-TopInset:(work.Top-screen.Top)/scale+TopInset,width,height);
         }
-        internal static Rect Capsule(Size size,double hostWidth)
+        internal static Rect Capsule(Size size,double hostWidth,double hostHeight=0,bool bottom=false)
         {
             double width=Math.Min(size.Width,hostWidth);
-            return new Rect((hostWidth-width)/2,0,width,size.Height);
+            return new Rect((hostWidth-width)/2,bottom?Math.Max(0,hostHeight-size.Height):0,width,size.Height);
         }
         internal static bool Clear(System.Drawing.Rectangle screen,System.Drawing.Rectangle work,double scale,IEnumerable<FullscreenCandidate> windows)
         {

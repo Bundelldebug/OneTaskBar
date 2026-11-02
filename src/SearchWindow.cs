@@ -52,7 +52,8 @@ namespace OneTaskBar
             var apps=query.Length==0?Recommendations():LauncherSearch.Apps(shell.Apps,query);
             if(apps.Count>0)AppCard(query.Length==0?"추천 앱":"검색된 앱",apps);
             if(query.Length==0){RecentCard();SettingCard("주제별 설정",LauncherSearch.Settings.Take(6));return;}
-            var settings=LauncherSearch.Settings.Where(s=>LauncherSearch.Matches(s.Name+" "+s.Keywords,query)).ToList();if(settings.Count>0)SettingCard("설정",settings);
+            var settings=LauncherSearch.Settings.Where(s=>LauncherSearch.Matches(s.Name+" "+s.Keywords,query)).ToList();
+            if(settings.Count>0)SettingCard("설정 및 제어판",settings);
             files=new StackPanel();files.Children.Add(Label("파일과 사진을 찾고 있습니다…",12,LightPanel.Muted));filesCard=Card("내 파일",files);
             debounce.Start();
         }
@@ -71,7 +72,21 @@ namespace OneTaskBar
         }
         void SettingCard(string title,IEnumerable<SearchSetting> settings)
         {
-            var wrap=new WrapPanel();foreach(var entry in settings){var setting=entry;var row=new StackPanel {Orientation=Orientation.Horizontal};row.Children.Add(new Glyph(setting.Icon,18){Color=Paint.Text,Margin=new Thickness(0,0,7,0)});row.Children.Add(Label(setting.Name,13,Paint.Ink));Action launch=()=>Open(()=> {if(setting.Uri==null)shell.ShowWelcome();else Native.Open(setting.Uri);},setting.Name);var button=Paint.Button(row,launch,setting.Name);button.Background=Paint.Brush(QuickPanel.Inactive);button.Margin=new Thickness(0,0,8,7);button.Padding=new Thickness(13,9,13,9);Navigation.Add(button,launch);wrap.Children.Add(button);}Card(title,wrap);
+            var wrap=new WrapPanel();
+            foreach(var setting in settings)
+            {
+                var row=new StackPanel {Orientation=Orientation.Horizontal};
+                row.Children.Add(new Glyph(setting.Icon,18){Color=Paint.Text,Margin=new Thickness(0,0,7,0)});
+                row.Children.Add(Label(setting.Name,13,Paint.Ink));
+                Action launch=()=>Open(()=>setting.Open(()=>shell.ShowWelcome()),setting.Name);
+                var button=Paint.Button(row,launch,setting.Name);
+                button.Background=Paint.Brush(QuickPanel.Inactive);
+                button.Margin=new Thickness(0,0,8,7);
+                button.Padding=new Thickness(13,9,13,9);
+                Navigation.Add(button,launch);
+                wrap.Children.Add(button);
+            }
+            Card(title,wrap);
         }
         void RecentCard()
         {

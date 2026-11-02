@@ -23,8 +23,27 @@ namespace OneTaskBar
     }
     internal sealed class SearchSetting
     {
-        internal string Name,Keywords,Icon,Uri;
-        internal SearchSetting(string name,string keywords,string icon,string uri) {Name=name;Keywords=keywords;Icon=icon;Uri=uri;}
+        internal readonly string Name,Keywords,Icon,Uri,Executable,Arguments;
+        internal bool AppSettings {get{return Uri==null&&Executable==null;}}
+        internal SearchSetting(string name,string keywords,string icon,string uri,string executable=null,string arguments=null)
+        {
+            Name=name;Keywords=keywords;Icon=icon;Uri=uri;Executable=executable;Arguments=arguments;
+        }
+        internal ProcessStartInfo LaunchInfo()
+        {
+            if(AppSettings)return null;
+            return new ProcessStartInfo(Executable==null?Uri:Path.Combine(Environment.SystemDirectory,Executable),Arguments??"") {UseShellExecute=true};
+        }
+        internal void Open(Action appSettings)
+        {
+            if(AppSettings)
+            {
+                appSettings();
+                return;
+            }
+            try{Process.Start(LaunchInfo());}
+            catch(Exception error){AppLog.Write("settings-open",Name+": "+error.Message);}
+        }
     }
     internal sealed class SearchFile
     {
@@ -32,7 +51,10 @@ namespace OneTaskBar
     }
     internal static class LauncherSearch
     {
-        internal static readonly SearchSetting[] Settings={
+        internal static readonly SearchSetting[] Settings=CreateSettings();
+        static SearchSetting[] CreateSettings()
+        {
+            return new[]{
             new SearchSetting("알림","notification 방해금지 집중","focus","ms-settings:notifications"),
             new SearchSetting("디스플레이","밝기 화면 해상도 배율 display brightness","window","ms-settings:display"),
             new SearchSetting("소리","음량 음소거 volume sound 오디오","volume","ms-settings:sound"),
@@ -42,7 +64,9 @@ namespace OneTaskBar
             new SearchSetting("블루투스","bluetooth 기기 연결 장치","bluetooth","ms-settings:bluetooth"),
             new SearchSetting("앱","프로그램 application 설치 제거","apps","ms-settings:appsfeatures"),
             new SearchSetting("키보드","keyboard 입력 언어 터치","window","ms-settings:typing"),
-            new SearchSetting("One TaskBar 설정","런처 독 시작 검색","home",null)};
+            new SearchSetting("One TaskBar 설정","런처 독 시작 검색","home",null)
+            }.Concat(WindowsSettingCatalog.Items()).ToArray();
+        }
         static string Fold(string text) {return new string((text??"").Normalize(NormalizationForm.FormKC).ToLowerInvariant().Where(c=>!Char.IsWhiteSpace(c)).ToArray());}
         internal static string Initials(string text) {var result=new StringBuilder();foreach(char c in Fold(text)){if(c>=0xac00&&c<=0xd7a3)result.Append((char)(0x1100+(c-0xac00)/588));else result.Append(c);}return result.ToString();}
         internal static bool Matches(string text,string query) {string normal=Fold(text),heads=Initials(text);return (query??"").Split(new[]{' ','\t'},StringSplitOptions.RemoveEmptyEntries).All(word=>normal.Contains(Fold(word))||heads.Contains(Fold(word)));}

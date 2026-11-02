@@ -45,6 +45,21 @@ namespace OneTaskBar
                     shell.Apps[0].Target=@"C:\Apps\Fixture.exe";var exeMenu=WindowPicker.Menu(shell.Apps[0],shell,allowAdmin:true);var packageMenu=WindowPicker.Menu(new AppEntry {AppID="Fixture.Package!App"},shell,allowAdmin:true);bool admin=Admin(exeMenu)&&Admin(packageMenu)&&!packageMenu.Items.OfType<MenuItem>().First(m=>Convert.ToString(m.Header)=="관리자 권한으로 실행").IsEnabled&&exeMenu.Items.OfType<MenuItem>().Any(m=>Convert.ToString(m.Header)=="앱 제거…");bool noDockAdmin=!Admin(WindowPicker.Menu(shell.Apps[0],shell));
                     drawer=new DrawerWindow(shell);drawer.Configure(720,650);drawer.Reload();bool appMenu=Admin(drawer.AppButton(shell.Apps[0].Key).ContextMenu);shell.StartPins.Replace(shell.Apps);start=new StartWindow(shell);start.FixturePhone(new PhoneSnapshot());start.FixtureRecent(new List<StartRecent>());start.Reload();bool startMenu=Admin(start.PinButton(shell.Apps[0].Key).ContextMenu);
                     finder=new SearchWindow(shell);finder.Configure(720,680);finder.Reload();finder.ShowAt(System.Windows.Forms.Screen.PrimaryScreen.Bounds,20,20,720,680);finder.Surface.UpdateLayout();bool recentSearch=RecentSearch(finder);finder.Query.Focus();bool wired=Press(finder.Query,Key.Down)&&finder.Navigation.Selected!=null&&finder.Navigation.Count==18&&finder.Recommendations().Count==12;bool searchMenu=finder.Navigation.Selected!=null&&Admin(finder.Navigation.Selected.ContextMenu);finder.Query.Text="no-match-fixture-938471";bool cleared=finder.Navigation.Selected==null;finder.HideImmediately();
+                    finder.ShowAt(System.Windows.Forms.Screen.PrimaryScreen.Bounds,20,20,720,680);
+                    foreach(string settingQuery in new[]{"하드 디스크 파티션 관리","덮개를 닫을 때 설정"})
+                    {
+                        finder.Query.Text=settingQuery;
+                        finder.Reload();
+                        finder.UpdateLayout();
+                        finder.Query.Focus();
+                        if(!Press(finder.Query,Key.Down)||finder.Navigation.Count==0||finder.Navigation.Selected==null)
+                            throw new InvalidOperationException("Windows settings results are not keyboard navigable: "+settingQuery);
+                        string name=LauncherSearch.Settings.First(item=>LauncherSearch.Matches(item.Name+" "+item.Keywords,settingQuery)).Name;
+                        if(!Labels(finder.Navigation.Selected).Any(label=>label.Text==name))
+                            throw new InvalidOperationException("Windows settings result label is missing: "+settingQuery);
+                    }
+                    Program.Save(finder.Surface,720,680,System.IO.Path.Combine(AppLog.Data,"search-lid-settings.png"));
+                    finder.HideImmediately();
                     int opened=-1;var root=new StackPanel();var query=new TextBox {Height=35};root.Children.Add(query);var grid=new UniformGrid {Columns=3};root.Children.Add(grid);fixture=new Window {Content=root,Width=350,Height=240,ShowInTaskbar=false,Title="One TaskBar · 검색 키보드 검사"};var nav=new SearchNavigation(fixture,query);var buttons=new List<Button>();
                     for(int i=0;i<6;i++){int index=i;var b=Paint.Action("결과 "+i,()=>opened=index);b.Height=55;nav.Add(b,()=>opened=index);buttons.Add(b);grid.Children.Add(b);}fixture.Show();fixture.Activate();fixture.UpdateLayout();query.Focus();Press(query,Key.Down);bool down=nav.Selected==buttons[0]&&buttons[0].IsKeyboardFocused&&buttons[0].BorderBrush!=Brushes.Transparent;double width=buttons[0].ActualWidth;
                     down=down&&buttons[0].FocusVisualStyle==null;Press(buttons[0],Key.Right);bool right=nav.Selected==buttons[1];Press(buttons[1],Key.Down);bool row=nav.Selected==buttons[4];Press(buttons[4],Key.Left);bool left=nav.Selected==buttons[3];Press(buttons[3],Key.Up);bool up=nav.Selected==buttons[0];Press(buttons[0],Key.Enter);bool enter=opened==0;Press(buttons[0],Key.Up);bool returnToQuery=query.IsKeyboardFocused&&nav.Selected==null;opened=-1;Press(query,Key.Enter);bool defaultEnter=opened==0;

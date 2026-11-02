@@ -36,6 +36,7 @@ namespace OneTaskBar
         readonly TextBlock status=Paint.TextBlock("",12,Paint.ControlWhite),number=Paint.TextBlock("",13,Paint.ControlWhite);
         readonly IslandActivity activity=new IslandActivity();
         readonly Glyph feedbackGlyph=new Glyph("volume",20){Color=Paint.ControlWhite};
+        readonly Glyph foldGlyph=new Glyph("chevron",15){Color=Paint.ControlWhite,RenderTransform=new RotateTransform(-90),RenderTransformOrigin=new Point(.5,.5)};
         readonly MediaPlayerView player;
         readonly Stopwatch motion=new Stopwatch();
         readonly DispatcherTimer expiry=new DispatcherTimer {Interval=TimeSpan.FromSeconds(1.6)};
@@ -114,7 +115,7 @@ namespace OneTaskBar
             root.Children.Add(notification);
             expanded.RowDefinitions.Add(new RowDefinition {Height=new GridLength(28)});
             expanded.RowDefinitions.Add(new RowDefinition());
-            var fold=Paint.Button(new Glyph("chevron",15){Color=Paint.ControlWhite,RenderTransform=new RotateTransform(-90),RenderTransformOrigin=new Point(.5,.5)},()=>SetExpanded(false),"접기");
+            var fold=Paint.Button(foldGlyph,()=>SetExpanded(false),"접기");
             fold.Background=Brushes.Transparent;fold.Width=28;fold.Height=22;
             fold.Padding=new Thickness(0);fold.HorizontalAlignment=HorizontalAlignment.Right;
             fold.Margin=new Thickness(0,3,12,0);expanded.Children.Add(fold);
@@ -150,19 +151,28 @@ namespace OneTaskBar
             levelSurface.Background=QuickPanel.Glass;
             levelSlider.InvalidateVisual();
         }
-        internal void Present(MediaState value,string output,Forms.Screen monitor,double dpi,System.Drawing.Rectangle? work=null)
+        bool bottom;
+        internal void Present(MediaState value,string output,Forms.Screen monitor,double dpi,System.Drawing.Rectangle? work=null,bool atBottom=false)
         {
             if(closed)return;
             outputName=output;
             media=value!=null&&value.Available&&value.Active?value:null;
             screen=monitor;scale=dpi;
-            var next=DynamicIslandLayout.Host(screen.Bounds,work??screen.WorkingArea,scale);
+            bottom=atBottom;
+            ((RotateTransform)foldGlyph.RenderTransform).Angle=bottom?90:-90;
+            var next=DynamicIslandLayout.Host(screen.Bounds,work??screen.WorkingArea,scale,bottom);
             if(host!=next||!IsVisible)
             {
                 host=next;Width=host.Width;Height=host.Height;
                 new WindowInteropHelper(this).EnsureHandle();
                 PlaceHost();
-                if(!IsVisible){current=DynamicIslandLayout.Capsule(new Size(56,18),host.Width);currentRadius=9;PlaceShape();((Window)this).Show();}
+                if(!IsVisible)
+                {
+                    current=DynamicIslandLayout.Capsule(new Size(56,18),host.Width,host.Height,bottom);
+                    currentRadius=9;
+                    PlaceShape();
+                    ((Window)this).Show();
+                }
                 PlaceHost();
             }
             if(media==null&&state.Expanded)SetExpanded(false);
@@ -306,7 +316,7 @@ namespace OneTaskBar
             }
             var size=state.Size(active,DateTime.UtcNow);
             size.Height=Math.Min(size.Height,host.Height);
-            MoveTo(DynamicIslandLayout.Capsule(size,host.Width));
+            MoveTo(DynamicIslandLayout.Capsule(size,host.Width,host.Height,bottom));
         }
         void UpdateMediaSurface()
         {
@@ -394,7 +404,7 @@ namespace OneTaskBar
             var rendering=e as RenderingEventArgs;
             if(rendering!=null){if(rendering.RenderingTime==lastRendering)return;lastRendering=rendering.RenderingTime;}
             double t=Math.Min(1,motion.Elapsed.TotalMilliseconds/220),ease=1-Math.Pow(1-t,3);
-            current=new Rect(from.X+(target.X-from.X)*ease,0,from.Width+(target.Width-from.Width)*ease,from.Height+(target.Height-from.Height)*ease);
+            current=new Rect(from.X+(target.X-from.X)*ease,from.Y+(target.Y-from.Y)*ease,from.Width+(target.Width-from.Width)*ease,from.Height+(target.Height-from.Height)*ease);
             currentRadius=fromRadius+(targetRadius-fromRadius)*ease;
             PlaceShape();
             if(t>=1)StopMotion();
@@ -405,7 +415,8 @@ namespace OneTaskBar
             Surface.Width=current.Width;Surface.Height=current.Height;
             Surface.CornerRadius=new CornerRadius(radius);
             clip.Rect=new Rect(0,0,current.Width,current.Height);clip.RadiusX=clip.RadiusY=radius;
-            Canvas.SetLeft(Surface,current.X);Canvas.SetTop(Surface,0);
+            Canvas.SetLeft(Surface,current.X);
+            Canvas.SetTop(Surface,current.Y);
             BackdropClip=current;
             Native.Round(this,radius);
         }
@@ -426,7 +437,7 @@ namespace OneTaskBar
         }
         internal object Inspect()
         {
-            return new {visible=IsVisible,expanded=state.Expanded,feedback=FeedbackVisible,activity=activity.Active,animating=animating,expiry=expiry.IsEnabled,width=current.Width,height=current.Height,window=Native.RegionInfo(this),hostX=host.X,hostY=host.Y,scale=scale};
+            return new {visible=IsVisible,expanded=state.Expanded,feedback=FeedbackVisible,activity=activity.Active,animating=animating,expiry=expiry.IsEnabled,width=current.Width,height=current.Height,window=Native.RegionInfo(this),hostX=host.X,hostY=host.Y,bottom=bottom,shapeY=current.Y,scale=scale};
         }
     }
 }

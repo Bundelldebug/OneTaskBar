@@ -75,7 +75,7 @@ namespace OneTaskBar
                 YouTubeArtwork.Enabled,v=>Preferences.Set(p=>{p.YouTubeHighResArtwork=v;p.YouTubeArtworkTrack=null;}));
             if(ReleaseFeatures.GlassUI)
             {
-                Row(nowBar,"Dynamic Island","상단에 미디어·새 알림과 충전·음량·밝기 상태를 표시합니다. 전체화면에서는 숨깁니다",
+                Row(nowBar,"Dynamic Island","미디어·새 알림과 충전·음량·밝기를 표시합니다. 위쪽 작업표시줄에서는 화면 아래에 표시합니다",
                     Preferences.Current.DynamicIsland,v=>Preferences.Set(p=>p.DynamicIsland=v));
                 Row(nowBar,"미디어 앱 전환 애니메이션","재생 앱을 최소화하거나 복원할 때 미디어 캡슐로 연결합니다",
                     Preferences.Current.MediaWindowAnimation,v=>Preferences.Set(p=>p.MediaWindowAnimation=v));

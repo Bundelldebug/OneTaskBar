@@ -70,9 +70,13 @@ namespace OneTaskBar
             {
                 var screen=new Drawing.Rectangle(-2560,-240,1920,1080);
                 var work=Drawing.Rectangle.FromLTRB(screen.Left+(edge==0?88:0),screen.Top+(edge==1?88:0),screen.Right-(edge==2?88:0),screen.Bottom-(edge==3?88:0));
-                var host=DynamicIslandLayout.Host(screen,work,dpi);
+                bool bottom=edge==1;
+                var host=DynamicIslandLayout.Host(screen,work,dpi,bottom);
                 var physical=Native.PlacementBounds(screen,dpi,host.X,host.Y,host.Width,host.Height);
                 Require(physical.Left>=work.Left&&physical.Top>=work.Top&&physical.Right<=work.Right&&physical.Bottom<=work.Bottom,"host respects negative origins, dock edges and mixed DPI");
+                var compact=DynamicIslandLayout.Capsule(new Size(112,28),host.Width,host.Height,bottom);
+                var expanded=DynamicIslandLayout.Capsule(new Size(360,host.Height),host.Width,host.Height,bottom);
+                Require(bottom?compact.Bottom==expanded.Bottom&&compact.Top>expanded.Top:compact.Top==0&&expanded.Top==0,"the top dock places the island below, with expansion anchored to the same bottom edge");
                 Require(DynamicIslandLayout.Clear(screen,work,dpi,new FullscreenCandidate[0]),"empty desktop permits the capsule");
                 var blocking=new FullscreenCandidate {Bounds=new Native.RectI {Left=work.Left,Top=work.Top,Right=work.Right,Bottom=work.Top+100},Monitor=screen};
                 Require(DynamicIslandLayout.Clear(screen,work,dpi,new[]{blocking}),"ordinary windows retain a persistent island above their reserved work area");
@@ -170,9 +174,26 @@ namespace OneTaskBar
                     view.SetExpanded(true);Require(!view.Expanded,"an empty capsule cannot open inactive controls");
                     view.ShowFeedback("charge",85,false);await Task.Delay(280);
                     Program.Save(view.Surface,240,28,Path.Combine(AppLog.Data,"island-charging.png"));
+                    view.Suspend();
+                    view.Present(media,"헤드폰",screen,dpi,null,true);
+                    await Task.Delay(280);
+                    double bottomEdge=view.Shape.Bottom;
+                    Require(view.Shape.Top>0,"the lower capsule sits at the bottom of its host");
+                    Require(!Native.RegionContains(view,(int)(180*dpi),2)&&Native.RegionContains(view,(int)(180*dpi),(int)((bottomEdge-14)*dpi)),"transparent space above the lower capsule does not intercept application clicks");
+                    view.SetExpanded(true);
+                    await Task.Delay(70);
+                    Require(Math.Abs(view.Shape.Bottom-bottomEdge)<.01,"expansion keeps the lower edge fixed on every frame");
+                    await Task.Delay(220);
+                    Require(view.Shape.Top==0&&view.Shape.Height==204,"the lower capsule expands upward into the media card");
+                    Program.Save(view.Surface,360,204,Path.Combine(AppLog.Data,"island-bottom-expanded.png"));
+                    view.SetExpanded(false);
+                    await Task.Delay(70);
+                    Require(Math.Abs(view.Shape.Bottom-bottomEdge)<.01,"collapse also keeps the lower edge fixed");
+                    await Task.Delay(220);
+                    Require(!view.Animating&&view.Shape.Height==28&&Math.Abs(view.Shape.Bottom-bottomEdge)<.01,"bottom motion settles and releases its rendering callback");
                     if(inspect){AppLog.Json("island-preview.json",new {ready=true});for(int i=0;i<120&&!File.Exists(Path.Combine(AppLog.Data,"preview-done"));i++)await Task.Delay(250);}
                     view.Suspend();
-                    AppLog.Json("dynamic-island-probe.json",new {passed=true,disabledByDefault=true,sharedMediaCommands=true,blackHeaderWithArtworkBlur=true,sharedCapsuleLevels=true,acceptedNotificationRouting=true,persistentTopSafeArea=true,nativeSafeAreaVerified=safeAreaVerified,fullscreenReleasesWorkspace=safeAreaVerified,crashRestoresWorkspace=safeAreaVerified,mixedDpiAndFourEdges=true,compactDoesNotStealFocus=true,rapidReversalsSettle=true,expiryTimerStops=true,hiddenInputAndMotionReleased=true,noLiveBackdrop=true,deviceValuesChanged=false});
+                    AppLog.Json("dynamic-island-probe.json",new {passed=true,disabledByDefault=true,sharedMediaCommands=true,blackHeaderWithArtworkBlur=true,sharedCapsuleLevels=true,acceptedNotificationRouting=true,topDockMovesIslandBelow=true,bottomExpansionAnchored=true,nativeSafeAreaVerified=safeAreaVerified,fullscreenReleasesWorkspace=safeAreaVerified,crashRestoresWorkspace=safeAreaVerified,mixedDpiAndFourEdges=true,compactDoesNotStealFocus=true,rapidReversalsSettle=true,expiryTimerStops=true,hiddenInputAndMotionReleased=true,noLiveBackdrop=true,deviceValuesChanged=false});
                     result=0;
                 }
                 catch(Exception error){AppLog.Json("dynamic-island-probe.json",new {passed=false,error=error.ToString(),island=view==null?null:view.Inspect()});}

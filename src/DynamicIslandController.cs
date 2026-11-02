@@ -35,24 +35,28 @@ namespace OneTaskBar
             }
             try
             {
-                if(islandSpace!=null&&(islandSpace.Monitor!=monitor.DeviceName||Math.Abs(islandSpace.Scale-dpi)>.001))CloseIsland();
+                if(islandSpace!=null&&(islandSpace.Monitor!=monitor.DeviceName||Math.Abs(islandSpace.Scale-dpi)>.001||islandSpace.Bottom!=(dock.Edge==1)))CloseIsland();
                 PrepareIslandSpace(monitor,dpi);
                 var work=islandSpace.PlacementArea();
                 if(!DynamicIslandLayout.Clear(monitor.Bounds,work,dpi,windows)){CloseIsland();return;}
                 if(Island==null)Island=new DynamicIsland(Media,SeekMedia,()=>ShowDetail("sound"),OpenMediaApplication,()=>PrepareWindowSwitcher(),id=>MediaApplication.Resolve(id,Running.Concat(Apps)));
-                Island.Present(Services.Media,Services.OutputName,monitor,dpi,work);
+                Island.Present(Services.Media,Services.OutputName,monitor,dpi,work,islandSpace.Bottom);
             }
             catch(Exception error){CloseIsland();AppLog.Once("island-safety-area",error.ToString());}
         }
         void PrepareIslandSpace(Forms.Screen monitor,double dpi)
         {
-            if(islandSpace==null)islandSpace=new IslandSafeArea(monitor,dpi);
+            bool bottom=DockGeometry.Edge==1;
+            if(islandSpace==null)islandSpace=new IslandSafeArea(monitor,dpi,bottom);
             if(islandSpace.Active)return;
-            var top=reservations.Where(item=>item.IsTopOn(monitor.DeviceName)).ToArray();
-            foreach(var item in top)item.SetAutoHide(true);
+            var overlapping=reservations.Where(item=>item.IsOn(monitor.DeviceName,bottom?3:1)).ToArray();
+            foreach(var item in overlapping)item.SetAutoHide(true);
             try{islandSpace.SetActive(true);}
-            finally{foreach(var item in top)item.SetAutoHide(DockAutoHide);}
-            foreach(var dock in docks)if(dock.Screen.DeviceName==monitor.DeviceName&&dock.Edge==1)dock.Rebuild();
+            finally{foreach(var item in overlapping)item.SetAutoHide(DockAutoHide);}
+            foreach(var dock in docks)
+            {
+                if(dock.Screen.DeviceName==monitor.DeviceName&&dock.Edge==(bottom?3:1))dock.Rebuild();
+            }
         }
         bool IslandFeedback(string kind,double value,bool muted)
         {

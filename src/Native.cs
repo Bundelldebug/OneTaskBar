@@ -178,6 +178,12 @@ namespace OneTaskBar
             var handle=new WindowInteropHelper(window).Handle;if(handle==IntPtr.Zero)return null;RectI rect;GetWindowRect(handle,out rect);var r=CreateRectRgn(0,0,0,0);
             try{int type=GetWindowRgn(handle,r),style=GetWindowLong(handle,-20);var owner=GetWindow(handle,4);int ownerStyle=owner!=IntPtr.Zero?GetWindowLong(owner,-20):0;return new {title=window.Title,visible=window.IsVisible,left=rect.Left,top=rect.Top,width=rect.Right-rect.Left,height=rect.Bottom-rect.Top,rounded=type!=0&&!PtInRegion(r,0,0)&&PtInRegion(r,(rect.Right-rect.Left)/2,(rect.Bottom-rect.Top)/2),excludedFromAltTab=(style&0x80)!=0&&(style&0x40000)==0,backdropExcludedFromAltTab=(ownerStyle&0x80)!=0&&(ownerStyle&0x40000)==0};}finally{DeleteObject(r);}
         }
+        internal static bool RegionContains(Window window,int x,int y)
+        {
+            var region=CreateRectRgn(0,0,0,0);
+            try{return GetWindowRgn(new WindowInteropHelper(window).Handle,region)!=0&&PtInRegion(region,x,y);}
+            finally{DeleteObject(region);}
+        }
         internal static void Open(string target)
         {
             try { Process.Start(new ProcessStartInfo(target) { UseShellExecute=true }); }

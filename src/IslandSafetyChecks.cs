@@ -57,24 +57,34 @@ namespace OneTaskBar
             Preferences.Set(p=>{p.DockEdge=1;p.MaximizedBehindDock=false;});
             try
             {
-                using(var area=new IslandSafeArea(screen,dpi))
+                using(var area=new IslandSafeArea(screen,dpi,true))
                 {
                     area.SetActive(true);
                     using(var dock=new AppBarReservation(screen,dpi))
                     {
                         await Task.Delay(200);
-                        int combined=(int)Math.Round((IslandSafeArea.Height+68)*dpi);
-                        Require(Native.WorkArea(screen).Top>=before.Top+combined,"the top dock and safety band reserve separate adjacent rows");
+                        int dockHeight=(int)Math.Round(68*dpi),islandHeight=(int)Math.Ceiling(IslandSafeArea.Height*dpi);
+                        var reserved=Native.WorkArea(screen);
+                        Require(reserved.Top>=before.Top+dockHeight&&reserved.Bottom<=before.Bottom-islandHeight,"the top dock and lower island reserve opposite edges");
                         var rect=DockGeometry.Rect(screen.Bounds,dpi,1,new Rect(40,screen.Bounds.Height/dpi-56,220,44));
-                        Require(rect.Top*dpi>=area.Bounds.Bottom-screen.Bounds.Top,"top dock icons stay below the island band");
+                        Require(rect.Top*dpi>=before.Top-screen.Bounds.Top&&rect.Bottom*dpi<=reserved.Top-screen.Bounds.Top,"top dock icons remain within their own upper band");
                         Require(Math.Abs(DockGeometry.Reserved(screen.Bounds,Native.WorkArea(screen),dpi,1)-68)<2,"the safe band is excluded from the dock's balancing gap");
+                        var host=DynamicIslandLayout.Host(screen.Bounds,area.PlacementArea(),dpi,true);
+                        var compact=DynamicIslandLayout.Capsule(new Size(112,28),host.Width,host.Height,true);
+                        Require(screen.Bounds.Top+(host.Top+compact.Top)*dpi>=reserved.Bottom-1&&screen.Bounds.Top+(host.Top+compact.Bottom)*dpi<=area.Bounds.Bottom,"lower media and feedback fit entirely below maximized content");
+                        source.WindowState=WindowState.Maximized;
+                        await Task.Delay(200);
+                        Native.RectI maximized;
+                        Native.GetWindowRect(new WindowInteropHelper(source).Handle,out maximized);
+                        Require(maximized.Bottom<=reserved.Bottom+16*dpi,"a maximized application avoids the lower capsule band");
+                        source.WindowState=WindowState.Normal;
                         area.SetActive(false);
                         await Task.Delay(150);
                         dock.SetAutoHide(true);
                         area.SetActive(true);
                         dock.SetAutoHide(false);
                         await Task.Delay(150);
-                        Require(area.Bounds.Top==before.Top&&Native.WorkArea(screen).Top>=before.Top+combined,"returning from fullscreen keeps the island above the top dock");
+                        Require(area.Bounds.Bottom==before.Bottom&&Native.WorkArea(screen).Top>=before.Top+dockHeight&&Native.WorkArea(screen).Bottom<=before.Bottom-islandHeight,"returning from fullscreen restores opposite reservations without shifting the dock");
                     }
                 }
             }

@@ -24,6 +24,7 @@ namespace OneTaskBar
         readonly HwndSource source;
         readonly Forms.Screen screen;
         readonly double scale;
+        internal readonly bool Bottom;
         readonly Lease lease;
         bool registered,busy,disposed,positioned;
         internal Native.RectI Bounds {get;private set;}
@@ -36,12 +37,13 @@ namespace OneTaskBar
         }
         internal static int BottomOffsetPixels(Drawing.Rectangle monitor)
         {
-            return current!=null&&current.registered&&current.screen.Bounds==monitor?current.Bounds.Bottom-monitor.Top:0;
+            return current!=null&&current.registered&&!current.Bottom&&current.screen.Bounds==monitor?current.Bounds.Bottom-monitor.Top:0;
         }
-        internal IslandSafeArea(Forms.Screen monitor,double dpi)
+        internal IslandSafeArea(Forms.Screen monitor,double dpi,bool bottom=false)
         {
             Recover();
             screen=monitor;scale=dpi;
+            Bottom=bottom;
             source=new HwndSource(new HwndSourceParameters("OneTaskBar.IslandSafeArea")
             {
                 WindowStyle=unchecked((int)0x80000000),ExtendedWindowStyle=0x80|0x08000000,
@@ -52,7 +54,7 @@ namespace OneTaskBar
         }
         Native.AppBarData Data()
         {
-            return new Native.AppBarData {Size=(uint)Marshal.SizeOf(typeof(Native.AppBarData)),Window=source.Handle,Edge=1,Callback=Callback};
+            return new Native.AppBarData {Size=(uint)Marshal.SizeOf(typeof(Native.AppBarData)),Window=source.Handle,Edge=Bottom?3u:1u,Callback=Callback};
         }
         IntPtr Message(IntPtr window,int message,IntPtr wparam,IntPtr lparam,ref bool handled)
         {
@@ -85,7 +87,9 @@ namespace OneTaskBar
                 var data=Data();
                 data.Rect=new Native.RectI {Left=monitor.Left,Top=monitor.Top,Right=monitor.Right,Bottom=monitor.Bottom};
                 Native.SHAppBarMessage(2,ref data);
-                data.Rect.Bottom=data.Rect.Top+(int)Math.Ceiling(Height*scale);
+                int height=(int)Math.Ceiling(Height*scale);
+                if(Bottom)data.Rect.Top=data.Rect.Bottom-height;
+                else data.Rect.Bottom=data.Rect.Top+height;
                 if(positioned&&data.Rect.Equals(Bounds))return;
                 Native.SHAppBarMessage(3,ref data);
                 Bounds=data.Rect;positioned=true;
@@ -95,7 +99,7 @@ namespace OneTaskBar
         internal Drawing.Rectangle PlacementArea()
         {
             var work=Native.WorkArea(screen);
-            return Drawing.Rectangle.FromLTRB(Bounds.Left,Bounds.Top,Bounds.Right,work.Bottom);
+            return Drawing.Rectangle.FromLTRB(work.Left,Bottom?work.Top:Bounds.Top,work.Right,Bottom?Bounds.Bottom:work.Bottom);
         }
         void Remove()
         {
