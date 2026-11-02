@@ -45,7 +45,11 @@ namespace OneTaskBar
                 if(session==null)
                 {
                     opening.Dispose();opening=null;
-                    bool native=await Task.Run(()=>ExplorerBridge.OpenTray(anchor));
+                    bool native=await Task.Run(()=>
+                    {
+                        if(ExplorerBridge.TrayVisible())return ExplorerBridge.AnchorTray(anchor);
+                        return ExplorerBridge.OpenTray(anchor);
+                    });
                     AppLog.Once("tray-provider","Native tray retained because its accessibility provider is unavailable");
                     if(!native)ActionNotice.Show("숨겨진 트레이 아이콘을 열지 못했습니다. Explorer 상태를 확인해 주세요.");
                     return;
@@ -62,7 +66,7 @@ namespace OneTaskBar
                 TrayPopup=popup;popup.Closed+=(s,e)=>{if(TrayPopup==popup)TrayPopup=null;};
                 popup.Present(anchor);session=null;
                 AppLog.Json("tray-proxy-state.json",new {visible=true,icons=popup.IconCount,nativeFallback=false});
-            }catch(Exception error){AppLog.Once("tray-popup",error.GetType().Name);}
+            }catch(Exception error){AppLog.Once("tray-popup",error.ToString());}
             finally{trayBusy=false;if(session!=null)session.Dispose();if(opening!=null)opening.Dispose();}
         }
         void CloseTrayOverflow()

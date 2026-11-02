@@ -32,6 +32,7 @@ namespace OneTaskBar
             if(service.Packaged){Caption(service.RequestPending?"Windows 확인창을 기다리고 있습니다":service.Permission==UserNotificationListenerAccessStatus.Denied?"Windows에서 접근을 허용해 주세요":"알림 접근 권한이 필요합니다",service.RequestPending?"확인창이 보이지 않으면 아래 Windows 권한 설정에서 One TaskBar를 허용해 주세요.":service.Permission==UserNotificationListenerAccessStatus.Denied?"이전에 거부한 권한은 Windows 설정에서 직접 허용해야 합니다.":"아래 버튼을 누른 뒤 Windows 확인창에서 허용을 선택해 주세요.");ButtonText(service.Permission==UserNotificationListenerAccessStatus.Denied?"권한 설정 열기":"Windows 알림 접근 허용");return;}
             if(identity==null){Caption("연결 상태 확인 중…","Windows 앱 등록을 확인하고 있습니다.");return;}
             if(identity.Registered){Caption("앱 등록이 확인되었습니다","알림 권한을 연결하기 위해 One TaskBar를 한 번 다시 시작합니다.");ButtonText("연결 계속");return;}
+            if(identity.ChangedLocation){Caption("설치 경로가 변경되었습니다","현재 설치된 One TaskBar로 Windows 알림 연결을 복구합니다. 기존 앱 등록은 업데이트하며 설정과 알림 기록은 삭제하지 않습니다.");ButtonText("알림 연결 복구");return;}
             Caption("이 PC에 알림 연결 등록","이 빌드는 Windows 11용 로컬 테스트 등록을 사용합니다. 연결 중 관리자 승인창이 뜰 수 있으며 앱을 한 번 다시 시작합니다. 인증서 신뢰와 Windows 보안 설정은 변경하지 않습니다.");ButtonText("이 PC에 연결 (로컬 테스트)");
         }
         internal async void Begin()

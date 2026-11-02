@@ -40,6 +40,8 @@ The optional identity is an **unsigned local-test package**, not a production-si
 
 The package identity is exactly `OneTaskBar.Desktop` with the publisher declared in `Package.appxmanifest`; the app checks its publisher and external installation path. It does not use the host application's identity. Registration and notification consent are separate.
 
+If the executable was moved or a test copy was registered from another folder, the connection window offers **Repair notification connection**. It updates the identity to the current executable's physical folder, advancing the identity revision when Windows cannot relocate the same package full name. It does not uninstall the existing registration or delete settings and notification history. Windows can require administrator approval again. A different, newer release at another location is preserved; reconnect from that release instead. Run desktop reviews from the installed app, using isolated data only for fixture probes.
+
 Disable integration inside One TaskBar to stop reading. Revoke access in Windows notification permission settings if desired. The ordinary uninstaller preserves user data and the optional local registration; to remove that registration for the current user after closing the app:
 
 ```powershell

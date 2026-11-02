@@ -16,6 +16,7 @@ namespace OneTaskBar
         internal ImageSource Icon;
         internal ImageSource OriginalIcon;
         internal AutomationElement Element;
+        internal TrayLegacyButton Legacy;
         internal string Executable;
         internal string Fallback="window";
     }
@@ -41,8 +42,14 @@ namespace OneTaskBar
         }
         internal void Invoke(TrayIconItem item,bool context)
         {
-            if(disposed||item==null||item.Element==null)return;
+            if(disposed||item==null||(item.Element==null&&item.Legacy==null))return;
             try {
+                if(item.Legacy!=null)
+                {
+                    if(context)LeaveNative();
+                    if(item.Legacy.Invoke(item.Name,context)&&context)SystemPanels.ContextMenu();
+                    return;
+                }
                 if(context){
                     LeaveNative();
                     item.Element.SetFocus();SystemPanels.ContextMenu();
@@ -72,13 +79,34 @@ namespace OneTaskBar
                     var decoder=BitmapDecoder.Create(stream,BitmapCreateOptions.PreservePixelFormat,BitmapCacheOption.OnLoad);
                     BitmapSource image=decoder.Frames.OrderByDescending(frame=>(long)frame.PixelWidth*frame.PixelHeight).FirstOrDefault();
                     if(image==null||image.PixelWidth>4096||image.PixelHeight>4096)return null;
-                    double scale=Math.Min(1,64.0/Math.Max(image.PixelWidth,image.PixelHeight));
-                    if(scale<1)image=new TransformedBitmap(image,new ScaleTransform(scale,scale));
-                    image.Freeze();
-                    return image;
+                    return CopyPixels(image,64);
                 }
             }
             catch{return null;}
+        }
+        internal static BitmapSource CopyPixels(BitmapSource image,int limit=96)
+        {
+            if(image==null||image.PixelWidth<1||image.PixelHeight<1||image.PixelWidth>4096||image.PixelHeight>4096)return null;
+            double scale=Math.Min(1,limit/(double)Math.Max(image.PixelWidth,image.PixelHeight));
+            if(scale<1)image=new TransformedBitmap(image,new ScaleTransform(scale,scale));
+            // A frozen decoder frame can retain its decoder's dispatcher. Only
+            // detached pixels cross from the loader thread into UI image brushes.
+            var converted=new FormatConvertedBitmap(image,PixelFormats.Pbgra32,null,0);
+            int stride=converted.PixelWidth*4;
+            var pixels=new byte[stride*converted.PixelHeight];
+            converted.CopyPixels(pixels,stride,0);
+            var detached=BitmapSource.Create(converted.PixelWidth,converted.PixelHeight,96,96,
+                PixelFormats.Pbgra32,null,pixels,stride);
+            detached.Freeze();
+            return detached;
+        }
+        internal static ImageSource ImproveResolution(ImageSource source,ImageSource candidate)
+        {
+            var original=source as BitmapSource;
+            var larger=CopyPixels(candidate as BitmapSource);
+            if(larger==null)return source;
+            if(original==null)return larger;
+            return new TrayIconQuality(larger).Choose(original,Colors.Gray);
         }
         static string Normalize(string value){return new String((value??"").Where(Char.IsLetterOrDigit).Select(Char.ToLowerInvariant).ToArray());}
         static List<SavedIcon> ReadSaved()
@@ -101,23 +129,44 @@ namespace OneTaskBar
             ExplorerBridge.AnchorTray(anchor);
             try{
                 var saved=ReadSaved();var result=new List<TrayIconItem>();var diagnostics=Program.Inspectable?new List<object>():null;
-                var root=AutomationElement.FromHandle(source);
-                foreach(AutomationElement element in root.FindAll(TreeScope.Descendants,new PropertyCondition(AutomationElement.ControlTypeProperty,ControlType.Button))){
-                    if(result.Count>=128)break;
-                    string name=element.Current.Name??"",id=element.Current.AutomationId??"";
-                    if(String.IsNullOrWhiteSpace(name))continue;
-                    if(!TrayButtonAction.CanInvoke(element))continue;
+                try
+                {
+                    var root=AutomationElement.FromHandle(source);
+                    foreach(AutomationElement element in root.FindAll(TreeScope.Descendants,new PropertyCondition(AutomationElement.ControlTypeProperty,ControlType.Button)))
+                    {
+                        if(result.Count>=128)break;
+                        try
+                        {
+                            string name=element.Current.Name??"";
+                            if(!String.IsNullOrWhiteSpace(name)&&TrayButtonAction.CanInvoke(element))
+                                result.Add(new TrayIconItem {Name=name,Element=element});
+                        }
+                        catch(ElementNotAvailableException) { }
+                    }
+                }
+                catch(Exception error){AppLog.Once("tray-uia-provider",error.ToString());}
+                if(result.Count==0)
+                    foreach(var legacy in TrayLegacyButton.ReadOverflow(source))
+                        result.Add(new TrayIconItem {Name=legacy.InitialName,Legacy=legacy});
+                foreach(var item in result)
+                {
+                    string name=item.Name,id=item.Element==null?"":item.Element.Current.AutomationId??"";
                     string normalized=Normalize(name);
                     var match=saved.OrderByDescending(s=>Score(normalized,id,s.Id,s.Name,s.Path)).FirstOrDefault();
                     if(match!=null&&Score(normalized,id,match.Id,match.Name,match.Path)==0)match=null;
                     ImageSource image=match==null?null:Decode(match.Image);
                     if(image==null&&match!=null&&File.Exists(match.Path))image=Native.AppIcon(match.Path);
-                    if(image==null&&apps!=null){
+                    var bitmap=image as BitmapSource;
+                    if(apps!=null&&(image==null||(bitmap!=null&&Math.Max(bitmap.PixelWidth,bitmap.PixelHeight)<48))){
                         var app=apps.OrderByDescending(a=>LabelScore(normalized,a.Name)).FirstOrDefault();
-                        if(app!=null&&LabelScore(normalized,app.Name)>0)image=AppIcons.Get(app);
+                        if(app!=null&&LabelScore(normalized,app.Name)>0)image=ImproveResolution(image,AppIcons.Get(app));
                     }
+                    if(image is BitmapSource)image=CopyPixels((BitmapSource)image);
                     if(diagnostics!=null)diagnostics.Add(new {name=name,automationId=id,matched=match==null?null:match.Name,executable=match==null?null:Path.GetFileName(match.Path),snapshot=image!=null});
-                    result.Add(new TrayIconItem {Name=name,Element=element,Icon=image,OriginalIcon=image,Executable=match==null?null:match.Path,Fallback=Fallback(normalized)});
+                    item.Icon=image;
+                    item.OriginalIcon=image;
+                    item.Executable=match==null?null:match.Path;
+                    item.Fallback=Fallback(normalized);
                 }
                 if(diagnostics!=null)AppLog.Json("tray-provider-review.json",diagnostics);
                 if(result.Count==0)return null;
@@ -128,7 +177,7 @@ namespace OneTaskBar
                     update.Item.Name=update.Name;
                 }
                 return session;
-            }catch(Exception error){AppLog.Once("tray-icons",error.GetType().Name);return null;}
+            }catch(Exception error){AppLog.Once("tray-icons",error.ToString());return null;}
         }
         internal static int Score(string name,string automationId,string id,string tooltip,string path)
         {

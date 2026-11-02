@@ -27,6 +27,7 @@ namespace OneTaskBar
             app.Dispatcher.BeginInvoke(new Action(async()=>{try{
                 Program.Inspectable=true;
                 await TrayFrameChecks.Run();
+                await TrayLegacyChecks.Run();
                 TrayIconQualityChecks.Run();
                 foreach(double dpi in new[]{1.0,1.5,2.0})foreach(double zoom in new[]{.6,1,1.4})foreach(int edge in new[]{0,1,2,3})
                 {
@@ -42,8 +43,12 @@ namespace OneTaskBar
                 var bitmap=ArtworkPalette.Sample(Colors.OrangeRed);
                 using(var stream=new MemoryStream()){
                     var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(bitmap));png.Save(stream);
-                    var image=TrayIcons.Decode(stream.ToArray()) as BitmapSource;
+                    var bytes=stream.ToArray();
+                    var image=await Task.Run(()=>TrayIcons.Decode(bytes) as BitmapSource);
                     Require(image!=null&&image.IsFrozen&&image.PixelWidth<=64,"native PNG snapshots decode at a bounded size and freeze");
+                    var brush=new ImageBrush(image);
+                    brush.Freeze();
+                    Require(brush.IsFrozen,"decoded images detach from the worker decoder before UI brush freezing");
                 }
                 var mono=new RenderTargetBitmap(32,32,96,96,PixelFormats.Pbgra32);
                 var drawing=new DrawingVisual();using(var dc=drawing.RenderOpen())dc.DrawEllipse(Brushes.Black,null,new Point(16,16),12,12);mono.Render(drawing);mono.Freeze();

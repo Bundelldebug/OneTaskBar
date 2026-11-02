@@ -40,7 +40,8 @@ namespace OneTaskBar
         }
         internal static bool Owned(string xml,string executable,string userSid)
         {
-            try{if(xml==null||xml.Length>65536)return false;var document=new XmlDocument {XmlResolver=null};using(var reader=XmlReader.Create(new StringReader(xml),new XmlReaderSettings {DtdProcessing=DtdProcessing.Prohibit,XmlResolver=null}))document.Load(reader);var ns=new XmlNamespaceManager(document.NameTable);ns.AddNamespace("t",TaskNamespace);Func<string,string> value=path=>{var node=document.SelectSingleNode("/t:Task/"+path,ns);return node==null?null:node.InnerText;};string level=value("t:Principals/t:Principal/t:RunLevel");return value("t:RegistrationInfo/t:Source")=="OneTaskBar.Logon.v1|"+userSid&&document.SelectNodes("/t:Task/t:Actions/*",ns).Count==1&&String.Equals(Path.GetFullPath(value("t:Actions/t:Exec/t:Command")),Path.GetFullPath(executable),StringComparison.OrdinalIgnoreCase)&&value("t:Actions/t:Exec/t:Arguments")==Arguments&&value("t:Principals/t:Principal/t:UserId")==userSid&&value("t:Principals/t:Principal/t:LogonType")=="InteractiveToken"&&(level==null||level=="LeastPrivilege");}catch{return false;}
+            string registered=LogonTaskIdentity.Executable(xml,userSid);
+            return registered!=null&&String.Equals(registered,Path.GetFullPath(executable),StringComparison.OrdinalIgnoreCase);
         }
         static string Legacy(){using(var key=Registry.CurrentUser.OpenSubKey(RunKey))return key==null?null:key.GetValue("OneTaskBar",null) as string;}
         static bool OwnLegacy(string command,string executable)
@@ -63,13 +64,40 @@ namespace OneTaskBar
         }
         static void SetCore(bool enabled)
         {
-            string executable=Exe,user=Sid;using(var scheduler=new Scheduler()){
-                var task=scheduler.Find(TaskName);if(task!=null&&!Owned((string)Invoke(task,"Xml",BindingFlags.GetProperty),executable,user))throw new InvalidOperationException("같은 이름의 다른 시작 작업이 있어 변경하지 않았습니다.");
-                if(enabled){scheduler.Keep(Invoke(scheduler.Root,"RegisterTask",BindingFlags.InvokeMethod,TaskName,Definition(executable,user),task==null?2:6,null,null,3,null));var registered=scheduler.Find(TaskName);if(registered==null||!(bool)Invoke(registered,"Enabled",BindingFlags.GetProperty)||!Owned((string)Invoke(registered,"Xml",BindingFlags.GetProperty),executable,user))throw new InvalidOperationException("로그인 시작 작업을 확인하지 못했습니다.");}
-                else if(task!=null)Invoke(scheduler.Root,"DeleteTask",BindingFlags.InvokeMethod,TaskName,0);
+            string executable=Exe,user=Sid,previous=null;
+            using(var scheduler=new Scheduler())
+            {
+                if(enabled)previous=RegisterOwnedTask(scheduler,TaskName,executable,user,true);
+                else
+                {
+                    var task=scheduler.Find(TaskName);
+                    previous=OwnedPath(task,user);
+                    if(task!=null)Invoke(scheduler.Root,"DeleteTask",BindingFlags.InvokeMethod,TaskName,0);
+                }
             }
-            using(var key=Registry.CurrentUser.OpenSubKey(RunKey,true))if(key!=null&&OwnLegacy(key.GetValue("OneTaskBar",null) as string,executable))key.DeleteValue("OneTaskBar",false);
+            using(var key=Registry.CurrentUser.OpenSubKey(RunKey,true))
+                if(key!=null&&(OwnLegacy(key.GetValue("OneTaskBar",null) as string,executable)||
+                    (previous!=null&&OwnLegacy(key.GetValue("OneTaskBar",null) as string,previous))))key.DeleteValue("OneTaskBar",false);
             cachedStatus=enabled;statusUntil=DateTime.UtcNow.AddSeconds(3);
+        }
+        static string OwnedPath(object task,string user)
+        {
+            if(task==null)return null;
+            string previous=LogonTaskIdentity.Executable((string)Invoke(task,"Xml",BindingFlags.GetProperty),user);
+            if(previous==null)throw new InvalidOperationException("같은 이름의 다른 시작 작업이 있어 변경하지 않았습니다.");
+            return previous;
+        }
+        static string RegisterOwnedTask(Scheduler scheduler,string name,string executable,string user,bool enabled)
+        {
+            var task=scheduler.Find(name);
+            string previous=OwnedPath(task,user);
+            scheduler.Keep(Invoke(scheduler.Root,"RegisterTask",BindingFlags.InvokeMethod,
+                name,Definition(executable,user,enabled),task==null?2:6,null,null,3,null));
+            var registered=scheduler.Find(name);
+            if(registered==null||(bool)Invoke(registered,"Enabled",BindingFlags.GetProperty)!=enabled||
+                !Owned((string)Invoke(registered,"Xml",BindingFlags.GetProperty),executable,user))
+                throw new InvalidOperationException("로그인 시작 작업을 확인하지 못했습니다.");
+            return previous;
         }
         internal static bool Migrate()
         {
@@ -77,9 +105,41 @@ namespace OneTaskBar
         }
         internal static int ProbeRegistration()
         {
-            string name="OneTaskBar.Validation."+Guid.NewGuid().ToString("N"),executable=Exe,user=Sid;bool created=false;try{using(var scheduler=new Scheduler()){
-                if(scheduler.Find(name)!=null)throw new InvalidOperationException("Fixture name collision");scheduler.Keep(Invoke(scheduler.Root,"RegisterTask",BindingFlags.InvokeMethod,name,Definition(executable,user,false),6,null,null,3,null));created=true;var task=scheduler.Find(name);string xml=task==null?null:(string)Invoke(task,"Xml",BindingFlags.GetProperty);bool enabled=task!=null&&(bool)Invoke(task,"Enabled",BindingFlags.GetProperty),owned=Owned(xml,executable,user);bool passed=task!=null&&!enabled&&owned;if(!passed&&xml!=null)File.WriteAllText(Path.Combine(AppLog.Data,"startup-registration-fixture.xml"),xml);Invoke(scheduler.Root,"DeleteTask",BindingFlags.InvokeMethod,name,0);created=false;AppLog.Json("startup-registration-probe.json",new {passed=passed,enabled=enabled,owned=owned,disabledTemporaryTaskOnly=true,currentUserInteractiveToken=true,leastPrivilege=true,taskNeverExecuted=true,temporaryTaskRemoved=true,realStartupUnchanged=true});return passed?0:1;
-            }}catch(Exception error){AppLog.Json("startup-registration-probe.json",new {passed=false,error=error.ToString()});return 1;}finally{if(created)try{using(var scheduler=new Scheduler()){var task=scheduler.Find(name);if(task!=null&&Owned((string)Invoke(task,"Xml",BindingFlags.GetProperty),executable,user))Invoke(scheduler.Root,"DeleteTask",BindingFlags.InvokeMethod,name,0);}}catch{}}
+            string name="OneTaskBar.Validation."+Guid.NewGuid().ToString("N"),executable=Exe,user=Sid;
+            string previous=Path.Combine(AppLog.Data,"portable-previous","OneTaskBar.exe");
+            bool created=false;
+            try
+            {
+                using(var scheduler=new Scheduler())
+                {
+                    if(scheduler.Find(name)!=null)throw new InvalidOperationException("Fixture name collision");
+                    created=true;
+                    RegisterOwnedTask(scheduler,name,previous,user,false);
+                    string relocated=RegisterOwnedTask(scheduler,name,executable,user,false);
+                    bool passed=String.Equals(relocated,previous,StringComparison.OrdinalIgnoreCase);
+                    Invoke(scheduler.Root,"DeleteTask",BindingFlags.InvokeMethod,name,0);
+                    created=false;
+                    AppLog.Json("startup-registration-probe.json",new {passed=passed,portableRelocation=passed,
+                        disabledTemporaryTaskOnly=true,currentUserInteractiveToken=true,leastPrivilege=true,
+                        taskNeverExecuted=true,temporaryTaskRemoved=true,realStartupUnchanged=true});
+                    return passed?0:1;
+                }
+            }
+            catch(Exception error)
+            {
+                AppLog.Json("startup-registration-probe.json",new {passed=false,error=error.ToString()});
+                return 1;
+            }
+            finally
+            {
+                if(created)try
+                {
+                    using(var scheduler=new Scheduler())
+                        if(OwnedPath(scheduler.Find(name),user)!=null)
+                            Invoke(scheduler.Root,"DeleteTask",BindingFlags.InvokeMethod,name,0);
+                }
+                catch { }
+            }
         }
     }
 }

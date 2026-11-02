@@ -17,6 +17,11 @@ namespace OneTaskBar
             Require(Object.ReferenceEquals(original,quality.Choose(live,Colors.White)),"matching current state retains the original pixels");
             var changed=Icon(16,Brushes.Lime);
             Require(Object.ReferenceEquals(changed,quality.Choose(changed,Colors.White)),"a new status color cannot be replaced by a stale original");
+            var larger=TrayIcons.ImproveResolution(live,original) as BitmapSource;
+            Require(larger!=null&&larger.PixelWidth==64,"small snapshots use larger matching app artwork");
+            Require(Object.ReferenceEquals(changed,TrayIcons.ImproveResolution(changed,original)),"larger app artwork cannot discard a different tray status");
+            var packageIcon=Icon(512,Brushes.Red);
+            Require(Object.ReferenceEquals(packageIcon,new TrayIconQuality(packageIcon).Choose(live,Colors.White)),"large packaged app logos remain eligible as original tray artwork");
             var badge=Icon(16,Brushes.Red,true);
             Require(Object.ReferenceEquals(badge,quality.Choose(badge,Colors.White)),"a changed status badge stays live");
             var black=Icon(64,Brushes.Black);

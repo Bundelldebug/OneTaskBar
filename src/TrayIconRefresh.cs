@@ -32,13 +32,24 @@ namespace OneTaskBar
                 if (disposed) break;
                 try
                 {
-                    if (item.Element == null) continue;
-                    var current = item.Element.Current;
+                    string name;
+                    System.Windows.Rect bounds;
+                    if(item.Legacy!=null)
+                    {
+                        if(!item.Legacy.Read(out name,out bounds))continue;
+                    }
+                    else
+                    {
+                        if(item.Element==null)continue;
+                        var current=item.Element.Current;
+                        name=current.Name??item.Name;
+                        bounds=current.BoundingRectangle;
+                    }
                     byte[] pixels;
                     byte[] previous;
                     lastPixels.TryGetValue(item,out previous);
                     System.Windows.Media.Color matte;
-                    var image = TrayIconPixels.Extract(frame, current.BoundingRectangle, out pixels, out matte, previous);
+                    var image = TrayIconPixels.Extract(frame, bounds, out pixels, out matte, previous);
                     bool changed = image != null;
                     if (changed)
                     {
@@ -50,11 +61,11 @@ namespace OneTaskBar
                         else originalPixels.Remove(item);
                         changed=!Object.ReferenceEquals(image,item.Icon);
                     }
-                    string name = current.Name ?? item.Name;
                     if (changed || name != item.Name)
                         updates.Add(new TrayIconUpdate {Item = item, Name = name, Image = changed ? image : null});
                 }
                 catch (System.Windows.Automation.ElementNotAvailableException) { }
+                catch (System.Runtime.InteropServices.COMException) { }
             }
             if(!reportedPixels&&lastPixels.Count>0)
             {

@@ -199,7 +199,9 @@ namespace OneTaskBar
         {
             if(!TaskbarMask.Active)return false;
             try {if(TrayButtonAction.Invoke(chevron,true))return true;chevron=null;}
-            catch{chevron=null;}return false;
+            catch{chevron=null;}
+            try {return TrayLegacyButton.InvokeChevron(trayHost);}
+            catch(Exception error){AppLog.Once("tray-chevron-legacy",error.ToString());return false;}
         }
         internal static bool TrayVisible()
         {

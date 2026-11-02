@@ -75,7 +75,7 @@ namespace OneTaskBar
                     System.Windows.Automation.AutomationProperties.SetName(button,update.Name);
                 }
             }
-            catch(Exception error){AppLog.Once("tray-refresh",error.GetType().Name);}
+            catch(Exception error){AppLog.Once("tray-refresh",error.ToString());}
             finally{refreshing=false;}
         }
         async void ActivateItem(TrayIconItem item,bool context)

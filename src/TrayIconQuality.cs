@@ -16,9 +16,11 @@ namespace OneTaskBar
         internal TrayIconQuality(ImageSource source)
         {
             original=source as BitmapSource;
-            if(original==null||original.PixelWidth>256||original.PixelHeight>256)return;
-            reference=new Pixels(original);
-            monochrome=TrayIconVisual.IsMonochrome(original);
+            if(original==null)return;
+            var sample=TrayIcons.CopyPixels(original);
+            if(sample==null)return;
+            reference=new Pixels(sample);
+            monochrome=TrayIconVisual.IsMonochrome(sample);
         }
 
         internal BitmapSource Choose(BitmapSource live,Color matte)

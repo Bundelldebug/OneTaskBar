@@ -12,14 +12,22 @@ using Windows.Foundation;
 using Windows.Management.Deployment;
 namespace OneTaskBar
 {
-    internal sealed class IdentityResult {public bool Registered,AdministratorRequired;public string AppId,Error;public int ErrorCode;}
+    internal sealed class IdentityResult {public bool Registered,AdministratorRequired,ChangedLocation;public string AppId,Error;public int ErrorCode;}
     internal static class NotificationIdentity
     {
         internal const string Name="OneTaskBar.Desktop",Publisher="CN=OneTaskBar, OID.2.25.311729368913984317654407730594956997722=1";
         internal static bool IsCurrent {get{try{var id=Windows.ApplicationModel.Package.Current.Id;return id.Name==Name&&String.Equals(id.Publisher,Publisher,StringComparison.OrdinalIgnoreCase);}catch{return false;}}}
         internal static IdentityResult Find()
         {
-            try {var package=new PackageManager().FindPackagesForUser("",Name,Publisher).FirstOrDefault(p=>p.Id.Name==Name&&String.Equals(p.Id.Publisher,Publisher,StringComparison.OrdinalIgnoreCase)&&String.Equals(p.EffectiveExternalPath.TrimEnd(Path.DirectorySeparatorChar),Path.GetDirectoryName(PhysicalFile(Path.Combine(AppLog.Root,"OneTaskBar.exe"))),StringComparison.OrdinalIgnoreCase));return package==null?new IdentityResult():new IdentityResult {Registered=true,AppId=package.Id.FamilyName+"!OneTaskBar"};}
+            try
+            {
+                string external=Path.GetDirectoryName(PhysicalFile(Path.Combine(AppLog.Root,"OneTaskBar.exe")));
+                var packages=new PackageManager().FindPackagesForUser("",Name,Publisher)
+                    .Where(p=>p.Id.Name==Name&&String.Equals(p.Id.Publisher,Publisher,StringComparison.OrdinalIgnoreCase)).ToArray();
+                var package=packages.FirstOrDefault(p=>NotificationRegistration.SameDirectory(p.EffectiveExternalPath,external));
+                return package==null?new IdentityResult {ChangedLocation=packages.Length!=0}:
+                    new IdentityResult {Registered=true,AppId=package.Id.FamilyName+"!OneTaskBar"};
+            }
             catch(Exception error){return new IdentityResult {Error=error.Message,ErrorCode=error.HResult};}
         }
         internal static bool Bootstrap(string[] args)
@@ -34,9 +42,10 @@ namespace OneTaskBar
         // The .NET Framework WinRT URI marshaler uses OriginalString. Normalize it to
         // file:/// explicitly so a Windows path cannot become an empty relative path.
         internal static Uri FileUri(string path){return new Uri(new Uri(Path.GetFullPath(path)).AbsoluteUri,UriKind.Absolute);}
-        internal static string Manifest()
+        internal static string Manifest(){return Manifest(typeof(NotificationIdentity).Assembly.GetName().Version);}
+        internal static string Manifest(Version version)
         {
-            var xml=new XmlDocument();using(var stream=typeof(NotificationIdentity).Assembly.GetManifestResourceStream("OneTaskBar.IdentityManifest")){if(stream==null)throw new InvalidOperationException("알림 연결 매니페스트가 없습니다.");xml.Load(stream);}var ns=new XmlNamespaceManager(xml.NameTable);ns.AddNamespace("p","http://schemas.microsoft.com/appx/manifest/foundation/windows10");var identity=(XmlElement)xml.SelectSingleNode("/p:Package/p:Identity",ns);identity.SetAttribute("Version",typeof(NotificationIdentity).Assembly.GetName().Version.ToString());return xml.OuterXml;
+            var xml=new XmlDocument();using(var stream=typeof(NotificationIdentity).Assembly.GetManifestResourceStream("OneTaskBar.IdentityManifest")){if(stream==null)throw new InvalidOperationException("알림 연결 매니페스트가 없습니다.");xml.Load(stream);}var ns=new XmlNamespaceManager(xml.NameTable);ns.AddNamespace("p","http://schemas.microsoft.com/appx/manifest/foundation/windows10");var identity=(XmlElement)xml.SelectSingleNode("/p:Package/p:Identity",ns);identity.SetAttribute("Version",version.ToString());return xml.OuterXml;
         }
         internal static int RegisterHelper(string nonce,string userSid)
         {
@@ -44,9 +53,29 @@ namespace OneTaskBar
             try {
                 using(var identity=WindowsIdentity.GetCurrent())if(identity.User.Value!=userSid)return 23;
                 var existing=Find();if(existing.Registered){result=existing;exit=0;}else{
-                    string folder=Path.Combine(AppLog.Data,"notification-identity");Directory.CreateDirectory(folder);string manifest=Path.Combine(folder,"AppxManifest.xml");File.WriteAllText(manifest,Manifest(),new System.Text.UTF8Encoding(false));
-                    string package=IdentityPackage.Build(manifest,folder),external=Path.GetDirectoryName(PhysicalFile(Path.Combine(AppLog.Root,"OneTaskBar.exe")));var options=new AddPackageOptions {AllowUnsigned=true,ExternalLocationUri=FileUri(external+Path.DirectorySeparatorChar)};var uri=FileUri(PhysicalFile(package));AppLog.Write("notification-register-path",uri.AbsoluteUri+" | "+options.ExternalLocationUri.AbsoluteUri);var operation=new PackageManager().AddPackageByUriAsync(uri,options);var watch=Stopwatch.StartNew();while(operation.Status==AsyncStatus.Started&&watch.Elapsed.TotalSeconds<90)Thread.Sleep(40);
-                    if(operation.Status==AsyncStatus.Started){operation.Cancel();throw new TimeoutException("Windows 앱 등록이 시간 안에 끝나지 않았습니다.");}if(operation.Status==AsyncStatus.Error)throw operation.ErrorCode;if(operation.Status==AsyncStatus.Canceled)throw new OperationCanceledException();var deployment=operation.GetResults();if(deployment.ExtendedErrorCode!=null)throw new InvalidOperationException(deployment.ErrorText,deployment.ExtendedErrorCode);
+                    var manager=new PackageManager();
+                    string external=Path.GetDirectoryName(PhysicalFile(Path.Combine(AppLog.Root,"OneTaskBar.exe")));
+                    var registered=manager.FindPackagesForUser("",Name,Publisher)
+                        .Where(p=>p.Id.Name==Name&&String.Equals(p.Id.Publisher,Publisher,StringComparison.OrdinalIgnoreCase))
+                        .OrderByDescending(p=>NotificationRegistration.VersionOf(p)).FirstOrDefault();
+                    Version version=NotificationRegistration.ForLocation(typeof(NotificationIdentity).Assembly.GetName().Version,
+                        registered==null?null:NotificationRegistration.VersionOf(registered),
+                        registered!=null&&!NotificationRegistration.SameDirectory(registered.EffectiveExternalPath,external));
+                    string folder=Path.Combine(AppLog.Data,"notification-identity");
+                    Directory.CreateDirectory(folder);
+                    string manifest=Path.Combine(folder,"AppxManifest.xml");
+                    File.WriteAllText(manifest,Manifest(version),new System.Text.UTF8Encoding(false));
+                    string package=IdentityPackage.Build(manifest,folder);
+                    var options=new AddPackageOptions {AllowUnsigned=true,ExternalLocationUri=FileUri(external+Path.DirectorySeparatorChar)};
+                    var uri=FileUri(PhysicalFile(package));
+                    AppLog.Write("notification-register-path",uri.AbsoluteUri+" | "+options.ExternalLocationUri.AbsoluteUri);
+                    var operation=manager.AddPackageByUriAsync(uri,options);
+                    var watch=Stopwatch.StartNew();
+                    while(operation.Status==AsyncStatus.Started&&watch.Elapsed.TotalSeconds<90)Thread.Sleep(40);
+                    if(operation.Status==AsyncStatus.Started){operation.Cancel();throw new TimeoutException("Windows 앱 등록이 시간 안에 끝나지 않았습니다.");}
+                    if(operation.Status==AsyncStatus.Error)throw operation.ErrorCode;
+                    if(operation.Status==AsyncStatus.Canceled)throw new OperationCanceledException();
+                    NotificationRegistration.CheckResult(operation.GetResults());
                     result=Find();if(!result.Registered)throw new InvalidOperationException("Windows 앱 등록을 확인하지 못했습니다.");exit=0;
                 }
             }catch(Exception error){result.Error=error.Message;result.ErrorCode=error.HResult;result.AdministratorRequired=error.HResult==unchecked((int)0x80070005)||error.HResult==unchecked((int)0x80073D2B)||error is UnauthorizedAccessException;exit=result.AdministratorRequired?5:1;AppLog.Write("notification-register",error.ToString());}
