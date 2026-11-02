@@ -84,15 +84,6 @@ namespace OneTaskBar
                 int disabled=1;
                 DwmSetWindowAttribute(window,3,ref disabled,4);
                 Native.SetWindowPos(window,new IntPtr(-1),(int)host.X,(int)host.Y,(int)host.Width,(int)host.Height,0x10);
-                try
-                {
-                    backdrop=new LiveBackdrop(this,0);
-                    backdrop.SetOpacity(0);
-                }
-                catch(Exception error)
-                {
-                    AppLog.Once("media-flight-backdrop",error.GetType().Name);
-                }
             };
             Closed+=(s,e)=> {
                 if(backdrop!=null)backdrop.Dispose();
@@ -112,6 +103,20 @@ namespace OneTaskBar
 
         internal void Present(IntPtr recipient=default(IntPtr))
         {
+            // A prepared flight owns no full-display blur target while idle.
+            // Restores already have a frozen blurred cover and need no second one.
+            if(!HasOcclusion&&backdrop==null)
+            {
+                try
+                {
+                    backdrop=new LiveBackdrop(this,0);
+                    backdrop.SetOpacity(0);
+                }
+                catch(Exception error)
+                {
+                    AppLog.Once("media-flight-backdrop",error.GetType().Name);
+                }
+            }
             Show();
             // Order the temporary plane below the recipient instead of raising
             // the recipient and its separate blur HWND through the new plane.
@@ -160,6 +165,12 @@ namespace OneTaskBar
 
         void Shape(double rx,double ry)
         {
+            // Detach both collections while editing. Otherwise every vertex
+            // propagates another mesh/bounds invalidation through the 3D scene.
+            var positions=mesh.Positions;
+            var coordinates=mesh.TextureCoordinates;
+            mesh.Positions=null;
+            mesh.TextureCoordinates=null;
             for(int corner=0;corner<4;corner++)
             {
                 double cx=corner==0||corner==3?.5-rx:-.5+rx;
@@ -169,10 +180,12 @@ namespace OneTaskBar
                     double angle=(corner+step/12.0)*Math.PI/2;
                     double x=cx+Math.Cos(angle)*rx,y=cy+Math.Sin(angle)*ry;
                     int index=corner*13+step+1;
-                    mesh.Positions[index]=new Point3D(x,y,0);
-                    mesh.TextureCoordinates[index]=new Point(x+.5,.5-y);
+                    positions[index]=new Point3D(x,y,0);
+                    coordinates[index]=new Point(x+.5,.5-y);
                 }
             }
+            mesh.Positions=positions;
+            mesh.TextureCoordinates=coordinates;
         }
 
         internal FrameworkElement Scene {get{return viewport;}}

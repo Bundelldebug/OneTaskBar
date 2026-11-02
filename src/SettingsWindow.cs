@@ -66,6 +66,8 @@ namespace OneTaskBar
             });
             Group(groups,"시작과 검색",launcher);
             var nowBar=new StackPanel();
+            Row(nowBar,"작업표시줄 미디어 캡슐 표시","작업표시줄 옆에 재생 중인 미디어를 표시합니다",
+                Preferences.Current.ShowNowBar,v=>Preferences.Set(p=>p.ShowNowBar=v));
             ChoiceRow(nowBar,"미디어 플레이어 펼침 스타일","큰 커버는 앨범 이미지를 위로 펼쳐 표시합니다",
                 Preferences.Current.NowBarLargeCover,v=>Preferences.Set(p=>p.NowBarLargeCover=v),"기본","큰 커버");
             Row(nowBar,"YouTube 고화질 커버",(Preferences.Current.YouTubeArtworkTrack!=null?"현재 영상만 허용됨 · ":"")+

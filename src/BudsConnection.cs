@@ -15,7 +15,7 @@ namespace OneTaskBar
     {
         internal string Name,Detail="연결됨";internal ImageSource Image;internal NotificationEntry Notification;internal Guid? Container;internal bool RichImage;
         internal List<NotificationAction> Actions {get{return Notification!=null&&Notification.Payload!=null?Notification.Payload.Actions:new List<NotificationAction>();}}
-        internal static bool IsBuds(string name){return Regex.IsMatch(name??"",@"Galaxy\s*Buds|\bBuds\s*(?:[0-9]|Pro|Live|FE|Plus)|버즈",RegexOptions.IgnoreCase);}
+        internal static bool IsBuds(string name){return Regex.IsMatch(name??"",@"Galaxy\s*Buds|(?:\b|(?<=_))Buds\s*(?:[0-9]|Pro\b|Live\b|FE\b|Plus\b|Core\b|On\b|Able\b)|버즈",RegexOptions.IgnoreCase|RegexOptions.CultureInvariant);}
         internal static BudsInfo Toast(NotificationEntry entry)
         {
             if(entry==null)return null;string app=entry.AppId??"",sender=entry.App??"",title=entry.Title??"",body=entry.Body??"";

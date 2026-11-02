@@ -20,15 +20,17 @@ namespace OneTaskBar
             var defaults=new PreferenceData();
             Require(!defaults.DuoStatusIcon&&!defaults.SliderValueNumbers,"Duo icon and slider numbers default off");
             var serializer=new JavaScriptSerializer();
+            Require(defaults.ShowNowBar&&serializer.Deserialize<PreferenceData>("{\"UIVersion\":90}").ShowNowBar,
+                "upgrading retains the dock media capsule until the user disables it");
             Require(!serializer.Deserialize<PreferenceData>("{\"UIVersion\":90}").DuoStatusIcon,
                 "older settings without a Duo preference retain the off default");
             foreach(bool enabled in new[]{false,true})
             {
                 var settings=serializer.Deserialize<PreferenceData>(serializer.Serialize(new PreferenceData
                 {
-                    DuoStatusIcon=enabled,SliderValueNumbers=enabled
+                    DuoStatusIcon=enabled,SliderValueNumbers=enabled,ShowNowBar=enabled
                 }));
-                Require(settings.DuoStatusIcon==enabled&&settings.SliderValueNumbers==enabled,
+                Require(settings.DuoStatusIcon==enabled&&settings.SliderValueNumbers==enabled&&settings.ShowNowBar==enabled,
                     "explicit on and off settings survive the stable upgrade");
             }
             foreach(double volume in new[]{0.0,1,25,26,50,51,75,76,100}){int expected=volume<=0?0:volume<=25?1:volume<=50?2:volume<=75?3:4;Require(DuoStatusGlyph.Dots(volume,false,true)==expected&&DuoStatusGlyph.Dots(volume,true,true)==0&&DuoStatusGlyph.Dots(volume,false,false)==0,"volume dots reflect endpoints, mute and missing devices");}
@@ -75,8 +77,37 @@ namespace OneTaskBar
                 foreach(int edge in new[]{0,2})foreach(bool duo in new[]{false,true}){Preferences.Current.DockEdge=edge;Preferences.Current.DuoStatusIcon=duo;dock=new DockHost(shell,screen);dock.Show();dock.Refresh(shell.Power);await Task.Delay(80);int length=duo?106:128;double pixelTolerance=.51/dock.Scale+.02;Require(Math.Abs(dock.Status.Width-44)<=pixelTolerance&&Math.Abs(dock.Status.Height-length)<=pixelTolerance&&dock.Battery.Height==18&&dock.Battery.IsVisible!=duo,"both styles stay narrow and only classic shows the thin battery bar; edge="+edge+" duo="+duo+" width="+dock.Status.Width+" height="+dock.Status.Height+" pill="+dock.Battery.Height+" visible="+dock.Battery.IsVisible);var glyph=Children<DuoStatusGlyph>(dock.Status).Single();Require(glyph.IsVisible==duo,"Duo can be enabled or disabled");Require(!duo||glyph.BatteryVisible,"Duo includes the battery arc");Require(dock.MediaBar!=null&&Math.Abs(dock.MediaBar.Shape.Y-12)<.1,"side media is anchored at the monitor top");dock.MediaBar.SetExpanded(true);await Task.Delay(50);Require(Math.Abs(dock.MediaBar.Shape.Y-12)<.1,"side media expands inward from the top");dock.MediaBar.SetExpanded(false);await Task.Delay(50);Require(Math.Abs(dock.MediaBar.Shape.Y-12)<.1,"side media returns to the top");
                     var root=(Grid)dock.Status.Surface.Child;foreach(FrameworkElement child in root.Children){if(child.Visibility!=Visibility.Visible)continue;var bounds=child.TransformToAncestor(root).TransformBounds(new Rect(child.RenderSize));Require(bounds.Left>=-.1&&bounds.Right<=root.ActualWidth+.1&&bounds.Top>=-.1&&bounds.Bottom<=root.ActualHeight+.1,"status controls are not clipped");}Program.Save(dock.Status.Surface,44,length,Path.Combine(AppLog.Data,"side-status-"+edge+(duo?"-duo":"-classic")+".png"));if(edge==0&&duo)await Charging(glyph);dock.Close();dock=null;
                 }
+                await MediaCapsuleVisibility(shell,screen);
                 await CustomStatus(shell,screen);await BudsStatus(shell,screen);
             }finally{if(dock!=null)dock.Close();shell.Power=oldPower;shell.Services.Media=oldMedia;shell.Desktop=oldDesktop;Preferences.Current.DockEdge=oldEdge;Preferences.Current.DuoStatusIcon=oldDuo;Preferences.Current.SliderValueNumbers=oldNumbers;}
+        }
+        static async Task MediaCapsuleVisibility(ShellController shell,System.Windows.Forms.Screen screen)
+        {
+            bool old=Preferences.Current.ShowNowBar;
+            DockHost dock=null;
+            var media=shell.Services.Media;
+            try
+            {
+                Preferences.Current.ShowNowBar=true;
+                dock=new DockHost(shell,screen);
+                dock.Show();
+                dock.Refresh(shell.Power);
+                Require(dock.MediaBar!=null,"playing media creates its dock capsule");
+                Preferences.Current.ShowNowBar=false;
+                dock.Rebuild();
+                dock.Refresh(shell.Power);
+                await Task.Delay(40);
+                Require(dock.MediaBar==null&&Object.ReferenceEquals(shell.Services.Media,media)&&media.Active,
+                    "disabling the dock capsule removes its window without clearing shared playback");
+                Preferences.Current.ShowNowBar=true;
+                dock.Refresh(shell.Power);
+                Require(dock.MediaBar!=null,"the dock capsule can be enabled again during playback");
+            }
+            finally
+            {
+                if(dock!=null)dock.Close();
+                Preferences.Current.ShowNowBar=old;
+            }
         }
         static async Task CustomStatus(ShellController shell,System.Windows.Forms.Screen screen)
         {

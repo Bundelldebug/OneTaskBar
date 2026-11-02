@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Forms=System.Windows.Forms;
 using Drawing=System.Drawing;
@@ -15,6 +16,40 @@ namespace OneTaskBar
     internal static class DynamicIslandChecks
     {
         static void Require(bool value,string message){if(!value)throw new InvalidOperationException("Dynamic Island: "+message);}
+        static BitmapSource CoverFixture()
+        {
+            var visual=new DrawingVisual();
+            using(var context=visual.RenderOpen())
+            {
+                context.DrawRectangle(Brushes.Coral,null,new Rect(0,0,192,216));
+                context.DrawRectangle(Brushes.Turquoise,null,new Rect(192,0,192,216));
+                context.DrawEllipse(Brushes.Gold,null,new Point(260,90),58,58);
+            }
+            var image=new RenderTargetBitmap(384,216,96,96,PixelFormats.Pbgra32);
+            image.Render(visual);
+            image.Freeze();
+            return image;
+        }
+        static void CheckSurface(BitmapSource artwork)
+        {
+            var brush=ArtworkPalette.IslandSurface(artwork);
+            Require(brush.IsFrozen&&Object.ReferenceEquals(brush,ArtworkPalette.IslandSurface(artwork)),
+                "unchanged artwork reuses a frozen island cover");
+            var visual=new DrawingVisual();
+            using(var context=visual.RenderOpen())context.DrawRectangle(brush,null,new Rect(0,0,360,204));
+            var image=new RenderTargetBitmap(360,204,96,96,PixelFormats.Pbgra32);
+            image.Render(visual);
+            var pixels=new byte[360*204*4];
+            image.CopyPixels(pixels,360*4,0);
+            int top=(5*360+180)*4,edge=(27*360+180)*4,next=(28*360+180)*4;
+            Require(pixels[top]+pixels[top+1]+pixels[top+2]==0,"the original top cap remains black");
+            for(int channel=0;channel<3;channel++)
+                Require(Math.Abs(pixels[edge+channel]-pixels[next+channel])<8,
+                    "the cover fades through the header boundary without a hard seam");
+            int left=(145*360+60)*4,right=(145*360+300)*4;
+            Require(Math.Abs(pixels[left]-pixels[right])+Math.Abs(pixels[left+2]-pixels[right+2])>25,
+                "the expanded surface retains recognizable thumbnail colors");
+        }
         internal static void Validate()
         {
             Require(!new PreferenceData().DynamicIsland,"existing installations do not enable an overlay on upgrade");
@@ -73,7 +108,8 @@ namespace OneTaskBar
                     bool safeAreaVerified=await IslandSafetyChecks.Validate(source,screen,dpi);
                     source.Activate();Native.Activate(new WindowInteropHelper(source).Handle);await Task.Delay(120);
                     Require(Native.GetForegroundWindow()==new WindowInteropHelper(source).Handle,"the source fixture owns focus before showing a compact capsule");
-                    var media=new MediaState {Available=true,Active=true,Playing=true,Title="Long media title · 아티스트 이름",Artist="테스트 아티스트",CanPlay=true,CanPrevious=true,CanNext=true,CanSeek=true,Duration=200,Position=45,Artwork=ArtworkPalette.Sample(Colors.Coral)};
+                    var media=new MediaState {Available=true,Active=true,Playing=true,Title="Long media title · 아티스트 이름",Artist="테스트 아티스트",CanPlay=true,CanPrevious=true,CanNext=true,CanSeek=true,Duration=200,Position=45,Artwork=CoverFixture()};
+                    CheckSurface(media.Artwork);
                     view.Present(media,"헤드폰",screen,dpi);
                     await Task.Delay(330);
                     Require(view.IsVisible&&!view.Animating&&view.Shape.Width==112&&view.Shape.Height==28,"media geometry settles without retaining resize callbacks");
@@ -87,7 +123,7 @@ namespace OneTaskBar
                     Require(view.Player.ActualHeight>0&&view.Player.ActualHeight+28<=view.Shape.Height+.5,"transport and timeline fit below the black header");
                     Require(view.Surface.Background==Brushes.Black&&
                         Object.ReferenceEquals(view.MediaSurface,ArtworkPalette.IslandSurface(media.Artwork)),
-                        "only the expanded lower panel uses the cached artwork-colored blur");
+                        "expanded media shares the cached thumbnail blur under a fading black cap");
                     view.Player.PlayButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                     Require(commands.Count==1&&commands[0]=="play","transport uses the shared media command");
                     Program.Save(view.Surface,360,204,Path.Combine(AppLog.Data,"island-expanded.png"));

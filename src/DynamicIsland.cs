@@ -61,7 +61,7 @@ namespace OneTaskBar
         internal Rect Shape {get{return current;}}
         internal MediaPlayerView Player {get{return player;}}
         internal PillSlider LevelSlider {get{return levelSlider;}}
-        internal Brush MediaSurface {get{return mediaSurface.Background;}}
+        internal Brush MediaSurface {get{return expanded.Background;}}
         internal IslandNotificationView NotificationView {get{return notification;}}
         internal bool NotificationVisible {get{return IsVisible&&state.NotificationVisible(DateTime.UtcNow);}}
         internal DynamicIsland(Action<string> command,Func<double,Task<bool>> seek,Action output,Action<string> openApp,Action opening=null,Func<string,AppEntry> sourceApp=null)
@@ -142,7 +142,7 @@ namespace OneTaskBar
             Loaded+=(s,e)=>QueuePlacement();
             LocationChanged+=(s,e)=>{if(!placingHost)QueuePlacement();};
             Deactivated+=(s,e)=>{if(state.Expanded&&!IsMouseOver)SetExpanded(false);};
-            Closed+=(s,e)=>{closed=true;activity.SetPlaying(false);StopMotion();StopOutside();expiry.Stop();ClearNotification();player.Update(new MediaState(),null);media=null;artwork=null;surfaceArtwork=null;art.Background=mediaSurface.Background=null;};
+            Closed+=(s,e)=>{closed=true;activity.SetPlaying(false);StopMotion();StopOutside();expiry.Stop();ClearNotification();player.Update(new MediaState(),null);media=null;artwork=null;surfaceArtwork=null;art.Background=expanded.Background=null;};
         }
         internal override void RefreshGlassMaterial()
         {
@@ -311,9 +311,9 @@ namespace OneTaskBar
         void UpdateMediaSurface()
         {
             var source=media==null?null:media.Artwork;
-            if(mediaSurface.Background!=null&&Object.ReferenceEquals(surfaceArtwork,source))return;
+            if(expanded.Background!=null&&Object.ReferenceEquals(surfaceArtwork,source))return;
             surfaceArtwork=source;
-            mediaSurface.Background=ArtworkPalette.IslandSurface(source);
+            expanded.Background=ArtworkPalette.IslandSurface(source);
         }
         internal void OutputChanged(string name){outputName=name;if(FeedbackVisible)RefreshPresentation();}
         async void RefreshDeviceSymbol(string kind)
@@ -358,7 +358,7 @@ namespace OneTaskBar
             else
             {
                 player.Update(new MediaState(),null);
-                mediaSurface.Background=null;
+                expanded.Background=null;
                 surfaceArtwork=null;
                 if(Native.GetForegroundWindow()==handle&&Native.IsWindow(previousWindow))Native.Activate(previousWindow);
             }
@@ -420,7 +420,7 @@ namespace OneTaskBar
             var handle=new WindowInteropHelper(this).Handle;
             if(handle!=IntPtr.Zero)Native.SetWindowLong(handle,-20,Native.GetWindowLong(handle,-20)|0x08000000);
             player.Update(new MediaState(),null);
-            media=null;artwork=null;surfaceArtwork=null;art.Background=mediaSurface.Background=null;target=Rect.Empty;
+            media=null;artwork=null;surfaceArtwork=null;art.Background=expanded.Background=null;target=Rect.Empty;
             symbolRequest++;symbolKey=null;feedbackGlyph.SetDeviceIcon(null);levelSlider.SetDeviceIcon(null);
             ((Window)this).Hide();
         }

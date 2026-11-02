@@ -1,5 +1,9 @@
 using System;
 using System.Windows;
+using System.Threading.Tasks;
+using System.Windows.Interop;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace OneTaskBar
 {
@@ -8,6 +12,37 @@ namespace OneTaskBar
         static void Require(bool value,string message)
         {
             if(!value)throw new Exception(message);
+        }
+        internal static async Task CaptureRace(Window source)
+        {
+            var handle=new WindowInteropHelper(source).Handle;
+            source.Activate();
+            Native.Activate(handle);
+            await Task.Delay(60);
+            Native.RectI rect;
+            Require(Native.GetWindowRect(handle,out rect),"capture fixture has a source window");
+            var bounds=new Rect(rect.Left,rect.Top,rect.Right-rect.Left,rect.Bottom-rect.Top);
+            var completion=new TaskCompletionSource<BitmapSource>();
+            using(var motion=new MediaWindowMotion(null,(window,area)=>completion.Task))
+            {
+                var pending=motion.Capture(handle,bounds);
+                Native.ShowWindow(handle,6);
+                await Task.Delay(80);
+                Native.ShowWindow(handle,9);
+                Native.Activate(handle);
+                await Task.Delay(80);
+                // Even if the HWND is visible again, a late desktop copy belongs
+                // to an earlier transition and must never replace the app frame.
+                completion.SetResult(ArtworkPalette.Sample(Colors.Coral));
+                await pending;
+                Require(motion.CapturedImage==null,"capture crossing minimize/restore is discarded");
+            }
+            var valid=ArtworkPalette.Sample(Colors.Turquoise);
+            using(var motion=new MediaWindowMotion(null,(window,area)=>Task.FromResult(valid)))
+            {
+                await motion.Capture(handle,bounds);
+                Require(Object.ReferenceEquals(motion.CapturedImage,valid),"an uninterrupted foreground capture is accepted");
+            }
         }
 
         internal static void Check()

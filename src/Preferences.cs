@@ -12,6 +12,7 @@ namespace OneTaskBar
         public bool NativeTaskView=false;
         public bool NativeTrayOverflow=false;
         public bool DynamicIsland=false;
+        public bool ShowNowBar=true;
         public bool NotificationIntegration=true;
         public bool NotificationPopups=true;
         public bool NotificationSoundEnabled=false;

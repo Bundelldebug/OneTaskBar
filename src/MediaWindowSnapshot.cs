@@ -22,8 +22,9 @@ namespace OneTaskBar
 
         // Only the foreground media window is sampled, on focus/minimize-button
         // entry. No polling capture, disk file, browser access or network request.
-        internal static BitmapSource Capture(IntPtr window,Rect bounds)
+        internal static BitmapSource Capture(IntPtr window,Rect bounds,Func<bool> current=null)
         {
+            if(current!=null&&!current())return null;
             if(Native.GetForegroundWindow()!=window||Native.IsIconic(window)||bounds.Width<1||bounds.Height<1||bounds.Width*bounds.Height>24000000)return null;
             var area=Rectangle.Intersect(new Rectangle((int)bounds.X,(int)bounds.Y,(int)bounds.Width,(int)bounds.Height),System.Windows.Forms.SystemInformation.VirtualScreen);
             if(area.Width<=0||area.Height<=0)return null;
@@ -49,10 +50,11 @@ namespace OneTaskBar
                         ReleaseDC(IntPtr.Zero,source);
                     }
                 }
-                Native.RectI current;
-                if(Native.GetForegroundWindow()!=window||Native.IsIconic(window)||!Native.GetWindowRect(window,out current)||
-                    Math.Abs(current.Left-bounds.Left)>2||Math.Abs(current.Top-bounds.Top)>2||
-                    Math.Abs(current.Right-bounds.Right)>2||Math.Abs(current.Bottom-bounds.Bottom)>2)return null;
+                Native.RectI actual;
+                if(current!=null&&!current())return null;
+                if(Native.GetForegroundWindow()!=window||Native.IsIconic(window)||!Native.GetWindowRect(window,out actual)||
+                    Math.Abs(actual.Left-bounds.Left)>2||Math.Abs(actual.Top-bounds.Top)>2||
+                    Math.Abs(actual.Right-bounds.Right)>2||Math.Abs(actual.Bottom-bounds.Bottom)>2)return null;
                 var handle=bitmap.GetHbitmap();
                 try
                 {

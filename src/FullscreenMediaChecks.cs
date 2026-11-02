@@ -57,6 +57,7 @@ namespace OneTaskBar
                         Native.DwmGetWindowAttribute(sourceWindow,14,out cloaked,4);
                         Require(cloaked==0,"independent watchdog restores source after an interrupted transition");
                     }
+                    await MediaFlightChecks.CaptureRace(view);
                     using(var motion=new MediaWindowMotion(null)){
                         var source=new System.Windows.Interop.WindowInteropHelper(view).Handle;var foreground=Native.GetForegroundWindow();
                         view.Width=800;view.Height=600;view.Update(media);view.UpdateLayout();
@@ -84,7 +85,9 @@ namespace OneTaskBar
                         var halfway=MediaWindowPose.At(initial,capsule,.5);
                         Require(halfway.Width>initial.Width*.45&&halfway.Width<initial.Width*.65,"the app remains readable through the middle of its flight");
                         int backdropsBefore=LiveBackdrop.InstanceCount;
-                        var plane=new MediaWindowPlane(snapshot,initial,capsule);plane.Frame(initial,capsule,.18);plane.Present();await Task.Delay(70);
+                        var plane=new MediaWindowPlane(snapshot,initial,capsule);
+                        Require(LiveBackdrop.InstanceCount==backdropsBefore,"warming a flight allocates no full-display blur host");
+                        plane.Frame(initial,capsule,.18);plane.Present();await Task.Delay(70);
                         Program.Save(plane.Scene,(int)plane.ActualWidth,(int)plane.ActualHeight,Path.Combine(AppLog.Data,"media-flight-pose.png"));plane.Close();
                         Native.ShowWindow(source,6);
                         var cover=new MediaWindowPlane(snapshot,initial,capsule);

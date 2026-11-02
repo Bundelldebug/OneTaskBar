@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Windows.Media;
 using Windows.Management.Deployment;
 namespace OneTaskBar
@@ -20,10 +21,28 @@ namespace OneTaskBar
         static readonly object gate=new object();static readonly Dictionary<string,ImageSource> pictures=new Dictionary<string,ImageSource>();static string root;static DateTime rootUntil;
         static readonly Dictionary<string,ImageSource> symbols=new Dictionary<string,ImageSource>();
         static string symbolRoot;static DateTime shortcutUntil;
+        static readonly string[] modelNames={"Buds4Pro","Buds4","Buds3FE","Buds3Pro","Buds3","Buds2Pro","Buds2","BudsCore","BudsFE","BudsLive","BudsPro"};
+        static readonly string[] modelKeys=modelNames.Select(name=>name.ToUpperInvariant()).ToArray();
         internal static string SymbolFile(string name)
         {
             string model=Model(name);
+            if(model=="BudsOn")return "ic_able_left_dark.png";
             return model!=null&&model.StartsWith("Buds4",StringComparison.Ordinal)?"ic_buds4f_left_dark.png":model!=null&&model.StartsWith("Buds3",StringComparison.Ordinal)?"ic_buds3_left_dark.png":model!=null?"ic_tws_left_dark.png":"ic_buds_pair_dark.png";
+        }
+        static string BatteryAssets()
+        {
+            if(symbolRoot!=null&&!Directory.Exists(symbolRoot))
+            {
+                symbolRoot=null;
+                shortcutUntil=DateTime.MinValue;
+            }
+            if(DateTime.UtcNow>=shortcutUntil)
+            {
+                shortcutUntil=DateTime.UtcNow.AddMinutes(5);
+                var package=new PackageManager().FindPackagesForUser("").FirstOrDefault(p=>p.Id.Name.Equals("SAMSUNGELECTRONICSCO.LTD.GalaxyBuds",StringComparison.OrdinalIgnoreCase)&&!p.IsFramework);
+                symbolRoot=package==null?null:Path.Combine(package.InstalledPath,"Assets","Battery");
+            }
+            return symbolRoot;
         }
         internal static string ConnectedName(ShellController shell){return BudsInfo.IsBuds(shell.Services.OutputName)?shell.Services.OutputName:shell.Buds.ModelName;}
         internal static ImageSource ShortcutIcon(){return ShortcutIcon(null);}
@@ -35,16 +54,11 @@ namespace OneTaskBar
                 ImageSource cached;if(symbols.TryGetValue(key,out cached))return cached;
                 try
                 {
-                    if(symbolRoot==null&&DateTime.UtcNow>=shortcutUntil)
-                    {
-                        shortcutUntil=DateTime.UtcNow.AddMinutes(5);
-                        var package=new PackageManager().FindPackagesForUser("").FirstOrDefault(p=>p.Id.Name.Equals("SAMSUNGELECTRONICSCO.LTD.GalaxyBuds",StringComparison.OrdinalIgnoreCase)&&!p.IsFramework);
-                        if(package!=null)symbolRoot=Path.Combine(package.InstalledPath,"Assets","Battery");
-                    }
-                    if(symbolRoot==null)return null;
+                    string assets=BatteryAssets();
+                    if(assets==null)return null;
                     foreach(string asset in new[]{key,"ic_buds_pair_dark.png"}.Distinct())
                     {
-                        string file=Path.Combine(symbolRoot,asset);if(!File.Exists(file))continue;
+                        string file=Path.Combine(assets,asset);if(!File.Exists(file))continue;
                         cached=NativeToastAssets.Image("",new Uri(file).AbsoluteUri,false,96);
                         if(cached!=null){symbols[key]=cached;return cached;}
                     }
@@ -61,14 +75,55 @@ namespace OneTaskBar
         }
         internal static string Model(string name)
         {
-            string value=BudsConnectionTracker.Normalize(name);foreach(string model in new[]{"Buds4Pro","Buds4","Buds3FE","Buds3Pro","Buds3","Buds2Pro","Buds2","BudsCore","BudsFE","BudsLive","BudsPro"})if(value.IndexOf(model.ToUpperInvariant(),StringComparison.Ordinal)>=0)return model;
+            string value=BudsConnectionTracker.Normalize(name)
+                .Replace("갤럭시","GALAXY").Replace("버즈","BUDS").Replace("프로","PRO")
+                .Replace("코어","CORE").Replace("라이브","LIVE").Replace("플러스","PLUS")
+                .Replace("BUDS온","BUDSON").Replace("BUDS에이블","BUDSABLE");
+            if((value.Contains("BUDSON")||value.Contains("BUDSABLE"))&&
+                Regex.IsMatch(name??"",@"Buds\s*(?:On|Able)\b|버즈\s*(?:온|에이블)\b",RegexOptions.IgnoreCase|RegexOptions.CultureInvariant))return "BudsOn";
+            for(int i=0;i<modelNames.Length;i++)
+                if(value.IndexOf(modelKeys[i],StringComparison.Ordinal)>=0)return modelNames[i];
             return value.Contains("GALAXYBUDS")?"Buds":null;
         }
         internal static ImageSource Picture(string name)
         {
-            string model=Model(name);if(model==null)return null;lock(gate){ImageSource image;if(pictures.TryGetValue(model,out image))return image;
-                if(DateTime.UtcNow>=rootUntil){rootUntil=DateTime.UtcNow.AddMinutes(5);try{root=new PackageManager().FindPackagesForUser("").Where(p=>p.Id.Name.IndexOf("SamsungSettings",StringComparison.OrdinalIgnoreCase)>=0&&!p.IsFramework).Select(p=>p.InstalledPath).FirstOrDefault(p=>Directory.Exists(Path.Combine(p,"EasyConnect2","Assets","Buds")));}catch{root=null;}}
-                if(root==null)return null;string file=Path.Combine(root,"EasyConnect2","Assets","Buds",model+"_IMG_Connect.png");image=NativeToastAssets.Image("",new Uri(file).AbsoluteUri,false,192);if(image!=null){if(pictures.Count>=6)pictures.Clear();pictures[model]=image;}return image;
+            string model=Model(name);
+            if(model==null)return null;
+            lock(gate)
+            {
+                ImageSource image;
+                if(pictures.TryGetValue(model,out image))return image;
+                if(DateTime.UtcNow>=rootUntil)
+                {
+                    rootUntil=DateTime.UtcNow.AddMinutes(5);
+                    try{root=new PackageManager().FindPackagesForUser("").Where(p=>p.Id.Name.IndexOf("SamsungSettings",StringComparison.OrdinalIgnoreCase)>=0&&!p.IsFramework).Select(p=>p.InstalledPath).FirstOrDefault(p=>Directory.Exists(Path.Combine(p,"EasyConnect2","Assets","Buds")));}
+                    catch{root=null;}
+                }
+                image=null;
+                if(root!=null)
+                {
+                    string file=Path.Combine(root,"EasyConnect2","Assets","Buds",model+"_IMG_Connect.png");
+                    image=NativeToastAssets.Image("",new Uri(file).AbsoluteUri,false,192);
+                }
+                if(image==null&&model=="BudsOn")
+                {
+                    try
+                    {
+                        string assets=BatteryAssets();
+                        if(assets!=null)
+                        {
+                            string file=Path.Combine(Path.GetDirectoryName(assets),"Home","Able_Black.png");
+                            image=NativeToastAssets.Image("",new Uri(file).AbsoluteUri,false,192);
+                        }
+                    }
+                    catch(Exception error){AppLog.Once("buds-model-picture",error.GetType().Name);}
+                }
+                if(image!=null)
+                {
+                    if(pictures.Count>=6)pictures.Clear();
+                    pictures[model]=image;
+                }
+                return image;
             }
         }
         static byte[] Property(uint instance,Key key)

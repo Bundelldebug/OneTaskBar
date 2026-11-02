@@ -10,29 +10,53 @@ namespace OneTaskBar
         static readonly ConditionalWeakTable<BitmapSource,Brush> playerSurfaces=new ConditionalWeakTable<BitmapSource,Brush>();
         static readonly ConditionalWeakTable<BitmapSource,Brush> outputSurfaces=new ConditionalWeakTable<BitmapSource,Brush>();
         static readonly ConditionalWeakTable<BitmapSource,Brush> islandSurfaces=new ConditionalWeakTable<BitmapSource,Brush>();
+        static readonly Brush islandHeader=IslandHeader();
+        static Brush IslandHeader()
+        {
+            var brush=new LinearGradientBrush {StartPoint=new System.Windows.Point(0,0),EndPoint=new System.Windows.Point(0,1)};
+            brush.GradientStops.Add(new GradientStop(Colors.Black,0));
+            brush.GradientStops.Add(new GradientStop(Colors.Black,.07));
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(235,0,0,0),.14));
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(100,0,0,0),.23));
+            brush.GradientStops.Add(new GradientStop(Colors.Transparent,.36));
+            brush.Freeze();
+            return brush;
+        }
         internal static Brush IslandSurface(BitmapSource source)
         {
-            if(source==null)return Neutral.Solid;
+            if(source==null)return IslandDrawing(Neutral.Glass);
             return islandSurfaces.GetValue(source,image=>
             {
-                var palette=Read(image);
-                var drawing=new DrawingGroup();
-                var bounds=new System.Windows.Rect(0,0,360,176);
-                using(var context=drawing.Open())
+                // Blur the same cover/tint used by the media player once per track.
+                // A small frozen bitmap avoids a live effect during island morphs.
+                var cover=new System.Windows.Controls.Border
                 {
-                    context.DrawRectangle(palette.Solid,null,bounds);
-                    context.PushOpacity(.46);
-                    context.DrawRectangle(OutputSurface(image),null,bounds);
-                    context.Pop();
-                    context.PushOpacity(.68);
-                    context.DrawRectangle(palette.Glass,null,bounds);
-                    context.Pop();
-                }
-                drawing.Freeze();
-                var brush=new DrawingBrush(drawing){Stretch=Stretch.UniformToFill};
-                brush.Freeze();
-                return brush;
+                    Width=192,Height=108,Background=Read(image).PlayerSurface(image),
+                    Effect=new System.Windows.Media.Effects.BlurEffect {Radius=4,RenderingBias=System.Windows.Media.Effects.RenderingBias.Performance}
+                };
+                cover.Measure(new System.Windows.Size(192,108));
+                cover.Arrange(new System.Windows.Rect(0,0,192,108));
+                var bitmap=new RenderTargetBitmap(192,108,96,96,PixelFormats.Pbgra32);
+                bitmap.Render(cover);
+                bitmap.Freeze();
+                var picture=new ImageBrush(bitmap){Stretch=Stretch.UniformToFill};
+                picture.Freeze();
+                return IslandDrawing(picture);
             });
+        }
+        static Brush IslandDrawing(Brush picture)
+        {
+            var drawing=new DrawingGroup();
+            var bounds=new System.Windows.Rect(0,0,360,204);
+            using(var context=drawing.Open())
+            {
+                context.DrawRectangle(picture,null,bounds);
+                context.DrawRectangle(islandHeader,null,bounds);
+            }
+            drawing.Freeze();
+            var brush=new DrawingBrush(drawing){Stretch=Stretch.UniformToFill};
+            brush.Freeze();
+            return brush;
         }
         internal static Brush OutputSurface(BitmapSource source)
         {

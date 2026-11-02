@@ -127,6 +127,11 @@ namespace OneTaskBar
         internal void Rebuild()
         {
             if(closed||DragReorder.Active)return;if(Scale<=0)Scale=1;
+            if(!Preferences.Current.ShowNowBar&&MediaBar!=null)
+            {
+                MediaBar.Close();
+                MediaBar=null;
+            }
             RebuildStatusItems();
             Battery.Compact=DockGeometry.Vertical(Edge);Battery.Height=Battery.Compact?18:23;
             var clockGrid=(Grid)Status.Surface.Child;
@@ -136,7 +141,7 @@ namespace OneTaskBar
             foreach(var surface in new[]{Start,Apps,Status}){surface.SetMaterial(LightPanel.DockGlass,LightPanel.DockSolid);Glass95.DockInk(surface.Surface);}pinDivider.Background=Glass95.DockForeground;pinDivider.Effect=DockAppearance.Readability;duoStatus.Effect=DockAppearance.Readability;
             startGlyph.Kind=Preferences.Current.NativeStartButton?"windows-start":"apps";startGlyph.Color=Preferences.Current.NativeStartButton?Paint.Brush("#FF1975DD"):Glass95.DockForeground;startGlyph.InvalidateVisual();startButton.ToolTip=Preferences.Current.NativeStartButton?"Windows 시작":"앱 목록";System.Windows.Automation.AutomationProperties.SetName(startButton,(string)startButton.ToolTip);
             var entries=controller.DockApps();powerWidth=PowerDisplay.DockSlot(controller.Power,Preferences.Current.DesktopPowerWatts);powerColumn.Width=new GridLength(powerWidth);powerAccess.Visibility=powerWidth>0?Visibility.Visible:Visibility.Collapsed;Battery.Width=DockGeometry.Vertical(Edge)?38:powerWidth==78?70:52;if(DockGeometry.Vertical(Edge))((Grid)Status.Surface.Child).RowDefinitions[2].Height=new GridLength(powerWidth>0?22:0);classicStatus.Visibility=Preferences.Current.DuoStatusIcon?Visibility.Collapsed:Visibility.Visible;duoStatus.Visibility=Preferences.Current.DuoStatusIcon?Visibility.Visible:Visibility.Collapsed;statusIcons.Width=Preferences.Current.DuoStatusIcon?32:DockGeometry.Vertical(Edge)?36:56;if(!Preferences.Current.Animations||!Preferences.Current.ChargeAnimation||!Preferences.Current.DuoStatusIcon)duoStatus.StopPulse();
-            mediaSpace=controller.Desktop&&(controller.Services.Media.Active||MediaBar!=null&&MediaBar.ReservesSpace);
+            mediaSpace=Preferences.Current.ShowNowBar&&controller.Desktop&&(controller.Services.Media.Active||MediaBar!=null&&MediaBar.ReservesSpace);
             var layout=DockLayout.Compute(Screen.Bounds,ContentScale,Math.Max(1,entries.Count),powerWidth,mediaSpace,68,Edge,Preferences.Current.DuoStatusIcon,ReleaseFeatures.GlassUI&&DockGeometry.Vertical(Edge)&&Preferences.Current.NowBarSideCapsule?88:44);bool overflow=entries.Count>layout.Capacity;int slots=Math.Max(0,layout.Capacity-(overflow?1:0));var shown=entries.Take(slots).ToArray();Overflow.Update(entries.Skip(slots));OverflowButton.Visibility=overflow?Visibility.Visible:Visibility.Collapsed;OverflowButton.ToolTip="숨겨진 앱 "+Overflow.Count+"개 · 마우스를 올려 펼치기";var keys=new HashSet<string>(shown.Select(e=>e.Key),StringComparer.OrdinalIgnoreCase);bool animate=placed&&visible&&Apps.IsVisible&&Motion.Enabled;
             int pinned=shown.Count(a=>a.Pinned);unpinnedOverflow=entries.Skip(slots).Any(a=>!a.Pinned);pinDivider.Visibility=pinned>0&&entries.Any(a=>!a.Pinned)?Visibility.Visible:Visibility.Collapsed;double nextDivider=DockLayout.AppOffset+pinned*46+6,oldDivider=Double.IsNaN(dividerX)?nextDivider:dividerX+dividerOffset.X;dividerX=nextDivider;Canvas.SetLeft(pinDivider,dividerX);dividerOffset.BeginAnimation(TranslateTransform.XProperty,null);dividerOffset.X=0;if(animate&&Math.Abs(oldDivider-nextDivider)>.01)dividerOffset.BeginAnimation(TranslateTransform.XProperty,Motion.PanelTween(oldDivider-nextDivider,0,330));
             TaskViewButton.Visibility=overflow&&layout.Capacity==0?Visibility.Collapsed:Visibility.Visible;Canvas.SetLeft(OverflowButton,layout.Capacity==0?52:DockLayout.AppOffset+shown.Length*46+12);
@@ -298,9 +303,12 @@ namespace OneTaskBar
         internal void Refresh(PowerState state)
         {
             if(closed) return;
-            bool reserve=controller.Desktop&&(controller.Services.Media.Active||MediaBar!=null&&MediaBar.ReservesSpace);double expected=PowerDisplay.DockSlot(state,Preferences.Current.DesktopPowerWatts);if(expected!=powerWidth||reserve!=mediaSpace)Rebuild();
+            bool reserve=Preferences.Current.ShowNowBar&&controller.Desktop&&(controller.Services.Media.Active||MediaBar!=null&&MediaBar.ReservesSpace);
+            double expected=PowerDisplay.DockSlot(state,Preferences.Current.DesktopPowerWatts);
+            if(expected!=powerWidth||reserve!=mediaSpace)Rebuild();
             if(MediaBar!=null&&(MediaBar.InterfaceVersion!=Preferences.Current.UIVersion||MediaBar.SideCapsuleStyle!=(ReleaseFeatures.GlassUI&&Preferences.Current.NowBarSideCapsule&&DockGeometry.Vertical(Edge)))){MediaBar.Close();MediaBar=null;}
-            if(MediaBar==null&&controller.Services.Media.Active&&controller.Desktop)MediaBar=new NowBar(controller,Screen){DismissedOutside=HideAfterMediaDismissed};
+            if(MediaBar==null&&Preferences.Current.ShowNowBar&&controller.Services.Media.Active&&controller.Desktop)
+                MediaBar=new NowBar(controller,Screen){DismissedOutside=HideAfterMediaDismissed};
             RefreshMedia();powerAccess.ToolTip=state.Known?"배터리 · 빠른 설정":"직접 입력한 PC 전력값 · 실시간 측정 아님";
             Battery.Update(state);var now=DateTime.Now;clockFace.Update(now,Edge);clockAccess.ToolTip=now.ToString("yyyy-MM-dd ddd tt h:mm:ss",System.Globalization.CultureInfo.GetCultureInfo("ko-KR"))+" · 알림센터";
             bool radioOff=controller.Services.WifiOn==false;string wifiKind=NetworkRouteInfo.Glyph(controller.Services.NetworkRoute,controller.Services.WifiPresent,radioOff,controller.Wifi!=null,controller.Services.NetworkConnected);

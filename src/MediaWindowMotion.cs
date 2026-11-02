@@ -7,6 +7,7 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using System.Threading.Tasks;
 
 namespace OneTaskBar
 {
@@ -21,6 +22,7 @@ namespace OneTaskBar
         readonly EventCallback callback;
         readonly IntPtr hook;
         readonly ShellController shell;
+        readonly Func<IntPtr,Rect,Task<BitmapSource>> captureSource;
         readonly Dictionary<IntPtr,Rect> normal=new Dictionary<IntPtr,Rect>();
         readonly MediaWindowLease lease=new MediaWindowLease();
         SwitchThumbnail preview;
@@ -28,18 +30,19 @@ namespace OneTaskBar
         NowBar.FlightHandoff handoff;
         MediaFlightTrace trace;
         BitmapSource snapshot,preparedImage;
-        IntPtr snapshotWindow,proactiveRestore,observedForeground;
+        IntPtr snapshotWindow,proactiveRestore,observedForeground,captureWindow;
         DateTime proactiveRestoreUntil;
         Rect snapshotBounds,preparedBounds,preparedCapsule,from,to;
         TimeSpan? started,lastFrame;
         bool capturing,minimizeHover,disposed,placing,restore,finishing;
-        int captureGeneration;
+        volatile int captureGeneration;
 
         internal bool Active {get{return preview!=null||plane!=null;}}
         internal int FrameCount {get;private set;}
         internal double FirstProgress {get;private set;}
         internal double MaximumFrameGap {get;private set;}
         internal object LastTiming {get;private set;}
+        internal BitmapSource CapturedImage {get{return snapshot;}}
         internal IntPtr PreviewHandle
         {
             get
@@ -49,11 +52,13 @@ namespace OneTaskBar
             }
         }
 
-        internal MediaWindowMotion(ShellController controller)
+        internal MediaWindowMotion(ShellController controller,Func<IntPtr,Rect,Task<BitmapSource>> captureSource=null)
         {
+            if(captureSource!=null&&!Program.Inspectable)throw new InvalidOperationException("Synthetic capture requires a fixture");
             shell=controller;
+            this.captureSource=captureSource;
             callback=OnEvent;
-            hook=SetWinEventHook(0x16,0x17,IntPtr.Zero,callback,0,0,2);
+            hook=SetWinEventHook(0x16,0x17,IntPtr.Zero,callback,0,0,controller==null&&Program.Inspectable?0u:2u);
             if(shell!=null)WindowActivation.Restoring+=PrepareRestore;
         }
 
@@ -107,26 +112,34 @@ namespace OneTaskBar
             double dpi=Math.Max(96,Native.GetDpiForWindow(foreground))/96.0;
             double caption=46*dpi;
             bool hover=cursor.X>=rect.Right-3*caption&&cursor.X<rect.Right-2*caption&&cursor.Y>=rect.Top&&cursor.Y<rect.Top+40*dpi;
-            if(resumed||snapshotWindow!=foreground||snapshotBounds!=bounds||hover&&!minimizeHover)Capture(foreground,bounds);
+            if(resumed||snapshotWindow!=foreground||snapshotBounds!=bounds||hover&&!minimizeHover)RequestCapture(foreground,bounds);
             else if(!Active)Warm(foreground,bounds);
             minimizeHover=hover;
         }
 
-        async void Capture(IntPtr window,Rect bounds)
+        async void RequestCapture(IntPtr window,Rect bounds)
         {
-            if(capturing)return;
+            await Capture(window,bounds);
+        }
+
+        internal async Task Capture(IntPtr window,Rect bounds)
+        {
+            if(capturing||disposed||Active)return;
             capturing=true;
+            captureWindow=window;
             int generation=captureGeneration;
             try
             {
-                await System.Threading.Tasks.Task.Delay(70);
-                if(disposed||generation!=captureGeneration||Active)return;
-                var image=await BackgroundWork.Run(()=>MediaWindowSnapshot.Capture(window,bounds));
-                if(disposed||generation!=captureGeneration||image==null)return;
+                // Capture while the app is still on screen. This latency-sensitive,
+                // bounded job must not wait behind metadata/icon work or a timer.
+                var image=await (captureSource!=null?captureSource(window,bounds):
+                    Task.Run(()=>MediaWindowSnapshot.Capture(window,bounds,()=>generation==captureGeneration&&!disposed)));
+                if(disposed||generation!=captureGeneration||Active||image==null||
+                    Native.IsIconic(window)||Native.GetForegroundWindow()!=window)return;
                 snapshot=image;
                 snapshotWindow=window;
                 snapshotBounds=bounds;
-                if(!Active)Warm(window,bounds);
+                if(shell!=null)Warm(window,bounds);
             }
             catch(Exception error)
             {
@@ -135,6 +148,7 @@ namespace OneTaskBar
             finally
             {
                 capturing=false;
+                captureWindow=IntPtr.Zero;
             }
         }
 
@@ -193,6 +207,9 @@ namespace OneTaskBar
         void OnEvent(IntPtr h,uint id,IntPtr window,int objectId,int child,uint thread,uint time)
         {
             if(disposed||objectId!=0||child!=0)return;
+            // A minimized/restored window may retain its old HWND and bounds.
+            // Never commit a screen copy that spans either native transition.
+            if(window==captureWindow)captureGeneration++;
             if(Application.Current.Dispatcher.CheckAccess())HandleEvent(window,id);
             else Application.Current.Dispatcher.BeginInvoke(new Action(()=>HandleEvent(window,id)),DispatcherPriority.Send);
         }
@@ -231,8 +248,9 @@ namespace OneTaskBar
         internal void Begin(IntPtr source,AppEntry app,IntPtr owner,Rect start,Rect end,bool hideSource=false,bool restoring=false,BitmapSource fixture=null,NowBar recipient=null)
         {
             if(disposed)return;
+            captureGeneration++;
             Stop();
-            trace=new MediaFlightTrace();
+            if(Program.Inspectable)trace=new MediaFlightTrace();
             from=start;
             to=end;
             restore=restoring;
@@ -307,7 +325,7 @@ namespace OneTaskBar
             double duration=plane==null?360:restore?MediaFlightTiming.RestoreMilliseconds:MediaFlightTiming.MinimizeMilliseconds;
             double p=Math.Min(1,(rendering.RenderingTime-started.Value).TotalMilliseconds/duration);
             if(FrameCount++==0)FirstProgress=p;
-            trace.Frame();
+            if(trace!=null)trace.Frame();
             long frameStamp=System.Diagnostics.Stopwatch.GetTimestamp();
             try
             {
@@ -315,7 +333,7 @@ namespace OneTaskBar
                 if(plane!=null)plane.Frame(restore?to:from,restore?from:to,position);
                 else Place(p);
                 if(handoff!=null)handoff.Apply(position);
-                trace.Work(frameStamp);
+                if(trace!=null)trace.Work(frameStamp);
             }
             catch(Exception error)
             {

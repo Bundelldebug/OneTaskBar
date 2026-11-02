@@ -4,7 +4,10 @@
 
 - Stable 9.5.0 includes the complete former beta feature set and UI 8.5/9.0/9.5. The clean-install Duo default is off; explicit saved choices remain unchanged.
 - Local release checks passed: self-test plus 28 isolated UI/lifecycle fixtures, installer folder fallbacks, and all 19 portable/setup payload entries. CI reruns the suite on the release commit before publication.
-- Island coverage includes the retained black header, cached artwork-color/blur surface, full capsule level controls, notification display without focus theft, original notification activation, history removal and resource release. No extra notification listener, idle polling, forced collection or working-set trimming was added.
+- Island coverage includes the retained black header, cached thumbnail blur and continuous transition at the header boundary, full capsule level controls, notification display without focus theft, original notification activation, history removal and resource release. No extra notification listener, idle polling, forced collection or working-set trimming was added.
+- Dock media visibility persists independently and is tested through actual dock rebuilds. Hidden dock media releases its window and reserved space while shared media remains active.
+- Delayed-capture fixtures minimize and restore the source before completing the first capture, then verify that the stale image is rejected. Mesh edits are batched, production dispatcher tracing is disabled, and a warmed hidden plane owns no live backdrop. Visual quality and animation cadence are unchanged; these checks do not establish a battery-drain percentage.
+- Buds On is mapped from its public name, BudsAble and Korean names to installed OEM assets. Local Galaxy Buds 7.1.8 and Samsung Settings contain the model-specific files; no OEM assets are redistributed. CI tests the name/asset-family mapping without requiring Samsung apps.
 - Windows notification registration has a separate monotonic version floor so the move from older 9.5.x beta numbering to 9.5.0 does not require an identity downgrade or consent reset. Publisher, family and notification capability remain unchanged.
 - Physical Windows 10 tray testing and the 150 MB total-RAM target remain outstanding. Builds remain unsigned.
 

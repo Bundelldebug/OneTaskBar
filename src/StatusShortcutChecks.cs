@@ -25,8 +25,8 @@ namespace OneTaskBar
                 if(dock.StatusShortcut("touch-keyboard")==null||dock.StatusShortcut("touch-keyboard").Kind!="keyboard"||dock.StatusShortcut("cast")==null||dock.StatusShortcut("cast").Kind!="cast")
                     throw new InvalidOperationException("Touch keyboard and Cast shortcuts must keep distinct visible symbols");
                 Program.Save(dock.Status.Surface,(int)dock.Status.Width,(int)dock.Status.Height,Path.Combine(AppLog.Data,"status-buds-shortcut.png"));
-                var models=new[]{"Galaxy Buds2 Pro","Galaxy Buds3 Pro","Jiho의 Buds4 Pro"};
-                var expected=new[]{"ic_tws_left_dark.png","ic_buds3_left_dark.png","ic_buds4f_left_dark.png"};
+                var models=new[]{"Galaxy Buds2 Pro","Galaxy Buds3 Pro","Jiho의 Buds4 Pro","Jiho의 Buds On"};
+                var expected=new[]{"ic_tws_left_dark.png","ic_buds3_left_dark.png","ic_buds4f_left_dark.png","ic_able_left_dark.png"};
                 var review=new StackPanel {Orientation=Orientation.Horizontal,Background=Paint.Brush("#FF29342F")};
                 for(int i=0;i<models.Length;i++)
                 {
@@ -40,7 +40,7 @@ namespace OneTaskBar
                     icon.SetDeviceIcon(source);cell.Children.Add(icon);
                     var label=Paint.TextBlock(model,12,Paint.ControlWhite);label.HorizontalAlignment=HorizontalAlignment.Center;label.Margin=new Thickness(0,10,0,0);cell.Children.Add(label);review.Children.Add(cell);
                 }
-                Program.Save(review,528,100,Path.Combine(AppLog.Data,"buds-model-symbols.png"));
+                Program.Save(review,704,100,Path.Combine(AppLog.Data,"buds-model-symbols.png"));
             }
             finally{if(dock!=null)dock.Close();Preferences.Current.DockStatusItems=saved;}
         }
