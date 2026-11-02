@@ -54,6 +54,7 @@ namespace OneTaskBar
         {
             Refresh();if(!Enabled)return;
             var current=new HashSet<string>(items.Select(Key),StringComparer.Ordinal);var fresh=items.Where(n=>!known.Contains(Key(n))&&Fresh(n,DateTimeOffset.Now)).OrderByDescending(n=>n.Created).Take(3).Reverse().ToList();
+            if(shell.Island!=null)shell.Island.RetainNotification(current);
             foreach(var banner in visible.ToArray())if(!banner.Retain(current))Close(banner,false);Layout();
             known.Clear();known.UnionWith(current);if(!baseline){baseline=true;if(gate!=null)gate.Refresh();return;}
             foreach(string key in pending.Keys.Where(k=>!current.Contains(k)||!Fresh(pending[k],DateTimeOffset.Now)).ToArray())pending.Remove(key);
@@ -90,7 +91,11 @@ namespace OneTaskBar
         }
         internal void Show(NotificationEntry item)
         {
-            if(disposed)return;shell.NotificationSound.Notify(item);if(shell.Buds.ShowNative(item))return;var existing=visible.FirstOrDefault(b=>String.Equals(NotificationStack.AppKey(b.Entry),NotificationStack.AppKey(item),StringComparison.OrdinalIgnoreCase));if(existing!=null){existing.Update(item);Layout();return;}
+            if(disposed)return;
+            shell.NotificationSound.Notify(item);
+            if(shell.Buds.ShowNative(item)||shell.IslandNotification(item,OpenEntry))return;
+            var existing=visible.FirstOrDefault(b=>String.Equals(NotificationStack.AppKey(b.Entry),NotificationStack.AppKey(item),StringComparison.OrdinalIgnoreCase));
+            if(existing!=null){existing.Update(item);Layout();return;}
             while(visible.Count>=3)Close(visible[0],false);
             var banner=new NotificationBanner(item,Open,Close);visible.Add(banner);Shown++;Layout();banner.Appear();expiry.Start();
         }
@@ -102,6 +107,14 @@ namespace OneTaskBar
         async void Open(NotificationBanner banner)
         {
             if(banner.Opening)return;banner.Opening=true;var entry=banner.Entry;Close(banner,true);
+            await ActivateEntry(entry);
+        }
+        async void OpenEntry(NotificationEntry entry)
+        {
+            await ActivateEntry(entry);
+        }
+        async Task ActivateEntry(NotificationEntry entry)
+        {
             try {var result=await Task.Run(()=>NotificationActivation.Open(entry,false));if(result.Invoked&&result.Exact)shell.Notifications.Dismiss(entry.Id);}
             catch(Exception error){AppLog.Write("notification-banner-open",error.Message);}
         }
@@ -114,7 +127,12 @@ namespace OneTaskBar
             if(!visible.Remove(banner))return;if(visible.Count==0)expiry.Stop();
             if(animate)await banner.Disappear();if(!banner.ClosedFlag)banner.Close();if(!disposed)Layout();
         }
-        internal void Clear(){foreach(var banner in visible.ToArray())Close(banner,false);expiry.Stop();}
+        internal void Clear()
+        {
+            foreach(var banner in visible.ToArray())Close(banner,false);
+            expiry.Stop();
+            if(shell.Island!=null)shell.Island.DismissNotification();
+        }
         public void Dispose(){if(disposed)return;disposed=true;++revision;shell.Notifications.SnapshotReady=null;Clear();if(gate!=null)gate.Dispose();}
     }
     internal sealed class NotificationBanner : GlassWindow

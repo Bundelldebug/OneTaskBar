@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows;
@@ -8,6 +9,7 @@ using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Forms=System.Windows.Forms;
 
@@ -16,17 +18,24 @@ namespace OneTaskBar
     internal sealed class DynamicIsland : GlassWindow
     {
         static readonly Brush Black=Brushes.Black;
+        static readonly Brush Charging=Paint.Brush("#FF79E6A1");
         readonly DynamicIslandState state=new DynamicIslandState();
         readonly Canvas canvas=new Canvas();
         readonly RectangleGeometry clip=new RectangleGeometry();
-        readonly Grid compact=new Grid(),feedback=new Grid(),expanded=new Grid();
+        readonly Grid compact=new Grid(),feedback=new Grid(),expanded=new Grid(),level=new Grid();
         readonly Grid body=new Grid();
+        readonly Border mediaSurface=new Border();
+        readonly Border levelSurface=new Border();
+        readonly PillSlider levelSlider=new PillSlider("volume")
+        {
+            IsHitTestVisible=false,MinWidth=0,Light=true,LinearFill=true,
+            NoTrackBorder=true,GlassStandalone=false,Height=60
+        };
+        readonly IslandNotificationView notification;
         readonly Border art=new Border {Width=20,Height=20,CornerRadius=new CornerRadius(6)};
         readonly TextBlock status=Paint.TextBlock("",12,Paint.ControlWhite),number=Paint.TextBlock("",13,Paint.ControlWhite);
         readonly IslandActivity activity=new IslandActivity();
         readonly Glyph feedbackGlyph=new Glyph("volume",20){Color=Paint.ControlWhite};
-        readonly Border feedbackTrack=new Border {Height=5,Background=Paint.Brush("#FF3D3D3D"),CornerRadius=new CornerRadius(2.5)};
-        readonly Border feedbackFill=new Border {Height=5,Background=Paint.ControlWhite,CornerRadius=new CornerRadius(2.5),HorizontalAlignment=HorizontalAlignment.Left};
         readonly MediaPlayerView player;
         readonly Stopwatch motion=new Stopwatch();
         readonly DispatcherTimer expiry=new DispatcherTimer {Interval=TimeSpan.FromSeconds(1.6)};
@@ -36,6 +45,7 @@ namespace OneTaskBar
         string symbolKey;
         int symbolRequest;
         ImageSource artwork;
+        BitmapSource surfaceArtwork;
         Forms.Screen screen;
         double scale=1;
         Rect host,current,from,target;
@@ -50,6 +60,10 @@ namespace OneTaskBar
         internal bool ExpiryActive {get{return expiry.IsEnabled;}}
         internal Rect Shape {get{return current;}}
         internal MediaPlayerView Player {get{return player;}}
+        internal PillSlider LevelSlider {get{return levelSlider;}}
+        internal Brush MediaSurface {get{return mediaSurface.Background;}}
+        internal IslandNotificationView NotificationView {get{return notification;}}
+        internal bool NotificationVisible {get{return IsVisible&&state.NotificationVisible(DateTime.UtcNow);}}
         internal DynamicIsland(Action<string> command,Func<double,Task<bool>> seek,Action output,Action<string> openApp,Action opening=null,Func<string,AppEntry> sourceApp=null)
         {
             this.opening=opening;
@@ -77,10 +91,6 @@ namespace OneTaskBar
             feedback.ColumnDefinitions.Add(new ColumnDefinition());
             feedback.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(40)});
             feedback.Children.Add(feedbackGlyph);
-            feedbackTrack.Child=feedbackFill;
-            feedbackTrack.VerticalAlignment=VerticalAlignment.Center;
-            feedbackTrack.SizeChanged+=(s,e)=>UpdateFeedbackFill();
-            Grid.SetColumn(feedbackTrack,1);feedback.Children.Add(feedbackTrack);
             status.VerticalAlignment=VerticalAlignment.Center;
             Grid.SetColumn(status,1);feedback.Children.Add(status);
             number.VerticalAlignment=VerticalAlignment.Center;
@@ -94,16 +104,25 @@ namespace OneTaskBar
             root.Children.Add(button);
             feedback.IsHitTestVisible=false;
             root.Children.Add(feedback);
-            expanded.RowDefinitions.Add(new RowDefinition {Height=new GridLength(20)});
+            level.RowDefinitions.Add(new RowDefinition {Height=new GridLength(28)});
+            level.RowDefinitions.Add(new RowDefinition {Height=new GridLength(60)});
+            levelSurface.Background=QuickPanel.Glass;levelSurface.Child=levelSlider;
+            Grid.SetRow(levelSurface,1);level.Children.Add(levelSurface);
+            root.Children.Add(level);
+            notification=new IslandNotificationView(DismissNotification);
+            notification.Open=OpenNotification;
+            root.Children.Add(notification);
+            expanded.RowDefinitions.Add(new RowDefinition {Height=new GridLength(28)});
             expanded.RowDefinitions.Add(new RowDefinition());
             var fold=Paint.Button(new Glyph("chevron",15){Color=Paint.ControlWhite,RenderTransform=new RotateTransform(-90),RenderTransformOrigin=new Point(.5,.5)},()=>SetExpanded(false),"접기");
             fold.Background=Brushes.Transparent;fold.Width=28;fold.Height=22;
             fold.Padding=new Thickness(0);fold.HorizontalAlignment=HorizontalAlignment.Right;
             fold.Margin=new Thickness(0,3,12,0);expanded.Children.Add(fold);
-            player=new MediaPlayerView(command,seek,()=>{SetExpanded(false);output();},openApp:id=>{SetExpanded(false);openApp(id);},sourceApp:sourceApp) {Margin=new Thickness(16,0,16,0)};
+            player=new MediaPlayerView(command,seek,()=>{SetExpanded(false);output();},openApp:id=>{SetExpanded(false);openApp(id);},sourceApp:sourceApp) {Margin=new Thickness(16,4,16,8)};
             player.FitPopup(164);
-            Grid.SetRow(player,1);expanded.Children.Add(player);root.Children.Add(expanded);
-            compact.Visibility=feedback.Visibility=expanded.Visibility=Visibility.Hidden;
+            mediaSurface.Child=player;
+            Grid.SetRow(mediaSurface,1);expanded.Children.Add(mediaSurface);root.Children.Add(expanded);
+            compact.Visibility=feedback.Visibility=expanded.Visibility=level.Visibility=notification.Visibility=Visibility.Hidden;
             Surface.Child=root;
             var decorator=(AdornerDecorator)Content;
             decorator.Child=null;
@@ -123,11 +142,13 @@ namespace OneTaskBar
             Loaded+=(s,e)=>QueuePlacement();
             LocationChanged+=(s,e)=>{if(!placingHost)QueuePlacement();};
             Deactivated+=(s,e)=>{if(state.Expanded&&!IsMouseOver)SetExpanded(false);};
-            Closed+=(s,e)=>{closed=true;activity.SetPlaying(false);StopMotion();StopOutside();expiry.Stop();player.Update(new MediaState(),null);media=null;artwork=null;art.Background=null;};
+            Closed+=(s,e)=>{closed=true;activity.SetPlaying(false);StopMotion();StopOutside();expiry.Stop();ClearNotification();player.Update(new MediaState(),null);media=null;artwork=null;surfaceArtwork=null;art.Background=mediaSurface.Background=null;};
         }
         internal override void RefreshGlassMaterial()
         {
-            // This black activity surface intentionally keeps its own contrast palette.
+            // The header stays black. Only the shared level surface follows the panel theme.
+            levelSurface.Background=QuickPanel.Glass;
+            levelSlider.InvalidateVisual();
         }
         internal void Present(MediaState value,string output,Forms.Screen monitor,double dpi,System.Drawing.Rectangle? work=null)
         {
@@ -153,7 +174,11 @@ namespace OneTaskBar
                     if(artwork==null)art.Background=null;
                     else{var brush=new ImageBrush(artwork){Stretch=Stretch.UniformToFill};brush.Freeze();art.Background=brush;}
                 }
-                if(state.Expanded)player.Update(media,output);
+                if(state.Expanded)
+                {
+                    player.Update(media,output);
+                    UpdateMediaSurface();
+                }
             }
             else if(artwork!=null){artwork=null;art.Background=null;}
             RefreshPresentation();
@@ -187,9 +212,53 @@ namespace OneTaskBar
         internal void ShowFeedback(string kind,double value,bool muted)
         {
             if(!IsVisible||closed)return;
+            if(kind!="charge"&&NotificationVisible)ClearNotification();
             state.Feedback(kind,value,muted,DateTime.UtcNow);
-            expiry.Stop();expiry.Interval=TimeSpan.FromSeconds(kind=="charge"?3:1.6);expiry.Start();
+            ArmExpiry();
             RefreshPresentation();
+        }
+        Action<NotificationEntry> openNotification;
+        internal bool ShowNotification(NotificationEntry entry,Action<NotificationEntry> open)
+        {
+            if(closed||!IsVisible||state.Expanded||entry==null)return false;
+            notification.Present(entry);
+            openNotification=open;
+            state.NotificationUntil=DateTime.UtcNow.AddSeconds(7);
+            ArmExpiry();
+            RefreshPresentation();
+            return true;
+        }
+        internal void RetainNotification(HashSet<string> keys)
+        {
+            var entry=notification.Entry;
+            if(entry!=null&&!keys.Contains(NotificationBanners.Key(entry)))DismissNotification();
+        }
+        void OpenNotification(NotificationEntry entry)
+        {
+            var open=openNotification;
+            DismissNotification();
+            if(open!=null)open(entry);
+        }
+        internal void DismissNotification()
+        {
+            ClearNotification();
+            ArmExpiry();
+            if(IsVisible&&!closed)RefreshPresentation();
+        }
+        void ClearNotification()
+        {
+            state.NotificationUntil=DateTime.MinValue;
+            notification.Present(null);
+            openNotification=null;
+        }
+        void ArmExpiry()
+        {
+            expiry.Stop();
+            var until=state.FeedbackUntil>state.NotificationUntil?state.FeedbackUntil:state.NotificationUntil;
+            var remaining=until-DateTime.UtcNow;
+            if(remaining<=TimeSpan.Zero||closed||!IsVisible)return;
+            expiry.Interval=TimeSpan.FromMilliseconds(Math.Max(1,remaining.TotalMilliseconds));
+            expiry.Start();
         }
         internal void ExpireFeedback()
         {
@@ -197,41 +266,55 @@ namespace OneTaskBar
             if(closed||!IsVisible)return;
             // Dispatcher timers may fire just before the UTC deadline on a coarse clock.
             // Keep the one-shot wakeup until the feedback really expires.
-            var remaining=state.FeedbackUntil-DateTime.UtcNow;
+            if(notification.Entry!=null&&IsMouseOver)state.NotificationUntil=DateTime.UtcNow.AddSeconds(2);
+            var until=state.FeedbackUntil>state.NotificationUntil?state.FeedbackUntil:state.NotificationUntil;
+            var remaining=until-DateTime.UtcNow;
             if(remaining>TimeSpan.Zero)
             {
                 expiry.Interval=TimeSpan.FromMilliseconds(Math.Max(1,remaining.TotalMilliseconds));
                 expiry.Start();
                 return;
             }
+            ClearNotification();
             RefreshPresentation();
         }
         void RefreshPresentation()
         {
-            bool active=media!=null,detail=state.Expanded&&active,show=state.FeedbackVisible(DateTime.UtcNow)&&!detail;
-            bool compactVisible=active&&!show&&!detail;
+            bool active=media!=null,detail=state.Expanded&&active;
+            bool notice=state.NotificationVisible(DateTime.UtcNow)&&!detail;
+            bool show=state.FeedbackVisible(DateTime.UtcNow)&&!detail&&!notice;
+            bool charge=show&&state.FeedbackKind=="charge";
+            bool compactVisible=active&&!show&&!detail&&!notice;
             ShowContent(compact,compactVisible);
             activity.SetPlaying(compactVisible&&media.Playing&&Motion.Enabled);
-            ShowContent(feedback,show);
+            ShowContent(feedback,charge);
+            ShowContent(level,show&&!charge);
+            ShowContent(notification,notice);
             ShowContent(expanded,detail);
             if(show)
             {
                 string kind=state.FeedbackKind;
                 RefreshDeviceSymbol(kind);
                 feedbackGlyph.Kind=kind=="charge"?"battery":kind=="brightness"?"brightness":SoundIcon.For(state.Value,state.Muted,true);
-                feedbackGlyph.Color=kind=="charge"?Paint.Brush("#FF79E6A1"):Paint.ControlWhite;
+                feedbackGlyph.Color=Charging;
                 feedbackGlyph.InvalidateVisual();
                 status.Text=kind=="charge"?"충전 중":"";
                 status.Visibility=kind=="charge"?Visibility.Visible:Visibility.Collapsed;
-                feedbackTrack.Visibility=kind=="charge"?Visibility.Collapsed:Visibility.Visible;
                 number.Text=Math.Round(state.Muted?0:state.Value)+"%";
-                UpdateFeedbackFill();
+                levelSlider.Kind=kind=="brightness"?"brightness":SoundIcon.For(state.Value,state.Muted,true);
+                levelSlider.Value=state.Muted?0:state.Value;
             }
             var size=state.Size(active,DateTime.UtcNow);
             size.Height=Math.Min(size.Height,host.Height);
             MoveTo(DynamicIslandLayout.Capsule(size,host.Width));
         }
-        void UpdateFeedbackFill(){feedbackFill.Width=Math.Max(0,feedbackTrack.ActualWidth)*(state.Muted?0:state.Value)/100;}
+        void UpdateMediaSurface()
+        {
+            var source=media==null?null:media.Artwork;
+            if(mediaSurface.Background!=null&&Object.ReferenceEquals(surfaceArtwork,source))return;
+            surfaceArtwork=source;
+            mediaSurface.Background=ArtworkPalette.IslandSurface(source);
+        }
         internal void OutputChanged(string name){outputName=name;if(FeedbackVisible)RefreshPresentation();}
         async void RefreshDeviceSymbol(string kind)
         {
@@ -241,11 +324,12 @@ namespace OneTaskBar
             symbolKey=key;
             int request=++symbolRequest;
             feedbackGlyph.SetDeviceIcon(null);
+            levelSlider.SetDeviceIcon(null);
             if(key==null)return;
             try
             {
                 var image=await BackgroundWork.Run(()=>BudsDeviceData.ShortcutIcon(name));
-                if(!closed&&request==symbolRequest)feedbackGlyph.SetDeviceIcon(image);
+                if(!closed&&request==symbolRequest)levelSlider.SetDeviceIcon(image);
             }
             catch(Exception error){AppLog.Once("island-device-symbol",error.GetType().Name);}
         }
@@ -267,12 +351,15 @@ namespace OneTaskBar
                 previousWindow=Native.GetForegroundWindow();
                 if(opening!=null)opening();
                 player.Update(media,outputName);
+                UpdateMediaSurface();
                 outsideClick=MenuDismiss.Watch(ContainsScreenPoint,()=>SetExpanded(false));
                 Activate();player.PlayButton.Focus();
             }
             else
             {
                 player.Update(new MediaState(),null);
+                mediaSurface.Background=null;
+                surfaceArtwork=null;
                 if(Native.GetForegroundWindow()==handle&&Native.IsWindow(previousWindow))Native.Activate(previousWindow);
             }
             RefreshPresentation();
@@ -296,7 +383,8 @@ namespace OneTaskBar
             target=next;from=current;
             body.Width=next.Width;body.Height=next.Height;
             fromRadius=currentRadius;
-            targetRadius=Math.Min(Math.Min(next.Width,next.Height)/2,state.Expanded?29:100);
+            bool card=state.Expanded||NotificationVisible||next.Height>32;
+            targetRadius=Math.Min(Math.Min(next.Width,next.Height)/2,card?29:100);
             if(!Motion.Enabled||current.IsEmpty){StopMotion();current=target;currentRadius=targetRadius;PlaceShape();return;}
             motion.Restart();
             if(!animating){animating=true;lastRendering=TimeSpan.MinValue;CompositionTarget.Rendering+=Frame;}
@@ -328,11 +416,12 @@ namespace OneTaskBar
             if(closed||!IsVisible&&!animating&&!expiry.IsEnabled)return;
             activity.SetPlaying(false);
             StopMotion();StopOutside();expiry.Stop();state.Reset();
+            ClearNotification();
             var handle=new WindowInteropHelper(this).Handle;
             if(handle!=IntPtr.Zero)Native.SetWindowLong(handle,-20,Native.GetWindowLong(handle,-20)|0x08000000);
             player.Update(new MediaState(),null);
-            media=null;artwork=null;art.Background=null;target=Rect.Empty;
-            symbolRequest++;symbolKey=null;feedbackGlyph.SetDeviceIcon(null);
+            media=null;artwork=null;surfaceArtwork=null;art.Background=mediaSurface.Background=null;target=Rect.Empty;
+            symbolRequest++;symbolKey=null;feedbackGlyph.SetDeviceIcon(null);levelSlider.SetDeviceIcon(null);
             ((Window)this).Hide();
         }
         internal object Inspect()

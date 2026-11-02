@@ -12,7 +12,9 @@ namespace OneTaskBar
         internal double Value;
         internal bool Muted;
         internal DateTime FeedbackUntil;
+        internal DateTime NotificationUntil;
         internal bool FeedbackVisible(DateTime now){return FeedbackKind!=null&&now<FeedbackUntil;}
+        internal bool NotificationVisible(DateTime now){return now<NotificationUntil;}
         internal void Feedback(string kind,double value,bool muted,DateTime now)
         {
             FeedbackKind=kind;
@@ -22,15 +24,16 @@ namespace OneTaskBar
         }
         internal Size Size(bool media,DateTime now)
         {
-            if(Expanded&&media)return new Size(360,184);
-            if(FeedbackVisible(now))return new Size(240,28);
+            if(Expanded&&media)return new Size(360,204);
+            if(NotificationVisible(now))return new Size(360,156);
+            if(FeedbackVisible(now))return FeedbackKind=="charge"?new Size(240,28):new Size(286,88);
             return media?new Size(112,28):new Size(56,18);
         }
-        internal void Reset(){Expanded=false;FeedbackKind=null;FeedbackUntil=DateTime.MinValue;}
+        internal void Reset(){Expanded=false;FeedbackKind=null;FeedbackUntil=NotificationUntil=DateTime.MinValue;}
     }
     internal static class DynamicIslandLayout
     {
-        internal const double MaximumWidth=360,MaximumHeight=184,TopInset=2;
+        internal const double MaximumWidth=360,MaximumHeight=204,TopInset=2;
         internal static Rect Host(System.Drawing.Rectangle screen,System.Drawing.Rectangle work,double scale)
         {
             scale=Math.Max(1,scale);

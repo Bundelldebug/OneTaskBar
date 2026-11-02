@@ -9,6 +9,31 @@ namespace OneTaskBar
         static readonly ConditionalWeakTable<BitmapSource,ArtworkPalette> cache=new ConditionalWeakTable<BitmapSource,ArtworkPalette>();
         static readonly ConditionalWeakTable<BitmapSource,Brush> playerSurfaces=new ConditionalWeakTable<BitmapSource,Brush>();
         static readonly ConditionalWeakTable<BitmapSource,Brush> outputSurfaces=new ConditionalWeakTable<BitmapSource,Brush>();
+        static readonly ConditionalWeakTable<BitmapSource,Brush> islandSurfaces=new ConditionalWeakTable<BitmapSource,Brush>();
+        internal static Brush IslandSurface(BitmapSource source)
+        {
+            if(source==null)return Neutral.Solid;
+            return islandSurfaces.GetValue(source,image=>
+            {
+                var palette=Read(image);
+                var drawing=new DrawingGroup();
+                var bounds=new System.Windows.Rect(0,0,360,176);
+                using(var context=drawing.Open())
+                {
+                    context.DrawRectangle(palette.Solid,null,bounds);
+                    context.PushOpacity(.46);
+                    context.DrawRectangle(OutputSurface(image),null,bounds);
+                    context.Pop();
+                    context.PushOpacity(.68);
+                    context.DrawRectangle(palette.Glass,null,bounds);
+                    context.Pop();
+                }
+                drawing.Freeze();
+                var brush=new DrawingBrush(drawing){Stretch=Stretch.UniformToFill};
+                brush.Freeze();
+                return brush;
+            });
+        }
         internal static Brush OutputSurface(BitmapSource source)
         {
             if(source==null)return Brushes.Transparent;return outputSurfaces.GetValue(source,image=>{

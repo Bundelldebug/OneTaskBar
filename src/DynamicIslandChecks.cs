@@ -24,7 +24,11 @@ namespace OneTaskBar
             state.Feedback("volume",135,false,now);
             Require(state.Value==100&&state.FeedbackVisible(now)&&!state.FeedbackVisible(now.AddSeconds(2)),"level values and transient lifetime are bounded");
             state.Expanded=true;
-            Require(state.Size(true,now).Height==184,"feedback cannot interrupt expanded media controls");
+            Require(state.Size(true,now).Height==204,"feedback cannot interrupt expanded media controls");
+            state.Expanded=false;
+            state.NotificationUntil=now.AddSeconds(7);
+            Require(state.Size(true,now)==new Size(360,156)&&!state.NotificationVisible(now.AddSeconds(8)),
+                "notifications have priority over feedback and a bounded lifetime");
             state.Reset();
             Require(!state.Expanded&&!state.FeedbackVisible(now),"suspend clears transient state");
             foreach(double dpi in new[]{1.0,1.25,1.5,2,2.5})foreach(int edge in new[]{0,1,2,3})
@@ -79,21 +83,47 @@ namespace OneTaskBar
                     Require(!view.HasBlur,"a solid black island creates no live backdrop renderer");
                     Program.Save(view.Surface,112,28,Path.Combine(AppLog.Data,"island-media.png"));
                     view.SetExpanded(true);await Task.Delay(330);
-                    Require(view.Expanded&&!view.Animating&&view.Shape.Height==184,"media expands and settles");
-                    Require(view.Player.ActualHeight>0&&view.Player.ActualHeight+20<=view.Shape.Height+.5,"transport and timeline fit inside the capsule");
+                    Require(view.Expanded&&!view.Animating&&view.Shape.Height==204,"media expands and settles");
+                    Require(view.Player.ActualHeight>0&&view.Player.ActualHeight+28<=view.Shape.Height+.5,"transport and timeline fit below the black header");
+                    Require(view.Surface.Background==Brushes.Black&&
+                        Object.ReferenceEquals(view.MediaSurface,ArtworkPalette.IslandSurface(media.Artwork)),
+                        "only the expanded lower panel uses the cached artwork-colored blur");
                     view.Player.PlayButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                     Require(commands.Count==1&&commands[0]=="play","transport uses the shared media command");
-                    Program.Save(view.Surface,360,184,Path.Combine(AppLog.Data,"island-expanded.png"));
+                    Program.Save(view.Surface,360,204,Path.Combine(AppLog.Data,"island-expanded.png"));
                     view.SetExpanded(false);await Task.Delay(280);
                     Require(!view.Expanded&&Native.GetForegroundWindow()==new WindowInteropHelper(source).Handle,"collapse returns focus to the previous fixture window");
                     view.ShowFeedback("volume",43,false);await Task.Delay(280);
-                    Require(view.FeedbackVisible&&view.ExpiryActive&&view.Shape.Width==240,"volume feedback replaces the compact media row");
+                    Require(view.FeedbackVisible&&view.ExpiryActive&&view.Shape.Width==286&&view.Shape.Height==88,
+                        "volume feedback uses a full-size capsule below the black header");
+                    Require(view.LevelSlider.ActualHeight==60&&view.LevelSlider.LinearFill&&view.LevelSlider.NoTrackBorder&&
+                        !view.LevelSlider.DarkTrack&&view.LevelSlider.Value==43,
+                        "island level feedback shares the quick-settings capsule geometry and value");
                     view.ExpireFeedback();
                     Require(view.FeedbackVisible&&view.ExpiryActive,"an early timer tick retains the expiry wakeup");
-                    Program.Save(view.Surface,240,28,Path.Combine(AppLog.Data,"island-volume.png"));
+                    Program.Save(view.Surface,286,88,Path.Combine(AppLog.Data,"island-volume.png"));
                     var expiryDeadline=DateTime.UtcNow.AddSeconds(3);
                     while((view.FeedbackVisible||view.ExpiryActive||view.Animating)&&DateTime.UtcNow<expiryDeadline)await Task.Delay(25);
                     Require(!view.FeedbackVisible&&!view.ExpiryActive&&!view.Animating&&view.Shape.Width==112,"feedback expires once and restores media without polling");
+                    view.ShowFeedback("brightness",62,false);await Task.Delay(280);
+                    Require(view.LevelSlider.Kind=="brightness"&&view.LevelSlider.Value==62,
+                        "brightness feedback resets the sound icon and retains the shared capsule style");
+                    Program.Save(view.Surface,286,88,Path.Combine(AppLog.Data,"island-brightness.png"));
+                    var notice=new NotificationEntry {Id=1,App="테스트 앱",AppId="fixture",Title="새 알림",Body="알림 내용과 원래 알림 열기 동작을 표시합니다.",Icon=media.Artwork};
+                    var noticeForeground=Native.GetForegroundWindow();
+                    Require(view.ShowNotification(notice,entry=>commands.Add("notification:"+entry.Id)),"accepted notification can use the island");
+                    await Task.Delay(280);
+                    Require(view.NotificationVisible&&view.NotificationView.Entry==notice&&view.ExpiryActive&&
+                        Native.GetForegroundWindow()==noticeForeground,
+                        "notification presentation does not steal foreground focus; before="+noticeForeground+"; after="+Native.GetForegroundWindow());
+                    Program.Save(view.Surface,360,156,Path.Combine(AppLog.Data,"island-notification.png"));
+                    view.NotificationView.OpenButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    Require(!view.NotificationVisible&&view.NotificationView.Entry==null&&commands.Contains("notification:1"),
+                        "opening clears retained content and invokes the original entry once");
+                    view.ShowNotification(notice,entry=>{});
+                    view.RetainNotification(new HashSet<string>());
+                    Require(!view.NotificationVisible&&view.NotificationView.Entry==null,
+                        "removal from native history releases a visible island notification");
                     for(int i=0;i<6;i++){view.SetExpanded(true);await Task.Delay(25);view.SetExpanded(false);await Task.Delay(25);}
                     await Task.Delay(300);
                     Require(!view.Expanded&&!view.Animating,"rapid reversals settle without a second motion subscription");
@@ -106,7 +136,7 @@ namespace OneTaskBar
                     Program.Save(view.Surface,240,28,Path.Combine(AppLog.Data,"island-charging.png"));
                     if(inspect){AppLog.Json("island-preview.json",new {ready=true});for(int i=0;i<120&&!File.Exists(Path.Combine(AppLog.Data,"preview-done"));i++)await Task.Delay(250);}
                     view.Suspend();
-                    AppLog.Json("dynamic-island-probe.json",new {passed=true,betaOnly=true,disabledByDefault=true,sharedMediaCommands=true,persistentTopSafeArea=true,nativeSafeAreaVerified=safeAreaVerified,fullscreenReleasesWorkspace=safeAreaVerified,crashRestoresWorkspace=safeAreaVerified,mixedDpiAndFourEdges=true,compactDoesNotStealFocus=true,rapidReversalsSettle=true,expiryTimerStops=true,hiddenInputAndMotionReleased=true,noLiveBackdrop=true,deviceValuesChanged=false});
+                    AppLog.Json("dynamic-island-probe.json",new {passed=true,disabledByDefault=true,sharedMediaCommands=true,blackHeaderWithArtworkBlur=true,sharedCapsuleLevels=true,acceptedNotificationRouting=true,persistentTopSafeArea=true,nativeSafeAreaVerified=safeAreaVerified,fullscreenReleasesWorkspace=safeAreaVerified,crashRestoresWorkspace=safeAreaVerified,mixedDpiAndFourEdges=true,compactDoesNotStealFocus=true,rapidReversalsSettle=true,expiryTimerStops=true,hiddenInputAndMotionReleased=true,noLiveBackdrop=true,deviceValuesChanged=false});
                     result=0;
                 }
                 catch(Exception error){AppLog.Json("dynamic-island-probe.json",new {passed=false,error=error.ToString(),island=view==null?null:view.Inspect()});}

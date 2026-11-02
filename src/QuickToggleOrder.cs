@@ -19,6 +19,38 @@ namespace OneTaskBar
         internal bool Extract(string key){return Defaults.Contains(key)&&!outside.Contains(key)&&Commit(Keys,outside.Concat(new[]{key}).ToArray());}
         internal bool Regroup(string key){return Defaults.Contains(key)&&outside.Contains(key)&&Commit(Keys.Where(k=>k!=key).Concat(new[]{key}).ToArray(),outside.Where(k=>k!=key).ToArray());}
         internal bool Contains(string key){return Defaults.Contains(key)&&!outside.Contains(key);}
-        bool Commit(string[] order,string[] external){try{Directory.CreateDirectory(Path.GetDirectoryName(file));string temp=file+".tmp";File.WriteAllText(temp,new JavaScriptSerializer().Serialize(new Saved {Order=order,Outside=external}));if(File.Exists(file))File.Replace(temp,file,file+".previous");else File.Move(temp,file);Keys=order;outside.Clear();foreach(string key in external)outside.Add(key);return true;}catch(Exception e){AppLog.Write("quick9-action-order-save",e.GetType().Name);return false;}}
+        bool Commit(string[] order,string[] external)
+        {
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(file));
+                string temp=file+".tmp";
+                File.WriteAllText(temp,new JavaScriptSerializer().Serialize(new Saved {Order=order,Outside=external}));
+                for(int attempt=0;;attempt++)
+                {
+                    try
+                    {
+                        if(File.Exists(file))File.Replace(temp,file,file+".previous");
+                        else File.Move(temp,file);
+                        break;
+                    }
+                    catch(IOException error)
+                    {
+                        int code=error.HResult&0xffff;
+                        if(attempt>=2||(code!=32&&code!=33))throw;
+                        System.Threading.Thread.Sleep(10);
+                    }
+                }
+                Keys=order;
+                outside.Clear();
+                foreach(string key in external)outside.Add(key);
+                return true;
+            }
+            catch(Exception error)
+            {
+                AppLog.Write("quick9-action-order-save",error.GetType().Name+" 0x"+error.HResult.ToString("X8")+": "+error.Message);
+                return false;
+            }
+        }
     }
 }

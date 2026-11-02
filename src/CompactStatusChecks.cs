@@ -17,7 +17,20 @@ namespace OneTaskBar
         static IEnumerable<T> Children<T>(DependencyObject root) where T:DependencyObject{var own=root as T;if(own!=null)yield return own;foreach(object item in LogicalTreeHelper.GetChildren(root)){var node=item as DependencyObject;if(node!=null)foreach(var child in Children<T>(node))yield return child;}}
         internal static void Validate(List<string> checks)
         {
-            Require(!new PreferenceData().SliderValueNumbers,"slider numbers default off");var serializer=new JavaScriptSerializer();foreach(bool enabled in new[]{false,true}){var settings=serializer.Deserialize<PreferenceData>(serializer.Serialize(new PreferenceData {DuoStatusIcon=enabled,SliderValueNumbers=enabled}));Require(settings.DuoStatusIcon==enabled&&settings.SliderValueNumbers==enabled,"both independent options round-trip");}
+            var defaults=new PreferenceData();
+            Require(!defaults.DuoStatusIcon&&!defaults.SliderValueNumbers,"Duo icon and slider numbers default off");
+            var serializer=new JavaScriptSerializer();
+            Require(!serializer.Deserialize<PreferenceData>("{\"UIVersion\":90}").DuoStatusIcon,
+                "older settings without a Duo preference retain the off default");
+            foreach(bool enabled in new[]{false,true})
+            {
+                var settings=serializer.Deserialize<PreferenceData>(serializer.Serialize(new PreferenceData
+                {
+                    DuoStatusIcon=enabled,SliderValueNumbers=enabled
+                }));
+                Require(settings.DuoStatusIcon==enabled&&settings.SliderValueNumbers==enabled,
+                    "explicit on and off settings survive the stable upgrade");
+            }
             foreach(double volume in new[]{0.0,1,25,26,50,51,75,76,100}){int expected=volume<=0?0:volume<=25?1:volume<=50?2:volume<=75?3:4;Require(DuoStatusGlyph.Dots(volume,false,true)==expected&&DuoStatusGlyph.Dots(volume,true,true)==0&&DuoStatusGlyph.Dots(volume,false,false)==0,"volume dots reflect endpoints, mute and missing devices");}
             Require(DuoStatusGlyph.Dots(Double.NaN,false,true)==0&&DuoStatusGlyph.Dots(300,false,true)==4,"invalid volume is bounded");Require(DockGeometry.SideStatusWidth==44&&DockGeometry.SideStatusLength(58)==128&&DockGeometry.SideStatusLength(0)==106,"side status remains narrow with or without power data");var date=new DateTime(2026,10,26,13,52,2);Require(DockGeometry.ClockLabel(date,true,true).Split('\n').Length==3&&DockGeometry.ClockLabel(date,true,false).Contains("2026-10-26"),"compact clock fits three lines while horizontal clock keeps the year");
             for(int i=0;i<4;i++){var dot=DuoStatusGlyph.VolumeDot(i);Require(Math.Abs((dot-DuoStatusGlyph.RingCenter).Length-12.7)<.001,"volume dots follow the battery arc curvature");}Require(DuoStatusGlyph.VolumeDot(1).Y>DuoStatusGlyph.VolumeDot(0).Y&&DuoStatusGlyph.VolumeDot(2).Y>DuoStatusGlyph.VolumeDot(3).Y,"center dots are lower than the outer dots");

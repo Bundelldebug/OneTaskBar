@@ -19,7 +19,7 @@ Start with the relevant row in `docs/DEBUGGING.md`. Search exact symbols with `r
 
 Build: `./Build.ps1 -SkipTests`. Run relevant isolated fixtures: `./tools/Test-UI.ps1 -Area Quick` (or `-List`). CI uses the same runner with `-Area All`. Read its `summary.json` first and only the failed probe's JSON. Report directories and fixture settings live under ignored `.qa-data/`.
 
-Stable builds expose UI 8.5/9.0; beta also exposes 9.5 through `ReleaseFeatures.GlassUI`. Shared fixes belong in both release branches. Preserve persisted widget/toggle keys, pins, settings and the disabled-by-default options during changes.
+Starting with stable 9.5.0, all former beta features are available alongside UI 8.5/9.0. `ReleaseFeatures.GlassUI` is version-based; the release channel changes labels, not feature availability. Preserve persisted widget/toggle keys, pins, settings and the disabled-by-default options during changes. The Windows notification identity has a separate version floor in `Package.appxmanifest` so a switch from the older 9.5.x beta numbering never requires an identity downgrade or consent reset.
 
 Keep normal control flow on separate lines in touched/new code. Split by responsibility rather than adding another large mixed file. Reuse frozen brushes/artwork; unchanged refreshes should not allocate or restart animations. Release timers, backdrop hosts and image caches when their owners retire. Do not force GC or trim the working set to manufacture measurements.
 

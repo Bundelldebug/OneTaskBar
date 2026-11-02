@@ -20,7 +20,15 @@ namespace OneTaskBar
                 new UIVersionChoice {Value=85,Label="8.5",Description="묶음 중심의 기본 빠른 설정입니다. 밝기·음량과 보조 버튼이 같은 줄에 표시됩니다."},
                 new UIVersionChoice {Value=90,Label="9.0",Description="항목별 이동·크기 조절과 독립된 보조 버튼을 지원합니다. 미디어에 웨이브 재생바가 표시됩니다."}
             };
-            if(ReleaseFeatures.GlassUI)values.Add(new UIVersionChoice {Value=95,Label="9.5 베타",Description="9.0의 배치를 유지하면서 실시간 배경 블러와 유리 가장자리 굴절·반사를 적용합니다."});
+            if(ReleaseFeatures.GlassUI)
+            {
+                values.Add(new UIVersionChoice
+                {
+                    Value=95,
+                    Label=ReleaseFeatures.Prerelease?"9.5 베타":"9.5",
+                    Description="9.0의 배치를 유지하면서 실시간 배경 블러와 유리 가장자리 굴절·반사를 적용합니다."
+                });
+            }
             return values.ToArray();
         }
         internal static UIVersionChoice[] Available {get{return choices;}}

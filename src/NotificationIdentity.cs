@@ -42,10 +42,41 @@ namespace OneTaskBar
         // The .NET Framework WinRT URI marshaler uses OriginalString. Normalize it to
         // file:/// explicitly so a Windows path cannot become an empty relative path.
         internal static Uri FileUri(string path){return new Uri(new Uri(Path.GetFullPath(path)).AbsoluteUri,UriKind.Absolute);}
-        internal static string Manifest(){return Manifest(typeof(NotificationIdentity).Assembly.GetName().Version);}
+        // Package versions must remain monotonic even when the public version
+        // returns from historical 9.5.x betas to stable 9.5.0.
+        internal static readonly Version RegistrationVersion=ReadRegistrationVersion();
+
+        static XmlDocument ManifestDocument()
+        {
+            var xml=new XmlDocument();
+            using(var stream=typeof(NotificationIdentity).Assembly.GetManifestResourceStream("OneTaskBar.IdentityManifest"))
+            {
+                if(stream==null)throw new InvalidOperationException("알림 연결 매니페스트가 없습니다.");
+                xml.Load(stream);
+            }
+            return xml;
+        }
+
+        static XmlElement ManifestIdentity(XmlDocument xml)
+        {
+            var ns=new XmlNamespaceManager(xml.NameTable);
+            ns.AddNamespace("p","http://schemas.microsoft.com/appx/manifest/foundation/windows10");
+            return (XmlElement)xml.SelectSingleNode("/p:Package/p:Identity",ns);
+        }
+
+        static Version ReadRegistrationVersion()
+        {
+            var floor=new Version(ManifestIdentity(ManifestDocument()).GetAttribute("Version"));
+            var build=typeof(NotificationIdentity).Assembly.GetName().Version;
+            return floor>build?floor:build;
+        }
+
+        internal static string Manifest(){return Manifest(RegistrationVersion);}
         internal static string Manifest(Version version)
         {
-            var xml=new XmlDocument();using(var stream=typeof(NotificationIdentity).Assembly.GetManifestResourceStream("OneTaskBar.IdentityManifest")){if(stream==null)throw new InvalidOperationException("알림 연결 매니페스트가 없습니다.");xml.Load(stream);}var ns=new XmlNamespaceManager(xml.NameTable);ns.AddNamespace("p","http://schemas.microsoft.com/appx/manifest/foundation/windows10");var identity=(XmlElement)xml.SelectSingleNode("/p:Package/p:Identity",ns);identity.SetAttribute("Version",version.ToString());return xml.OuterXml;
+            var xml=ManifestDocument();
+            ManifestIdentity(xml).SetAttribute("Version",version.ToString());
+            return xml.OuterXml;
         }
         internal static int RegisterHelper(string nonce,string userSid)
         {
@@ -58,7 +89,7 @@ namespace OneTaskBar
                     var registered=manager.FindPackagesForUser("",Name,Publisher)
                         .Where(p=>p.Id.Name==Name&&String.Equals(p.Id.Publisher,Publisher,StringComparison.OrdinalIgnoreCase))
                         .OrderByDescending(p=>NotificationRegistration.VersionOf(p)).FirstOrDefault();
-                    Version version=NotificationRegistration.ForLocation(typeof(NotificationIdentity).Assembly.GetName().Version,
+                    Version version=NotificationRegistration.ForLocation(RegistrationVersion,
                         registered==null?null:NotificationRegistration.VersionOf(registered),
                         registered!=null&&!NotificationRegistration.SameDirectory(registered.EffectiveExternalPath,external));
                     string folder=Path.Combine(AppLog.Data,"notification-identity");

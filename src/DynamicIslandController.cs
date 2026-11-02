@@ -63,6 +63,10 @@ namespace OneTaskBar
             if(hud!=null&&hud.IsVisible)hud.HideImmediately();
             return true;
         }
+        internal bool IslandNotification(NotificationEntry entry,Action<NotificationEntry> open)
+        {
+            return IslandEnabled&&Island!=null&&Island.ShowNotification(entry,open);
+        }
         void CloseIsland()
         {
             if(Island!=null){Island.Close();Island=null;}

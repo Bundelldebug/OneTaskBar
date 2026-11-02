@@ -1,5 +1,13 @@
 # Validation
 
+## 9.5.0
+
+- Stable 9.5.0 includes the complete former beta feature set and UI 8.5/9.0/9.5. The clean-install Duo default is off; explicit saved choices remain unchanged.
+- Local release checks passed: self-test plus 28 isolated UI/lifecycle fixtures, installer folder fallbacks, and all 19 portable/setup payload entries. CI reruns the suite on the release commit before publication.
+- Island coverage includes the retained black header, cached artwork-color/blur surface, full capsule level controls, notification display without focus theft, original notification activation, history removal and resource release. No extra notification listener, idle polling, forced collection or working-set trimming was added.
+- Windows notification registration has a separate monotonic version floor so the move from older 9.5.x beta numbering to 9.5.0 does not require an identity downgrade or consent reset. Publisher, family and notification capability remain unchanged.
+- Physical Windows 10 tray testing and the 150 MB total-RAM target remain outstanding. Builds remain unsigned.
+
 ## 9.0.11 / 9.5.8-beta.1
 
 - Local fixtures cover monitor selection and persistence, missing-monitor fallback, status shortcut symbols and layout, mute readback, overview motion and the stable feature gate. CI reruns the full isolated suite on the release commit.

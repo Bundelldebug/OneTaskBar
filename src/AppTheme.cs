@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 namespace OneTaskBar
 {
     internal sealed class AppThemeState
@@ -19,5 +20,13 @@ namespace OneTaskBar
     internal static class ReleaseFeatures
     {
         internal static readonly bool GlassUI=typeof(ReleaseFeatures).Assembly.GetName().Version>=new Version(9,5,0,0);
+        internal static readonly bool Prerelease=ReadPrerelease();
+
+        static bool ReadPrerelease()
+        {
+            var version=Attribute.GetCustomAttribute(typeof(ReleaseFeatures).Assembly,
+                typeof(AssemblyInformationalVersionAttribute)) as AssemblyInformationalVersionAttribute;
+            return version!=null&&version.InformationalVersion.IndexOf('-')>=0;
+        }
     }
 }

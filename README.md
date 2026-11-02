@@ -10,8 +10,9 @@ Use `OneTaskBar-Setup.exe` to install for the current user, or extract the entir
 
 - Move the dock to any screen edge, reorder pinned apps, and choose blur, a solid color, an image or no background.
 - Search installed apps and local files. Create app folders, or group the app screen by Windows Start menu folders.
-- Move and resize quick-settings items. UI 8.5 and 9.0 are available in stable builds; beta builds also offer UI 9.5 glass effects.
+- Move and resize quick-settings items. Choose UI 8.5, 9.0 or 9.5 with live glass effects.
 - Control playback and output devices from quick settings or the media capsule. The optional brightness and volume labels are off by default.
+- Open fullscreen media controls, choose a vertical capsule for side docks, or enable Dynamic Island for media, new notifications and charging, volume and brightness feedback. Media window transitions and the Duo status icon are optional.
 - Switch windows and desktops with previews. Windows' original Start, search, notifications and Alt+Tab remain selectable in settings.
 - Group, expand and swipe away notifications. Custom notification sounds use a local file you choose.
 

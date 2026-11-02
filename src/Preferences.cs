@@ -35,7 +35,7 @@ namespace OneTaskBar
         public bool MaximizedBehindDock=false;
         public bool NativeAltTab=false;
         public bool QuickSliderScroll=false;
-        public bool DuoStatusIcon=true,SliderValueNumbers=false;
+        public bool DuoStatusIcon=false,SliderValueNumbers=false;
         public string[] DockStatusItems=new string[0];
         public bool DockWindowDrop=true;
         public int QuickToggleWidthPercent=100,QuickToggleCollapsedHeight=62;

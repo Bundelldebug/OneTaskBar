@@ -28,6 +28,16 @@ namespace OneTaskBar
                 identity.GetAttribute("Publisher") == NotificationIdentity.Publisher, "revision changes preserve package identity");
             Require(xml.SelectSingleNode("/p:Package/p:Capabilities/*[@Name='userNotificationListener']", ns) != null,
                 "notification capability is retained");
+            var stableFloor=NotificationIdentity.RegistrationVersion;
+            var previousBeta=new Version(9,5,9,1);
+            Require(stableFloor>previousBeta&&stableFloor>=typeof(NotificationIdentity).Assembly.GetName().Version,
+                "stable numbering retains a package version above historical betas");
+            Require(NotificationRegistration.ForLocation(stableFloor,previousBeta,true)==stableFloor,
+                "beta-to-stable relocation upgrades the identity without uninstalling");
+            xml.LoadXml(NotificationIdentity.Manifest());
+            identity=(XmlElement)xml.SelectSingleNode("/p:Package/p:Identity",ns);
+            Require(identity.GetAttribute("Version")==stableFloor.ToString(),
+                "default registration manifest uses the package version floor");
             checks.Add("notification-identity-relocation-preserves-family-and-uses-monotonic-revision");
         }
 
