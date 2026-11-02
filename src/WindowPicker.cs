@@ -15,7 +15,7 @@ namespace OneTaskBar
             foreach(var h in entry.Windows.Where(Native.IsWindow)) {
                 var title=new StringBuilder(512);Native.GetWindowText(h,title,title.Capacity);var handle=h;
                 var titleText=new TextBlock {Text=title.ToString(),TextTrimming=TextTrimming.CharacterEllipsis,MaxWidth=290};
-                var item=new MenuItem {Header=titleText,ToolTip=title.ToString(),Icon=entry.Icon==null?(object)new Glyph("window",18){Color=Paint.Ink}:AppIcons.Visual(entry.Icon,18)}; item.Click+=(s,e)=>Native.Activate(handle);menu.Items.Add(item);
+                var item=new MenuItem {Header=titleText,ToolTip=title.ToString(),Icon=AppIcons.Visual(entry,18)}; item.Click+=(s,e)=>Native.Activate(handle);menu.Items.Add(item);
             }
             if(!windowsOnly) {
                 if(menu.Items.Count>0)menu.Items.Add(new Separator());

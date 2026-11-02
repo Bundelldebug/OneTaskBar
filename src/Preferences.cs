@@ -37,6 +37,7 @@ namespace OneTaskBar
         public bool NativeStartKey=true,NativeSearch=false;
         public bool NativeStartButton=false;
         public bool GroupAppsByStartMenu=false;
+        public bool SquircleIcons=false;
         public bool MaximizedBehindDock=false;
         public bool NativeAltTab=false;
         public bool QuickSliderScroll=false;
@@ -71,6 +72,10 @@ namespace OneTaskBar
         internal static void SetAppearance(Action<PreferenceData> change)
         {
             change(Current);Normalize(Current);Save();var notify=AppearanceChanged;if(notify!=null)notify();
+        }
+        internal static void SetAppIcons(bool enabled)
+        {
+            Current.SquircleIcons=enabled;Save();AppIconTheme.NotifyChanged();
         }
         internal static void Save()
         {

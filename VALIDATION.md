@@ -1,5 +1,12 @@
 # Validation
 
+## 9.5.2
+
+- Optional squircle icons use the original app artwork, retain existing squircle silhouettes, and preserve native source pixels in frozen drawings. Spotify keeps its circular green icon on a black tile. The editor supports per-app images, color and artwork size, plus PNG/ICO export; new installations keep this option off.
+- Shape and color analysis is shared for immutable source images through weak keys. Cached metadata retains no bitmap or analysis pixel buffer. Explicit tile colors skip palette sampling, mutable icons are reanalyzed, and editor custom images load off the UI thread.
+- All 31 local isolated UI/lifecycle fixtures passed. The icon fixture covers the reference outline, native artwork and resolution, existing Samsung shapes, browser profile identity, live option changes, metadata reuse and invalidation, bounded themed-image caching, persisted overrides and repeated atomic exports.
+- A separate STA microbenchmark repeated shape detection, automatic conversion and palette lookup 100 times on the same frozen source. It took 30.89 ms before and 3.06 ms after; the rendered pixel hashes matched. This measures icon processing, not total app speed or battery drain. The total-RAM target remains 150 MB; no forced collection or working-set trimming is used.
+
 ## 9.5.1
 
 - Fullscreen media uses the shared player controls and a single artwork visual. Its collapsed presentation is a 440 × 104 DIP pill with play/next buttons and a decorative wave; expanded playback retains the full controller. Isolated fixtures cover UI 8.5/9.0/9.5, rapid reversal, live updates during a transition, compact commands, small displays and hidden-window cleanup.

@@ -14,6 +14,7 @@ Use this routing table before reading source. The probe runner prints one result
 
 | Symptom | Read first | Fixture area / useful report |
 | --- | --- | --- |
+| Squircle outline, native artwork, per-app override, export or icon toggle | `SquircleGeometry.cs` shares the Samsung-style outline with brand assets; `AppIconShape.cs` masks native images; `AppIconTheme.cs` has a bounded frozen-image cache. `AppIconFiles.cs` owns overrides/export, `AppIconStudio.cs` owns the editor. Never replace app artwork with drawn logos. `AppIcons.DeferredIcon` refreshes visible presenters on `AppIconTheme.Changed`, without device rescans. | Launcher / `squircle-icon-probe`; optional `--live-icons` compares installed app sources |
 | New widget appears below a gap | `QuickWidgetLayout.PlaceFirst` in `QuickWidgetModel.cs`, `QuickGridSurface.ExtractAction` in `QuickGridEditing.cs` | Quick / `quick9-probe` |
 | Toggle group order, extraction, adding or resizing | `QuickGridEditing.cs`, `QuickToggleOrder.cs`, `QuickWidgetBoard.cs` | Quick |
 | Wrong connected state or unchanged control flicker | `QuickGridState.cs`, `QuickToggleButton.cs`, `BudsConnection.cs` | Quick; Dock / `desktop-behavior-probe` |

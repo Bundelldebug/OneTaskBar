@@ -10,6 +10,7 @@ Use `OneTaskBar-Setup.exe` to install for the current user, or extract the entir
 
 - Move the dock to any screen edge, reorder pinned apps, and choose blur, a solid color, an image or no background.
 - Search installed apps and local files. Create app folders, or group the app screen by Windows Start menu folders.
+- Fit original app artwork into squircles, with a per-app editor and PNG/ICO export. Existing squircle icons are preserved.
 - Move and resize quick-settings items. Choose UI 8.5, 9.0 or 9.5 with live glass effects.
 - Control playback and output devices from quick settings or the media capsule. The optional brightness and volume labels are off by default.
 - Open fullscreen media controls, choose a vertical capsule for side docks, or enable Dynamic Island for media, new notifications and charging, volume and brightness feedback. The dock media capsule, window transitions and Duo status icon each have their own switch.
@@ -17,6 +18,8 @@ Use `OneTaskBar-Setup.exe` to install for the current user, or extract the entir
 - Group, expand and swipe away notifications. Custom notification sounds use a local file you choose.
 
 The dock's Start button opens the app screen or Start menu according to settings. Click it again or click outside to close the menu. App context menus provide pinning, folders and supported desktop-app actions.
+
+The squircle option is off by default under Appearance. The icon editor accepts local images, adjusts artwork size and background color, and can keep an app's original icon. It changes One TaskBar's presentation only. For image conversion, run `OneTaskBar.exe --make-squircle-icon "input.png" "output.ico"`.
 
 ## Shortcuts and recovery
 

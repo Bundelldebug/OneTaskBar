@@ -21,20 +21,59 @@ namespace OneTaskBar
         internal static int CachedCount {get{lock(cacheLock)return cache.Count;}}
         static string Key(AppEntry app){string key=!String.IsNullOrEmpty(app.AppID)&&app.AppID.Contains("!")?app.AppID:(app.AppID??"")+"|"+(app.Target??app.Executable??"");return WebAppIcons.HasSeparateIdentity(app.AppID)?app.AppID+(app.Windows.Count>0?"|window":"|shortcut"):key;}
         static ImageSource Ready(AppEntry app){lock(cacheLock){CachedIcon item;if(!cache.TryGetValue(Key(app),out item)||!item.Image.IsValueCreated)return null;recent.Remove(item.Position);recent.AddFirst(item.Position);return item.Image.Value;}}
-        internal static FrameworkElement Visual(AppEntry app,double size){var image=app.Icon??Ready(app);return image!=null?Visual(image,size):new DeferredIcon(app,size);}
+        internal static FrameworkElement Visual(AppEntry app,double size){return new DeferredIcon(app,size);}
         // Decode only icons that have entered a visible viewport, with bounded parallel work.
         sealed class DeferredIcon : Decorator
         {
-            readonly AppEntry entry;readonly double size;ScrollViewer scroll;bool requested;int attempts;
-            internal DeferredIcon(AppEntry app,double pixels){entry=app;size=pixels;Width=Height=size;Child=new Glyph("window",size){Color=Paint.Text};Loaded+=(s,e)=>{if(!requested)attempts=0;Observe();};Unloaded+=(s,e)=>Stop();SizeChanged+=(s,e)=>Check();IsVisibleChanged+=(s,e)=>{if(IsVisible){if(!requested)attempts=0;Observe();}else Stop();};}
+            readonly AppEntry entry;
+            readonly double size;
+            ImageSource source;
+            ScrollViewer scroll;
+            bool requested,subscribed;
+            int attempts;
+            internal DeferredIcon(AppEntry app,double pixels)
+            {
+                entry=app;size=pixels;Width=Height=size;
+                source=entry.Icon??Ready(entry);Refresh();
+                Loaded+=(s,e)=>{
+                    if(!subscribed){AppIconTheme.Changed+=ThemeChanged;subscribed=true;}
+                    if(!requested)attempts=0;
+                    Refresh();Observe();
+                };
+                Unloaded+=(s,e)=>{
+                    Stop();
+                    if(subscribed){AppIconTheme.Changed-=ThemeChanged;subscribed=false;}
+                };
+                SizeChanged+=(s,e)=>Check();
+                IsVisibleChanged+=(s,e)=>{
+                    if(IsVisible){if(!requested)attempts=0;Refresh();Observe();}else Stop();
+                };
+            }
+            void ThemeChanged(){if(IsLoaded&&IsVisible)Refresh();}
+            void Refresh()
+            {
+                if(!Dispatcher.CheckAccess()){Dispatcher.BeginInvoke(new Action(Refresh));return;}
+                var image=AppIconTheme.Resolve(entry,source);
+                var current=Child as Image;
+                if(current!=null&&Object.ReferenceEquals(current.Source,image))return;
+                LauncherMotion.InvalidateCache(this);
+                Child=image!=null?Visual(image,size):(UIElement)new Glyph("window",size){Color=Paint.Text};
+            }
             void Stop(){if(scroll!=null)scroll.ScrollChanged-=Scrolled;scroll=null;}
             void Scrolled(object sender,ScrollChangedEventArgs args){Check();}
-            void Observe(){if(requested||!IsLoaded)return;Stop();DependencyObject parent=this;while((parent=VisualTreeHelper.GetParent(parent))!=null){scroll=parent as ScrollViewer;if(scroll!=null)break;}if(scroll!=null)scroll.ScrollChanged+=Scrolled;Check();}
+            void Observe(){if(source!=null||requested||!IsLoaded)return;Stop();DependencyObject parent=this;while((parent=VisualTreeHelper.GetParent(parent))!=null){scroll=parent as ScrollViewer;if(scroll!=null)break;}if(scroll!=null)scroll.ScrollChanged+=Scrolled;Check();}
             async void Check()
             {
-                if(requested||!IsLoaded||!IsVisible||ActualWidth<=0||ActualHeight<=0||attempts>=2)return;
+                if(source!=null||requested||!IsLoaded||!IsVisible||ActualWidth<=0||ActualHeight<=0||attempts>=2)return;
                 if(scroll!=null){try{var bounds=TransformToAncestor(scroll).TransformBounds(new Rect(0,0,ActualWidth,ActualHeight));if(!bounds.IntersectsWith(new Rect(0,0,scroll.ActualWidth,scroll.ActualHeight)))return;}catch(InvalidOperationException){return;}}
-                requested=true;attempts++;Stop();try{await loaders.WaitAsync();ImageSource icon;try{icon=await BackgroundWork.Run(()=>Get(entry));}finally{loaders.Release();}if(icon!=null){LauncherMotion.InvalidateCache(this);Child=Visual(icon,size);InvalidateVisual();return;}}catch(Exception error){AppLog.Once("icon-load",error.Message);}requested=false;if(attempts<2&&IsLoaded&&IsVisible){await Task.Delay(200);Observe();}
+                requested=true;attempts++;Stop();
+                try {
+                    await loaders.WaitAsync();ImageSource icon;
+                    try{icon=await BackgroundWork.Run(()=>Get(entry));}finally{loaders.Release();}
+                    if(icon!=null){source=icon;Refresh();InvalidateVisual();return;}
+                }catch(Exception error){AppLog.Once("icon-load",error.Message);}
+                requested=false;
+                if(attempts<2&&IsLoaded&&IsVisible){await Task.Delay(200);Observe();}
             }
         }
         internal static FrameworkElement Visual(ImageSource source,double size)
@@ -60,7 +99,7 @@ namespace OneTaskBar
             string executable=app.Executable??app.Target;
             if(result==null&&!String.IsNullOrEmpty(executable)&&File.Exists(executable)&&!executable.EndsWith(".lnk",StringComparison.OrdinalIgnoreCase))result=Native.ResourceIcon(executable,0);
             if(result==null)result=Native.AppIcon(!String.IsNullOrEmpty(app.Target)?app.Target:"shell:AppsFolder\\"+app.AppID);
-            return Normalize(result as BitmapSource)??result;
+            return Normalize(result as BitmapSource,256)??result;
         }
         // Preserve the original artwork, colors and aspect ratio; remove transparent asset padding only.
         internal static BitmapSource Normalize(BitmapSource original,int maximumPixels=160)

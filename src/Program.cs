@@ -71,6 +71,8 @@ namespace OneTaskBar
             if(args.Contains("--notification-swipe-probe"))return NotificationSwipeChecks.Run(args.Contains("--inspect"));
             if(args.Contains("--launcher-motion-probe"))return LauncherMotionChecks.Run();
             if(args.Contains("--deferred-icon-probe"))return DeferredIconChecks.Run();
+            if(args.Contains("--squircle-icon-probe"))return SquircleIconChecks.Run(args.Contains("--live-icons"));
+            if(args.Contains("--make-squircle-icon"))return AppIconCommand.Run(args);
             if(args.Contains("--settings-visibility-probe"))return SettingsVisibilityChecks.Run();
             if(args.Contains("--window-switcher-probe"))return WindowSwitcherChecks.Run(args.Contains("--inspect"));
             if(args.Contains("--desktop-overview-probe"))return DesktopOverviewChecks.Run(args.Contains("--inspect"));

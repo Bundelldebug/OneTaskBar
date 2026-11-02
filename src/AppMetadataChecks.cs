@@ -24,7 +24,26 @@ namespace OneTaskBar
         static string Pixels(ImageSource source){var bitmap=source as BitmapSource;if(bitmap==null)return null;var image=new FormatConvertedBitmap(bitmap,PixelFormats.Bgra32,null,0);int stride=image.PixelWidth*4;var bytes=new byte[stride*image.PixelHeight];image.CopyPixels(bytes,stride,0);using(var sha=SHA256.Create())return BitConverter.ToString(sha.ComputeHash(bytes));}
         internal static async Task CheckDock(ShellController shell,System.Windows.Forms.Screen screen)
         {
-            var pins=shell.Pins;var running=shell.Running;DockHost dock=null;try{var old=new AppEntry {Name="Old development name",Target=@"C:\Fixture\Files.exe",Pinned=true};shell.Pins=new List<AppEntry>{old};shell.Running=new List<AppEntry>();dock=new DockHost(shell,screen);dock.Show();await Task.Delay(80);var button=dock.AppButton(old.Key);Require(button!=null,"fixture dock creates the pinned cell");var host=((Grid)button.Content).Children.OfType<System.Windows.Controls.Border>().First();var current=old.Copy();current.Name="Native file manager";current.Icon=ArtworkPalette.Sample(Colors.Coral);shell.Pins=new List<AppEntry>{current};dock.Rebuild();await Task.Delay(30);var image=host.Child as Image;Require(Object.ReferenceEquals(button,dock.AppButton(old.Key))&&image!=null&&Object.ReferenceEquals(image.Source,current.Icon)&&(string)button.ToolTip==current.Name,"existing dock cell updates its icon and label without replacing the animated button");}finally{if(dock!=null)dock.Close();shell.Pins=pins;shell.Running=running;}
+            var pins=shell.Pins;
+            var running=shell.Running;
+            DockHost dock=null;
+            try {
+                var old=new AppEntry {Name="Old development name",Target=@"C:\Fixture\Files.exe",Pinned=true};
+                shell.Pins=new List<AppEntry>{old};shell.Running=new List<AppEntry>();
+                dock=new DockHost(shell,screen);dock.Show();await Task.Delay(80);
+                var button=dock.AppButton(old.Key);
+                Require(button!=null,"fixture dock creates the pinned cell");
+                var host=((Grid)button.Content).Children.OfType<System.Windows.Controls.Border>().First();
+                var current=old.Copy();current.Name="Native file manager";current.Icon=ArtworkPalette.Sample(Colors.Coral);
+                shell.Pins=new List<AppEntry>{current};dock.Rebuild();await Task.Delay(30);
+                var presenter=host.Child as Decorator;
+                var image=presenter==null?host.Child as Image:presenter.Child as Image;
+                Require(Object.ReferenceEquals(button,dock.AppButton(old.Key))&&image!=null&&Object.ReferenceEquals(image.Source,AppIconTheme.Resolve(current,current.Icon))&&(string)button.ToolTip==current.Name,"existing dock cell updates its icon and label without replacing the animated button");
+            }
+            finally {
+                if(dock!=null)dock.Close();
+                shell.Pins=pins;shell.Running=running;
+            }
         }
         internal static int Live()
         {
