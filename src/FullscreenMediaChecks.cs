@@ -54,6 +54,7 @@ namespace OneTaskBar
                     int pillPasses=view.LayoutPasses;
                     for(int n=0;n<12;n++)view.Update(media,"Fixture output");
                     Require(view.LayoutPasses==pillPasses&&!view.Morphing,"unchanged pill refreshes do not start layout or animations");
+                    for(int n=0;n<100&&view.WallpaperBrush==null;n++)await Task.Delay(50);
                     Require(view.WallpaperBrush!=null&&view.WallpaperBrush.IsFrozen,"collapsed mode loads a frozen desktop wallpaper surface");
                     Program.Save(view.Surface,760,900,Path.Combine(AppLog.Data,"fullscreen-media-collapsed.png"));
                     media.Playing=false;view.Update(media);Require(!view.SeekBar.WavePlaying,"pausing uses the shared wave decay");media.Playing=true;
