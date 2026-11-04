@@ -73,7 +73,7 @@ namespace OneTaskBar
                 throw new InvalidOperationException("Returning from a scrolling settings page moves the home list after the transition begins");
             window.OpenSettings("화면");
             await Task.Delay(25);
-            window.SearchSettings.Text="미디어";
+            window.SearchSettings.Text="미디어 플레이어";
             await Task.Delay(300);
             if(window.SettingsPage!=null||window.VisibleSettingsSections!=1||viewport.VerticalOffset>.5)
                 throw new InvalidOperationException("Search interrupts a settings return with stale content or offset");

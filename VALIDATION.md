@@ -1,5 +1,17 @@
 # Validation
 
+## 9.5.3
+
+- Desktop widgets are native children of the Explorer desktop view. The live diagnostic `--desktop-widgets-live` confirmed parenting and read 21 real desktop icons through UI Automation. Dragging, the context menu and icon avoidance on a visible desktop were not exercised by an automated fixture.
+- Collapsed fullscreen media shows wallpaper-tinted tiles and corner app shortcuts. `fullscreen-tiles-probe` covers placement, every tile size, shortcuts, the picker, persistence and weather parsing with fixture data. Live Open-Meteo requests were not sent by a fixture.
+- Optimization, installed app, plugged in, idle, about two minutes after start, one 60-second sample each: CPU 0.0601% to 0.0307%, total working set 222.4 MiB to 190.6 MiB, private working set 93.4 MiB to 67.2 MiB. Battery cadence is covered by `RuntimeCadence.Check`, not by a battery measurement.
+
+## Fullscreen follow-up — 2026-11-03
+
+- Reproduced the owned fullscreen media window being excluded from dock visibility. Only that surface is now registered until close; other owned shell windows remain excluded. Edge entry also checks the current fullscreen state before revealing an auto-hidden dock, without a new polling timer.
+- The fullscreen clock uses twelve-hour `h:mm` with no AM/PM label. Midnight, noon and 23:59 formatting are covered.
+- The desktop behavior, fullscreen media, self-test, Dynamic Island and modern Now Bar fixtures passed. The native fixture covers the stale visibility tick/edge entry race, hidden-player recovery and existing monitor geometry checks.
+
 ## 9.5.2
 
 - Optional squircle icons use the original app artwork, retain existing squircle silhouettes, and preserve native source pixels in frozen drawings. Spotify keeps its circular green icon on a black tile. The editor supports per-app images, color and artwork size, plus PNG/ICO export; new installations keep this option off.

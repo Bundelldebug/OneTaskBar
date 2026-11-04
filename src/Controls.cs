@@ -124,6 +124,7 @@ namespace OneTaskBar
                 if(kind=="mute") { line(16,9,22,15); line(22,9,16,15); }
                 else {dc.DrawGeometry(null,pen,Geometry.Parse("M15.5,8 Q19.5,12 15.5,16"));if(kind!="volume-low")dc.DrawGeometry(null,pen,Geometry.Parse("M18.5,4.5 Q25,12 18.5,19.5"));}
             } else if(kind=="bolt") dc.DrawGeometry(brush,null,Geometry.Parse("M14,1 L4,14 11,14 9,23 21,9 14,9 Z"));
+            else if(kind=="laptop") {dc.DrawRoundedRectangle(null,new Pen(brush,1.7),new Rect(3.55,5.05,16.9,11.4),2.2,2.2);dc.DrawRectangle(brush,null,new Rect(2.2,18,19.6,1.7));}
             else if(kind=="apps") { for(int i=0;i<9;i++) dc.DrawEllipse(brush,null,new Point(5+(i%3)*7,5+(i/3)*7),1.5,1.5); }
             else if(kind=="more") {for(int i=0;i<3;i++)dc.DrawEllipse(brush,null,new Point(5+i*7,12),1.5,1.5);}
             else if(kind=="windows-start") {foreach(int x in new[]{2,13})foreach(int y in new[]{2,13})dc.DrawRoundedRectangle(brush,null,new Rect(x,y,9,9),.5,.5);}

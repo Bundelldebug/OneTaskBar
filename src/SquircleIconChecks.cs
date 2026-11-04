@@ -49,6 +49,24 @@ namespace OneTaskBar
             return AppIconShape.Raster(image, 128);
         }
 
+        // A freeform glyph with transparent surroundings, like a logo that is not a filled shape.
+        static ImageSource Mark(Brush body, Brush detail = null)
+        {
+            var group = new DrawingGroup();
+            using (var draw = group.Open())
+            {
+                draw.DrawRectangle(body, null, new Rect(42, 10, 16, 80));
+                draw.DrawRectangle(body, null, new Rect(10, 42, 80, 16));
+                if (detail != null)
+                    draw.DrawRectangle(detail, null, new Rect(42, 42, 16, 16));
+            }
+
+            group.Freeze();
+            var image = new DrawingImage(group);
+            image.Freeze();
+            return AppIconShape.Raster(image, 128);
+        }
+
         static FrameworkElement Card(string title, ImageSource image)
         {
             var stack = new StackPanel
@@ -116,6 +134,10 @@ namespace OneTaskBar
                     }
 
                     Require(AppIconShape.AnalysisCount == analyses, "Preview redraw reanalyzed an immutable source icon");
+                    Require(AppIconShape.Background(Mark(Brushes.CornflowerBlue)) == Colors.White, "Colored freeform artwork uses a white tile");
+                    Require(AppIconShape.Background(Mark(Brushes.Black)) == Colors.White, "Dark freeform artwork uses a white tile");
+                    Require(AppIconShape.Background(Mark(Brushes.White)) == Colors.Black, "White artwork that would vanish on white uses a black tile");
+                    Require(AppIconShape.Background(Mark(Brushes.White, Brushes.CornflowerBlue)) == Colors.White, "White artwork with a visible colored part stays on white");
                     var mutable = new DrawingImage(new GeometryDrawing(Brushes.White, null, new RectangleGeometry(new Rect(0, 0, 64, 64))));
                     Require(!AppIconShape.AlreadySquircle(mutable), "Square recognized as squircle");
                     ((GeometryDrawing)mutable.Drawing).Geometry = SquircleGeometry.Create(new Rect(0, 0, 64, 64));

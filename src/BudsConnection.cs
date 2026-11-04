@@ -56,6 +56,19 @@ namespace OneTaskBar
         bool ShouldWatch {get{return !disposed&&shell.Desktop&&shell.DisplayAwake;}}
         internal string ConnectedCaption {get;private set;}
         internal bool HasConnectedBuds {get;private set;}
+        internal int? ConnectedBudsBattery
+        {
+            get
+            {
+                foreach(var device in devices.Values)
+                {
+                    if(!BudsInfo.IsBuds(device.Name)||!BluetoothPeer.Read(device).Connected)continue;
+                    int? level=BudsInfo.Battery(device.Properties);
+                    if(level.HasValue)return level;
+                }
+                return null;
+            }
+        }
         internal string ModelName {get;private set;}
         internal string BudsCaption {get;private set;}
         internal BudsConnections(ShellController owner){shell=owner;dispatcher=Application.Current.Dispatcher;expiry.Tick+=(s,e)=>{if(Popup==null){expiry.Stop();return;}if(Popup.IsMouseOver)Popup.Expires=DateTime.UtcNow.AddSeconds(2);else if(DateTime.UtcNow>=Popup.Expires)Hide(true);};}

@@ -202,29 +202,22 @@ namespace OneTaskBar
 
         static Color ReadBackground(ImageSource source)
         {
-            var bitmap = Raster(source, 32);
-            byte[] bytes = Pixels(bitmap);
-            double r = 0, g = 0, b = 0, total = 0;
+            // Artwork that is not a filled shape sits on white. Only a mark that would
+            // disappear on white, because nearly all of it is white, gets a black tile.
+            byte[] bytes = Pixels(Raster(source, 64));
+            int visible = 0, contrasting = 0;
             for (int i = 0; i < bytes.Length; i += 4)
             {
-                double alpha = bytes[i + 3] / 255.0;
-                double high = Math.Max(bytes[i], Math.Max(bytes[i + 1], bytes[i + 2]));
-                double low = Math.Min(bytes[i], Math.Min(bytes[i + 1], bytes[i + 2]));
-                double weight = alpha * (.2 + (high - low) / 255.0);
-                r += bytes[i + 2] * weight;
-                g += bytes[i + 1] * weight;
-                b += bytes[i] * weight;
-                total += weight;
+                if (bytes[i + 3] < 112)
+                    continue;
+                visible++;
+                double light = (bytes[i + 2] * .213 + bytes[i + 1] * .715 + bytes[i] * .072) / 255;
+                if (light < .8)
+                    contrasting++;
             }
 
-            if (total < 1)
-                return Color.FromRgb(50, 73, 104);
-            double red = r / total, green = g / total, blue = b / total;
-            double light = (red * .213 + green * .715 + blue * .072) / 255;
-            if (light > .78 || light < .1)
-                return Color.FromRgb(54, 75, 100);
-            // Keep native white and black marks legible against their new tile.
-            return Color.FromRgb((byte)(red * .55), (byte)(green * .55), (byte)(blue * .55));
+            bool invisibleOnWhite = visible > 0 && contrasting < visible * .06;
+            return invisibleOnWhite ? Colors.Black : Colors.White;
         }
 
         internal static ImageSource Automatic(ImageSource source, bool compact = false)

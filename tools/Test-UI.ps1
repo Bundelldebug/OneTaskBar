@@ -12,9 +12,9 @@ $taskRoot=Split-Path -Parent $PSScriptRoot
 # Only isolated fixtures belong here. Live diagnostic signals and hardware-changing probes do not.
 $taskAreas=[ordered]@{
     Quick=@('self-test','quick9-probe','quick-size-probe')
-    Media=@('self-test','media9-probe','nowbar9-probe','nowbar-probe','dynamic-island-probe','fullscreen-media-probe')
+    Media=@('self-test','media9-probe','nowbar9-probe','nowbar-probe','dynamic-island-probe','fullscreen-media-probe','fullscreen-tiles-probe')
     Launcher=@('self-test','launcher-keyboard-probe','launcher-motion-probe','start-size-probe','deferred-icon-probe','squircle-icon-probe')
-    Dock=@('self-test','desktop-behavior-probe','window-switcher-probe','window-activation-probe','window-preview-probe','desktop-overview-probe','tray-overflow-probe')
+    Dock=@('self-test','desktop-behavior-probe','desktop-widgets-probe','window-switcher-probe','window-activation-probe','window-preview-probe','desktop-overview-probe','tray-overflow-probe')
     Notifications=@('self-test','notification-ui-probe','notification-stack-probe','notification-swipe-probe','popup-probe')
     Settings=@('self-test','panel-theme-probe','surface-material-probe','settings-visibility-probe','beta-feedback-probe','update950-probe','squircle-icon-probe')
     Startup=@('self-test','startup-probe')
@@ -47,7 +47,7 @@ try {
         if(-not $taskCompleted){Stop-Process -Id $taskProcess.Id -ErrorAction SilentlyContinue}
         $taskReport=Join-Path $taskData ($taskProbe+'.json')
         $taskResult=$null
-        if(Test-Path -LiteralPath $taskReport){try{$taskResult=Get-Content -LiteralPath $taskReport -Raw|ConvertFrom-Json}catch{}}
+        if(Test-Path -LiteralPath $taskReport){try{$taskResult=Get-Content -LiteralPath $taskReport -Raw -Encoding UTF8|ConvertFrom-Json}catch{}}
         $taskPassed=$taskCompleted -and $taskProcess.ExitCode -eq 0 -and $taskResult -and $taskResult.passed -eq $true
         $taskResults.Add([pscustomobject]@{probe=$taskProbe;passed=[bool]$taskPassed;seconds=[Math]::Round($taskTimer.Elapsed.TotalSeconds,2);report=$taskReport})
         if(-not $taskPassed){$taskFailure='Fixture failed: '+$taskProbe+'; details: '+$taskReport;break}

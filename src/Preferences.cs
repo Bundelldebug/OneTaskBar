@@ -51,6 +51,15 @@ namespace OneTaskBar
         public bool MediaWindowAnimation=true;
         public bool NowBarSideCapsule=false;
         public bool NowBarLargeCover=false;
+        public int FullscreenClockPercent=100;
+        public bool DesktopWidgets=false;
+        public bool FullscreenWidgets=true;
+        public string[] FullscreenTiles={"weather:2x2","moon:1x1","rain:1x1","gauges:2x1","calendar:2x2","todo:2x2"};
+        public string[] FullscreenActions={"capture","mute"};
+        public string FullscreenAppLeft,FullscreenAppRight;
+        public string WeatherPlace;
+        public double WeatherLatitude,WeatherLongitude;
+        public string DualClockZone="GMT Standard Time";
         public bool YouTubeHighResArtwork=false;
         public string YouTubeArtworkTrack;
         public int DesktopPowerWatts=0;
@@ -62,7 +71,9 @@ namespace OneTaskBar
         internal static readonly PreferenceData Current=Load();
         internal static event Action Changed;
         internal static event Action AppearanceChanged;
-        internal static PreferenceData Normalize(PreferenceData value){if(!ReleaseFeatures.GlassUI&&value.UIVersion>=95)value.UIVersion=90;value.UITheme=Math.Max(0,Math.Min(2,value.UITheme));value.DockTheme=Math.Max(0,Math.Min(2,value.DockTheme));value.DockScalePercent=DockSizing.Clamp(value.DockScalePercent);SurfaceMaterial.Normalize(value);return value;}
+        internal static event Action MediaAppearanceChanged;
+        internal static event Action DesktopWidgetsChanged;
+        internal static PreferenceData Normalize(PreferenceData value){if(!ReleaseFeatures.GlassUI&&value.UIVersion>=95)value.UIVersion=90;value.UITheme=Math.Max(0,Math.Min(2,value.UITheme));value.DockTheme=Math.Max(0,Math.Min(2,value.DockTheme));value.DockScalePercent=DockSizing.Clamp(value.DockScalePercent);value.FullscreenClockPercent=Math.Max(50,Math.Min(200,value.FullscreenClockPercent));SurfaceMaterial.Normalize(value);return value;}
         static PreferenceData Load(){try{if(File.Exists(file))return Normalize(new JavaScriptSerializer().Deserialize<PreferenceData>(File.ReadAllText(file))??new PreferenceData());}catch(Exception e){AppLog.Once("settings-read",e.Message);}return Normalize(new PreferenceData());}
         internal static void Set(Action<PreferenceData> change)
         {
@@ -76,6 +87,22 @@ namespace OneTaskBar
         internal static void SetAppIcons(bool enabled)
         {
             Current.SquircleIcons=enabled;Save();AppIconTheme.NotifyChanged();
+        }
+        internal static void SetMediaAppearance(Action<PreferenceData> change)
+        {
+            change(Current);
+            Normalize(Current);
+            Save();
+            var notify=MediaAppearanceChanged;
+            if(notify!=null)notify();
+        }
+        internal static void SetDesktopWidgets(bool enabled)
+        {
+            if(Current.DesktopWidgets==enabled)return;
+            Current.DesktopWidgets=enabled;
+            Save();
+            var notify=DesktopWidgetsChanged;
+            if(notify!=null)notify();
         }
         internal static void Save()
         {

@@ -250,23 +250,9 @@ namespace OneTaskBar
         void ToggleTheme(){InvokeToggle("theme");}
         internal async void InvokeToggle(string key)
         {
-            if(QuickActionCatalog.Commands.Contains(key)){QuickActionCatalog.Invoke(key,shell);return;}
-            var setting=QuickSettingCatalog.Find(key);if(setting!=null){Preferences.Set(p=>setting.Write(p,!setting.Read(p)));return;}
             if(pendingToggles.Contains(key))return;pendingToggles.Add(key);if(key=="theme")themeBusy=true;Refresh(shell.Power,shell.Brightness,shell.Audio.Value,shell.Audio.Muted,shell.Audio.Available,shell.Brightness>=0);
             try {
-                if(key=="mute")
-                {
-                    shell.Audio.ToggleMute();
-                    shell.Audio.Read();
-                }
-                else if(key=="theme")AppTheme.Toggle();
-                else if(key=="efficiency")shell.Toggles.ToggleEfficiency();
-                else if(key=="dnd")await shell.Toggles.Disturb.Toggle();
-                else if(key=="awake")shell.Toggles.SetAwake(!shell.Toggles.Awake);
-                else if(key=="animations")Preferences.Set(p=>p.Animations=!p.Animations);
-                else if(key=="startup")shell.Toggles.ToggleStartup();
-                else if(key=="slider-scroll")Preferences.Set(p=>p.QuickSliderScroll=!p.QuickSliderScroll);
-                else if(key=="wifi"||key=="bluetooth"){if(!await shell.Services.ToggleRadio(key))throw new InvalidOperationException("Windows가 이 무선 장치의 제어를 허용하지 않았습니다.");await shell.Services.Refresh();}
+                await shell.InvokeQuickAction(key);
                 notice.Visibility=Visibility.Collapsed;
             }catch(Exception error){Feedback(error.Message);}
             finally {pendingToggles.Remove(key);if(key=="theme")themeBusy=false;Refresh(shell.Power,shell.Brightness,shell.Audio.Value,shell.Audio.Muted,shell.Audio.Available,shell.Brightness>=0);}

@@ -267,7 +267,16 @@ namespace OneTaskBar
         {
             try {string file=Path.Combine(AppLog.Data,"explorer-pins.json");if(File.Exists(file))return new JavaScriptSerializer().Deserialize<List<TaskbarItem>>(File.ReadAllText(file))??new List<TaskbarItem>();}catch{}return new List<TaskbarItem>();
         }
-        internal static void Save(List<TaskbarItem> items) {AppLog.Json("explorer-pins.json",items.Where(a=>a.Pinned).Select(a=>new {Id=a.Id,Name=a.Name,Pinned=a.Pinned}).ToArray());}
+        static string savedPins;
+        // Rewriting an unchanged file would wake the disk on every pin read.
+        internal static void Save(List<TaskbarItem> items)
+        {
+            var pinned=items.Where(a=>a.Pinned).Select(a=>new {Id=a.Id,Name=a.Name,Pinned=a.Pinned}).ToArray();
+            string signature=String.Join("\n",pinned.Select(a=>a.Id+"\t"+a.Name));
+            if(signature==savedPins)return;
+            savedPins=signature;
+            AppLog.Json("explorer-pins.json",pinned);
+        }
         internal static List<TaskbarItem> ReadApps()
         {
             var result=new List<TaskbarItem>();

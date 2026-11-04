@@ -22,6 +22,10 @@ namespace OneTaskBar
                     animations=Motion.WithAnimationsForFixture();
                     Preferences.Current.Animations=true;
                     Preferences.Current.UIVersion=95;
+                    Require(FullscreenMedia.FormatTime(new DateTime(2026, 11, 3, 0, 5, 0)) == "12:05"
+                        && FullscreenMedia.FormatTime(new DateTime(2026, 11, 3, 12, 5, 0)) == "12:05"
+                        && FullscreenMedia.FormatTime(new DateTime(2026, 11, 3, 23, 59, 0)) == "11:59",
+                        "fullscreen clock uses twelve hours without an AM/PM label");
                     bool locked=false;string command=null;
                     view=new FullscreenMedia(c=>command=c,p=>Task.FromResult(true),()=>{},()=>locked=true);
                     view.Width=760;view.Height=900;view.Show();
@@ -47,8 +51,8 @@ namespace OneTaskBar
                     view.Update(media,"Fixture output");Require(view.Morphing,"an in-flight media refresh preserves the cover animation");
                     view.ToggleArtwork();await Task.Delay(500);Require(!view.Morphing&&view.LargeCover,"rapid reversals settle without stale callbacks");
                     view.ToggleArtwork();await Task.Delay(420);view.Update(media,"Fixture output");
-                    Require(view.CoverBounds.Width==54&&view.CoverBounds.Top>=view.CardBounds.Top&&view.CoverBounds.Bottom<=view.CardBounds.Bottom,"compact cover stays inside its reserved pill slot");
-                    Require(view.CardBounds.Height==104&&view.CardBounds.Width<=440&&view.Player.FullscreenPill,"collapsed media uses a short pill instead of the full controller");
+                    Require(view.CoverBounds.Width==44&&view.CoverBounds.Top>=view.CardBounds.Top&&view.CoverBounds.Bottom<=view.CardBounds.Bottom,"compact cover stays inside its reserved pill slot");
+                    Require(view.CardBounds.Height==84&&view.CardBounds.Width<=380&&view.Player.FullscreenPill,"collapsed media uses a smaller and thinner pill");
                     Require(view.Player.PreviousButton.Visibility==Visibility.Collapsed&&view.SeekBar.WaveDecoration,"pill keeps play/next and a decorative bottom wave");
                     view.Player.NextButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Require(command=="next","pill next button keeps the shared media command");
                     int pillPasses=view.LayoutPasses;
@@ -57,6 +61,19 @@ namespace OneTaskBar
                     for(int n=0;n<100&&view.WallpaperBrush==null;n++)await Task.Delay(50);
                     Require(view.WallpaperBrush!=null&&view.WallpaperBrush.IsFrozen,"collapsed mode loads a frozen desktop wallpaper surface");
                     Program.Save(view.Surface,760,900,Path.Combine(AppLog.Data,"fullscreen-media-collapsed.png"));
+                    int previousClock=Preferences.Current.FullscreenClockPercent;
+                    try
+                    {
+                        Preferences.SetMediaAppearance(p=>p.FullscreenClockPercent=150);
+                        Require(view.ClockSize==96,"clock size applies to the open fullscreen surface");
+                        var saved=new System.Web.Script.Serialization.JavaScriptSerializer().Deserialize<PreferenceData>(File.ReadAllText(Path.Combine(AppLog.Data,"settings.json")));
+                        Require(saved.FullscreenClockPercent==150,"clock size persists independently of dock preferences");
+                        Preferences.SetMediaAppearance(p=>p.FullscreenClockPercent=200);
+                        view.ToggleArtwork();await Task.Delay(420);
+                        Require(view.ClockSize==64&&view.CoverBounds.Top>110&&view.CoverBounds.Bottom<view.CardBounds.Top,"large clock keeps the cover and controls clear");
+                        view.ToggleArtwork();await Task.Delay(420);
+                    }
+                    finally {Preferences.SetMediaAppearance(p=>p.FullscreenClockPercent=previousClock);}
                     media.Playing=false;view.Update(media);Require(!view.SeekBar.WavePlaying,"pausing uses the shared wave decay");media.Playing=true;
                     view.ToggleArtwork();await Task.Delay(420);
                     Require(!view.Player.FullscreenPill&&!view.SeekBar.WaveDecoration&&view.Player.PreviousButton.Visibility==Visibility.Visible,"expanding restores the full shared controller");
@@ -67,7 +84,7 @@ namespace OneTaskBar
                         try{
                             alternate.Width=640;alternate.Height=480;alternate.Show();alternate.Update(media,"Fixture output");
                             alternate.ToggleArtwork();await Task.Delay(420);alternate.Update(media,"Fixture output");
-                            Require(alternate.Player.FullscreenPill&&alternate.CardBounds.Height==104&&alternate.CoverBounds.Width==54,"older UI versions use the same compact pill geometry");
+                            Require(alternate.Player.FullscreenPill&&alternate.CardBounds.Height==84&&alternate.CoverBounds.Width==44,"older UI versions use the same compact pill geometry");
                             alternate.ToggleArtwork();await Task.Delay(420);alternate.Update(media,"Fixture output");
                             Require(!alternate.Player.FullscreenPill&&alternate.Player.PreviousButton.Visibility==Visibility.Visible,"older UI versions restore full controls after a pill transition");
                         }

@@ -20,7 +20,7 @@ $taskFilter="IDProcess=$($taskMain.Id) OR IDProcess=$($taskGuard.Id)"
 function Read-RuntimeState {
     $taskStateFile=Join-Path $DataDirectory 'live-state.json'
     if(-not(Test-Path -LiteralPath $taskStateFile)){return $null}
-    $taskState=Get-Content -LiteralPath $taskStateFile -Raw | ConvertFrom-Json
+    $taskState=Get-Content -LiteralPath $taskStateFile -Raw -Encoding UTF8 | ConvertFrom-Json
     [pscustomobject]@{desktop=$taskState.desktop;mediaActive=$taskState.mediaActive;notifications=$taskState.notificationsAllowed;displays=$taskState.displays;windowCount=$taskState.windowCount;pulseMilliseconds=$taskState.pulseMilliseconds}
 }
 $null=Get-CimInstance Win32_PerfFormattedData_PerfProc_Process -Filter $taskFilter

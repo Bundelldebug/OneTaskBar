@@ -7,6 +7,7 @@ namespace OneTaskBar
 {
     internal sealed partial class MediaPlayerView
     {
+        internal const double FullscreenPillWidth=380,FullscreenPillHeight=84,FullscreenPillArtwork=44;
         bool fullscreenMode,fullscreenLayoutDirty;
         double fullscreenHeight;
         internal bool FullscreenPill {get;private set;}
@@ -70,24 +71,24 @@ namespace OneTaskBar
             }
             Height=fullscreenHeight-1.2;
             Margin=new Thickness(0);
-            double[] rows={16,27,Math.Max(32,Height-63),20};
+            double[] rows={10,22,Math.Max(30,Height-48),16};
             for(int i=0;i<4;i++)RowDefinitions[i].Height=new GridLength(rows[i]);
             route.Visibility=compactOutput.Visibility=Visibility.Collapsed;
-            header.Margin=new Thickness(84,0,30,0);
+            header.Margin=new Thickness(74,0,22,0);
             Grid.SetRow(header,1);
             Grid.SetRow(timeline,3);
             timeline.Margin=new Thickness(0);
             timeline.VerticalAlignment=VerticalAlignment.Bottom;
-            SeekBar.Height=20;
+            SeekBar.Height=16;
             if(Modern){
                 Grid.SetRow(transport,2);
-                transport.Margin=new Thickness(84,0,30,0);
+                transport.Margin=new Thickness(74,0,22,0);
                 transport.Visibility=Visibility.Visible;
                 FitFullscreenPillControls();
             }
             else{
                 Grid.SetRow(controls,2);
-                controls.Margin=new Thickness(84,0,30,0);
+                controls.Margin=new Thickness(74,0,22,0);
                 header.ColumnDefinitions[0].Width=new GridLength(0);
                 header.ColumnDefinitions[2].Width=new GridLength(0);
                 artist.Visibility=Visibility.Collapsed;
@@ -98,11 +99,11 @@ namespace OneTaskBar
         void FitFullscreenPillControls()
         {
             modernArtist.Visibility=Visibility.Collapsed;
-            modernTitle.TextSize=14;
+            modernTitle.TextSize=13.5;
             modernTitle.Height=modernTitle.LineHeight;
             modernWords.Height=modernTitle.Height;
             titleLine.ColumnDefinitions[0].Width=new GridLength(0);
-            double room=Math.Max(1,(header.ActualWidth>1?header.ActualWidth:ActualWidth-114)-8);
+            double room=Math.Max(1,(header.ActualWidth>1?header.ActualWidth:ActualWidth-96)-8);
             modernTitle.Width=Math.Min(modernTitle.NaturalWidth,room);
             FitFullscreenPillButtons();
         }
@@ -110,13 +111,13 @@ namespace OneTaskBar
         void FitFullscreenPillButtons()
         {
             playGlyph.Update(playGlyph.Kind,Paint.ControlWhite);
-            PlayButton.Width=PlayButton.Height=NextButton.Width=NextButton.Height=38;
-            PlayButton.Margin=new Thickness(0,0,16,0);
+            PlayButton.Width=PlayButton.Height=NextButton.Width=NextButton.Height=32;
+            PlayButton.Margin=new Thickness(0,0,14,0);
         }
 
         internal Rect FullscreenArtworkSlot
         {
-            get{return new Rect(22,(fullscreenHeight-54)/2,54,54);}
+            get{return new Rect(18,(fullscreenHeight-FullscreenPillArtwork)/2,FullscreenPillArtwork,FullscreenPillArtwork);}
         }
 
         internal void StopFullscreenMedia()

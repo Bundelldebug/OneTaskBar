@@ -51,6 +51,7 @@ namespace OneTaskBar
                         throw new Exception("Auto-hide fallback must reveal only at its own monitor edge");
                 }
             }
+            await FullscreenDockChecks.Run(dock);
             bool blur=Preferences.Current.Blur;
             try
             {

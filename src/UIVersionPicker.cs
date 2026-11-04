@@ -10,6 +10,11 @@ namespace OneTaskBar
         public string Label {get;set;}public int Value {get;set;}public string Description {get;set;}
         public override string ToString(){return Label??"";}
     }
+    internal sealed class PickerChoice
+    {
+        public string Label {get;set;}public object Value {get;set;}
+        public override string ToString(){return Label??"";}
+    }
     internal static class UIVersions
     {
         static readonly UIVersionChoice[] choices=Create();

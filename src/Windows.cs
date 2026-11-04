@@ -271,7 +271,21 @@ namespace OneTaskBar
         void QueueHide(){if(autoHide&&!fullScreen&&visible&&!hideDelay.IsEnabled&&!InUse())hideDelay.Start();}
         internal void Reveal()
         {
-            if(closed||!autoHide||fullScreen||!controller.DisplayAwake)return;interactionUntil=DateTime.UtcNow.AddMilliseconds(1200);if(revealEdge!=null)revealEdge.Show(false);AnimateAutoHide(true);Refresh(controller.Power);QueueHide();
+            if (closed || !autoHide || fullScreen || !controller.DisplayAwake)
+                return;
+            // Input may arrive before the next visibility tick after an app enters
+            // fullscreen. Recheck on this edge event, without adding a poll timer.
+            if (FullscreenVisibility.IsFullScreen(Screen.Bounds, FullscreenVisibility.Capture()))
+            {
+                UpdateVisibility(true, autoHide);
+                return;
+            }
+            interactionUntil = DateTime.UtcNow.AddMilliseconds(1200);
+            if (revealEdge != null)
+                revealEdge.Show(false);
+            AnimateAutoHide(true);
+            Refresh(controller.Power);
+            QueueHide();
         }
         internal void UpdateVisibility(bool obscured,bool automatic,bool desktopIdle=false)
         {

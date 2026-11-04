@@ -40,6 +40,7 @@ namespace OneTaskBar
             Row(desktopRows,"작업표시줄 단색 배경","하단 작업표시줄을 블러 없는 회색 단색으로 표시합니다",Preferences.Current.DockSolidBackground,v=>Preferences.Set(p=>{p.DockSolidBackground=v;p.DockBackgroundKind=v?1:0;}));
             startup=Row(desktopRows,"로그인 시 자동 시작","현재 사용자 로그인 작업으로 지연 없이 실행합니다",StartupPreference.Enabled,v=> {try{StartupPreference.Set(v);status.Text=v?"로그인 자동 시작을 켰습니다":"로그인 자동 시작을 껐습니다";}catch(Exception e){status.Text="자동 시작 설정을 저장하지 못했습니다: "+e.Message;if(startup!=null)startup.Refresh(StartupPreference.Enabled);}});
             PersonalizeDock(desktopRows);Group(groups,"데스크톱",desktopRows);
+            Group(groups,"바탕화면 위젯",DesktopWidgetSettings(shell));
             var panels=new StackPanel();
             ChoiceRow(panels,"알림센터","시계와 알림 버튼에서 열 화면",Preferences.Current.NativeNotifications,v=>Preferences.Set(p=>p.NativeNotifications=v));
             Row(panels,"One Taskbar 알림 팝업","Windows 알림을 둥근 블러 카드로 표시합니다. 방해 금지와 앱별 배너 설정을 따릅니다",Preferences.Current.NotificationPopups,v=>Preferences.Set(p=>p.NotificationPopups=v));
@@ -85,6 +86,11 @@ namespace OneTaskBar
                 var fullscreen=Paint.Action("전체화면 미디어 열기",shell.OpenFullscreenMedia);
                 fullscreen.Margin=new Thickness(15,8,15,12);
                 nowBar.Children.Add(fullscreen);
+                var clockSize=MaterialSlider(nowBar,"전체화면 미디어 시계 크기",Preferences.Current.FullscreenClockPercent,200,"%",value=>
+                    Preferences.SetMediaAppearance(p=>p.FullscreenClockPercent=value));
+                clockSize.Minimum=50;
+                clockSize.TickFrequency=5;
+                FullscreenTileSettings(nowBar);
             }
             Group(groups,"미디어 플레이어",nowBar);
             var safety=new StackPanel();Row(safety,"긴급 종료 단축키","Ctrl + Shift + Tab + 1 · One TaskBar 종료 및 Windows 작업표시줄 복원",Preferences.Current.EmergencyExit,v=>Preferences.Set(p=>p.EmergencyExit=v));Group(groups,"복구",safety);

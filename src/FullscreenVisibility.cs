@@ -9,12 +9,35 @@ namespace OneTaskBar
 {
     internal sealed class FullscreenCandidate
     {
+        internal IntPtr Window;
         internal Native.RectI Bounds,Client;
         internal Rectangle Monitor;
         internal bool Maximized,Framed;
     }
     internal static class FullscreenVisibility
     {
+        static readonly object mediaGate = new object();
+        static readonly HashSet<IntPtr> mediaSurfaces = new HashSet<IntPtr>();
+
+        internal static void TrackMediaSurface(IntPtr window, bool track)
+        {
+            if (window == IntPtr.Zero)
+                return;
+            lock (mediaGate)
+            {
+                if (track)
+                    mediaSurfaces.Add(window);
+                else
+                    mediaSurfaces.Remove(window);
+            }
+        }
+
+        static bool MediaSurface(IntPtr window)
+        {
+            lock (mediaGate)
+                return mediaSurfaces.Contains(window);
+        }
+
         [DllImport("user32.dll")]static extern bool GetClientRect(IntPtr window,out Native.RectI rect);
         [DllImport("user32.dll")]static extern bool ClientToScreen(IntPtr window,ref Native.PointI point);
         internal static bool PassiveSurface(int extended,bool foreground,string kind,bool titled)
@@ -26,20 +49,51 @@ namespace OneTaskBar
         }
         internal static List<FullscreenCandidate> Capture()
         {
-            var result=new List<FullscreenCandidate>();uint own=(uint)Process.GetCurrentProcess().Id;
-            Native.EnumWindows((window,state)=>{uint pid;Native.GetWindowThreadProcessId(window,out pid);if(pid==own)return true;var candidate=Inspect(window);if(candidate!=null)result.Add(candidate);return true;},IntPtr.Zero);return result;
+            var result = new List<FullscreenCandidate>();
+            uint own = (uint)Process.GetCurrentProcess().Id;
+            Native.EnumWindows((window, state) =>
+            {
+                uint pid;
+                Native.GetWindowThreadProcessId(window, out pid);
+                bool media = pid == own && MediaSurface(window);
+                // Ordinary shell surfaces must not hide the dock. The explicitly
+                // registered fullscreen player is the one owned exception.
+                if (pid == own && !media)
+                    return true;
+                var candidate = Inspect(window, media);
+                if (candidate != null)
+                    result.Add(candidate);
+                return true;
+            }, IntPtr.Zero);
+            return result;
         }
         internal static FullscreenCandidate Inspect(IntPtr window)
+        {
+            return Inspect(window, MediaSurface(window));
+        }
+        static FullscreenCandidate Inspect(IntPtr window, bool media)
         {
             if(!Native.IsWindowVisible(window)||Native.IsIconic(window))return null;
             int cloaked;if(Native.DwmGetWindowAttribute(window,14,out cloaked,4)>=0&&cloaked!=0)return null;
             var name=new StringBuilder(100);Native.GetClassName(window,name,100);string kind=name.ToString();
             var title=new StringBuilder(256);Native.GetWindowText(window,title,title.Capacity);
             bool foreground=Native.GetAncestor(Native.GetForegroundWindow(),3)==window;
-            if(PassiveSurface(Native.GetWindowLong(window,-20),foreground,kind,title.Length>0))return null;
+            if(!media&&PassiveSurface(Native.GetWindowLong(window,-20),foreground,kind,title.Length>0))return null;
             Native.RectI bounds,client;if(!Native.GetWindowRect(window,out bounds)||!GetClientRect(window,out client)||bounds.Right<=bounds.Left||bounds.Bottom<=bounds.Top)return null;
             var first=new Native.PointI {X=client.Left,Y=client.Top};var last=new Native.PointI {X=client.Right,Y=client.Bottom};if(!ClientToScreen(window,ref first)||!ClientToScreen(window,ref last))return null;
-            var candidate=new FullscreenCandidate {Bounds=bounds,Client=new Native.RectI {Left=first.X,Top=first.Y,Right=last.X,Bottom=last.Y},Monitor=System.Windows.Forms.Screen.FromHandle(window).Bounds,Maximized=Native.IsZoomed(window),Framed=(Native.GetWindowLong(window,-16)&0xC40000)!=0};if((Native.GetWindowLong(window,-20)&0x80)!=0&&!ClientCovers(candidate.Client,candidate.Monitor)&&!Native.CoversMonitor(candidate.Bounds,candidate.Monitor,candidate.Maximized,candidate.Framed))return null;return candidate;
+            var candidate = new FullscreenCandidate
+            {
+                Window = window,
+                Bounds = bounds,
+                Client = new Native.RectI { Left = first.X, Top = first.Y, Right = last.X, Bottom = last.Y },
+                Monitor = System.Windows.Forms.Screen.FromHandle(window).Bounds,
+                Maximized = Native.IsZoomed(window),
+                Framed = (Native.GetWindowLong(window, -16) & 0xC40000) != 0
+            };
+            if ((Native.GetWindowLong(window, -20) & 0x80) != 0 && !ClientCovers(candidate.Client, candidate.Monitor)
+                && !Native.CoversMonitor(candidate.Bounds, candidate.Monitor, candidate.Maximized, candidate.Framed))
+                return null;
+            return candidate;
         }
         static bool ClientCovers(Native.RectI rect,Rectangle screen){return rect.Left<=screen.Left+1&&rect.Top<=screen.Top+1&&rect.Right>=screen.Right-1&&rect.Bottom>=screen.Bottom-1;}
         internal static bool IsFullScreen(Rectangle screen,IEnumerable<FullscreenCandidate> windows)

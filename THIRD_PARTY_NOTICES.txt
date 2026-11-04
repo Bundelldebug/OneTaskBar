@@ -89,3 +89,5 @@ Liquid glass design and optical references (implementation reference only):
 The One TaskBar contour sampler is an independent Windows Composition implementation.
 No Android/Xposed/Compose or React/SVG runtime code or binaries from these projects
 are incorporated or executed. Existing slider shapes and content are retained.
+
+Weather data: Open-Meteo / https://open-meteo.com / CC BY 4.0. Requested only after the user enters a location.

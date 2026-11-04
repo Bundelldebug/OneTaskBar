@@ -92,6 +92,9 @@ namespace OneTaskBar
             if(args.Contains("--feature-857-probe"))return Feature857Checks.Run();
             if(args.Contains("--feature-857-live"))return Feature857Checks.Live();
             if(args.Contains("--desktop-behavior-probe"))return DesktopBehaviorChecks.Run();
+            if(args.Contains("--desktop-widgets-probe"))return DesktopWidgetChecks.Run();
+            if(args.Contains("--desktop-widgets-live"))return DesktopWidgetChecks.Live();
+            if(args.Contains("--fullscreen-tiles-probe"))return FullscreenTileChecks.Run();
             if(args.Contains("--taskbar-state-probe"))return DesktopBehaviorChecks.NativeState();
             if(args.Contains("--taskbar-logo-probe"))return TaskbarLogoChecks.Probe();
             if(args.Contains("--app-screen-probe"))return AppScreenChecks.Run();
