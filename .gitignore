@@ -25,3 +25,5 @@ start-pins.json
 apps-layout.json
 native-toast-lease.json
 native-notification-action-lease.json
+/.claude/
+CLAUDE.local.md
