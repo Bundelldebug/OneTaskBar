@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using Forms=System.Windows.Forms;
 
 namespace OneTaskBar
@@ -21,24 +22,32 @@ namespace OneTaskBar
         internal readonly QuickWidgetTile Toggle;
         internal readonly MediaPlayerView Player;
         readonly Action<DesktopWidgetSlot,System.Drawing.Point,System.Drawing.Point,bool,bool> gesture;
-        readonly Thumb move,resize;
+        readonly Thumb move;
         readonly TextBlock notice;
         System.Drawing.Point origin;
         string lastClock,lastDate,lastBattery;
         bool retired;
         readonly InfoTile tile;
-        bool pressed,moving;
-        internal DesktopWidgetView(ShellController controller,DesktopWidgetSlot slot,Action<DesktopWidgetSlot> remove,
-            Action<DesktopWidgetSlot,System.Drawing.Point,System.Drawing.Point,bool,bool> drag,Action<DesktopWidgetSlot> menu=null)
+        readonly Border backdrop=new Border {IsHitTestVisible=false};
+        TileScheme scheme;
+        bool pressed,moving,pressedControl,held;
+        readonly Action<DesktopWidgetSlot> select;
+        DispatcherTimer hold;
+        const int HoldMilliseconds=450;
+        // Which corner handle is resizing: 1 lower right, 2 lower left, 3 upper right, 4 upper left.
+        internal int ResizeCorner {get;private set;}
+        internal DesktopWidgetView(ShellController controller,DesktopWidgetSlot slot,
+            Action<DesktopWidgetSlot,System.Drawing.Point,System.Drawing.Point,bool,bool> drag,Action<DesktopWidgetSlot> choose=null,TileScheme tileScheme=null)
         {
             shell=controller;
             Slot=slot;
             gesture=drag;
+            select=choose;
+            ResizeCorner=1;
             PreviewMouseLeftButtonDown+=(s,e)=>
             {
                 if(editor.Visibility==Visibility.Visible)return;
-                pressed=true;
-                origin=Forms.Cursor.Position;
+                Press(OnControl(e.OriginalSource as DependencyObject),Forms.Cursor.Position);
             };
             PreviewMouseMove+=(s,e)=>
             {
@@ -53,6 +62,7 @@ namespace OneTaskBar
                 {
                     if(Math.Abs(at.X-origin.X)<8&&Math.Abs(at.Y-origin.Y)<8)return;
                     moving=true;
+                    StopHold();
                     CaptureMouse();
                     Opacity=.85;
                     gesture(Slot,origin,origin,false,false);
@@ -61,27 +71,32 @@ namespace OneTaskBar
             };
             PreviewMouseLeftButtonUp+=(s,e)=>
             {
-                pressed=false;
-                if(!moving)return;
-                moving=false;
-                Opacity=1;
-                ReleaseMouseCapture();
-                gesture(Slot,origin,Forms.Cursor.Position,false,true);
-                e.Handled=true;
+                if(!pressed)return;
+                if(moving)
+                {
+                    pressed=moving=false;
+                    Opacity=1;
+                    ReleaseMouseCapture();
+                    gesture(Slot,origin,Forms.Cursor.Position,false,true);
+                    e.Handled=true;
+                    return;
+                }
+                e.Handled=Release();
             };
             MouseRightButtonUp+=(s,e)=>
             {
-                if(menu==null)return;
-                menu(Slot);
+                if(select==null)return;
+                select(Slot);
                 e.Handled=true;
             };
             UseLayoutRounding=true;
             AutomationProperties.SetName(this,"바탕화면 위젯 · "+DesktopWidgetCatalog.Title(slot.Key));
             card=new Border {CornerRadius=new CornerRadius(28),Background=Paint.Brush("#DC28323C"),BorderBrush=Paint.Brush("#46FFFFFF"),BorderThickness=new Thickness(1),Child=body};
+            Children.Add(backdrop);
             Children.Add(card);
             if(InfoTileCatalog.Known(slot.Key))
             {
-                var scheme=TileScheme.Desktop();
+                scheme=tileScheme??TileScheme.Desktop();
                 card.Background=scheme.Surface;
                 card.BorderThickness=new Thickness(0);
                 tile=InfoTileCatalog.Create(slot.Key,false,shell,scheme);
@@ -128,23 +143,13 @@ namespace OneTaskBar
             move=new Thumb {Cursor=Cursors.SizeAll,Background=Brushes.Transparent,Template=TransparentThumb()};
             AutomationProperties.SetName(move,"위젯 이동. 방향키로 이동, Shift+방향키로 크기 조절");
             editor.Children.Add(move);
-            var close=Paint.Button(new Glyph("close",14),()=>remove(Slot),"위젯 삭제");
-            close.Width=close.Height=26;
-            close.Padding=new Thickness(0);
-            close.HorizontalAlignment=HorizontalAlignment.Right;
-            close.VerticalAlignment=VerticalAlignment.Top;
-            close.Margin=new Thickness(4);
-            close.Background=Paint.Brush("#F04B5766");
-            close.Resources["ButtonRadius"]=new CornerRadius(13);
-            editor.Children.Add(close);
-            resize=new Thumb {Width=26,Height=26,Cursor=Cursors.SizeNWSE,HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Bottom,
-                Template=ResizeThumb(),Background=Brushes.Transparent};
-            AutomationProperties.SetName(resize,"위젯 크기 조절");
-            editor.Children.Add(resize);
             Children.Add(editor);
             Editing(false);
-            Wire(move,false);
-            Wire(resize,true);
+            Wire(move,false,1);
+            Corner(HorizontalAlignment.Right,VerticalAlignment.Bottom,1,Cursors.SizeNWSE);
+            Corner(HorizontalAlignment.Left,VerticalAlignment.Bottom,2,Cursors.SizeNESW);
+            Corner(HorizontalAlignment.Right,VerticalAlignment.Top,3,Cursors.SizeNESW);
+            Corner(HorizontalAlignment.Left,VerticalAlignment.Top,4,Cursors.SizeNWSE);
             SizeChanged+=(s,e)=>Shape();
         }
         static ControlTemplate TransparentThumb()
@@ -153,21 +158,80 @@ namespace OneTaskBar
             factory.SetValue(Border.BackgroundProperty,Brushes.Transparent);
             return new ControlTemplate(typeof(Thumb)) {VisualTree=factory};
         }
-        static ControlTemplate ResizeThumb()
+        static ControlTemplate HandleThumb()
         {
             var factory=new FrameworkElementFactory(typeof(Border));
-            factory.SetValue(Border.BorderBrushProperty,Paint.ControlWhite);
-            factory.SetValue(Border.BorderThicknessProperty,new Thickness(0,0,3,3));
-            factory.SetValue(Border.CornerRadiusProperty,new CornerRadius(0,0,12,0));
-            factory.SetValue(Border.MarginProperty,new Thickness(3,3,7,7));
-            factory.SetValue(Border.BackgroundProperty,Brushes.Transparent);
+            factory.SetValue(Border.WidthProperty,14.0);
+            factory.SetValue(Border.HeightProperty,14.0);
+            factory.SetValue(Border.CornerRadiusProperty,new CornerRadius(7));
+            factory.SetValue(Border.BackgroundProperty,Paint.ControlWhite);
+            factory.SetValue(Border.BorderBrushProperty,Paint.Brush("#FF4F8BF0"));
+            factory.SetValue(Border.BorderThicknessProperty,new Thickness(3));
             return new ControlTemplate(typeof(Thumb)) {VisualTree=factory};
         }
-        void Wire(Thumb thumb,bool sizing)
+        void Corner(HorizontalAlignment across,VerticalAlignment down,int corner,Cursor cursor)
+        {
+            var handle=new Thumb {Width=28,Height=28,Cursor=cursor,HorizontalAlignment=across,VerticalAlignment=down,Template=HandleThumb(),Background=Brushes.Transparent};
+            AutomationProperties.SetName(handle,"위젯 크기 조절");
+            editor.Children.Add(handle);
+            Wire(handle,true,corner);
+        }
+        // A plain click or a long press opens editing. A click on a control keeps its own
+        // action, so only a long press there edits.
+        static bool OnControl(DependencyObject source)
+        {
+            while(source is Visual)
+            {
+                if(source is ButtonBase)return true;
+                source=VisualTreeHelper.GetParent(source);
+            }
+            return false;
+        }
+        internal void Press(bool onControl,System.Drawing.Point at)
+        {
+            pressed=true;
+            moving=held=false;
+            pressedControl=onControl;
+            origin=at;
+            if(hold==null)
+            {
+                hold=new DispatcherTimer {Interval=TimeSpan.FromMilliseconds(HoldMilliseconds)};
+                hold.Tick+=(s,e)=>
+                {
+                    StopHold();
+                    if(!pressed||moving||retired)return;
+                    held=true;
+                    CaptureMouse();
+                    if(select!=null)select(Slot);
+                };
+            }
+            hold.Start();
+        }
+        void StopHold()
+        {
+            if(hold!=null)hold.Stop();
+        }
+        // Returns true when the release was used for editing and must not click a control.
+        internal bool Release()
+        {
+            StopHold();
+            pressed=false;
+            if(held)
+            {
+                held=false;
+                ReleaseMouseCapture();
+                return true;
+            }
+            if(pressedControl||select==null)return false;
+            select(Slot);
+            return true;
+        }
+        void Wire(Thumb thumb,bool sizing,int corner)
         {
             thumb.DragStarted+=(s,e)=>
             {
                 origin=Forms.Cursor.Position;
+                ResizeCorner=corner;
                 gesture(Slot,origin,origin,sizing,false);
             };
             thumb.DragDelta+=(s,e)=>gesture(Slot,origin,Forms.Cursor.Position,sizing,false);
@@ -179,6 +243,7 @@ namespace OneTaskBar
                 var center=PointToScreen(new Point(ActualWidth/2,ActualHeight/2));
                 var point=new System.Drawing.Point((int)center.X,(int)center.Y);
                 bool size=sizing||(Keyboard.Modifiers&ModifierKeys.Shift)!=0;
+                ResizeCorner=sizing?corner:1;
                 gesture(Slot,point,point,size,false);
                 gesture(Slot,point,new System.Drawing.Point(point.X+x,point.Y+y),size,true);
                 e.Handled=true;
@@ -190,12 +255,18 @@ namespace OneTaskBar
             card.BorderThickness=new Thickness(value?2:tile!=null?0:1);
             card.BorderBrush=value?Paint.Brush("#FF4F8BF0"):Paint.Brush("#46FFFFFF");
         }
+        internal void Material(Brush blurred,int opacity)
+        {
+            backdrop.Background=blurred;
+            if(scheme!=null)card.Background=WidgetMaterial.Surface(scheme,opacity);
+            else card.Opacity=Math.Max(.1,opacity/100.0);
+        }
         void Shape()
         {
             bool circular=Toggle!=null&&ActualWidth<=110&&ActualHeight<=110;
             bool pill=Toggle!=null?ActualWidth>ActualHeight:InfoTileCatalog.Known(Slot.Key)&&InfoTile.Pill(InfoTileCatalog.Columns(Slot.Key),InfoTileCatalog.Rows(Slot.Key));
             double radius=circular||pill?Math.Min(ActualWidth,ActualHeight)/2:28;
-            card.CornerRadius=new CornerRadius(radius);
+            card.CornerRadius=backdrop.CornerRadius=new CornerRadius(radius);
             body.Clip=new RectangleGeometry(new Rect(0,0,Math.Max(0,ActualWidth-2),Math.Max(0,ActualHeight-2)),Math.Max(0,radius-1),Math.Max(0,radius-1));
             if(Toggle!=null)Toggle.Shape(new QuickWidgetSlot {Columns=circular?1:2,Rows=!circular&&ActualHeight>ActualWidth?2:1});
         }
@@ -280,8 +351,8 @@ namespace OneTaskBar
             if(retired)return;
             retired=true;
             if(tile!=null)tile.Retire();
+            StopHold();
             if(move.IsDragging)move.CancelDrag();
-            if(resize.IsDragging)resize.CancelDrag();
             Visibility=Visibility.Collapsed;
             body.Children.Clear();
         }

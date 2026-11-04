@@ -33,6 +33,8 @@ namespace OneTaskBar
             var narrow=FullscreenTileStrip.Place(new[]{2,2,1},new[]{2,2,1},3);
             Require(narrow[1].X<0&&narrow[2]==new Point(2,.5),"a tile that does not fit is left out, and a lone tile centers vertically");
             Require(CalendarTile.Weeks(new DateTime(2026,11,1))==5&&CalendarTile.Weeks(new DateTime(2026,8,1))==6&&CalendarTile.Weeks(new DateTime(2026,2,1))==4,"calendar rows match the month");
+            Require(BudsInfo.AppBattery("L 80% R 75% 케이스 50%")==75,"the lower earbud level is shown, not the case");
+            Require(BudsInfo.AppBattery("왼쪽 90 · 오른쪽 88")==88&&BudsInfo.AppBattery("배터리 64%")==64&&BudsInfo.AppBattery("연결됨")==null&&BudsInfo.AppBattery("L 300%")==null,"app battery text is read safely");
             string todo=Path.Combine(AppLog.Data,"todo-fixture.json");
             File.WriteAllText(todo,"[\"  하나  \",\"\",null,\""+new string('x',500)+"\"]");
             var items=TodoStore.Load(todo);

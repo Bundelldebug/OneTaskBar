@@ -2,8 +2,11 @@
 
 ## 9.5.3
 
-- Desktop widgets are native children of the Explorer desktop view. The live diagnostic `--desktop-widgets-live` confirmed parenting and read 21 real desktop icons through UI Automation. Dragging, the context menu and icon avoidance on a visible desktop were not exercised by an automated fixture.
+- Desktop widgets are native children of the Explorer desktop view. The live diagnostic `--desktop-widgets-live` confirmed parenting and read 21 real desktop icons through UI Automation. ``--desktop-widgets-live`` now also drives the real widget manager on the real desktop with isolated data: selection, toolbar, move, grid snap, icon clearance, corner resize to the matching tile, blur, deselect and removal. It calls the gesture handlers directly; physical mouse input was checked by hand only for click and toolbar.
 - Collapsed fullscreen media shows wallpaper-tinted tiles and corner app shortcuts. `fullscreen-tiles-probe` covers placement, every tile size, shortcuts, the picker, persistence and weather parsing with fixture data. Live Open-Meteo requests were not sent by a fixture.
+- Widgets first shipped below Explorer's transparent icon list, so they were visible but received no clicks. They are now raised above it and re-raised if Explorer restacks. The live diagnostic asserts which child receives a click at the widget center.
+- Blur is one frozen image of the wallpaper behind each widget, redrawn on move, option or wallpaper change. Plugged in, media playing but not foreground, 6 widgets, 60-second sample about two minutes after start: plain 0.0194% CPU, 237.1 MiB total; opacity 70 blur 24: 0.0357%, 260.9 MiB; opacity 40 blur 30: 0.0390%, 217.3 MiB. Memory differences between single samples include noise.
+- With a media app, one earlier sample read 1.71% CPU and committed memory swinging between 247 and 531 MiB, and only runs with the window animation off or the app not foreground were quiet. Capture and plane rebuilds are now rate limited and counted in ``live-state.json`` as ``mediaCaptures`` and ``mediaPlaneBuilds``. The later samples above recorded zero captures, so the reduction in that foreground case has not been measured.
 - Optimization, installed app, plugged in, idle, about two minutes after start, one 60-second sample each: CPU 0.0601% to 0.0307%, total working set 222.4 MiB to 190.6 MiB, private working set 93.4 MiB to 67.2 MiB. Battery cadence is covered by `RuntimeCadence.Check`, not by a battery measurement.
 
 ## Fullscreen follow-up — 2026-11-03

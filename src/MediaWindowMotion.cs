@@ -112,7 +112,7 @@ namespace OneTaskBar
             double dpi=Math.Max(96,Native.GetDpiForWindow(foreground))/96.0;
             double caption=46*dpi;
             bool hover=cursor.X>=rect.Right-3*caption&&cursor.X<rect.Right-2*caption&&cursor.Y>=rect.Top&&cursor.Y<rect.Top+40*dpi;
-            if(resumed||snapshotWindow!=foreground||snapshotBounds!=bounds||hover&&!minimizeHover)RequestCapture(foreground,bounds);
+            if(resumed||hover&&!minimizeHover||(snapshotWindow!=foreground||snapshotBounds!=bounds)&&DateTime.UtcNow>=captureAt)RequestCapture(foreground,bounds);
             else if(!Active)Warm(foreground,bounds);
             minimizeHover=hover;
         }
@@ -127,6 +127,9 @@ namespace OneTaskBar
             if(capturing||disposed||Active)return;
             capturing=true;
             captureWindow=window;
+            // A capture that cannot complete must not repeat on every pulse.
+            captureAt=DateTime.UtcNow.AddSeconds(2);
+            Captures++;
             int generation=captureGeneration;
             try
             {
@@ -139,6 +142,7 @@ namespace OneTaskBar
                 snapshot=image;
                 snapshotWindow=window;
                 snapshotBounds=bounds;
+                warmAt=DateTime.MinValue;
                 if(shell!=null)Warm(window,bounds);
             }
             catch(Exception error)
@@ -165,6 +169,9 @@ namespace OneTaskBar
             return bounds.Width>0&&bounds.Height>0;
         }
 
+        DateTime captureAt=DateTime.MinValue,warmAt=DateTime.MinValue;
+        internal int Captures {get;private set;}
+        internal int PlaneBuilds {get;private set;}
         void Warm(IntPtr window,Rect bounds)
         {
             Rect capsule;
@@ -175,6 +182,10 @@ namespace OneTaskBar
                 if(!lease.Arm(window))DropPrepared();
                 return;
             }
+            // Each plane holds a large texture, so a failing lease must not rebuild one per pulse.
+            if(DateTime.UtcNow<warmAt)return;
+            warmAt=DateTime.UtcNow.AddSeconds(3);
+            PlaneBuilds++;
             DropPrepared();
             try
             {

@@ -3,6 +3,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Media;
+using System.Windows.Threading;
 using Forms=System.Windows.Forms;
 
 namespace OneTaskBar
@@ -15,14 +19,19 @@ namespace OneTaskBar
         DesktopWidgetGallery gallery;
         IntPtr parent;
         DateTime discoveryAt;
-        bool disposed,editing,changing;
+        bool disposed,changing;
+        string selectedId;
+        Popup toolbar;
+        FrameworkElement toolbarBody;
+        DispatcherTimer selectionWatch;
         int interfaceVersion;
         DesktopWidgetSlot dragging;
         Rect dragPixels;
         internal ShellController Shell {get{return shell;}}
         internal string Status {get;private set;}
         internal int HostCount {get{return hosts.Count;}}
-        internal bool Editing {get{return editing;}}
+        internal bool Editing {get{return selectedId!=null;}}
+        internal string SelectedId {get{return selectedId;}}
         internal DesktopWidgetStore Store
         {
             get
@@ -35,6 +44,8 @@ namespace OneTaskBar
         {
             shell=controller;
             Preferences.DesktopWidgetsChanged+=PreferenceChanged;
+            Preferences.WidgetMaterialChanged+=MaterialChanged;
+            Microsoft.Win32.SystemEvents.UserPreferenceChanged+=SystemPreferenceChanged;
             Status="바탕화면 위젯이 꺼져 있습니다";
         }
         void PreferenceChanged()
@@ -42,7 +53,7 @@ namespace OneTaskBar
             if(disposed)return;
             if(!Preferences.Current.DesktopWidgets)
             {
-                SetEditing(false);
+                Deselect();
                 Clear();
                 Status="바탕화면 위젯이 꺼져 있습니다";
             }
@@ -57,16 +68,236 @@ namespace OneTaskBar
             gallery.Closed+=(s,e)=>
             {
                 gallery=null;
-                SetEditing(false);
             };
             gallery.Show();
         }
-        internal void SetEditing(bool value)
+        readonly Dictionary<string,Brush> wallpapers=new Dictionary<string,Brush>(StringComparer.OrdinalIgnoreCase);
+        readonly HashSet<string> wallpapersLoading=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        DispatcherTimer materialDelay;
+        bool readableInk=true;
+        internal int MaterialRenders {get;private set;}
+        void SystemPreferenceChanged(object sender,Microsoft.Win32.UserPreferenceChangedEventArgs e)
         {
-            editing=value&&Preferences.Current.DesktopWidgets;
-            foreach(var host in hosts.Values)host.View.Editing(editing);
-            if(!editing&&store!=null)store.Save();
-            if(gallery!=null)gallery.RefreshStatus();
+            if(e.Category!=Microsoft.Win32.UserPreferenceCategory.Desktop)return;
+            Application.Current.Dispatcher.BeginInvoke(new Action(()=>
+            {
+                if(disposed)return;
+                wallpapers.Clear();
+                PaintAll();
+            }));
+        }
+        // Slider drags arrive quickly, and each one can redraw every widget.
+        void MaterialChanged()
+        {
+            if(disposed)return;
+            if(materialDelay==null)
+            {
+                materialDelay=new DispatcherTimer {Interval=TimeSpan.FromMilliseconds(150)};
+                materialDelay.Tick+=(s,e)=>
+                {
+                    materialDelay.Stop();
+                    ApplyMaterial();
+                };
+            }
+            materialDelay.Stop();
+            materialDelay.Start();
+        }
+        internal void ApplyMaterial()
+        {
+            if(disposed)return;
+            bool readable=Preferences.Current.WidgetOpacity>=WidgetMaterial.ReadableOpacity;
+            if(readable!=readableInk)
+            {
+                readableInk=readable;
+                // Text color is chosen when a widget is built, so crossing the line rebuilds them.
+                Deselect();
+                Clear();
+                discoveryAt=DateTime.MinValue;
+                Pulse();
+                return;
+            }
+            PaintAll();
+        }
+        void PaintAll()
+        {
+            foreach(var item in Store.Items)
+            {
+                DesktopWidgetHost host;
+                if(hosts.TryGetValue(item.Id,out host))PaintWidget(item,host);
+            }
+        }
+        async void LoadWallpaper(Forms.Screen screen)
+        {
+            string device=screen.DeviceName;
+            if(!wallpapersLoading.Add(device))return;
+            var bounds=screen.Bounds;
+            try
+            {
+                var snapshot=await BackgroundWork.Run(()=>DesktopWallpaper.Read(bounds));
+                if(disposed)return;
+                wallpapers[device]=snapshot.Brush;
+                if(!readableInk)
+                {
+                    Clear();
+                    discoveryAt=DateTime.MinValue;
+                    Pulse();
+                }
+                else PaintAll();
+            }
+            catch(Exception e)
+            {
+                AppLog.Once("widget-wallpaper",e.GetType().Name);
+            }
+            finally{wallpapersLoading.Remove(device);}
+        }
+        Brush WallpaperFor(Forms.Screen screen)
+        {
+            Brush wallpaper;
+            if(wallpapers.TryGetValue(screen.DeviceName,out wallpaper))return wallpaper;
+            LoadWallpaper(screen);
+            return null;
+        }
+        void PaintWidget(DesktopWidgetSlot item,DesktopWidgetHost host)
+        {
+            int opacity=Preferences.Current.WidgetOpacity,blur=Preferences.Current.WidgetBlur;
+            var screen=ScreenFor(item);
+            Brush picture=null;
+            if(blur>0)
+            {
+                var wallpaper=WallpaperFor(screen);
+                double scale=Native.DropMonitorScale(screen.Bounds);
+                picture=WidgetMaterial.Blurred(wallpaper,new Rect(screen.Bounds.X,screen.Bounds.Y,screen.Bounds.Width,screen.Bounds.Height),Physical(item,screen,scale),blur*scale);
+                if(picture!=null)MaterialRenders++;
+            }
+            host.View.Material(picture,opacity);
+        }
+        TileScheme SchemeFor(DesktopWidgetSlot item)
+        {
+            if(Preferences.Current.WidgetOpacity>=WidgetMaterial.ReadableOpacity)return TileScheme.Desktop();
+            var wallpaper=WallpaperFor(ScreenFor(item));
+            return wallpaper!=null?TileScheme.FromWallpaper(wallpaper):TileScheme.Desktop();
+        }
+        internal bool ToolbarOpen {get{return toolbar!=null&&toolbar.IsOpen;}}
+        internal string ToolbarWidget {get{return selectedId;}}
+        // One widget is edited at a time, as on a phone home screen.
+        internal void Select(DesktopWidgetSlot item)
+        {
+            if(disposed||!Preferences.Current.DesktopWidgets||!Store.Items.Contains(item))return;
+            selectedId=item.Id;
+            foreach(var pair in hosts)pair.Value.View.Editing(pair.Key==selectedId);
+            ShowToolbar(item);
+            if(selectionWatch==null)
+            {
+                selectionWatch=new DispatcherTimer {Interval=TimeSpan.FromMilliseconds(120)};
+                selectionWatch.Tick+=(s,e)=>WatchSelection();
+            }
+            selectionWatch.Start();
+            RefreshIcons();
+        }
+        internal void Deselect()
+        {
+            if(selectionWatch!=null)selectionWatch.Stop();
+            CloseToolbar();
+            if(selectedId==null)return;
+            selectedId=null;
+            foreach(var host in hosts.Values)host.View.Editing(false);
+            if(store!=null)store.Save();
+        }
+        // The timer exists only while a widget is selected: Explorer owns clicks on the empty desktop.
+        void WatchSelection()
+        {
+            if(selectedId==null||dragging!=null||Forms.Control.MouseButtons==Forms.MouseButtons.None)return;
+            DesktopWidgetHost host;
+            var at=Forms.Cursor.Position;
+            var point=new Point(at.X,at.Y);
+            if(hosts.TryGetValue(selectedId,out host)&&host.Pixels.Contains(point))return;
+            if(InToolbar(point))return;
+            Deselect();
+        }
+        bool InToolbar(Point point)
+        {
+            if(toolbar==null||!toolbar.IsOpen||toolbarBody==null)return false;
+            var source=PresentationSource.FromVisual(toolbarBody);
+            if(source==null||source.CompositionTarget==null)return false;
+            var scale=source.CompositionTarget.TransformToDevice;
+            var corner=toolbarBody.PointToScreen(new Point(0,0));
+            return new Rect(corner.X,corner.Y,toolbarBody.ActualWidth*scale.M11,toolbarBody.ActualHeight*scale.M22).Contains(point);
+        }
+        void CloseToolbar()
+        {
+            if(toolbar!=null)toolbar.IsOpen=false;
+            toolbar=null;
+            toolbarBody=null;
+        }
+        void ShowToolbar(DesktopWidgetSlot item)
+        {
+            CloseToolbar();
+            DesktopWidgetHost host;
+            if(!hosts.TryGetValue(item.Id,out host))return;
+            var scheme=TileScheme.Desktop();
+            var row=new StackPanel {Orientation=Orientation.Horizontal,Margin=new Thickness(6)};
+            Func<string,Action,bool,Button> chip=(text,action,chosen)=>
+            {
+                var button=Paint.Button(Paint.TextBlock(text,13,scheme.Ink),action,text);
+                button.Background=chosen?scheme.Track:Brushes.Transparent;
+                button.Padding=new Thickness(12,7,12,7);
+                button.Resources["ButtonRadius"]=new CornerRadius(16);
+                row.Children.Add(button);
+                return button;
+            };
+            if(InfoTileCatalog.Known(item.Key))
+            {
+                var family=InfoTileCatalog.Family(item.Key);
+                foreach(string span in family.Spans)
+                {
+                    string token=family.Key+":"+span;
+                    chip(InfoTileCatalog.SpanLabel(token),()=>Resize(item,token),token==item.Key);
+                }
+            }
+            chip("위젯 추가",OpenGallery,false);
+            chip("제거",()=>Remove(item),false);
+            chip("완료",Deselect,false);
+            toolbarBody=new Border {Background=scheme.Surface,CornerRadius=new CornerRadius(22),BorderBrush=scheme.Track,BorderThickness=new Thickness(1),Child=row};
+            toolbar=new Popup {PlacementTarget=host.View,Placement=PlacementMode.Top,VerticalOffset=-8,AllowsTransparency=true,StaysOpen=true,Child=toolbarBody};
+            toolbar.IsOpen=true;
+        }
+        // The tile whose shape is closest to what was dragged, so its content never stretches.
+        internal static string NearestSpan(InfoTileFamily family,double ratio)
+        {
+            string best=null;
+            double distance=Double.MaxValue;
+            foreach(string span in family.Spans)
+            {
+                string token=family.Key+":"+span;
+                var design=InfoTileCatalog.Design(token);
+                double gap=Math.Abs(Math.Log(ratio/(design.Width/design.Height)));
+                if(gap>=distance)continue;
+                distance=gap;
+                best=token;
+            }
+            return best;
+        }
+        void Snap(DesktopWidgetSlot item)
+        {
+            if(!InfoTileCatalog.Known(item.Key))return;
+            string token=NearestSpan(InfoTileCatalog.Family(item.Key),item.Width/Math.Max(1,item.Height));
+            var design=InfoTileCatalog.Design(token);
+            double scale=Math.Sqrt(item.Width*item.Height/(design.Width*design.Height));
+            if(token!=item.Key)
+            {
+                DesktopWidgetHost host;
+                if(hosts.TryGetValue(item.Id,out host))
+                {
+                    hosts.Remove(item.Id);
+                    host.Dispose();
+                }
+                item.Key=token;
+            }
+            item.Width=design.Width*scale;
+            item.Height=design.Height*scale;
+            DesktopWidgetStore.Normalize(item);
+            Clear(item,false);
+            Pulse();
         }
         internal void Add(string key,Forms.Screen screen)
         {
@@ -81,8 +312,8 @@ namespace OneTaskBar
                 return;
             }
             if(!Preferences.Current.DesktopWidgets)Preferences.SetDesktopWidgets(true);
-            SetEditing(true);
             Pulse();
+            Select(item);
         }
         // Windows desktop icons, read in the background on demand and when the desktop is showing.
         List<Rect> iconPixels=new List<Rect>();
@@ -136,7 +367,11 @@ namespace OneTaskBar
             item.X=free.X;
             item.Y=free.Y;
             DesktopWidgetHost host;
-            if(hosts.TryGetValue(item.Id,out host))host.Place(Physical(item,screen,scale),scale);
+            if(hosts.TryGetValue(item.Id,out host))
+            {
+                host.Place(Physical(item,screen,scale),scale);
+                PaintWidget(item,host);
+            }
             return true;
         }
         void Settle()
@@ -162,35 +397,11 @@ namespace OneTaskBar
             Clear(item,true);
             Store.Save();
             Pulse();
+            if(selectedId==item.Id)ShowToolbar(item);
         }
-        void Menu(DesktopWidgetSlot item)
+        internal void Remove(DesktopWidgetSlot item)
         {
-            var menu=new System.Windows.Controls.ContextMenu();
-            if(InfoTileCatalog.Known(item.Key))
-            {
-                var family=InfoTileCatalog.Family(item.Key);
-                foreach(string span in family.Spans)
-                {
-                    string token=family.Key+":"+span;
-                    var entry=new System.Windows.Controls.MenuItem {Header="크기 "+InfoTileCatalog.SpanLabel(token),IsChecked=token==item.Key};
-                    entry.Click+=(s,e)=>Resize(item,token);
-                    menu.Items.Add(entry);
-                }
-                menu.Items.Add(new System.Windows.Controls.Separator());
-            }
-            var add=new System.Windows.Controls.MenuItem {Header="위젯 추가"};
-            add.Click+=(s,e)=>OpenGallery();
-            menu.Items.Add(add);
-            var layout=new System.Windows.Controls.MenuItem {Header=editing?"크기 조절 마치기":"크기 자유롭게 조절"};
-            layout.Click+=(s,e)=>SetEditing(!editing);
-            menu.Items.Add(layout);
-            var remove=new System.Windows.Controls.MenuItem {Header="제거"};
-            remove.Click+=(s,e)=>Remove(item);
-            menu.Items.Add(remove);
-            menu.IsOpen=true;
-        }
-        void Remove(DesktopWidgetSlot item)
-        {
+            if(selectedId==item.Id)Deselect();
             DesktopWidgetHost host;
             if(hosts.TryGetValue(item.Id,out host))
             {
@@ -212,7 +423,7 @@ namespace OneTaskBar
             var fitted=DesktopWidgetStore.Fit(item,new Size(area.Width/scale,area.Height/scale));
             return new Rect(area.Left+fitted.X*scale,area.Top+fitted.Y*scale,fitted.Width*scale,fitted.Height*scale);
         }
-        void Drag(DesktopWidgetSlot item,System.Drawing.Point start,System.Drawing.Point end,bool resize,bool commit)
+        internal void Drag(DesktopWidgetSlot item,System.Drawing.Point start,System.Drawing.Point end,bool resize,bool commit)
         {
             if(disposed||changing)return;
             DesktopWidgetHost host;
@@ -221,14 +432,21 @@ namespace OneTaskBar
             {
                 dragging=item.Copy();
                 dragPixels=host.Pixels;
+                if(toolbar!=null)toolbar.IsOpen=false;
                 RefreshIcons();
             }
             var screen=resize?ScreenFor(dragging):Forms.Screen.FromPoint(end);
             double scale=Native.DropMonitorScale(screen.Bounds);
             if(resize)
             {
-                item.Width=dragging.Width+(end.X-start.X)/scale;
-                item.Height=dragging.Height+(end.Y-start.Y)/scale;
+                int corner=host.View.ResizeCorner;
+                bool fromLeft=corner==2||corner==4,fromTop=corner==3||corner==4;
+                double dx=(end.X-start.X)/scale,dy=(end.Y-start.Y)/scale;
+                item.Width=dragging.Width+(fromLeft?-dx:dx);
+                item.Height=dragging.Height+(fromTop?-dy:dy);
+                DesktopWidgetStore.Normalize(item);
+                if(fromLeft)item.X=dragging.X+dragging.Width-item.Width;
+                if(fromTop)item.Y=dragging.Y+dragging.Height-item.Height;
             }
             else
             {
@@ -246,8 +464,11 @@ namespace OneTaskBar
             if(commit)
             {
                 dragging=null;
-                if(!resize)Clear(item,true);
+                RepaintMoved(item);
+                if(resize)Snap(item);
+                else Clear(item,true);
                 Store.Save();
+                if(selectedId==item.Id)ShowToolbar(item);
             }
         }
         internal void Pulse()
@@ -282,7 +503,12 @@ namespace OneTaskBar
             var root=Native.GetAncestor(parent,2);
             if(foreground==root)covered=false;
             var bounds=covered?new Rect(foregroundRect.Left,foregroundRect.Top,Math.Max(0,foregroundRect.Right-foregroundRect.Left),Math.Max(0,foregroundRect.Bottom-foregroundRect.Top)):Rect.Empty;
-            if((!covered||editing)&&Store.Items.Count>0&&DateTime.UtcNow>=iconsAt)RefreshIcons();
+            if(!covered&&Store.Items.Count>0&&DateTime.UtcNow>=iconsAt)RefreshIcons();
+            // Explorer can restack its icon list, for example after a refresh.
+            if(DesktopWidgetNative.IconsOnTop(parent))
+            {
+                foreach(var above in hosts.Values)above.Raise();
+            }
             foreach(var item in Store.Items)
             {
                 DesktopWidgetHost host;
@@ -296,9 +522,10 @@ namespace OneTaskBar
                 {
                     try
                     {
-                        host=new DesktopWidgetHost(parent,new DesktopWidgetView(shell,item,Remove,Drag,Menu));
+                        host=new DesktopWidgetHost(parent,new DesktopWidgetView(shell,item,Drag,Select,SchemeFor(item)));
+                        PaintWidget(item,host);
                         hosts.Add(item.Id,host);
-                        host.View.Editing(editing);
+                        host.View.Editing(item.Id==selectedId);
                     }
                     catch(Exception e)
                     {
@@ -310,14 +537,20 @@ namespace OneTaskBar
                 var screen=ScreenFor(item);
                 double scale=Native.DropMonitorScale(screen.Bounds);
                 host.Place(Physical(item,screen,scale),scale);
-                bool visible=editing||bounds.IsEmpty||!bounds.Contains(host.Pixels);
+                bool visible=item.Id==selectedId||bounds.IsEmpty||!bounds.Contains(host.Pixels);
                 host.Present(visible);
                 if(visible)host.View.Refresh();
             }
-            Status=Store.Items.Count==0?"추가할 위젯을 선택하세요":Store.Items.Count+"개 위젯 · "+(editing?"배치 편집 중":"바탕화면에 표시 중");
+            Status=Store.Items.Count==0?"추가할 위젯을 선택하세요":Store.Items.Count+"개 위젯 · "+"바탕화면에 표시 중";
+        }
+        void RepaintMoved(DesktopWidgetSlot item)
+        {
+            DesktopWidgetHost moved;
+            if(hosts.TryGetValue(item.Id,out moved))PaintWidget(item,moved);
         }
         internal void DisplayChanged()
         {
+            wallpapers.Clear();
             dragging=null;
             Pulse();
         }
@@ -330,6 +563,9 @@ namespace OneTaskBar
                 hosts.Clear();
                 parent=IntPtr.Zero;
                 dragging=null;
+                CloseToolbar();
+                selectedId=null;
+                if(selectionWatch!=null)selectionWatch.Stop();
             }
             finally{changing=false;}
         }
@@ -338,6 +574,9 @@ namespace OneTaskBar
             if(disposed)return;
             disposed=true;
             Preferences.DesktopWidgetsChanged-=PreferenceChanged;
+            Preferences.WidgetMaterialChanged-=MaterialChanged;
+            Microsoft.Win32.SystemEvents.UserPreferenceChanged-=SystemPreferenceChanged;
+            if(materialDelay!=null)materialDelay.Stop();
             if(gallery!=null)gallery.Close();
             Clear();
         }

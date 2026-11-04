@@ -13,7 +13,6 @@ namespace OneTaskBar
     {
         readonly DesktopWidgets widgets;
         readonly TextBlock status;
-        readonly Button edit;
         readonly ComboBox display;
         readonly List<KeyValuePair<string,Button>> choices=new List<KeyValuePair<string,Button>>();
         readonly List<InfoTile> previews=new List<InfoTile>();
@@ -42,11 +41,7 @@ namespace OneTaskBar
             status=Paint.TextBlock("",12,Paint.Muted);
             status.TextWrapping=TextWrapping.Wrap;
             bottom.Children.Add(status);
-            edit=Paint.Action("배치 편집",()=>widgets.SetEditing(!widgets.Editing));
-            edit.HorizontalAlignment=HorizontalAlignment.Left;
-            edit.Margin=new Thickness(0,8,0,0);
-            bottom.Children.Add(edit);
-            var help=Paint.TextBlock("끌어서 옮기고, 우클릭으로 크기를 바꿉니다.",12,Paint.Muted);
+            var help=Paint.TextBlock("바탕화면에서 위젯을 클릭하면 편집합니다. 끌면 옮겨집니다.",12,Paint.Muted);
             help.TextWrapping=TextWrapping.Wrap;
             help.Margin=new Thickness(0,10,0,0);
             bottom.Children.Add(help);
@@ -122,8 +117,7 @@ namespace OneTaskBar
         internal void RefreshStatus()
         {
             status.Text=widgets.Status;
-            edit.Content=widgets.Editing?"편집 마치기":"배치 편집";
-            edit.IsEnabled=Preferences.Current.DesktopWidgets;
+
         }
     }
 }

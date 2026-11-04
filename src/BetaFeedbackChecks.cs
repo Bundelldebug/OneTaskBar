@@ -74,7 +74,7 @@ namespace OneTaskBar
                 settings.SearchSettings.Text="ㅇㅁㅇㅁ";settings.UpdateLayout();Require(settings.SettingsNoResults&&settings.VisibleSettingsCards==0&&settings.VisibleSettingsSections==0,"No-results search removes category cards and separators");Program.Save(settings.Surface,760,720,Path.Combine(AppLog.Data,"settings-no-results.png"));
                 settings.SearchSettings.Text="불투명도";
                 settings.UpdateLayout();
-                Require(!settings.SettingsNoResults&&settings.VisibleSettingsSections==2&&settings.VisibleSettingsCards>=1&&settings.VisibleSettingsCards<=2,
+                Require(!settings.SettingsNoResults&&settings.VisibleSettingsSections==3&&settings.VisibleSettingsCards>=1&&settings.VisibleSettingsCards<=3,
                     "Search finds dock and Start material settings without empty groups");
                 settings.SearchSettings.Text="동적 블러";
                 settings.UpdateLayout();

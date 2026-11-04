@@ -42,8 +42,25 @@ namespace OneTaskBar
             var now=DateTime.UtcNow;
             if(now<budsAt)return budsLevel;
             budsAt=now.AddSeconds(15);
-            budsLevel=shell.Buds.ConnectedBudsBattery;
+            // App notification value first, then the battery Windows keeps for the device.
+            budsLevel=shell.Buds.ConnectedBudsBattery??budsSystem;
+            string model=BudsModel(shell);
+            if(model==null)
+            {
+                budsSystem=null;
+                return budsLevel;
+            }
+            if(!budsReading)ReadSystemBattery(shell.Buds.ConnectedBudsContainer,model);
             return budsLevel;
+        }
+        static int? budsSystem;
+        static bool budsReading;
+        static async void ReadSystemBattery(Guid? container,string model)
+        {
+            budsReading=true;
+            try{budsSystem=await BackgroundWork.Run(()=>BudsDeviceData.Battery(container,model));}
+            catch(Exception error){AppLog.Once("tile-buds-battery",error.GetType().Name);}
+            finally{budsReading=false;}
         }
     }
 

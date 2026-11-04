@@ -97,7 +97,7 @@ namespace OneTaskBar
                     {
                         var initial=DesktopWidgetCatalog.Initial(key);
                         var slot=new DesktopWidgetSlot {Id=Guid.NewGuid().ToString("N"),Key=key,Width=initial.Width,Height=initial.Height};
-                        var view=new DesktopWidgetView(shell,slot,s=>{},(s,a,b,r,c)=>{});
+                        var view=new DesktopWidgetView(shell,slot,(s,a,b,r,c)=>{});
                         var host=new DesktopWidgetHost(parent,view);
                         hosts.Add(host);
                         host.Place(new Rect(outer.Left+24*dpi+(index%3)*280*dpi,outer.Top+50*dpi+(index/3)*160*dpi,initial.Width*dpi,initial.Height*dpi),dpi);
@@ -123,6 +123,39 @@ namespace OneTaskBar
                     moving.Present(true);
                     Require(moving.View.IsVisible,"widgets return after occlusion");
                     checks.Add("native child hosting, actual DPI movement, no activation theft and visibility lifecycle");
+                    int chosen=0;
+                    var gestureSlot=new DesktopWidgetSlot {Id=Guid.NewGuid().ToString("N"),Key="calendar:2x2",Width=190,Height=190};
+                    var gestureView=new DesktopWidgetView(shell,gestureSlot,(s,a,b,r,c)=>{},s=>chosen++);
+                    var at=new System.Drawing.Point(10,10);
+                    gestureView.Press(false,at);
+                    Require(gestureView.Release()&&chosen==1,"clicking an empty part of a widget opens editing");
+                    gestureView.Press(true,at);
+                    Require(!gestureView.Release()&&chosen==1,"clicking a control keeps the control's action");
+                    gestureView.Press(true,at);
+                    await Task.Delay(600);
+                    Require(chosen==2,"holding a control opens editing");
+                    Require(gestureView.Release()&&chosen==2,"releasing a long press does not click or select again");
+                    gestureView.Retire();
+                    Require(DesktopWidgets.NearestSpan(InfoTileCatalog.Family("gauges:2x1"),4.5)=="gauges:4x1","dragging wider picks the wide tile");
+                    Require(DesktopWidgets.NearestSpan(InfoTileCatalog.Family("gauges:2x1"),1.05)=="gauges:2x2","dragging square picks the square tile");
+                    Require(DesktopWidgets.NearestSpan(InfoTileCatalog.Family("calendar:2x2"),5)=="calendar:2x2","a one-size tile keeps its shape");
+                    var liveSlot=shell.Widgets.Store.Add("clock-digital:2x2","fixture-a",new Size(1200,900));
+                    Preferences.Current.DesktopWidgets=true;
+                    shell.Widgets.Select(liveSlot);
+                    Require(shell.Widgets.Editing&&shell.Widgets.SelectedId==liveSlot.Id,"selecting edits one widget");
+                    shell.Widgets.Deselect();
+                    Require(!shell.Widgets.Editing,"editing ends cleanly");
+                    Preferences.Current.DesktopWidgets=false;
+                    shell.Widgets.Store.Items.Remove(liveSlot);
+                    var flat=new DrawingBrush(new GeometryDrawing(Brushes.SteelBlue,null,new RectangleGeometry(new Rect(0,0,100,100))));
+                    flat.Freeze();
+                    var blurred=WidgetMaterial.Blurred(flat,new Rect(0,0,1600,1000),new Rect(300,200,380,176),20);
+                    Require(blurred!=null&&blurred.IsFrozen,"a blurred widget backdrop is one frozen image");
+                    Require(WidgetMaterial.Blurred(null,new Rect(0,0,1600,1000),new Rect(300,200,380,176),20)==null&&WidgetMaterial.Blurred(flat,new Rect(0,0,1600,1000),new Rect(300,200,380,176),0)==null,"no wallpaper or zero blur draws nothing");
+                    Require(new PreferenceData().WidgetOpacity==100&&new PreferenceData().WidgetBlur==0,"opacity and blur are off by default");
+                    Require(Preferences.Normalize(new PreferenceData {WidgetOpacity=-5,WidgetBlur=999}).WidgetOpacity==10&&Preferences.Normalize(new PreferenceData {WidgetBlur=999}).WidgetBlur==40,"material settings are bounded");
+                    Require(((SolidColorBrush)WidgetMaterial.Surface(TileScheme.Light,40)).Color.A==102,"opacity sets the card alpha");
+                    checks.Add("click, long press and control gestures; aspect-based size snapping; single selection");
                     var handles=hosts.Select(h=>h.Source.Handle).ToArray();
                     foreach(var host in hosts)host.Dispose();
                     hosts.Clear();
@@ -171,7 +204,7 @@ namespace OneTaskBar
                     var screen=System.Windows.Forms.Screen.PrimaryScreen;
                     double scale=Native.DropMonitorScale(screen.Bounds);
                     var slot=new DesktopWidgetSlot {Id=Guid.NewGuid().ToString("N"),Key="clock",X=48,Y=48,Width=260,Height=150};
-                    host=new DesktopWidgetHost(desktop,new DesktopWidgetView(shell,slot,s=>{},(s,a,b,r,c)=>{}));
+                    host=new DesktopWidgetHost(desktop,new DesktopWidgetView(shell,slot,(s,a,b,r,c)=>{}));
                     host.Place(DesktopWidgets.Physical(slot,screen,scale),scale);
                     host.Present(true);
                     host.View.Refresh();
@@ -182,9 +215,63 @@ namespace OneTaskBar
                     IntPtr atCenter=WindowFromPoint(center);
                     bool parented=DesktopWidgetNative.GetParent(host.Source.Handle)==desktop;
                     bool visible=IsWindowVisible(host.Source.Handle);
+                    // Unlike WindowFromPoint this ignores other apps' windows covering the desktop.
+                    bool receivesClicks=DesktopWidgetNative.ChildAt(desktop,center.X,center.Y)==host.Source.Handle;
+                    bool iconsOnTop=DesktopWidgetNative.IconsOnTop(desktop);
                     var icons=await BackgroundWork.Run(()=>DesktopIcons.Read(desktop));
-                    AppLog.Json("desktop-widgets-live.json",new {passed=parented&&visible,desktopIcons=icons.Count,parented=parented,visible=visible,hitTestReachesWidget=atCenter==host.Source.Handle,left=actual.Left,top=actual.Top,width=actual.Right-actual.Left,height=actual.Bottom-actual.Top,scale=scale});
-                    result=parented&&visible?0:1;
+                    bool reached=atCenter==host.Source.Handle;
+                    // The real manager on the real desktop, with isolated data: nothing saved by the user is touched.
+                    host.Dispose();
+                    host=null;
+                    Preferences.Current.DesktopWidgets=true;
+                    var manager=shell.Widgets;
+                    manager.Add("gauges:2x1",screen);
+                    var widget=manager.Store.Items[manager.Store.Items.Count-1];
+                    await Task.Delay(1500);
+                    manager.Pulse();
+                    bool selected=manager.SelectedId==widget.Id;
+                    bool toolbarOpen=manager.ToolbarOpen;
+                    var start=new System.Drawing.Point(800,600);
+                    double beforeX=widget.X,beforeY=widget.Y;
+                    manager.Drag(widget,start,new System.Drawing.Point(start.X+300,start.Y+180),false,false);
+                    manager.Drag(widget,start,new System.Drawing.Point(start.X+300,start.Y+180),false,true);
+                    bool moved=widget.X!=beforeX||widget.Y!=beforeY;
+                    bool onGrid=widget.X%DesktopWidgetStore.GridStep==0&&widget.Y%DesktopWidgetStore.GridStep==0;
+                    await Task.Delay(1200);
+                    var pixels=DesktopWidgets.Physical(widget,screen,scale);
+                    bool clearOfIcons=!icons.Any(r=>r.IntersectsWith(pixels));
+                    manager.Drag(widget,start,start,true,false);
+                    manager.Drag(widget,start,new System.Drawing.Point(start.X+(int)(220*scale),start.Y),true,true);
+                    await Task.Delay(300);
+                    string resized=widget.Key;
+                    int rendersBefore=manager.MaterialRenders;
+                    Preferences.Current.WidgetOpacity=70;
+                    Preferences.Current.WidgetBlur=24;
+                    manager.ApplyMaterial();
+                    await Task.Delay(1500);
+                    manager.Pulse();
+                    bool rendered=manager.MaterialRenders>rendersBefore;
+                    string image=null;
+                    var shot=DesktopWidgets.Physical(widget,screen,scale);
+                    var shotCenter=new Native.PointI {X=(int)(shot.X+shot.Width/2),Y=(int)(shot.Y+shot.Height/2)};
+                    if(manager.HostCount==1&&DesktopWidgetNative.GetParent(WindowFromPoint(shotCenter))==desktop)
+                    {
+                        using(var bitmap=new System.Drawing.Bitmap((int)shot.Width,(int)shot.Height))
+                        using(var graphics=System.Drawing.Graphics.FromImage(bitmap))
+                        {
+                            graphics.CopyFromScreen((int)shot.X,(int)shot.Y,0,0,bitmap.Size);
+                            image=Path.Combine(AppLog.Data,"desktop-widget-blur-live.png");
+                            bitmap.Save(image);
+                        }
+                    }
+                    manager.Deselect();
+                    bool ended=!manager.Editing&&!manager.ToolbarOpen;
+                    manager.Remove(widget);
+                    bool removed=manager.HostCount==0;
+                    Preferences.Current.DesktopWidgets=false;
+                    bool scenario=selected&&toolbarOpen&&moved&&onGrid&&clearOfIcons&&resized=="gauges:4x1"&&rendered&&ended&&removed;
+                    AppLog.Json("desktop-widgets-live.json",new {passed=parented&&visible&&receivesClicks&&!iconsOnTop&&scenario,selected=selected,toolbarOpen=toolbarOpen,moved=moved,onGrid=onGrid,clearOfIcons=clearOfIcons,resized=resized,materialRendered=rendered,editingEnded=ended,removed=removed,screenshot=image!=null,receivesClicks=receivesClicks,iconsOnTop=iconsOnTop,desktopIcons=icons.Count,parented=parented,visible=visible,hitTestReachesWidget=reached,left=actual.Left,top=actual.Top,width=actual.Right-actual.Left,height=actual.Bottom-actual.Top,scale=scale});
+                    result=parented&&visible&&receivesClicks&&!iconsOnTop&&scenario?0:1;
                 }
                 catch(Exception e)
                 {

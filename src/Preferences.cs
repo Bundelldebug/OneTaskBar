@@ -53,6 +53,8 @@ namespace OneTaskBar
         public bool NowBarLargeCover=false;
         public int FullscreenClockPercent=100;
         public bool DesktopWidgets=false;
+        public int WidgetOpacity=100;
+        public int WidgetBlur=0;
         public bool FullscreenWidgets=true;
         public string[] FullscreenTiles={"weather:2x2","moon:1x1","rain:1x1","gauges:2x1","calendar:2x2","todo:2x2"};
         public string[] FullscreenActions={"capture","mute"};
@@ -73,7 +75,8 @@ namespace OneTaskBar
         internal static event Action AppearanceChanged;
         internal static event Action MediaAppearanceChanged;
         internal static event Action DesktopWidgetsChanged;
-        internal static PreferenceData Normalize(PreferenceData value){if(!ReleaseFeatures.GlassUI&&value.UIVersion>=95)value.UIVersion=90;value.UITheme=Math.Max(0,Math.Min(2,value.UITheme));value.DockTheme=Math.Max(0,Math.Min(2,value.DockTheme));value.DockScalePercent=DockSizing.Clamp(value.DockScalePercent);value.FullscreenClockPercent=Math.Max(50,Math.Min(200,value.FullscreenClockPercent));SurfaceMaterial.Normalize(value);return value;}
+        internal static event Action WidgetMaterialChanged;
+        internal static PreferenceData Normalize(PreferenceData value){if(!ReleaseFeatures.GlassUI&&value.UIVersion>=95)value.UIVersion=90;value.UITheme=Math.Max(0,Math.Min(2,value.UITheme));value.DockTheme=Math.Max(0,Math.Min(2,value.DockTheme));value.DockScalePercent=DockSizing.Clamp(value.DockScalePercent);value.FullscreenClockPercent=Math.Max(50,Math.Min(200,value.FullscreenClockPercent));value.WidgetOpacity=Math.Max(10,Math.Min(100,value.WidgetOpacity));value.WidgetBlur=Math.Max(0,Math.Min(40,value.WidgetBlur));SurfaceMaterial.Normalize(value);return value;}
         static PreferenceData Load(){try{if(File.Exists(file))return Normalize(new JavaScriptSerializer().Deserialize<PreferenceData>(File.ReadAllText(file))??new PreferenceData());}catch(Exception e){AppLog.Once("settings-read",e.Message);}return Normalize(new PreferenceData());}
         internal static void Set(Action<PreferenceData> change)
         {
@@ -94,6 +97,14 @@ namespace OneTaskBar
             Normalize(Current);
             Save();
             var notify=MediaAppearanceChanged;
+            if(notify!=null)notify();
+        }
+        internal static void SetWidgetMaterial(Action<PreferenceData> change)
+        {
+            change(Current);
+            Normalize(Current);
+            Save();
+            var notify=WidgetMaterialChanged;
             if(notify!=null)notify();
         }
         internal static void SetDesktopWidgets(bool enabled)

@@ -15,7 +15,7 @@ Use `OneTaskBar-Setup.exe` to install for the current user, or extract the entir
 - Control playback and output devices from quick settings or the media capsule. The optional brightness and volume labels are off by default.
 - Open fullscreen media controls, choose a vertical capsule for side docks, or enable Dynamic Island for media, new notifications and charging, volume and brightness feedback. The dock media capsule, window transitions and Duo status icon each have their own switch.
 - Switch windows and desktops with previews. Windows' original Start, search, notifications and Alt+Tab remain selectable in settings.
-- Place clock, calendar, battery, player, reminder, weather and other widgets on the desktop in sizes from 2×1 to 4×2. Dragging snaps to a grid and avoids desktop icons.
+- Place clock, calendar, battery, player, reminder, weather and other widgets on the desktop in sizes from 2×1 to 4×2. Click or long-press a widget to edit it; dragging snaps to a grid and avoids desktop icons. Opacity and blur are adjustable.
 - Collapsing the fullscreen media screen shows widgets below the time and your chosen apps in the lower corners.
 - Group, expand and swipe away notifications. Custom notification sounds use a local file you choose.
 

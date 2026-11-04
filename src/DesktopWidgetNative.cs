@@ -29,6 +29,22 @@ namespace OneTaskBar
             },IntPtr.Zero);
             return result;
         }
+        [DllImport("user32.dll")] static extern IntPtr GetWindow(IntPtr window,uint relation);
+        [DllImport("user32.dll")] internal static extern bool ScreenToClient(IntPtr window,ref Native.PointI point);
+        [DllImport("user32.dll")] internal static extern IntPtr ChildWindowFromPointEx(IntPtr parent,Native.PointI point,uint flags);
+        // The icon list is transparent, so a widget beneath it is visible but receives no mouse input.
+        internal static bool IconsOnTop(IntPtr desktopView)
+        {
+            IntPtr list=FindWindowEx(desktopView,IntPtr.Zero,"SysListView32",null);
+            return list!=IntPtr.Zero&&GetWindow(desktopView,5)==list;
+        }
+        // The child of the desktop view that receives a click at this screen point.
+        internal static IntPtr ChildAt(IntPtr desktopView,int x,int y)
+        {
+            var point=new Native.PointI {X=x,Y=y};
+            ScreenToClient(desktopView,ref point);
+            return ChildWindowFromPointEx(desktopView,point,0);
+        }
         internal static IntPtr EnterDpi(IntPtr parent)
         {
             try{return SetThreadDpiAwarenessContext(GetWindowDpiAwarenessContext(parent));}
@@ -86,6 +102,11 @@ namespace OneTaskBar
             {
                 DesktopWidgetNative.ExitDpi(previous);
             }
+            Raise();
+        }
+        internal void Raise()
+        {
+            if(Alive)Native.SetWindowPos(Source.Handle,IntPtr.Zero,0,0,0,0,0x0013);
         }
         IntPtr Message(IntPtr window,int message,IntPtr wp,IntPtr lp,ref bool handled)
         {
