@@ -9,6 +9,7 @@ namespace OneTaskBar
     {
         internal static async Task Run(DockHost dock)
         {
+            Require(FullscreenVisibility.IsCaptureTool("ShareX")&&FullscreenVisibility.IsCaptureTool("SnippingTool")&&!FullscreenVisibility.IsCaptureTool("chrome")&&!FullscreenVisibility.IsCaptureTool(null),"capture tools' selection layers are not fullscreen apps");
             var media = new FullscreenMedia(command => { }, position => Task.FromResult(true), () => { }, () => { });
             try
             {

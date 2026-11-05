@@ -47,6 +47,27 @@ namespace OneTaskBar
             bool app=(extended&0x40000)!=0;
             return !app&&((extended&(0x08000000|0x20))!=0||!titled&&(extended&0x80)!=0);
         }
+        // Screenshot and screen-recording tools put a borderless, topmost, screen-sized selection layer over the
+        // monitor. That layer is not an app, and counting it as fullscreen hid the dock exactly when the capture was
+        // taken. Names are matched without the extension; the answer is kept per process.
+        static readonly string[] captureTools={"sharex","snippingtool","screenclippinghost","screensketch","greenshot","lightshot","flameshot","snagit32","snagiteditor","gyazo","gyazowin","picpick","screenpresso","faststone capture","fscapture"};
+        static readonly Dictionary<uint,bool> captureByProcess=new Dictionary<uint,bool>();
+        internal static bool IsCaptureTool(string processName)
+        {
+            if(String.IsNullOrEmpty(processName))return false;
+            foreach(string tool in captureTools)if(String.Equals(processName,tool,StringComparison.OrdinalIgnoreCase))return true;
+            return false;
+        }
+        static bool CaptureToolProcess(uint pid)
+        {
+            bool known;
+            if(captureByProcess.TryGetValue(pid,out known))return known;
+            try{using(var process=Process.GetProcessById((int)pid))known=IsCaptureTool(process.ProcessName);}
+            catch(Exception){known=false;}
+            if(captureByProcess.Count>256)captureByProcess.Clear();
+            captureByProcess[pid]=known;
+            return known;
+        }
         internal static List<FullscreenCandidate> Capture()
         {
             var result = new List<FullscreenCandidate>();
@@ -61,6 +82,9 @@ namespace OneTaskBar
                 if (pid == own && !media)
                     return true;
                 var candidate = Inspect(window, media);
+                // Only a window that would count as fullscreen is worth looking up.
+                if (candidate != null && !media && (ClientCovers(candidate.Client, candidate.Monitor) || Native.CoversMonitor(candidate.Bounds, candidate.Monitor, candidate.Maximized, candidate.Framed)) && CaptureToolProcess(pid))
+                    return true;
                 if (candidate != null)
                     result.Add(candidate);
                 return true;
