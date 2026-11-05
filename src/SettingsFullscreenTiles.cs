@@ -15,7 +15,7 @@ namespace OneTaskBar
             ActionPicker(rows,"두 번째 빠른 실행 버튼",1);
             ZonePicker(rows);
             WeatherPlaceRow(rows);
-            var hint=Paint.TextBlock("왼쪽·오른쪽 아래 앱은 접힌 화면의 버튼을 눌러 선택하고, 우클릭으로 바꿀 수 있습니다.",12,Paint.Muted);
+            var hint=Paint.TextBlock("접힌 화면의 위젯을 우클릭하거나 길게 누르면 그 자리에서 바로 편집됩니다. 끌어서 옮기고, 아래 막대로 크기를 바꾸거나 추가·제거할 수 있습니다. 왼쪽·오른쪽 아래 앱은 버튼을 눌러 선택하고 우클릭으로 바꿉니다.",12,Paint.Muted);
             hint.TextWrapping=TextWrapping.Wrap;
             hint.Margin=new Thickness(15,8,15,12);
             rows.Children.Add(hint);
@@ -50,9 +50,16 @@ namespace OneTaskBar
         }
         internal static void SetFullscreenTile(string family,string token)
         {
-            var chosen=(Preferences.Current.FullscreenTiles??new string[0]).Where(k=>InfoTileCatalog.Known(k)&&InfoTileCatalog.FamilyKey(k)!=family).ToList();
-            if(!String.IsNullOrEmpty(token))chosen.Add(token);
-            var ordered=InfoTileCatalog.Tokens.Where(chosen.Contains).ToArray();
+            // The order set on the screen is kept: a changed size stays in place, a new tile goes last.
+            var current=(Preferences.Current.FullscreenTiles??new string[0]).Where(InfoTileCatalog.Known).ToList();
+            int at=current.FindIndex(k=>InfoTileCatalog.FamilyKey(k)==family);
+            if(String.IsNullOrEmpty(token))
+            {
+                if(at>=0)current.RemoveAt(at);
+            }
+            else if(at>=0)current[at]=token;
+            else current.Add(token);
+            var ordered=current.ToArray();
             Preferences.SetMediaAppearance(p=>p.FullscreenTiles=ordered);
         }
         static void ActionPicker(StackPanel rows,string title,int slot)

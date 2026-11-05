@@ -48,6 +48,7 @@ namespace OneTaskBar
             QuickToggleButton grouped;
             if(Toggles.TryGetValue("buds",out grouped))((Glyph)grouped.Content).SetDeviceIcon(budsSymbol);
             Volume.SetDeviceIcon(Volume.IsEnabled&&BudsInfo.IsBuds(shell.Services.OutputName)?budsSymbol:null);
+            Volume.OutputKind=Volume.IsEnabled?OutputIcons.Kind(shell.Services.OutputName):null;
         }
         async void SamsungIcon(AppEntry app)
         {

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
@@ -329,6 +329,7 @@ namespace OneTaskBar
         async void RefreshDeviceSymbol(string kind)
         {
             string name=outputName;
+            levelSlider.OutputKind=kind=="volume"?OutputIcons.Kind(name):null;
             string key=kind=="volume"&&BudsInfo.IsBuds(name)?BudsDeviceData.SymbolFile(name):null;
             if(key==symbolKey)return;
             symbolKey=key;

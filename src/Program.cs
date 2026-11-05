@@ -37,7 +37,7 @@ namespace OneTaskBar
             CaptureReview=args.Contains("--review-ui");Inspectable=CaptureReview||args.Contains("--qa")||File.Exists(Path.Combine(AppLog.Data,"ui-inspection.flag"));
             if(args.Length>0 && args[0]=="--guard") { Guard(args); return 0; }
             if(args.Contains("--stop")) { Signal("Stop"); return 0; }
-            if(args.Length==2&&args[0]=="--open-panel"&&new[]{"notifications","quick","start","search","desktops","media-screen"}.Contains(args[1])){Signal("Panel-"+args[1]);return 0;}
+            if(args.Length==2&&args[0]=="--open-panel"&&new[]{"notifications","quick","start","search","desktops","media-screen","widgets"}.Contains(args[1])){Signal("Panel-"+args[1]);return 0;}
             if(args.Length==2&&args[0]=="--review-edge"&&new[]{"0","1","2","3"}.Contains(args[1])){Signal("Panel-edge"+args[1]);return 0;}
             if(args.Length==2&&args[0]=="--review-background"&&new[]{"0","1","2","3"}.Contains(args[1])){Signal("Panel-background"+args[1]);return 0;}
             if(args.Length==3&&args[0]=="--register-notifications")return NotificationIdentity.RegisterHelper(args[1],args[2]);

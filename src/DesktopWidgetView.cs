@@ -15,7 +15,7 @@ namespace OneTaskBar
     {
         readonly ShellController shell;
         internal readonly DesktopWidgetSlot Slot;
-        readonly Border card;
+        readonly GlassTileBorder card;
         readonly Grid body=new Grid(),editor=new Grid();
         readonly TextBlock primary,secondary;
         readonly BatteryPill battery;
@@ -91,7 +91,7 @@ namespace OneTaskBar
             };
             UseLayoutRounding=true;
             AutomationProperties.SetName(this,"바탕화면 위젯 · "+DesktopWidgetCatalog.Title(slot.Key));
-            card=new Border {CornerRadius=new CornerRadius(28),Background=Paint.Brush("#DC28323C"),BorderBrush=Paint.Brush("#46FFFFFF"),BorderThickness=new Thickness(1),Child=body};
+            card=new GlassTileBorder {Optical=false,CornerRadius=new CornerRadius(28),Background=Paint.Brush("#DC28323C"),BorderBrush=Paint.Brush("#46FFFFFF"),BorderThickness=new Thickness(1),Child=body};
             Children.Add(backdrop);
             Children.Add(card);
             if(InfoTileCatalog.Known(slot.Key))
@@ -291,11 +291,16 @@ namespace OneTaskBar
             card.BorderThickness=new Thickness(value?2:tile!=null?0:1);
             card.BorderBrush=value?Paint.Brush("#FF4F8BF0"):Paint.Brush("#46FFFFFF");
         }
-        internal void Material(Brush blurred,int opacity)
+        internal void Material(Brush blurred,int opacity,bool glass=false)
         {
             backdrop.Background=blurred;
-            if(scheme!=null)card.Background=WidgetMaterial.Surface(scheme,opacity);
-            else card.Opacity=Math.Max(.1,opacity/100.0);
+            if(card.Optical!=glass)
+            {
+                card.Optical=glass;
+                card.InvalidateVisual();
+            }
+            if(scheme!=null)card.Background=glass?scheme.Surface:WidgetMaterial.Surface(scheme,opacity);
+            else card.Opacity=glass?.8:Math.Max(.1,opacity/100.0);
         }
         void Shape()
         {

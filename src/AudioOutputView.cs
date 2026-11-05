@@ -23,6 +23,6 @@ namespace OneTaskBar
             }
             if(!devices.Any())Children.Add(Paint.TextBlock("사용 가능한 출력 장치가 없습니다",13,Muted));
         }
-        static string Kind(string name){if(BudsInfo.IsBuds(name)||System.Text.RegularExpressions.Regex.IsMatch(name??"","headphone|headset|헤드폰|헤드셋|이어폰",System.Text.RegularExpressions.RegexOptions.IgnoreCase))return "headphones";return System.Text.RegularExpressions.Regex.IsMatch(name??"","HDMI|Display|NVIDIA|AMD|디스플레이",System.Text.RegularExpressions.RegexOptions.IgnoreCase)?"computer":"volume";}
+        static string Kind(string name){string kind=OutputIcons.Kind(name);return kind==null?"volume":kind=="earbuds"?"headphones":kind;}
     }
 }

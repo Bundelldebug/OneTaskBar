@@ -55,6 +55,9 @@ namespace OneTaskBar
         public bool DesktopWidgets=false;
         public int WidgetOpacity=100;
         public int WidgetBlur=0;
+        public bool WidgetGlass=true;
+        public bool WidgetsSeeded=false;
+        public bool DesktopMenuEntry=true;
         public bool FullscreenWidgets=true;
         public string[] FullscreenTiles={"weather:2x2","moon:1x1","rain:1x1","gauges:2x1","calendar:2x2","todo:2x2"};
         public string[] FullscreenActions={"capture","mute"};

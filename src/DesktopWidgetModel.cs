@@ -50,10 +50,28 @@ namespace OneTaskBar
             }
             return key=="media"?new Size(280,180):key=="clock"?new Size(180,110):key=="battery"?new Size(150,100):new Size(80,80);
         }
+        // Quick-setting widgets come in three sizes, on the same cells as the tiles.
+        internal static readonly Size[] ToggleSizes={new Size(InfoTile.Span(1),InfoTile.Span(1)),new Size(InfoTile.Span(2),InfoTile.Span(1)),new Size(InfoTile.Span(2),InfoTile.Span(2))};
+        // Every widget of one kind and size is exactly the same size, wherever it was dragged to.
+        internal static Size Canonical(string key,double width,double height)
+        {
+            if(InfoTileCatalog.Known(key))return InfoTileCatalog.Design(key);
+            if(key=="media"||key=="clock"||key=="battery"||!Known(key))return new Size(width,height);
+            Size best=ToggleSizes[1];
+            double distance=Double.MaxValue;
+            foreach(var size in ToggleSizes)
+            {
+                double gap=Math.Abs(Math.Log(Math.Max(1,width)/size.Width))+Math.Abs(Math.Log(Math.Max(1,height)/size.Height));
+                if(gap>=distance)continue;
+                distance=gap;
+                best=size;
+            }
+            return best;
+        }
         internal static Size Initial(string key)
         {
             if(InfoTileCatalog.Known(key))return InfoTileCatalog.Design(key);
-            return key=="media"?new Size(360,210):key=="clock"?new Size(260,150):key=="battery"?new Size(220,130):new Size(208,88);
+            return key=="media"?new Size(360,210):key=="clock"?new Size(260,150):key=="battery"?new Size(220,130):ToggleSizes[1];
         }
     }
 
@@ -77,6 +95,7 @@ namespace OneTaskBar
                     if(item==null||!DesktopWidgetCatalog.Known(item.Key)||!Guid.TryParse(item.Id,out id)||!ids.Add(item.Id))continue;
                     Migrate(item);
                     Normalize(item);
+                    Canonicalize(item);
                     Items.Add(item);
                 }
             }
@@ -92,6 +111,13 @@ namespace OneTaskBar
             if(token==null)return;
             var size=DesktopWidgetCatalog.Initial(token);
             item.Key=token;
+            item.Width=size.Width;
+            item.Height=size.Height;
+        }
+        // Widgets saved by earlier versions may have been resized to odd proportions.
+        internal static void Canonicalize(DesktopWidgetSlot item)
+        {
+            var size=DesktopWidgetCatalog.Canonical(item.Key,item.Width,item.Height);
             item.Width=size.Width;
             item.Height=size.Height;
         }
@@ -139,11 +165,27 @@ namespace OneTaskBar
             }
             return best;
         }
-        internal DesktopWidgetSlot Add(string key,string monitor,Size available,IEnumerable<Rect> avoid=null)
+        // A widget put exactly where the arrangement says, without searching for free space.
+        internal DesktopWidgetSlot Place(string key,string monitor,Point at)
+        {
+            if(Items.Count>=Limit||!DesktopWidgetCatalog.Known(key))return null;
+            var size=DesktopWidgetCatalog.Initial(key);
+            var item=new DesktopWidgetSlot {Id=Guid.NewGuid().ToString("N"),Key=key,Monitor=monitor,Width=size.Width,Height=size.Height,X=at.X,Y=at.Y};
+            Canonicalize(item);
+            Items.Add(item);
+            return item;
+        }
+        internal DesktopWidgetSlot Add(string key,string monitor,Size available,IEnumerable<Rect> avoid=null,Point? near=null)
         {
             if(Items.Count>=Limit||!DesktopWidgetCatalog.Known(key))return null;
             var size=DesktopWidgetCatalog.Initial(key);
             var item=new DesktopWidgetSlot {Id=Guid.NewGuid().ToString("N"),Key=key,Monitor=monitor,Width=size.Width,Height=size.Height,X=GridStep,Y=GridStep};
+            Canonicalize(item);
+            if(near.HasValue)
+            {
+                item.X=near.Value.X;
+                item.Y=near.Value.Y;
+            }
             var occupied=Items.Where(s=>s.Monitor==monitor).Select(s=>Fit(s,available)).ToList();
             if(avoid!=null)occupied.AddRange(avoid);
             Rect chosen=FindFree(Fit(item,available),occupied,available);

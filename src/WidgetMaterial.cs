@@ -13,7 +13,12 @@ namespace OneTaskBar
     {
         const double Detail=.5;
         internal const int ReadableOpacity=60;
-        internal static bool Plain {get{return Preferences.Current.WidgetOpacity>=100&&Preferences.Current.WidgetBlur<=0;}}
+        // The 9.5 interface gives widgets the same glass as its panels, unless the user turns it off.
+        internal static bool Glass {get{return Glass95.Enabled&&Glass95.Transparent&&Preferences.Current.WidgetGlass;}}
+        internal const int GlassBlur=26;
+        internal static int Blur {get{return Glass?Math.Max(GlassBlur,Preferences.Current.WidgetBlur):Preferences.Current.WidgetBlur;}}
+        internal static bool Tinted {get{return Glass||Preferences.Current.WidgetOpacity<ReadableOpacity;}}
+        internal static bool Plain {get{return !Glass&&Preferences.Current.WidgetOpacity>=100&&Preferences.Current.WidgetBlur<=0;}}
         internal static Brush Blurred(Brush wallpaper,Rect screen,Rect widget,double radius)
         {
             if(wallpaper==null||radius<=0||widget.Width<1||widget.Height<1)return null;

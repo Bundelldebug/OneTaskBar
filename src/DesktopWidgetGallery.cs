@@ -12,6 +12,8 @@ namespace OneTaskBar
     internal sealed class DesktopWidgetGallery : GlassWindow
     {
         readonly DesktopWidgets widgets;
+        // Where the widget menu was opened on the desktop; new widgets start there.
+        internal System.Drawing.Point? Anchor;
         readonly TextBlock status;
         readonly ComboBox display;
         readonly List<KeyValuePair<string,Button>> choices=new List<KeyValuePair<string,Button>>();
@@ -100,7 +102,8 @@ namespace OneTaskBar
                 var button=Paint.Button(body,()=>
                 {
                     var target=display.SelectedItem as PickerChoice;
-                    widgets.Add(selected,target==null?Forms.Screen.PrimaryScreen:(Forms.Screen)target.Value);
+                    var screen=Anchor.HasValue?Forms.Screen.FromPoint(Anchor.Value):target==null?Forms.Screen.PrimaryScreen:(Forms.Screen)target.Value;
+                    widgets.Add(selected,screen,Anchor);
                     RefreshStatus();
                 },label+" 위젯 추가");
                 button.Height=128;

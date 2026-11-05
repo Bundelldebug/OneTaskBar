@@ -54,6 +54,7 @@ namespace OneTaskBar
         internal FullscreenTileStrip Tiles {get{return tiles;}}
         internal FullscreenAppCorners Corners {get{return corners;}}
         internal Rect TilesBounds {get;private set;}
+        internal override bool EscapeConsumed(){return tiles!=null&&tiles.ConsumeEscape();}
         internal double ClockBottom {get;private set;}
         internal FullscreenMedia(Action<string> dispatch,Func<double,Task<bool>> seekCommand,Action output,Action lockPC,Func<string,AppEntry> sourceApp=null,ShellController controller=null)
         {
@@ -192,13 +193,16 @@ namespace OneTaskBar
             if(showTiles&&tiles==null)
             {
                 tiles=new FullscreenTileStrip(shell,HideImmediately);
+                tiles.Changed=()=>{layoutValid=false;Layout(false);};
                 tiles.Recolor(scheme);
                 canvas.Children.Add(tiles);
             }
             if(tiles!=null)
             {
+                if(!showTiles)tiles.EndEdit(false);
                 var room=showTiles?tiles.Fit(w-96,CardBounds.Top-ClockBottom-20):new Size(0,0);
                 bool fits=room.Width>0;
+                if(!fits)tiles.EndEdit(false);
                 tiles.Visibility=fits?Visibility.Visible:Visibility.Collapsed;
                 if(fits)
                 {
@@ -207,6 +211,7 @@ namespace OneTaskBar
                     Canvas.SetTop(tiles,TilesBounds.Y);
                     Animate(tiles,OpacityProperty,1,animate);
                     tiles.Refresh(DateTime.Now);
+                    tiles.PlaceEditing();
                 }
             }
             if(!large&&corners==null)

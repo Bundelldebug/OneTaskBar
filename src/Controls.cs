@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Automation;
@@ -242,7 +242,7 @@ namespace OneTaskBar
             double w=ActualWidth,h=ActualHeight; if(w<=0 || h<=0) return;
             if(WaveMode){DrawWave(dc,w,h);return;}
             if(Glass95.Enabled&&Tablet&&!Slim){DrawGlass(dc,w,h);return;}
-            double shown=(double)GetValue(DisplayValueProperty);string iconKind=Kind.StartsWith("volume",StringComparison.Ordinal)?SoundIcon.For(value,false,IsEnabled):Kind;
+            double shown=(double)GetValue(DisplayValueProperty);string iconKind=Kind.StartsWith("volume",StringComparison.Ordinal)?VolumeIconKind():Kind;
             double axis=Vertical?h:w,cross=Vertical?w:h;bool capsule=Tablet&&ShowIcon&&!Slim&&!LinearFill;double thickness=Slim?6:cross,top=(cross-thickness)/2;var track=Vertical?new Rect(top,0,thickness,h):new Rect(0,top,w,thickness);var logical=capsule?CapsuleFillBounds(axis,cross,shown):new Rect(0,top,FillWidth(axis,shown),thickness);var filled=Vertical?new Rect(logical.Y,h-logical.Right,logical.Height,logical.Width):logical;double fillRadius=Math.Min(filled.Width,filled.Height)/2;var fill=new RectangleGeometry(filled,fillRadius,fillRadius);
             dc.DrawRoundedRectangle(UnfilledBrush,NoTrackBorder?null:new Pen(Paint.Brush("#288B9692"),.7),track,thickness/2,thickness/2);
             bool clipTrack=LinearFill&&!Slim;if(clipTrack)dc.PushClip(new RectangleGeometry(track,thickness/2,thickness/2));
@@ -330,7 +330,7 @@ namespace OneTaskBar
             Loaded+=(s,e)=>{if(lens==null){var layer=AdornerLayer.GetAdornerLayer(Surface);if(layer!=null){lens=new GlassLens(this);layer.Add(lens);}}ApplyMaterial();if(Program.CaptureReview){ShowInTaskbar=true;var h=new WindowInteropHelper(this).Handle;Native.SetWindowLong(h,-20,(Native.GetWindowLong(h,-20)|0x40000)&~(0x80|0x08000000));}};
             IsVisibleChanged+=(s,e)=> {if(!IsVisible)HiddenSince=DateTime.UtcNow;};
             Closed+=(s,e)=> {closed=true;++motion;LauncherMotion.Cancel(TransitionContent);CompleteDismissal(false);Preferences.Changed-=ApplyMaterial;Preferences.AppearanceChanged-=ApplyAppearance;};
-            PreviewKeyDown+=(s,e)=> { if(e.Key==Key.Escape&&!DragReorder.Active) {var overview=this as DesktopOverview;var overflow=this as TrayOverflowWindow;if(overview!=null)overview.Dismiss();else if(overflow!=null)overflow.Dismiss();else Hide(); e.Handled=true; } };
+            PreviewKeyDown+=(s,e)=> { if(e.Key==Key.Escape&&!DragReorder.Active) {if(EscapeConsumed()){e.Handled=true;return;}var overview=this as DesktopOverview;var overflow=this as TrayOverflowWindow;if(overview!=null)overview.Dismiss();else if(overflow!=null)overflow.Dismiss();else Hide(); e.Handled=true; } };
         }
         void ApplyAppearance(){if(DockSurface||this is StartWindow)ApplyMaterial();}
         void ApplyMaterial()
@@ -407,6 +407,8 @@ namespace OneTaskBar
             scale.BeginAnimation(ScaleTransform.ScaleXProperty,Motion.PanelTween(.94,1,310));scale.BeginAnimation(ScaleTransform.ScaleYProperty,Motion.PanelTween(.94,1,310));translate.BeginAnimation(TranslateTransform.YProperty,Motion.PanelTween(offset,0,310));
             Surface.BeginAnimation(UIElement.OpacityProperty,new DoubleAnimation(0,1,TimeSpan.FromMilliseconds(150)));
         }
+        // A window can use Escape for something inside it before Escape closes the window.
+        internal virtual bool EscapeConsumed(){return false;}
         public new void Hide()
         {
             if(TransitionContent==null)TransitionContent=Surface.Child as FrameworkElement;

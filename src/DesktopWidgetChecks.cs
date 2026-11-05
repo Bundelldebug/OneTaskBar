@@ -40,7 +40,7 @@ namespace OneTaskBar
                     first.X=973;first.Y=719;first.Width=420;first.Height=240;
                     store.Save();
                     var reloaded=new DesktopWidgetStore(file);
-                    Require(reloaded.Items.Count==2&&reloaded.Items[0].Id==first.Id&&reloaded.Items[0].X==973&&reloaded.Items[0].Width==420,"position, size, identity and monitor persist");
+                    Require(reloaded.Items.Count==2&&reloaded.Items[0].Id==first.Id&&reloaded.Items[0].X==973&&reloaded.Items[0].Width==InfoTile.Span(2)&&reloaded.Items[0].Height==InfoTile.Span(2),"position, identity and monitor persist, and the size is the tile's own");
                     var fitted=DesktopWidgetStore.Fit(reloaded.Items[0],new Size(640,480));
                     Require(fitted.Right<=640&&fitted.Bottom<=480&&reloaded.Items[0].X==973,"smaller/disconnected displays fit without destroying the saved layout");
                     first.X=Double.NaN;first.Y=Double.PositiveInfinity;first.Width=-3;first.Height=Double.NaN;
@@ -172,9 +172,55 @@ namespace OneTaskBar
                     Require(chosen==2,"holding a control opens editing");
                     Require(gestureView.Release()&&chosen==2,"releasing a long press does not click or select again");
                     gestureView.Retire();
-                    Require(DesktopWidgets.NearestSpan(InfoTileCatalog.Family("gauges:2x1"),4.5)=="gauges:4x1","dragging wider picks the wide tile");
-                    Require(DesktopWidgets.NearestSpan(InfoTileCatalog.Family("gauges:2x1"),1.05)=="gauges:2x2","dragging square picks the square tile");
-                    Require(DesktopWidgets.NearestSpan(InfoTileCatalog.Family("calendar:2x2"),5)=="calendar:2x2","a one-size tile keeps its shape");
+                    Require(DesktopWidgets.NearestSize(InfoTileCatalog.Family("gauges:2x1"),410,95)=="gauges:4x1","dragging wider picks the wide tile");
+                    Require(DesktopWidgets.NearestSize(InfoTileCatalog.Family("gauges:2x1"),200,200)=="gauges:2x2","dragging square picks the square tile");
+                    Require(DesktopWidgets.NearestSize(InfoTileCatalog.Family("calendar:2x2"),700,90)=="calendar:2x2","a one-size tile keeps its shape");
+                    Require(DesktopWidgets.NearestSize(InfoTileCatalog.Family("care:2x1"),400,200)=="care:4x2","dragging both ways picks the large tile");
+                    foreach(string token in InfoTileCatalog.Tokens)
+                    {
+                        // Whatever it was stretched to, every saved or snapped widget lands on its tile's one size.
+                        var stretched=new DesktopWidgetSlot {Key=token,Width=373.03,Height=83.3};
+                        DesktopWidgetStore.Canonicalize(stretched);
+                        var design=InfoTileCatalog.Design(token);
+                        Require(stretched.Width==design.Width&&stretched.Height==design.Height,"a stretched "+token+" returns to its design size");
+                    }
+                    var odd=new DesktopWidgetSlot {Key="mute",Width=207,Height=101};
+                    DesktopWidgetStore.Canonicalize(odd);
+                    Require(DesktopWidgetCatalog.ToggleSizes.Any(s=>s.Width==odd.Width&&s.Height==odd.Height),"a toggle widget takes one of the three cell sizes");
+                    string sizesFile=Path.Combine(AppLog.Data,"widget-sizes-fixture.json");
+                    File.WriteAllText(sizesFile,new JavaScriptSerializer().Serialize(new[]
+                    {
+                        new DesktopWidgetSlot {Id=Guid.NewGuid().ToString("N"),Key="search:4x1",X=100,Y=100,Width=373,Height=83},
+                        new DesktopWidgetSlot {Id=Guid.NewGuid().ToString("N"),Key="care:4x1",X=100,Y=300,Width=399,Height=89},
+                        new DesktopWidgetSlot {Id=Guid.NewGuid().ToString("N"),Key="player:4x1",X=100,Y=500,Width=485,Height=108}
+                    }));
+                    var sameSize=new DesktopWidgetStore(sizesFile).Items;
+                    Require(sameSize.Count==3&&sameSize.All(s=>s.Width==InfoTile.Span(4)&&s.Height==InfoTile.Span(1)),"widgets saved at odd sizes are the same size when loaded");
+                    foreach(double dpiScale in new[]{1.0,1.25,1.5,1.75,2.0})
+                    {
+                        var screen=System.Windows.Forms.Screen.PrimaryScreen;
+                        var left=new DesktopWidgetSlot {Key="care:4x1",X=24.3,Y=24.7,Width=InfoTile.Span(4),Height=InfoTile.Span(1)};
+                        var right=new DesktopWidgetSlot {Key="care:4x1",X=511.9,Y=333.1,Width=InfoTile.Span(4),Height=InfoTile.Span(1)};
+                        var a=DesktopWidgets.Physical(left,screen,dpiScale);
+                        var b=DesktopWidgets.Physical(right,screen,dpiScale);
+                        Require(a.Width==b.Width&&a.Height==b.Height,"equal widgets are the same pixels at "+dpiScale+"x");
+                    }
+                    var layout=DesktopWidgetLayouts.Default(new Size(1536,864),true,true);
+                    Require(layout.Count==7&&layout.Select(e=>e.Key).Distinct().Count()==layout.Count,"the default arrangement is a distinct set of widgets");
+                    var layoutRects=layout.Select(e=>new Rect(e.Value.X,e.Value.Y,InfoTileCatalog.Design(e.Key).Width,InfoTileCatalog.Design(e.Key).Height)).ToList();
+                    for(int i=0;i<layoutRects.Count;i++)
+                    {
+                        Require(layoutRects[i].Left>=0&&layoutRects[i].Right<=1536&&layoutRects[i].Bottom<=864,"the default arrangement fits the screen");
+                        for(int j=i+1;j<layoutRects.Count;j++)Require(!layoutRects[i].IntersectsWith(layoutRects[j]),"default widgets never overlap");
+                    }
+                    Require(layoutRects.Max(r=>r.Right)==1536-DesktopWidgetLayouts.Margin&&layoutRects.Select(r=>r.Left).Distinct().Count()==2,"the default arrangement is one aligned block on the right edge");
+                    Require(DesktopWidgetLayouts.Default(new Size(1536,400),true,true).Count<layout.Count&&DesktopWidgetLayouts.Default(new Size(300,800),true,true).Count==0,"a small screen gets fewer widgets, or none");
+                    var noBattery=DesktopWidgetLayouts.Default(new Size(1536,864),false,false).Select(e=>e.Key).ToList();
+                    Require(!noBattery.Contains("power-list:2x2")&&!noBattery.Contains("weather:2x2"),"a PC without a battery or weather place gets neither tile");
+                    Require(DesktopMenuEntry.Command(@"C:\Apps\One TaskBar\OneTaskBar.exe")=="\"C:\\Apps\\One TaskBar\\OneTaskBar.exe\" --open-panel widgets","the desktop menu entry opens the widget picker");
+                    DesktopMenuEntry.Sync();
+                    Require(DesktopMenuEntry.Writes==0,"fixtures never write the desktop menu entry");
+                    Require(new PreferenceData().WidgetGlass&&new PreferenceData().DesktopMenuEntry&&!new PreferenceData().WidgetsSeeded,"glass and the menu entry default on, and nothing is seeded yet");
                     var liveSlot=shell.Widgets.Store.Add("clock-digital:2x2","fixture-a",new Size(1200,900));
                     Preferences.Current.DesktopWidgets=true;
                     shell.Widgets.Select(liveSlot);

@@ -26,6 +26,21 @@ namespace OneTaskBar
         readonly EventCallback callback;readonly Func<bool> enabled,replace,prepare;IntPtr hook;bool disposed;
         readonly OsdMaskLease lease=new OsdMaskLease {Session=Guid.NewGuid().ToString("N")};
         static string LeaseFile {get{return Path.Combine(AppLog.Data,"native-osd-lease.json");}}
+        // Masks stay while audio or brightness is briefly unreadable, for example while Bluetooth earbuds
+        // connect or a game owns the display. Letting go then lets Windows' own bar flash up with no
+        // content, or sit behind ours.
+        internal static readonly TimeSpan Grace=TimeSpan.FromSeconds(60);
+        DateTime lastReady=DateTime.MinValue;
+        internal static bool Hold(bool ready,DateTime now,ref DateTime lastReady,TimeSpan grace)
+        {
+            if(ready)
+            {
+                lastReady=now;
+                return true;
+            }
+            return lastReady!=DateTime.MinValue&&now-lastReady<grace;
+        }
+        bool Held(){return Hold(prepare(),DateTime.UtcNow,ref lastReady,Grace);}
         internal int Suppressed {get;private set;}internal int PrimedShows {get;private set;}
         internal IntPtr[] MaskedWindows {get{return lease.Windows.Select(w=>new IntPtr(w.Window)).ToArray();}}
         internal int Prepared {get{return MaskedWindows.Count(IsMasked);}}
@@ -50,7 +65,7 @@ namespace OneTaskBar
         }
         void Acquire(IntPtr window)
         {
-            if(!prepare()||!Eligible(window,false))return;var record=lease.Windows.FirstOrDefault(w=>w.Window==window.ToInt64());
+            if(!Held()||!Eligible(window,false))return;var record=lease.Windows.FirstOrDefault(w=>w.Window==window.ToInt64());
             if(record!=null&&IsMasked(window))return;
             if(record==null){if(IsMasked(window))return;uint pid;Native.GetWindowThreadProcessId(window,out pid);int style=Native.GetWindowLong(window,-20);uint color,flags;byte alpha;bool layered=GetLayeredWindowAttributes(window,out color,out alpha,out flags);if((style&0x80000)!=0&&!layered)return;
                 record=new OsdMaskRecord {Window=window.ToInt64(),Pid=pid,Mode=2,Style=style,Color=color,Flags=flags,Alpha=layered?alpha:(byte)255};lease.Windows.Add(record);if(!Save()){lease.Windows.Remove(record);return;}}
@@ -58,7 +73,7 @@ namespace OneTaskBar
         }
         internal void Refresh()
         {
-            if(disposed)return;if(!enabled()||!prepare()){Release();return;}foreach(string cls in new[]{"XamlExplorerHostIslandWindow","NativeHWNDHost"}){IntPtr window=IntPtr.Zero;for(int i=0;i<64;i++){window=FindWindowEx(IntPtr.Zero,window,cls,null);if(window==IntPtr.Zero)break;Acquire(window);}}
+            if(disposed)return;if(!enabled()||!Held()){Release();return;}foreach(string cls in new[]{"XamlExplorerHostIslandWindow","NativeHWNDHost"}){IntPtr window=IntPtr.Zero;for(int i=0;i<64;i++){window=FindWindowEx(IntPtr.Zero,window,cls,null);if(window==IntPtr.Zero)break;Acquire(window);}}
         }
         void OnEvent(IntPtr source,uint id,IntPtr window,int objectId,int child,uint thread,uint time)
         {

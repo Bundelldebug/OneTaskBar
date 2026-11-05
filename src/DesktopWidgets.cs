@@ -48,6 +48,31 @@ namespace OneTaskBar
             Preferences.WidgetMaterialChanged+=MaterialChanged;
             Microsoft.Win32.SystemEvents.UserPreferenceChanged+=SystemPreferenceChanged;
             Status="바탕화면 위젯이 꺼져 있습니다";
+            DesktopMenuEntry.Sync();
+        }
+        // The first time widgets are turned on with nothing placed, offer the tidy default arrangement.
+        internal int SeedDefault(bool replace)
+        {
+            if(disposed)return 0;
+            var screen=Forms.Screen.PrimaryScreen;
+            double scale=Native.DropMonitorScale(screen.Bounds);
+            var available=new Size(screen.WorkingArea.Width/scale,screen.WorkingArea.Height/scale);
+            var layout=DesktopWidgetLayouts.Default(available,shell.Power.Known,WeatherService.Configured);
+            if(layout.Count==0)return 0;
+            Deselect();
+            if(replace)
+            {
+                Clear();
+                Store.Items.Clear();
+            }
+            foreach(var entry in layout)Store.Place(entry.Key,screen.DeviceName,entry.Value);
+            Store.Save();
+            Preferences.SetWidgetMaterial(p=>p.WidgetsSeeded=true);
+            discoveryAt=DateTime.MinValue;
+            if(!Preferences.Current.DesktopWidgets)Preferences.SetDesktopWidgets(true);
+            else Pulse();
+            if(gallery!=null)gallery.RefreshStatus();
+            return layout.Count;
         }
         void PreferenceChanged()
         {
@@ -58,14 +83,19 @@ namespace OneTaskBar
                 Clear();
                 Status="바탕화면 위젯이 꺼져 있습니다";
             }
-            else Pulse();
+            else
+            {
+                if(!Preferences.Current.WidgetsSeeded&&Store.Items.Count==0)SeedDefault(false);
+                else if(!Preferences.Current.WidgetsSeeded)Preferences.SetWidgetMaterial(p=>p.WidgetsSeeded=true);
+                Pulse();
+            }
             if(gallery!=null)gallery.RefreshStatus();
         }
-        internal void OpenGallery()
+        internal void OpenGallery(System.Drawing.Point? anchor=null)
         {
             if(disposed)return;
-            if(gallery!=null){gallery.Activate();return;}
-            gallery=new DesktopWidgetGallery(this);
+            if(gallery!=null){gallery.Anchor=anchor;gallery.Activate();return;}
+            gallery=new DesktopWidgetGallery(this) {Anchor=anchor};
             gallery.Closed+=(s,e)=>
             {
                 gallery=null;
@@ -75,7 +105,7 @@ namespace OneTaskBar
         readonly Dictionary<string,Brush> wallpapers=new Dictionary<string,Brush>(StringComparer.OrdinalIgnoreCase);
         readonly HashSet<string> wallpapersLoading=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         DispatcherTimer materialDelay;
-        bool readableInk=true;
+        bool tintedInk;
         internal int MaterialRenders {get;private set;}
         void SystemPreferenceChanged(object sender,Microsoft.Win32.UserPreferenceChangedEventArgs e)
         {
@@ -91,6 +121,7 @@ namespace OneTaskBar
         void MaterialChanged()
         {
             if(disposed)return;
+            DesktopMenuEntry.Sync();
             if(materialDelay==null)
             {
                 materialDelay=new DispatcherTimer {Interval=TimeSpan.FromMilliseconds(150)};
@@ -106,10 +137,10 @@ namespace OneTaskBar
         internal void ApplyMaterial()
         {
             if(disposed)return;
-            bool readable=Preferences.Current.WidgetOpacity>=WidgetMaterial.ReadableOpacity;
-            if(readable!=readableInk)
+            bool tinted=WidgetMaterial.Tinted;
+            if(tinted!=tintedInk)
             {
-                readableInk=readable;
+                tintedInk=tinted;
                 // Text color is chosen when a widget is built, so crossing the line rebuilds them.
                 Deselect();
                 Clear();
@@ -137,7 +168,7 @@ namespace OneTaskBar
                 var snapshot=await BackgroundWork.Run(()=>DesktopWallpaper.Read(bounds));
                 if(disposed)return;
                 wallpapers[device]=snapshot.Brush;
-                if(!readableInk)
+                if(tintedInk)
                 {
                     Clear();
                     discoveryAt=DateTime.MinValue;
@@ -160,7 +191,8 @@ namespace OneTaskBar
         }
         void PaintWidget(DesktopWidgetSlot item,DesktopWidgetHost host)
         {
-            int opacity=Preferences.Current.WidgetOpacity,blur=Preferences.Current.WidgetBlur;
+            bool glass=WidgetMaterial.Glass;
+            int opacity=glass?60:Preferences.Current.WidgetOpacity,blur=WidgetMaterial.Blur;
             var screen=ScreenFor(item);
             Brush picture=null;
             if(blur>0)
@@ -170,11 +202,11 @@ namespace OneTaskBar
                 picture=WidgetMaterial.Blurred(wallpaper,new Rect(screen.Bounds.X,screen.Bounds.Y,screen.Bounds.Width,screen.Bounds.Height),Physical(item,screen,scale),blur*scale);
                 if(picture!=null)MaterialRenders++;
             }
-            host.View.Material(picture,opacity);
+            host.View.Material(picture,opacity,glass);
         }
         TileScheme SchemeFor(DesktopWidgetSlot item)
         {
-            if(Preferences.Current.WidgetOpacity>=WidgetMaterial.ReadableOpacity)return TileScheme.Desktop();
+            if(!WidgetMaterial.Tinted)return TileScheme.Desktop();
             var wallpaper=WallpaperFor(ScreenFor(item));
             return wallpaper!=null?TileScheme.FromWallpaper(wallpaper):TileScheme.Desktop();
         }
@@ -278,15 +310,15 @@ namespace OneTaskBar
                     chip(InfoTileCatalog.SpanLabel(token),()=>Resize(item,token),token==item.Key);
                 }
             }
-            chip("위젯 추가",OpenGallery,false);
+            chip("위젯 추가",()=>OpenGallery(),false);
             chip("제거",()=>Remove(item),false);
             chip("완료",Deselect,false);
             toolbarBody=new Border {Background=scheme.Surface,CornerRadius=new CornerRadius(22),BorderBrush=scheme.Track,BorderThickness=new Thickness(1),Child=row};
             toolbar=new Popup {PlacementTarget=host.View,Placement=PlacementMode.Top,VerticalOffset=-8,AllowsTransparency=true,StaysOpen=true,Child=toolbarBody};
             toolbar.IsOpen=true;
         }
-        // The tile whose shape is closest to what was dragged, so its content never stretches.
-        internal static string NearestSpan(InfoTileFamily family,double ratio)
+        // The tile closest to the dragged size, by width and height, so a drag steps between real sizes.
+        internal static string NearestSize(InfoTileFamily family,double width,double height)
         {
             string best=null;
             double distance=Double.MaxValue;
@@ -294,40 +326,41 @@ namespace OneTaskBar
             {
                 string token=family.Key+":"+span;
                 var design=InfoTileCatalog.Design(token);
-                double gap=Math.Abs(Math.Log(ratio/(design.Width/design.Height)));
+                double gap=Math.Abs(Math.Log(Math.Max(1,width)/design.Width))+Math.Abs(Math.Log(Math.Max(1,height)/design.Height));
                 if(gap>=distance)continue;
                 distance=gap;
                 best=token;
             }
             return best;
         }
+        // A resize ends on a real size, never a stretched one, so equal widgets are equal.
         void Snap(DesktopWidgetSlot item)
         {
-            if(!InfoTileCatalog.Known(item.Key))return;
-            string token=NearestSpan(InfoTileCatalog.Family(item.Key),item.Width/Math.Max(1,item.Height));
-            var design=InfoTileCatalog.Design(token);
-            double scale=Math.Sqrt(item.Width*item.Height/(design.Width*design.Height));
-            if(token!=item.Key)
+            if(InfoTileCatalog.Known(item.Key))
             {
-                DesktopWidgetHost host;
-                if(hosts.TryGetValue(item.Id,out host))
+                string token=NearestSize(InfoTileCatalog.Family(item.Key),item.Width,item.Height);
+                if(token!=item.Key)
                 {
-                    hosts.Remove(item.Id);
-                    host.Dispose();
+                    DesktopWidgetHost host;
+                    if(hosts.TryGetValue(item.Id,out host))
+                    {
+                        hosts.Remove(item.Id);
+                        host.Dispose();
+                    }
+                    item.Key=token;
                 }
-                item.Key=token;
             }
-            item.Width=design.Width*scale;
-            item.Height=design.Height*scale;
-            DesktopWidgetStore.Normalize(item);
+            DesktopWidgetStore.Canonicalize(item);
             Clear(item,false);
             Pulse();
         }
-        internal void Add(string key,Forms.Screen screen)
+        // Where a widget was asked for from the desktop menu: the new widget starts there.
+        internal void Add(string key,Forms.Screen screen,System.Drawing.Point? anchor=null)
         {
             if(disposed||screen==null)return;
             double scale=Native.DropMonitorScale(screen.Bounds);
-            var item=Store.Add(key,screen.DeviceName,new Size(screen.WorkingArea.Width/scale,screen.WorkingArea.Height/scale),IconRects(screen,scale));
+            Point? near=anchor.HasValue?(Point?)new Point((anchor.Value.X-screen.WorkingArea.Left)/scale,(anchor.Value.Y-screen.WorkingArea.Top)/scale):null;
+            var item=Store.Add(key,screen.DeviceName,new Size(screen.WorkingArea.Width/scale,screen.WorkingArea.Height/scale),IconRects(screen,scale),near);
             RefreshIcons();
             if(item==null)
             {
@@ -414,10 +447,11 @@ namespace OneTaskBar
                 hosts.Remove(item.Id);
                 host.Dispose();
             }
-            var size=DesktopWidgetCatalog.Initial(token);
             item.Key=token;
+            var size=DesktopWidgetCatalog.Initial(token);
             item.Width=size.Width;
             item.Height=size.Height;
+            DesktopWidgetStore.Canonicalize(item);
             Clear(item,true);
             Store.Save();
             Pulse();
@@ -445,7 +479,8 @@ namespace OneTaskBar
         {
             var area=screen.WorkingArea;
             var fitted=DesktopWidgetStore.Fit(item,new Size(area.Width/scale,area.Height/scale));
-            return new Rect(area.Left+fitted.X*scale,area.Top+fitted.Y*scale,fitted.Width*scale,fitted.Height*scale);
+            // The size is rounded on its own, so equal widgets are equal pixels wherever they sit.
+            return new Rect(area.Left+Math.Round(fitted.X*scale),area.Top+Math.Round(fitted.Y*scale),Math.Round(fitted.Width*scale),Math.Round(fitted.Height*scale));
         }
         internal void Drag(DesktopWidgetSlot item,System.Drawing.Point start,System.Drawing.Point end,bool resize,bool commit)
         {
@@ -498,6 +533,7 @@ namespace OneTaskBar
         internal void Pulse()
         {
             if(disposed||!Preferences.Current.DesktopWidgets)return;
+            if(tintedInk!=WidgetMaterial.Tinted)ApplyMaterial();
             if(interfaceVersion!=Preferences.Current.UIVersion)
             {
                 Clear();

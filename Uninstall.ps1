@@ -36,6 +36,7 @@ try{
 }finally{foreach($taskCom in @($taskEntry,$taskFolder,$taskService)){if($taskCom -and [Runtime.InteropServices.Marshal]::IsComObject($taskCom)){[Runtime.InteropServices.Marshal]::FinalReleaseComObject($taskCom)|Out-Null}}}
 $run=[Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Software\Microsoft\Windows\CurrentVersion\Run',$true)
 try{if($run -and (([string]$run.GetValue('OneTaskBar','')).Contains($exe) -or ([string]$run.GetValue('OneTaskBar','')).Contains('OneTaskBar.Desktop_t4xw24pnxmkbp!OneTaskBar'))){$run.DeleteValue('OneTaskBar',$false)}}finally{if($run){$run.Dispose()}}
+[Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree('Software\Classes\DesktopBackground\Shell\OneTaskBar.Widgets',$false)
 $software=[Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Software\Microsoft\Windows\CurrentVersion\Uninstall',$true)
 try{if($software){$software.DeleteSubKeyTree('OneTaskBar',$false)}}finally{if($software){$software.Dispose()}}
 $shortcutShell=New-Object -ComObject WScript.Shell

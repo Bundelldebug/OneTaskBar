@@ -377,7 +377,7 @@ namespace OneTaskBar
         bool budsOutput;string deviceModel;ImageSource deviceSymbol;
         internal bool BudsIcon {get{return slider.HasDeviceIcon;}}
         async void LoadDeviceSymbol(string name){string model=BudsDeviceData.SymbolFile(name);deviceModel=model;try{var image=await BackgroundWork.Run(()=>BudsDeviceData.ShortcutIcon(name));if(deviceModel!=model)return;deviceSymbol=image;slider.SetDeviceIcon(budsOutput?deviceSymbol:null);}catch(Exception error){AppLog.Once("hud-device-symbol",error.GetType().Name);}}
-        internal void Set(string kind,double value,bool muted,string outputName=null){string icon=kind=="volume"?SoundIcon.For(value,muted,true):kind;if(slider.Kind!=icon){slider.Kind=icon;slider.InvalidateVisual();}slider.Value=muted?0:value;budsOutput=kind=="volume"&&BudsInfo.IsBuds(outputName);if(budsOutput&&deviceModel!=BudsDeviceData.SymbolFile(outputName))LoadDeviceSymbol(outputName);slider.SetDeviceIcon(budsOutput?deviceSymbol:null);}
+        internal void Set(string kind,double value,bool muted,string outputName=null){string symbol=kind=="volume"?OutputIcons.Kind(outputName):null;string icon=kind=="volume"?(symbol!=null&&!muted&&value>0?symbol:SoundIcon.For(value,muted,true)):kind;if(slider.Kind!=icon){slider.Kind=icon;slider.InvalidateVisual();}slider.Value=muted?0:value;budsOutput=kind=="volume"&&BudsInfo.IsBuds(outputName);if(budsOutput&&deviceModel!=BudsDeviceData.SymbolFile(outputName))LoadDeviceSymbol(outputName);slider.SetDeviceIcon(budsOutput?deviceSymbol:null);}
     }
     internal sealed class DrawerWindow : GlassWindow
     {

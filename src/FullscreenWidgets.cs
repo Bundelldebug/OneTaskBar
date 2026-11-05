@@ -9,7 +9,7 @@ using System.Windows.Media;
 namespace OneTaskBar
 {
     // Tiles below the clock of the collapsed fullscreen media screen.
-    internal sealed class FullscreenTileStrip : Canvas
+    internal sealed partial class FullscreenTileStrip : Canvas
     {
         sealed class Entry
         {
@@ -48,7 +48,7 @@ namespace OneTaskBar
         // Rebuilds only when the chosen tiles change, so unrelated appearance changes keep their state.
         internal void Sync()
         {
-            string next=scheme.Key+"|"+String.Join(",",Tiles())+"|"+String.Join(",",Actions());
+            string next=scheme.Key+"|"+String.Join(",",Tiles())+"|"+String.Join(",",Actions())+"|"+editing;
             if(next==signature)return;
             signature=next;
             Retire();
@@ -57,13 +57,23 @@ namespace OneTaskBar
                 var tile=InfoTileCatalog.Create(key,true,shell,scheme);
                 var host=new Border {Background=scheme.Surface,CornerRadius=new CornerRadius(InfoTile.Radius(InfoTileCatalog.Columns(key),InfoTileCatalog.Rows(key))),Child=tile};
                 Children.Add(host);
-                entries.Add(new Entry {Key=key,Columns=InfoTileCatalog.Columns(key),Rows=InfoTileCatalog.Rows(key),Host=host,Tile=tile});
+                var added=new Entry {Key=key,Columns=InfoTileCatalog.Columns(key),Rows=InfoTileCatalog.Rows(key),Host=host,Tile=tile};
+                entries.Add(added);
+                Hook(added);
             }
             foreach(string key in Actions())
             {
                 var button=ActionButton(key);
                 Children.Add(button);
-                entries.Add(new Entry {Key=key,Columns=1,Rows=1,Host=button});
+                var action=new Entry {Key=key,Columns=1,Rows=1,Host=button};
+                entries.Add(action);
+                Hook(action);
+            }
+            if(editing)
+            {
+                var plus=PlusButton();
+                Children.Add(plus);
+                entries.Add(new Entry {Key=AddKey,Columns=1,Rows=1,Host=plus});
             }
         }
         Button ActionButton(string key)
@@ -171,6 +181,8 @@ namespace OneTaskBar
         }
         internal void Retire()
         {
+            CancelHold();
+            pressed=null;
             foreach(var entry in entries)
             {
                 if(entry.Tile!=null)entry.Tile.Retire();

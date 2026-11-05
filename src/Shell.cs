@@ -145,7 +145,7 @@ namespace OneTaskBar
             var displaySource=new Guid("2b84c20e-ad23-4ddf-93db-05ffbd7efca5");displayNotify=Native.RegisterPowerSettingNotification(messages.Handle,ref displaySource,0);
             Audio.Changed=()=>{Services.InvalidateOutput(Audio.DeviceRevision);Wake();};
             Services.Changed=ServiceChanged;Notifications.Updated=ServiceChanged;Notifications.AppCatalog=()=>Apps;
-            osdGate=new NativeOsdGate(()=>Desktop&&!disposed,ReplaceNativeOsd,()=>Desktop&&!disposed&&Brightness>=0&&Audio.Available);
+            osdGate=new NativeOsdGate(()=>Desktop&&!disposed,ReplaceNativeOsd,()=>Desktop&&!disposed&&(Brightness>=0||Audio.Available));
             Native.RegisterHotKey(messages.Handle,1,0x4000|2|1,0x51); // Ctrl+Alt+Q, no Win-key hook.
             Native.RegisterHotKey(messages.Handle,2,0x4000|2|1,0x48); // Ctrl+Alt+H.
             stop=new EventWaitHandle(false,EventResetMode.AutoReset,@"Local\OneTaskBar.Stop");
@@ -628,6 +628,7 @@ namespace OneTaskBar
             bool battery=Power.Known&&!Power.Connected;
             bool interactive=FullscreenMediaLive||(StartMenu!=null&&StartMenu.IsVisible)||(Quick!=null&&Quick.IsVisible)||(Center!=null&&Center.IsVisible)||(Detail!=null&&Detail.IsVisible)||(Drawer!=null&&Drawer.IsVisible)||(Finder!=null&&Finder.IsVisible)||(Welcome!=null&&Welcome.IsVisible)||IslandExpanded||docks.Any(d=>d.MediaBar!=null&&d.MediaBar.Expanded);
             if(now>=osdScanAt){osdScanAt=now.AddSeconds(RuntimeCadence.OsdScan(battery));if(osdGate!=null)osdGate.Refresh();}
+            LiveBackdrop.SweepOrphans();
             if(Desktop)ExplorerBridge.KeepTrayPosition(trayDock!=null?trayDock.TrayAnchor():null);
             var foreground=Native.GetForegroundWindow(); uint foregroundPid; Native.GetWindowThreadProcessId(foreground,out foregroundPid);
             if(foregroundPid!=ownPid) LastApplication=foreground;
@@ -680,7 +681,7 @@ namespace OneTaskBar
                     var old=Pins;Pins=t.Result.Pins;explorerItems=t.Result.Mirror;ExplorerBridge.Save(explorerItems);StartupDockCache.Save(Pins);
                     if(Catalog.PresentationChanged(old,Pins))foreach(var dock in docks)dock.Rebuild();
                 })));}
-            ++iteration;if(now>=liveStateAt){liveStateAt=now.AddSeconds(RuntimeCadence.LiveState(battery));AppLog.Json("live-state.json",new {time=DateTimeOffset.Now.ToString("o"),sequence=iteration,islandEnabled=IslandEnabled,island=Island!=null?Island.Inspect():null,islandArea=islandSpace!=null&&islandSpace.Active?(object)islandSpace.Bounds:null,pulseMilliseconds=cadence,desktop=Desktop,battery=Power.Level,connected=Power.Connected,volume=Audio.Value,muted=Audio.Muted,brightness=Brightness,displays=docks.Count,apps=Apps.Count,pinned=Pins.Count,running=Running.Count,appRefreshMs=Math.Round(lastAppRefreshMs,1),wifi=Services.WifiOn,bluetooth=Services.BluetoothOn,media=Services.Media.Title,mediaActive=Services.Media.Active,mediaPlaying=Services.Media.Playing,audioReads=Audio.ReadCount,retiredPanels=RetiredPanels,managedBytes=GC.GetTotalMemory(false),backdropCount=LiveBackdrop.InstanceCount,windowCount=Application.Current.Windows.Count,output=Services.OutputName,wifiSignal=WifiSignal,packaged=Notifications.Packaged,notificationsAllowed=Notifications.Allowed,cachedIcons=AppIcons.CachedCount,ecoWorkers=BackgroundWork.EcoWorkers,backgroundJobs=BackgroundWork.Completed,mediaMetadataReads=Services.MetadataReads,weatherSource=WeatherService.Source,weatherProblem=WeatherService.Problem,weatherShown=WeatherService.Current!=null,batteryDevices=TileDevices.ConnectedCount,mediaCaptures=mediaMotion!=null?mediaMotion.Captures:0,mediaPlaneBuilds=mediaMotion!=null?mediaMotion.PlaneBuilds:0,notificationSnapshotReads=Notifications.SnapshotReads,notificationCount=Notifications.Items.Count,inspectable=Program.Inspectable,quick=Quick!=null?Native.RegionInfo(Quick):null,center=Center!=null?Native.RegionInfo(Center):null,docks=docks.Select(d=>d.Inspect()).ToArray()});}
+            ++iteration;if(now>=liveStateAt){liveStateAt=now.AddSeconds(RuntimeCadence.LiveState(battery));AppLog.Json("live-state.json",new {time=DateTimeOffset.Now.ToString("o"),sequence=iteration,islandEnabled=IslandEnabled,island=Island!=null?Island.Inspect():null,islandArea=islandSpace!=null&&islandSpace.Active?(object)islandSpace.Bounds:null,pulseMilliseconds=cadence,desktop=Desktop,battery=Power.Level,connected=Power.Connected,volume=Audio.Value,muted=Audio.Muted,brightness=Brightness,displays=docks.Count,apps=Apps.Count,pinned=Pins.Count,running=Running.Count,appRefreshMs=Math.Round(lastAppRefreshMs,1),wifi=Services.WifiOn,bluetooth=Services.BluetoothOn,media=Services.Media.Title,mediaActive=Services.Media.Active,mediaPlaying=Services.Media.Playing,audioReads=Audio.ReadCount,retiredPanels=RetiredPanels,managedBytes=GC.GetTotalMemory(false),backdropCount=LiveBackdrop.InstanceCount,windowCount=Application.Current.Windows.Count,output=Services.OutputName,wifiSignal=WifiSignal,packaged=Notifications.Packaged,notificationsAllowed=Notifications.Allowed,cachedIcons=AppIcons.CachedCount,ecoWorkers=BackgroundWork.EcoWorkers,backgroundJobs=BackgroundWork.Completed,mediaMetadataReads=Services.MetadataReads,backdropSweeps=LiveBackdrop.Swept,osdMasks=OsdMasks.Length,desktopMenuEntry=DesktopMenuEntry.Present,desktopMenuStatus=DesktopMenuEntry.Status,weatherSource=WeatherService.Source,weatherProblem=WeatherService.Problem,weatherShown=WeatherService.Current!=null,batteryDevices=TileDevices.ConnectedCount,mediaCaptures=mediaMotion!=null?mediaMotion.Captures:0,mediaPlaneBuilds=mediaMotion!=null?mediaMotion.PlaneBuilds:0,notificationSnapshotReads=Notifications.SnapshotReads,notificationCount=Notifications.Items.Count,inspectable=Program.Inspectable,quick=Quick!=null?Native.RegionInfo(Quick):null,center=Center!=null?Native.RegionInfo(Center):null,docks=docks.Select(d=>d.Inspect()).ToArray()});}
         }
         T ReleasePanel<T>(T panel,DateTime now) where T:GlassWindow
         {
@@ -721,6 +722,8 @@ namespace OneTaskBar
         {
             if(!Desktop&&!Demo)return;
             bool volumeStart=kind=="volume"&&(!HudVisible||HudKind!="volume");if(kind!="volume")hudOutputRevision++;HudUpdates++;HudKind=kind;hudChangedAt=DateTime.UtcNow;
+            // A bar that is about to appear is a good moment to make sure Windows' own is covered.
+            if((!HudVisible||volumeStart)&&osdGate!=null)osdGate.Refresh();
             if(IslandFeedback(kind,value,muted)){if(volumeStart&&!Demo)RefreshHudOutput(++hudOutputRevision);return;}
             if(hud==null){hud=new HudWindow();hudScreen=null;}
             var screen=Forms.Screen.FromPoint(Forms.Cursor.Position);

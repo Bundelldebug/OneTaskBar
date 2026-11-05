@@ -26,12 +26,54 @@ namespace OneTaskBar
         internal static int InstanceCount {get{return instances.Count;}}
         internal static int OrphanCount {get{int count=0;foreach(var item in instances)if(item.background!=IntPtr.Zero&&Native.IsWindowVisible(item.background)&&!item.Visible)count++;return count;}}
         internal static int VisibleCount {get{int count=0;foreach(var item in instances)if(item.background!=IntPtr.Zero&&Native.IsWindowVisible(item.background))count++;return count;}}
+        internal static int Swept {get;private set;}
+        static bool Cloaked(IntPtr window)
+        {
+            int cloak;
+            return window!=IntPtr.Zero&&Native.DwmGetWindowAttribute(window,14,out cloak,4)==0&&cloak!=0;
+        }
+        // The blur lives in its own window. If the window it belongs to is gone, hidden or cloaked
+        // while the blur stays up, the screen shows a smeared shape with nothing in it. This puts
+        // such a leftover away; it is cheap enough to run on the shell's regular tick.
+        internal static int SweepOrphans()
+        {
+            int swept=0;
+            foreach(var item in new System.Collections.Generic.List<LiveBackdrop>(instances))
+            {
+                if(item.background==IntPtr.Zero||item.target==null)continue;
+                bool cloaked=item.window!=null&&Cloaked(new WindowInteropHelper(item.window).Handle);
+                // A window that was cloaked, for example on another virtual desktop, gets its blur back when it returns.
+                if(item.sweptCloak&&!cloaked&&item.Visible)
+                {
+                    item.sweptCloak=false;
+                    item.Sync(true);
+                    continue;
+                }
+                if(!Native.IsWindowVisible(item.background))continue;
+                if(!item.Visible)
+                {
+                    Native.ShowWindow(item.background,0);
+                    item.shown=false;
+                    swept++;
+                }
+                else if(cloaked)
+                {
+                    Native.ShowWindow(item.background,0);
+                    item.shown=false;
+                    item.sweptCloak=true;
+                    swept++;
+                }
+            }
+            Swept+=swept;
+            return swept;
+        }
         [DllImport("user32.dll",CharSet=CharSet.Unicode)]static extern IntPtr CreateWindowEx(int ex,string cls,string title,uint style,int x,int y,int width,int height,IntPtr parent,IntPtr menu,IntPtr instance,IntPtr data);
         [DllImport("user32.dll")]static extern bool DestroyWindow(IntPtr window);
         [DllImport("user32.dll")]static extern bool EnableWindow(IntPtr window,bool enabled);
         [DllImport("user32.dll")]static extern bool SetLayeredWindowAttributes(IntPtr window,uint key,byte alpha,uint flags);
         [DllImport("dwmapi.dll")]static extern int DwmSetWindowAttribute(IntPtr window,int attribute,ref int value,int size);
         IntPtr background;
+        bool sweptCloak;
         DesktopWindowTarget target;
         ContainerVisual root;
         SpriteVisual blur;
