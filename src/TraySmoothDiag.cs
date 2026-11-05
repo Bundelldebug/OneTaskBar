@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -38,6 +38,19 @@ namespace OneTaskBar
                 }
                 panel.Children.Add(row);
             }
+            var clock=System.Diagnostics.Stopwatch.StartNew();
+            for(int n=0;n<30;n++)
+            {
+                var pixels=new byte[24*24*4];for(int i=0;i<pixels.Length;i+=4){pixels[i]=(byte)(n*7);pixels[i+1]=(byte)(i%251);pixels[i+2]=200;pixels[i+3]=(byte)((i/4+n)%3==0?0:255);}
+                TrayIconSmoother.Smooth(BitmapSource.Create(24,24,96,96,PixelFormats.Pbgra32,null,pixels,24*4));
+            }
+            double first=clock.Elapsed.TotalMilliseconds;clock.Restart();
+            for(int n=0;n<30;n++)
+            {
+                var pixels=new byte[24*24*4];for(int i=0;i<pixels.Length;i+=4){pixels[i]=(byte)(n*7);pixels[i+1]=(byte)(i%251);pixels[i+2]=200;pixels[i+3]=(byte)((i/4+n)%3==0?0:255);}
+                TrayIconSmoother.Smooth(BitmapSource.Create(24,24,96,96,PixelFormats.Pbgra32,null,pixels,24*4));
+            }
+            File.WriteAllText(Path.Combine(AppLog.Data,"tray-smooth-timing.txt"),"30 distinct icons: "+first.ToString("0.0")+" ms; same 30 again as new bitmaps: "+clock.Elapsed.TotalMilliseconds.ToString("0.0")+" ms; builds="+TrayIconSmoother.Builds);
             panel.Measure(new Size(900,700));panel.Arrange(new Rect(0,0,panel.DesiredSize.Width,panel.DesiredSize.Height));
             var target=new RenderTargetBitmap((int)panel.DesiredSize.Width,(int)panel.DesiredSize.Height,96,96,PixelFormats.Pbgra32);target.Render(panel);
             var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(target));

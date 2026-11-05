@@ -288,8 +288,11 @@ namespace OneTaskBar
                 }
                 // Construct and lay out before hiding the real window. Disk
                 // journaling still precedes cloaking, preserving crash recovery.
+                // Some windows, such as the frame of a Store app, cannot be cloaked. A restore then covers the real
+                // window; a minimize has nothing to hide, because the system is already taking the window away, so the
+                // flight still runs over it. Giving up here made the window vanish with no animation at all.
                 if(hideSource&&(!lease.Arm(source)||!lease.HideRepresentation(source))&&
-                    !(restore&&plane!=null&&plane.CoverRestoringWindow(source)))
+                    !(plane!=null&&(!restore||plane.CoverRestoringWindow(source))))
                 {
                     Stop();
                     return;

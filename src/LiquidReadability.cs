@@ -8,7 +8,7 @@ namespace OneTaskBar
 {
     // Light text on thin glass is hard to read over a white window. While a liquid panel is open, this reads
     // the average brightness of a thin strip of screen just outside each edge of the panel, so it never reads
-    // the panel's own glass, and steps the tint darker in a few stages. Four tiny reads twice a second, only
+    // the panel's own glass, and steps the tint darker in a few stages. Four tiny reads every two seconds, only
     // while the panel is visible; nothing runs when it is hidden or the option is off.
     internal static class LiquidReadability
     {
@@ -36,7 +36,7 @@ namespace OneTaskBar
             internal Watcher(GlassWindow window)
             {
                 Window=window;
-                Timer=new DispatcherTimer(DispatcherPriority.Background){Interval=TimeSpan.FromMilliseconds(500)};
+                Timer=new DispatcherTimer(DispatcherPriority.Background){Interval=TimeSpan.FromMilliseconds(2000)};
                 Timer.Tick+=(s,e)=>Sample();
                 window.IsVisibleChanged+=(s,e)=>Follow();
                 window.Closed+=(s,e)=>Timer.Stop();

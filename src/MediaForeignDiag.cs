@@ -43,7 +43,7 @@ namespace OneTaskBar
                     var capsule=new Rect(screen.Left+screen.Width/2-170,screen.Bottom-150,340,56);
                     using(var enter=new MediaWindowMotion(null,null))
                     {
-                        enter.Begin(window,null,IntPtr.Zero,bounds,capsule,false,false,image,null);
+                        enter.Begin(window,null,IntPtr.Zero,bounds,capsule,true,false,image,null);
                         Native.ShowWindow(window,6);
                         var log=new List<string>();
                         var clock=System.Diagnostics.Stopwatch.StartNew();
