@@ -49,6 +49,25 @@ namespace OneTaskBar
             return AppIconShape.Raster(image, 128);
         }
 
+        // A square of four colors, so no single edge color can stand in for it, with a transparent margin.
+        static BitmapSource Blocks(double start, double size)
+        {
+            var group = new DrawingGroup();
+            using (var draw = group.Open())
+            {
+                draw.DrawRectangle(Brushes.Transparent, null, new Rect(0, 0, 100, 100));
+                draw.DrawRectangle(Brushes.Crimson, null, new Rect(start, start, size / 2, size / 2));
+                draw.DrawRectangle(Brushes.SeaGreen, null, new Rect(start + size / 2, start, size / 2, size / 2));
+                draw.DrawRectangle(Brushes.RoyalBlue, null, new Rect(start, start + size / 2, size / 2, size / 2));
+                draw.DrawRectangle(Brushes.Goldenrod, null, new Rect(start + size / 2, start + size / 2, size / 2, size / 2));
+            }
+
+            group.Freeze();
+            var image = new DrawingImage(group);
+            image.Freeze();
+            return AppIconShape.Raster(image, 128);
+        }
+
         // A freeform glyph with transparent surroundings, like a logo that is not a filled shape.
         static ImageSource Mark(Brush body, Brush detail = null)
         {
@@ -138,6 +157,28 @@ namespace OneTaskBar
                     Require(AppIconShape.Background(Mark(Brushes.Black)) == Colors.White, "Dark freeform artwork uses a white tile");
                     Require(AppIconShape.Background(Mark(Brushes.White)) == Colors.Black, "White artwork that would vanish on white uses a black tile");
                     Require(AppIconShape.Background(Mark(Brushes.White, Brushes.CornflowerBlue)) == Colors.White, "White artwork with a visible colored part stays on white");
+                    var padded = Blocks(14, 72);
+                    Require(AppIconShape.FillsTile(padded), "A square with a transparent margin fills the tile");
+                    var paddedTile = AppIconShape.Automatic(padded, true);
+                    Require(AppIconShape.AlreadySquircle(paddedTile), "Filled artwork is still cut to the squircle");
+                    Require(UsesSource(((DrawingImage)paddedTile).Drawing, padded), "Filled artwork keeps the original image");
+                    var filled = AppIconShape.Pixels(AppIconShape.Raster(paddedTile, 128));
+                    foreach (var point in new[] { new Point(4, 64), new Point(123, 64), new Point(64, 4), new Point(64, 123), new Point(30, 30), new Point(98, 98) })
+                    {
+                        int at = ((int)point.Y * 128 + (int)point.X) * 4;
+                        Require(filled[at + 3] > 250 && !(filled[at] > 240 && filled[at + 1] > 240 && filled[at + 2] > 240), "Background shows inside filled artwork");
+                    }
+
+                    var rounded = new DrawingGroup();
+                    using (var draw = rounded.Open())
+                        draw.DrawRoundedRectangle(Brushes.Crimson, null, new Rect(10, 10, 80, 80), 14, 14);
+                    rounded.Freeze();
+                    var roundedImage = new DrawingImage(rounded);
+                    roundedImage.Freeze();
+                    Require(AppIconShape.FillsTile(AppIconShape.Raster(roundedImage, 128)), "A rounded square fills the tile");
+                    Require(!AppIconShape.FillsTile(circle), "A circle stays on a tile");
+                    Require(!AppIconShape.FillsTile(wide), "Wide artwork stays on a tile");
+                    Require(!AppIconShape.FillsTile(Mark(Brushes.CornflowerBlue)), "Freeform artwork stays on a tile");
                     var mutable = new DrawingImage(new GeometryDrawing(Brushes.White, null, new RectangleGeometry(new Rect(0, 0, 64, 64))));
                     Require(!AppIconShape.AlreadySquircle(mutable), "Square recognized as squircle");
                     ((GeometryDrawing)mutable.Drawing).Geometry = SquircleGeometry.Create(new Rect(0, 0, 64, 64));

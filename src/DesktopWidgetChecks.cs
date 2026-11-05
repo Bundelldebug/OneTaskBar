@@ -92,12 +92,12 @@ namespace OneTaskBar
                     IntPtr foreground=Native.GetForegroundWindow();
                     shell.Power=new PowerState {Known=true,Level=73,Connected=false};
                     shell.Services.Media=new MediaState {Available=true,Active=true,Playing=true,CanPlay=true,CanNext=true,CanPrevious=true,CanSeek=true,Duration=210,Position=62,Title="바탕화면 미디어",Artist="테스트 아티스트",Artwork=ArtworkPalette.Sample(Colors.SteelBlue)};
-                    int index=0;
+                    int index=0,commits=0;
                     foreach(string key in new[]{"clock","battery","media","mute","wifi","numbers","buds","devices","windows","capture","manager","clock-analog:2x2","player:4x1","care:2x2","todo:2x2"})
                     {
                         var initial=DesktopWidgetCatalog.Initial(key);
                         var slot=new DesktopWidgetSlot {Id=Guid.NewGuid().ToString("N"),Key=key,Width=initial.Width,Height=initial.Height};
-                        var view=new DesktopWidgetView(shell,slot,(s,a,b,r,c)=>{});
+                        var view=new DesktopWidgetView(shell,slot,(s,a,b,r,c)=>{if(c)commits++;});
                         var host=new DesktopWidgetHost(parent,view);
                         hosts.Add(host);
                         host.Place(new Rect(outer.Left+24*dpi+(index%3)*280*dpi,outer.Top+50*dpi+(index/3)*160*dpi,initial.Width*dpi,initial.Height*dpi),dpi);
@@ -123,9 +123,37 @@ namespace OneTaskBar
                     moving.Present(true);
                     Require(moving.View.IsVisible,"widgets return after occlusion");
                     checks.Add("native child hosting, actual DPI movement, no activation theft and visibility lifecycle");
+                    // A press whose button came up outside the widget never sees a release.
+                    var abandoned=hosts[1].View;
+                    abandoned.Press(false,new System.Drawing.Point(10,10));
+                    await Task.Delay(700);
+                    Require(!abandoned.IsMouseCaptured,"a press released outside the widget must not keep the mouse");
+                    bool buttonDown=true;
+                    abandoned.ButtonDown=()=>buttonDown;
+                    abandoned.Press(false,new System.Drawing.Point(10,10));
+                    abandoned.Move(new System.Drawing.Point(80,80));
+                    buttonDown=false;
+                    await Task.Delay(200);
+                    Require(!abandoned.IsMouseCaptured&&abandoned.Opacity==1&&commits==1,"a move whose mouse-up went missing still ends and commits");
+                    buttonDown=true;
+                    abandoned.Press(false,new System.Drawing.Point(10,10));
+                    abandoned.Move(new System.Drawing.Point(80,80));
+                    bool lostCaptureChecked=abandoned.IsMouseCaptured;
+                    if(lostCaptureChecked)
+                    {
+                        abandoned.ReleaseMouseCapture();
+                        Require(abandoned.Opacity==1&&commits==2,"losing the mouse mid-move ends and commits");
+                    }
+                    else
+                    {
+                        buttonDown=false;
+                        await Task.Delay(200);
+                    }
+                    checks.Add("presses and moves that lose their mouse-up release the mouse; capture-loss path "+(lostCaptureChecked?"checked":"not reached"));
                     int chosen=0;
                     var gestureSlot=new DesktopWidgetSlot {Id=Guid.NewGuid().ToString("N"),Key="calendar:2x2",Width=190,Height=190};
                     var gestureView=new DesktopWidgetView(shell,gestureSlot,(s,a,b,r,c)=>{},s=>chosen++);
+                    gestureView.ButtonDown=()=>true;
                     var at=new System.Drawing.Point(10,10);
                     gestureView.Press(false,at);
                     Require(gestureView.Release()&&chosen==1,"clicking an empty part of a widget opens editing");
@@ -143,6 +171,21 @@ namespace OneTaskBar
                     Preferences.Current.DesktopWidgets=true;
                     shell.Widgets.Select(liveSlot);
                     Require(shell.Widgets.Editing&&shell.Widgets.SelectedId==liveSlot.Id,"selecting edits one widget");
+                    var away=new Point(-99999,-99999);
+                    IntPtr current=Native.GetForegroundWindow();
+                    shell.Widgets.CheckSelection(false,away,current);
+                    Require(shell.Widgets.Editing,"no click elsewhere keeps editing");
+                    shell.Widgets.CheckSelection(true,away,current);
+                    Require(!shell.Widgets.Editing,"a click elsewhere ends editing, even one shorter than the timer");
+                    shell.Widgets.Select(liveSlot);
+                    shell.Widgets.CheckSelection(false,away,parent);
+                    Require(shell.Widgets.Editing,"this app's own window does not end editing");
+                    IntPtr tray=FindWindow("Shell_TrayWnd",null);
+                    if(tray!=IntPtr.Zero)
+                    {
+                        shell.Widgets.CheckSelection(false,away,tray);
+                        Require(!shell.Widgets.Editing,"switching to another app ends editing and closes the toolbar");
+                    }
                     shell.Widgets.Deselect();
                     Require(!shell.Widgets.Editing,"editing ends cleanly");
                     Preferences.Current.DesktopWidgets=false;
@@ -184,6 +227,7 @@ namespace OneTaskBar
             }),DispatcherPriority.ApplicationIdle);
             return app.Run();
         }
+        [System.Runtime.InteropServices.DllImport("user32.dll",CharSet=System.Runtime.InteropServices.CharSet.Unicode)] static extern IntPtr FindWindow(string kind,string name);
         [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr window);
         [System.Runtime.InteropServices.DllImport("user32.dll")] static extern IntPtr WindowFromPoint(Native.PointI point);
         // Live diagnostic for the real Explorer desktop. One temporary child window
@@ -218,7 +262,9 @@ namespace OneTaskBar
                     // Unlike WindowFromPoint this ignores other apps' windows covering the desktop.
                     bool receivesClicks=DesktopWidgetNative.ChildAt(desktop,center.X,center.Y)==host.Source.Handle;
                     bool iconsOnTop=DesktopWidgetNative.IconsOnTop(desktop);
+                    var iconClock=System.Diagnostics.Stopwatch.StartNew();
                     var icons=await BackgroundWork.Run(()=>DesktopIcons.Read(desktop));
+                    long iconMilliseconds=iconClock.ElapsedMilliseconds;
                     bool reached=atCenter==host.Source.Handle;
                     // The real manager on the real desktop, with isolated data: nothing saved by the user is touched.
                     host.Dispose();
@@ -270,7 +316,7 @@ namespace OneTaskBar
                     bool removed=manager.HostCount==0;
                     Preferences.Current.DesktopWidgets=false;
                     bool scenario=selected&&toolbarOpen&&moved&&onGrid&&clearOfIcons&&resized=="gauges:4x1"&&rendered&&ended&&removed;
-                    AppLog.Json("desktop-widgets-live.json",new {passed=parented&&visible&&receivesClicks&&!iconsOnTop&&scenario,selected=selected,toolbarOpen=toolbarOpen,moved=moved,onGrid=onGrid,clearOfIcons=clearOfIcons,resized=resized,materialRendered=rendered,editingEnded=ended,removed=removed,screenshot=image!=null,receivesClicks=receivesClicks,iconsOnTop=iconsOnTop,desktopIcons=icons.Count,parented=parented,visible=visible,hitTestReachesWidget=reached,left=actual.Left,top=actual.Top,width=actual.Right-actual.Left,height=actual.Bottom-actual.Top,scale=scale});
+                    AppLog.Json("desktop-widgets-live.json",new {passed=parented&&visible&&receivesClicks&&!iconsOnTop&&scenario,selected=selected,toolbarOpen=toolbarOpen,moved=moved,onGrid=onGrid,clearOfIcons=clearOfIcons,resized=resized,materialRendered=rendered,editingEnded=ended,removed=removed,screenshot=image!=null,receivesClicks=receivesClicks,iconsOnTop=iconsOnTop,desktopIcons=icons.Count,iconMilliseconds=iconMilliseconds,parented=parented,visible=visible,hitTestReachesWidget=reached,left=actual.Left,top=actual.Top,width=actual.Right-actual.Left,height=actual.Bottom-actual.Top,scale=scale});
                     result=parented&&visible&&receivesClicks&&!iconsOnTop&&scenario?0:1;
                 }
                 catch(Exception e)

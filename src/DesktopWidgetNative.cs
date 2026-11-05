@@ -45,6 +45,21 @@ namespace OneTaskBar
             ScreenToClient(desktopView,ref point);
             return ChildWindowFromPointEx(desktopView,point,0);
         }
+        [DllImport("user32.dll")] static extern short GetAsyncKeyState(int key);
+        [DllImport("user32.dll")] static extern int GetSystemMetrics(int index);
+        // The primary button right now, wherever it went down. Swapped buttons report by physical side.
+        internal static bool LeftButtonDown()
+        {
+            return (GetAsyncKeyState(GetSystemMetrics(23)!=0?2:1)&0x8000)!=0;
+        }
+        // True when either button is down or went down since the last call, so a short click between
+        // two timer ticks still counts.
+        internal static bool ClickedSinceLastCheck()
+        {
+            bool left=(GetAsyncKeyState(1)&0x8001)!=0;
+            bool right=(GetAsyncKeyState(2)&0x8001)!=0;
+            return left||right;
+        }
         internal static IntPtr EnterDpi(IntPtr parent)
         {
             try{return SetThreadDpiAwarenessContext(GetWindowDpiAwarenessContext(parent));}

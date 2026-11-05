@@ -32,8 +32,11 @@ namespace OneTaskBar
         TileScheme scheme;
         bool pressed,moving,pressedControl,held;
         readonly Action<DesktopWidgetSlot> select;
-        DispatcherTimer hold;
-        const int HoldMilliseconds=450;
+        DispatcherTimer watch;
+        DateTime pressedAt;
+        const int HoldMilliseconds=450,WatchMilliseconds=50;
+        // Replaced only by fixtures, which have no physical button to hold.
+        internal Func<bool> ButtonDown=DesktopWidgetNative.LeftButtonDown;
         // Which corner handle is resizing: 1 lower right, 2 lower left, 3 upper right, 4 upper left.
         internal int ResizeCorner {get;private set;}
         internal DesktopWidgetView(ShellController controller,DesktopWidgetSlot slot,
@@ -46,6 +49,7 @@ namespace OneTaskBar
             ResizeCorner=1;
             PreviewMouseLeftButtonDown+=(s,e)=>
             {
+                EndPress();
                 if(editor.Visibility==Visibility.Visible)return;
                 Press(OnControl(e.OriginalSource as DependencyObject),Forms.Cursor.Position);
             };
@@ -54,34 +58,30 @@ namespace OneTaskBar
                 if(!pressed)return;
                 if(e.LeftButton!=MouseButtonState.Pressed)
                 {
-                    pressed=false;
+                    EndPress();
                     return;
                 }
-                var at=Forms.Cursor.Position;
-                if(!moving)
-                {
-                    if(Math.Abs(at.X-origin.X)<8&&Math.Abs(at.Y-origin.Y)<8)return;
-                    moving=true;
-                    StopHold();
-                    CaptureMouse();
-                    Opacity=.85;
-                    gesture(Slot,origin,origin,false,false);
-                }
-                gesture(Slot,origin,at,false,false);
+                Move(Forms.Cursor.Position);
             };
             PreviewMouseLeftButtonUp+=(s,e)=>
             {
                 if(!pressed)return;
                 if(moving)
                 {
-                    pressed=moving=false;
-                    Opacity=1;
-                    ReleaseMouseCapture();
-                    gesture(Slot,origin,Forms.Cursor.Position,false,true);
+                    EndPress();
                     e.Handled=true;
                     return;
                 }
                 e.Handled=Release();
+            };
+            // Without capture the release happens elsewhere and this widget never hears about it.
+            MouseLeave+=(s,e)=>
+            {
+                if(pressed&&!moving&&!held)EndPress();
+            };
+            LostMouseCapture+=(s,e)=>
+            {
+                if(e.OriginalSource==this&&(moving||held))EndPress();
             };
             MouseRightButtonUp+=(s,e)=>
             {
@@ -182,7 +182,7 @@ namespace OneTaskBar
         {
             while(source is Visual)
             {
-                if(source is ButtonBase)return true;
+                if(source is ButtonBase||source is TextBoxBase||source is RangeBase)return true;
                 source=VisualTreeHelper.GetParent(source);
             }
             return false;
@@ -193,33 +193,69 @@ namespace OneTaskBar
             moving=held=false;
             pressedControl=onControl;
             origin=at;
-            if(hold==null)
+            pressedAt=DateTime.UtcNow;
+            if(watch==null)
             {
-                hold=new DispatcherTimer {Interval=TimeSpan.FromMilliseconds(HoldMilliseconds)};
-                hold.Tick+=(s,e)=>
-                {
-                    StopHold();
-                    if(!pressed||moving||retired)return;
-                    held=true;
-                    CaptureMouse();
-                    if(select!=null)select(Slot);
-                };
+                watch=new DispatcherTimer {Interval=TimeSpan.FromMilliseconds(WatchMilliseconds)};
+                watch.Tick+=(s,e)=>WatchPress();
             }
-            hold.Start();
+            watch.Start();
         }
-        void StopHold()
+        // Runs only while the button is down. The mouse-up can go missing, so the button itself decides.
+        void WatchPress()
         {
-            if(hold!=null)hold.Stop();
+            if(!pressed||retired)
+            {
+                StopWatch();
+                return;
+            }
+            if(!ButtonDown())
+            {
+                EndPress();
+                return;
+            }
+            if(moving||held||(DateTime.UtcNow-pressedAt).TotalMilliseconds<HoldMilliseconds)return;
+            held=true;
+            CaptureMouse();
+            if(select!=null)select(Slot);
+        }
+        void StopWatch()
+        {
+            if(watch!=null)watch.Stop();
+        }
+        internal void Move(System.Drawing.Point at)
+        {
+            if(!moving)
+            {
+                if(Math.Abs(at.X-origin.X)<8&&Math.Abs(at.Y-origin.Y)<8)return;
+                moving=true;
+                Opacity=.85;
+                gesture(Slot,origin,origin,false,false);
+                CaptureMouse();
+                // Capture can be refused and lost at once, which has already ended this move.
+                if(!moving)return;
+            }
+            gesture(Slot,origin,at,false,false);
+        }
+        // Ends a press however it stopped. A move in progress is committed where the pointer is.
+        void EndPress()
+        {
+            StopWatch();
+            bool wasMoving=moving;
+            pressed=moving=held=false;
+            if(wasMoving)Opacity=1;
+            if(IsMouseCaptured)ReleaseMouseCapture();
+            if(wasMoving)gesture(Slot,origin,Forms.Cursor.Position,false,true);
         }
         // Returns true when the release was used for editing and must not click a control.
         internal bool Release()
         {
-            StopHold();
+            StopWatch();
             pressed=false;
             if(held)
             {
                 held=false;
-                ReleaseMouseCapture();
+                if(IsMouseCaptured)ReleaseMouseCapture();
                 return true;
             }
             if(pressedControl||select==null)return false;
@@ -351,7 +387,9 @@ namespace OneTaskBar
             if(retired)return;
             retired=true;
             if(tile!=null)tile.Retire();
-            StopHold();
+            StopWatch();
+            pressed=moving=held=false;
+            if(IsMouseCaptured)ReleaseMouseCapture();
             if(move.IsDragging)move.CancelDrag();
             Visibility=Visibility.Collapsed;
             body.Children.Clear();

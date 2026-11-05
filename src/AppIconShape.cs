@@ -12,6 +12,7 @@ namespace OneTaskBar
         {
             internal bool IsSquircle, FullArtwork;
             internal Color? EdgeColor, Background;
+            internal Rect? FilledBox;
         }
 
         // Weak keys do not keep retired source bitmaps alive. Values contain only
@@ -60,10 +61,41 @@ namespace OneTaskBar
                         best = bucket;
                 }
 
-            if (opaque > 4096 * .68 && edgeCount > 0 && count[best] > edgeCount * .35)
+            value.FilledBox = FindFilledBox(data);
+            if ((opaque > 4096 * .68 || value.FilledBox.HasValue) && edgeCount > 0 && count[best] > edgeCount * .35)
                 value.EdgeColor = Color.FromRgb((byte)(red[best] / count[best]), (byte)(green[best] / count[best]), (byte)(blue[best] / count[best]));
             value.FullArtwork = opaque > 4096 * .96;
             return value;
+        }
+
+        // The drawn area of artwork that is itself a square or rounded square, in 64px sample
+        // coordinates. A circle fills about 79% of its bounds, so it stays on a tile instead.
+        static Rect? FindFilledBox(byte[] data)
+        {
+            int left = 64, top = 64, right = -1, bottom = -1, solid = 0;
+            for (int y = 0; y < 64; y++)
+                for (int x = 0; x < 64; x++)
+                {
+                    if (data[(y * 64 + x) * 4 + 3] < 112)
+                        continue;
+                    solid++;
+                    left = Math.Min(left, x);
+                    right = Math.Max(right, x);
+                    top = Math.Min(top, y);
+                    bottom = Math.Max(bottom, y);
+                }
+
+            int w = right - left + 1, h = bottom - top + 1;
+            if (w < 16 || h < 16 || Math.Abs(w - h) > Math.Max(w, h) * .12)
+                return null;
+            if (solid / (double)(w * h) < .86)
+                return null;
+            return new Rect(left, top, w, h);
+        }
+
+        internal static bool FillsTile(ImageSource source)
+        {
+            return source != null && Inspect(source).FilledBox.HasValue;
         }
 
         internal static BitmapSource Raster(ImageSource source, int pixels)
@@ -225,9 +257,45 @@ namespace OneTaskBar
             if (source == null)
                 return null;
             Analysis analysis = Inspect(source);
+            if (analysis.FilledBox.HasValue)
+                return Filled(source, analysis);
             if (analysis.EdgeColor.HasValue)
                 return Tile(source, analysis.EdgeColor.Value.ToString(), compact ? 92 : 100);
             return Tile(source, null, analysis.FullArtwork ? (compact ? 92 : 100) : (compact ? 72 : 78));
+        }
+
+        // Square artwork becomes the tile: its drawn area, without any transparent margin in the
+        // file, reaches past the outline so no background shows along the edges.
+        static ImageSource Filled(ImageSource source, Analysis analysis)
+        {
+            const double reach = 96 * 1.04;
+            Rect box = analysis.FilledBox.Value;
+            double w = source.Width, h = source.Height;
+            if (w <= 0 || h <= 0 || Double.IsNaN(w) || Double.IsNaN(h) || Double.IsInfinity(w) || Double.IsInfinity(h))
+            {
+                w = h = 64;
+            }
+
+            double sample = 64 / Math.Max(w, h);
+            double scale = reach / Math.Min(box.Width, box.Height);
+            double drawnWidth = w * sample * scale, drawnHeight = h * sample * scale;
+            double x = 50 + ((64 - w * sample) / 2 - (box.Left + box.Width / 2)) * scale;
+            double y = 50 + ((64 - h * sample) / 2 - (box.Top + box.Height / 2)) * scale;
+            Color tint = analysis.EdgeColor ?? Background(source);
+            var group = new DrawingGroup();
+            using (var draw = group.Open())
+            {
+                var shape = SquircleGeometry.Create(new Rect(2, 2, 96, 96));
+                draw.DrawGeometry(new SolidColorBrush(tint), null, shape);
+                draw.PushClip(shape);
+                draw.DrawImage(source, new Rect(x, y, drawnWidth, drawnHeight));
+                draw.Pop();
+            }
+
+            group.Freeze();
+            var image = new DrawingImage(group);
+            image.Freeze();
+            return image;
         }
 
         internal static ImageSource Tile(ImageSource source, string color, int artworkPercent)

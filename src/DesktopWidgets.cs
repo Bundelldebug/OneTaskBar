@@ -24,6 +24,7 @@ namespace OneTaskBar
         Popup toolbar;
         FrameworkElement toolbarBody;
         DispatcherTimer selectionWatch;
+        IntPtr selectedForeground;
         int interfaceVersion;
         DesktopWidgetSlot dragging;
         Rect dragPixels;
@@ -191,6 +192,8 @@ namespace OneTaskBar
                 selectionWatch=new DispatcherTimer {Interval=TimeSpan.FromMilliseconds(120)};
                 selectionWatch.Tick+=(s,e)=>WatchSelection();
             }
+            DesktopWidgetNative.ClickedSinceLastCheck();
+            selectedForeground=Native.GetForegroundWindow();
             selectionWatch.Start();
             RefreshIcons();
         }
@@ -206,13 +209,34 @@ namespace OneTaskBar
         // The timer exists only while a widget is selected: Explorer owns clicks on the empty desktop.
         void WatchSelection()
         {
-            if(selectedId==null||dragging!=null||Forms.Control.MouseButtons==Forms.MouseButtons.None)return;
-            DesktopWidgetHost host;
             var at=Forms.Cursor.Position;
-            var point=new Point(at.X,at.Y);
+            CheckSelection(DesktopWidgetNative.ClickedSinceLastCheck(),new Point(at.X,at.Y),Native.GetForegroundWindow());
+        }
+        internal void CheckSelection(bool clicked,Point point,IntPtr foreground)
+        {
+            if(selectedId==null||dragging!=null)return;
+            // The toolbar floats above other apps, so editing cannot outlive a switch to one of them.
+            if(foreground!=selectedForeground)
+            {
+                selectedForeground=foreground;
+                if(ForeignApp(foreground))
+                {
+                    Deselect();
+                    return;
+                }
+            }
+            if(!clicked)return;
+            DesktopWidgetHost host;
             if(hosts.TryGetValue(selectedId,out host)&&host.Pixels.Contains(point))return;
             if(InToolbar(point))return;
             Deselect();
+        }
+        bool ForeignApp(IntPtr window)
+        {
+            if(window==IntPtr.Zero||window==parent||window==Native.GetAncestor(parent,2))return false;
+            uint process;
+            Native.GetWindowThreadProcessId(window,out process);
+            return process!=(uint)System.Diagnostics.Process.GetCurrentProcess().Id;
         }
         bool InToolbar(Point point)
         {
