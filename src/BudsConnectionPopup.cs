@@ -41,7 +41,7 @@ namespace OneTaskBar
         internal void Appear(){Animate(1);}
         internal Task<bool> Disappear(){return Animate(0);}
         Task<bool> Animate(double value){if(finished!=null)finished.TrySetResult(false);finished=new TaskCompletionSource<bool>();var task=finished.Task;clock.Stop();from=progress;to=value;if(!Motion.Enabled){progress=to;Place();finished.TrySetResult(true);return task;}watch.Restart();clock.Start();return task;}
-        void Frame(){double t=Math.Min(1,watch.Elapsed.TotalMilliseconds/(to==1?240:150));progress=from+(to-from)*(1-Math.Pow(1-t,3));Place();if(t>=1){clock.Stop();finished.TrySetResult(true);}}
+        void Frame(){double t=Math.Min(1,watch.Elapsed.TotalMilliseconds/(to==1?240:150));progress=from+(to-from)*SpringEase.Out(t);Place();if(t>=1){clock.Stop();finished.TrySetResult(true);}}
         void Place(){Opacity=progress;Native.BlurOpacity(this,progress);Native.Place(this,monitor,bounds.X,bounds.Y+(1-progress)*12,bounds.Width,bounds.Height);}
     }
 }

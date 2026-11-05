@@ -40,6 +40,22 @@ namespace OneTaskBar
                     Native.Activate(window);await Task.Delay(500);var image=MediaWindowSnapshot.Capture(window,bounds,()=>true);
                     var screen=System.Windows.Forms.Screen.PrimaryScreen.Bounds;
                     var capsule=new Rect(screen.Left+screen.Width/2-170,screen.Bottom-150,340,56);
+                    using(var enter=new MediaWindowMotion(null,null))
+                    {
+                        enter.Begin(window,null,IntPtr.Zero,bounds,capsule,true,false,image,null);
+                        Native.ShowWindow(window,6);
+                        for(int step=0;step<6;step++)
+                        {
+                            await Task.Delay(75);
+                            using(var bitmap=new System.Drawing.Bitmap(screen.Width,screen.Height))
+                            using(var graphics=System.Drawing.Graphics.FromImage(bitmap))
+                            {
+                                graphics.CopyFromScreen(screen.Left,screen.Top,0,0,bitmap.Size);
+                                bitmap.Save(Path.Combine(AppLog.Data,"foreign-enter-"+step+".png"));
+                            }
+                        }
+                        await Task.Delay(700);
+                    }
                     Native.ShowWindow(window,6);
                     await Task.Delay(700);
                     var shots=new List<string>();var states=new List<string>();bool activeAtStart=false;long planeWindow=0;int frames=0;

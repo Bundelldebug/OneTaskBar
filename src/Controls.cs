@@ -343,12 +343,14 @@ namespace OneTaskBar
                 bool custom=DockAppearance.Custom,useBlur=!custom&&HasBlur&&Preferences.Current.Blur&&(!Glass95.Enabled||Glass95.Transparent);
                 bool tuned=!custom&&SurfaceMaterial.Enabled(true);
                 if(tuned&&SurfaceMaterial.Blur(true)==0)useBlur=false;
-                Native.SurfaceBlur(this,tuned&&useBlur?SurfaceMaterial.Blur(true):-1);
+                bool liquidDock=useBlur&&!tuned;
+                Native.SurfaceBlur(this,LiquidGlass.Radius(tuned&&useBlur?SurfaceMaterial.Blur(true):-1,liquidDock,true),LiquidGlass.Boost(liquidDock));
                 Native.EnableBlur(this,useBlur);
                 if(Glass95.Enabled&&!custom){if(glassEdge==null||edgeDark!=Dark){edgeDark=Dark;glassEdge=Glass95.Edge(Dark);}}
                 else glassEdge=null;
                 Surface.Background=custom?DockAppearance.Background:useBlur?LightPanel.DockGlass:Dark?Paint.Brush("#FF29302D"):LightPanel.DockSolid;
                 if(tuned)Surface.Background=SurfaceMaterial.Tint(true,!Preferences.Current.Blur||!HasBlur);
+                if(LiquidGlass.Enabled&&liquidDock)Surface.Background=LiquidGlass.Tint(Dark);
                 Surface.BorderBrush=custom?Glass95.Enabled&&!DockAppearance.IconsOnly?Glass95.Rim:Brushes.Transparent:glassEdge??(Brush)Brushes.Transparent;
                 Surface.BorderThickness=new Thickness(custom&&Glass95.Enabled&&!DockAppearance.IconsOnly?.7:0);
                 return;
@@ -356,7 +358,8 @@ namespace OneTaskBar
             bool enabled=HasBlur&&Preferences.Current.Blur&&!(DockSurface&&Preferences.Current.DockSolidBackground)&&(!Glass95.Enabled||Glass95.Transparent);Native.EnableBlur(this,enabled);
             bool tunedStart=this is StartWindow&&SurfaceMaterial.Enabled(false);
             if(tunedStart&&SurfaceMaterial.Blur(false)==0){enabled=false;Native.EnableBlur(this,false);}
-            Native.SurfaceBlur(this,tunedStart&&enabled?SurfaceMaterial.Blur(false):-1);
+            bool liquid=enabled&&!tunedStart&&!OpaqueSurface&&Glass95.Enabled&&!(this is HudWindow);
+            Native.SurfaceBlur(this,LiquidGlass.Radius(tunedStart&&enabled?SurfaceMaterial.Blur(false):-1,liquid,false),LiquidGlass.Boost(liquid));
             bool panel=PanelMaterial.ReadablePanel(this),popup=PanelMaterial.NotificationPopup(this);
             var center=this as NotificationWindow;
             if(center!=null){Dark=Glass95.Dark;Surface.Background=enabled?NotificationStyle.Surface:NotificationStyle.Solid;Surface.BorderBrush=Glass95.Enabled?Glass95.Rim:Paint.Brush("#28FFFFFF");Surface.BorderThickness=new Thickness(.7);center.RefreshChrome();return;}
@@ -373,6 +376,7 @@ namespace OneTaskBar
                 else Surface.Background=enabled?glassTint:solidTint??Paint.Brush(Dark?"#FF344139":"#FFE0E5E2");
             }
             if(tunedStart)Surface.Background=SurfaceMaterial.Tint(false,!Preferences.Current.Blur||!HasBlur);
+            if(liquid&&LiquidGlass.Enabled&&!(this is NowBar)&&!DockSurface)Surface.Background=LiquidGlass.Tint(panel||popup||Dark);
             if(!OpaqueSurface&&!(this is NowBar)&&!DockSurface)PanelMaterial.RefreshCards(Surface);
         }
         internal virtual void RefreshGlassMaterial(){ApplyMaterial();if(DockSurface)Glass95.DockInk(Surface);else Glass95.RefreshColors(Surface);}

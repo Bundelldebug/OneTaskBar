@@ -16,21 +16,20 @@ namespace OneTaskBar
         sealed class AnimationFixture : IDisposable {bool disposed;internal AnimationFixture(){animationFixtures++;}public void Dispose(){if(disposed)return;disposed=true;animationFixtures--;}}
         internal static DoubleAnimation Tween(double from,double to,int milliseconds)
         {
-            return new DoubleAnimation(from,to,TimeSpan.FromMilliseconds(milliseconds)) {EasingFunction=new CubicEase {EasingMode=EasingMode.EaseOut},FillBehavior=FillBehavior.Stop};
+            return new DoubleAnimation(from,to,TimeSpan.FromMilliseconds(milliseconds)) {EasingFunction=SpringEase.Smooth,FillBehavior=FillBehavior.Stop};
         }
         internal static DoubleAnimationUsingKeyFrames PanelTween(double from,double to,int milliseconds)
         {
             var animation=new DoubleAnimationUsingKeyFrames {Duration=TimeSpan.FromMilliseconds(milliseconds),FillBehavior=FillBehavior.Stop};
             animation.KeyFrames.Add(new LinearDoubleKeyFrame(from,KeyTime.FromTimeSpan(TimeSpan.Zero)));
-            animation.KeyFrames.Add(new SplineDoubleKeyFrame(to,KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(milliseconds)),new KeySpline(.22,.72,.2,1)));
+            animation.KeyFrames.Add(new EasingDoubleKeyFrame(to,KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(milliseconds)),SpringEase.Smooth));
             return animation;
         }
         static DoubleAnimationUsingKeyFrames Spring(double from,double peak,double target,int milliseconds)
         {
             var motion=new DoubleAnimationUsingKeyFrames {Duration=TimeSpan.FromMilliseconds(milliseconds),FillBehavior=FillBehavior.Stop};
             motion.KeyFrames.Add(new LinearDoubleKeyFrame(from,KeyTime.FromTimeSpan(TimeSpan.Zero)));
-            motion.KeyFrames.Add(new SplineDoubleKeyFrame(peak,KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(milliseconds*.74)),new KeySpline(.18,.8,.16,1)));
-            motion.KeyFrames.Add(new SplineDoubleKeyFrame(target,KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(milliseconds)),new KeySpline(.25,0,.3,1)));return motion;
+            motion.KeyFrames.Add(new EasingDoubleKeyFrame(target,KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(milliseconds)),SpringEase.Snappy));return motion;
         }
         internal static DoubleAnimation Launcher(FrameworkElement content,bool opening)
         {
@@ -57,7 +56,7 @@ namespace OneTaskBar
                 Fade(part,part.Opacity,opacity,130);
             };
             button.MouseEnter+=(s,e)=>apply(Preferences.Current.Hover?1.025:1,.88);button.MouseLeave+=(s,e)=>apply(1,1);
-            button.PreviewMouseLeftButtonDown+=(s,e)=>apply(.94,.72);button.PreviewMouseLeftButtonUp+=(s,e)=>apply(button.IsMouseOver&&Preferences.Current.Hover?1.025:1,button.IsMouseOver?.88:1);
+            button.PreviewMouseLeftButtonDown+=(s,e)=>apply(.955,.78);button.PreviewMouseLeftButtonUp+=(s,e)=>apply(button.IsMouseOver&&Preferences.Current.Hover?1.025:1,button.IsMouseOver?.88:1);
             button.LostMouseCapture+=(s,e)=> {bool over=button.IsMouseOver&&!DragReorder.Active;apply(over&&Preferences.Current.Hover?1.025:1,over?.88:1);};
         }
         internal static Point LimitScale(Rect button,Rect viewport,Point requested)
@@ -85,7 +84,7 @@ namespace OneTaskBar
             button.LostMouseCapture+=(s,e)=>settle(button.IsMouseOver&&Preferences.Current.Hover?1.08:1);
             Action activatePulse=()=>{
                 if(!Enabled||DragReorder.Active)return;bouncing=true;double target=button.IsMouseOver&&Preferences.Current.Hover?1.08:1;
-                var pulse=new DoubleAnimationUsingKeyFrames {Duration=TimeSpan.FromMilliseconds(360),FillBehavior=FillBehavior.Stop};pulse.KeyFrames.Add(new LinearDoubleKeyFrame(.88,KeyTime.FromTimeSpan(TimeSpan.Zero)));pulse.KeyFrames.Add(new SplineDoubleKeyFrame(1.12,KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(125)),new KeySpline(.15,.65,.25,1)));pulse.KeyFrames.Add(new SplineDoubleKeyFrame(target,KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(360)),new KeySpline(.2,.6,.25,1)));
+                var pulse=new DoubleAnimationUsingKeyFrames {Duration=TimeSpan.FromMilliseconds(420),FillBehavior=FillBehavior.Stop};pulse.KeyFrames.Add(new LinearDoubleKeyFrame(.88,KeyTime.FromTimeSpan(TimeSpan.Zero)));pulse.KeyFrames.Add(new EasingDoubleKeyFrame(target,KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(420)),SpringEase.Bouncy));
                 scale.ScaleX=scale.ScaleY=target;scale.BeginAnimation(ScaleTransform.ScaleXProperty,pulse);scale.BeginAnimation(ScaleTransform.ScaleYProperty,pulse);
                 var lift=new DoubleAnimationUsingKeyFrames {Duration=pulse.Duration,FillBehavior=FillBehavior.Stop};lift.KeyFrames.Add(new LinearDoubleKeyFrame(0,KeyTime.FromTimeSpan(TimeSpan.Zero)));lift.KeyFrames.Add(new SplineDoubleKeyFrame(-1.5,KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(125)),new KeySpline(.15,.65,.25,1)));lift.KeyFrames.Add(new SplineDoubleKeyFrame(0,KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(360)),new KeySpline(.2,.6,.25,1)));lift.Completed+=(sender,args)=>{bouncing=false;settle(button.IsMouseOver&&Preferences.Current.Hover?1.08:1);};shift.BeginAnimation(TranslateTransform.YProperty,lift);
             };

@@ -20,7 +20,7 @@ namespace OneTaskBar
         internal void Reveal(){clock.Stop();Opacity=0;Native.BlurOpacity(this,0);Fade(1,150,false);}
         internal void FadeAway(){if(closed||closeAfter)return;Fade(0,110,true);}
         void Fade(double value,int milliseconds,bool finish){from=Opacity;to=value;duration=milliseconds;closeAfter=finish;if(!Motion.Enabled){Apply(value);if(finish)Close();return;}watch.Restart();clock.Start();}
-        void Frame(){if(closed){clock.Stop();return;}double t=Math.Min(1,watch.Elapsed.TotalMilliseconds/duration);Apply(from+(to-from)*(1-Math.Pow(1-t,3)));if(t>=1){clock.Stop();if(closeAfter)Close();}}
+        void Frame(){if(closed){clock.Stop();return;}double t=Math.Min(1,watch.Elapsed.TotalMilliseconds/duration);Apply(from+(to-from)*SpringEase.Out(t));if(t>=1){clock.Stop();if(closeAfter)Close();}}
         void Apply(double opacity){Opacity=opacity;Native.BlurOpacity(this,opacity);}
     }
     internal static class ActionNotice

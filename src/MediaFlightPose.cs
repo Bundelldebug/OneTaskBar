@@ -30,7 +30,7 @@ namespace OneTaskBar
             double radius=18+(Math.Min(width,height)/2-18)*morph;
             return new MediaWindowPose {
                 Center=center,Width=width,Height=height,Radius=Math.Max(0,Math.Min(Math.Min(width,height)/2,radius)),
-                Tilt=-11*direction*envelope,Turn=-11*direction*envelope,
+                Tilt=-5*direction*envelope,Turn=-5*direction*envelope,
                 Opacity=1-MediaFlightTiming.Smooth((p-.73)/.27),Defocus=.72*envelope
             };
         }

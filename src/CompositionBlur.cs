@@ -23,7 +23,7 @@ namespace OneTaskBar
         // Use the ABI factory directly: .NET's PropertyValue projection unboxes
         // numbers, which loses the IPropertyValue pointer required by Direct2D.
         [ComImport,Guid("629BDBC8-D932-4FF4-96B9-8D96C5C1E858"),InterfaceType(ComInterfaceType.InterfaceIsIInspectable)]
-        interface IPropertyFactory
+        internal interface IPropertyFactory
         {
             void CreateEmpty(out IntPtr value);
             void CreateUInt8(byte input,out IntPtr value);
@@ -64,5 +64,39 @@ namespace OneTaskBar
                 var brush=factory.CreateBrush();brush.SetSourceParameter("Backdrop",backdrop);return brush;
             }
         }
+        // The blur followed by a saturation lift: the colors behind the glass stay vivid through the blur,
+        // which is most of what makes a liquid-glass surface read as glass and not as frosted plastic.
+        internal static CompositionEffectBrush CreateVivid(Compositor compositor,CompositionBrush backdrop)
+        {
+            var effect=new CompositionSaturation(new CompositionBlur(new CompositionEffectSourceParameter("Backdrop")));
+            using(var factory=compositor.CreateEffectFactory(effect,new[]{"SurfaceBlur.BlurAmount","Vivid.Saturation"})){
+                var brush=factory.CreateBrush();brush.SetSourceParameter("Backdrop",backdrop);return brush;
+            }
+        }
+    }
+    [ComVisible(true),ClassInterface(ClassInterfaceType.None)]
+    public sealed class CompositionSaturation : IGraphicsEffect,IGraphicsEffectSource,IGraphicsEffectInterop
+    {
+        readonly IGraphicsEffectSource source;
+        internal CompositionSaturation(IGraphicsEffectSource source){this.source=source;Name="Vivid";}
+        public string Name {get;set;}
+        public void GetEffectId(out Guid id){id=new Guid("5CB2D9CF-327D-459F-A0CE-40C0B2086BF7");}
+        public void GetNamedPropertyMapping(string name,out uint index,out uint mapping)
+        {
+            if(name!="Saturation")throw new ArgumentException("Unknown effect property");
+            index=0;mapping=1;
+        }
+        public void GetPropertyCount(out uint count){count=1;}
+        public void GetProperty(uint index,out IntPtr value)
+        {
+            var factory=(CompositionBlur.IPropertyFactory)System.Runtime.InteropServices.WindowsRuntime.WindowsRuntimeMarshal.GetActivationFactory(typeof(Windows.Foundation.PropertyValue));
+            if(index!=0)throw new ArgumentOutOfRangeException("index");
+            factory.CreateSingle(1,out value);
+        }
+        public void GetSource(uint index,out IGraphicsEffectSource value)
+        {
+            if(index!=0)throw new ArgumentOutOfRangeException("index");value=source;
+        }
+        public void GetSourceCount(out uint count){count=1;}
     }
 }

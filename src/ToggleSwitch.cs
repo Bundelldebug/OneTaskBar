@@ -20,7 +20,7 @@ namespace OneTaskBar
         internal void Set(bool value)
         {
             Checked=value;double target=value?1:0;
-            double before=(double)GetValue(ProgressProperty);BeginAnimation(ProgressProperty,null);SetValue(ProgressProperty,target);if(Preferences.Current.Animations)BeginAnimation(ProgressProperty,new DoubleAnimation(before,target,TimeSpan.FromMilliseconds(170)) {EasingFunction=new CubicEase {EasingMode=EasingMode.EaseOut}});
+            double before=(double)GetValue(ProgressProperty);BeginAnimation(ProgressProperty,null);SetValue(ProgressProperty,target);if(Preferences.Current.Animations)BeginAnimation(ProgressProperty,new DoubleAnimation(before,target,TimeSpan.FromMilliseconds(260)) {EasingFunction=SpringEase.Snappy});
             if(Changed!=null)Changed(value);
         }
         internal void Refresh(bool value){if(Checked==value)return;Checked=value;BeginAnimation(ProgressProperty,null);SetValue(ProgressProperty,value?1.0:0.0);InvalidateVisual();}

@@ -116,7 +116,7 @@ namespace OneTaskBar
         static void Animate(ScaleTransform transform,double value)
         {
             if(!Preferences.Current.Hover||!Preferences.Current.Animations)value=1;
-            var a=new DoubleAnimation(value,TimeSpan.FromMilliseconds(140)) {EasingFunction=new CubicEase {EasingMode=EasingMode.EaseOut}};
+            var a=new DoubleAnimation(value,TimeSpan.FromMilliseconds(220)) {EasingFunction=SpringEase.Smooth};
             transform.BeginAnimation(ScaleTransform.ScaleXProperty,a); transform.BeginAnimation(ScaleTransform.ScaleYProperty,a);
         }
         internal void Show()
@@ -157,7 +157,7 @@ namespace OneTaskBar
                 bool returning=cell.Leaving;cell.Leaving=false;cell.Token++;cell.Button.IsHitTestVisible=true;
                 double x=DockLayout.AppOffset+i*46+(i>=pinned?12:0),oldX=Double.IsNaN(cell.X)?x+16:cell.X+cell.Offset.X;
                 if(added||returning||resetPreview||Math.Abs(cell.X-x)>.01){cell.X=x;Canvas.SetLeft(cell.Button,x);cell.Offset.BeginAnimation(TranslateTransform.XProperty,null);cell.Offset.X=0;cell.Offset.BeginAnimation(TranslateTransform.YProperty,null);cell.Offset.Y=0;
-                    if(animate){cell.Offset.BeginAnimation(TranslateTransform.XProperty,Motion.PanelTween(oldX-x,0,330));if(added||returning){cell.Offset.BeginAnimation(TranslateTransform.YProperty,Motion.PanelTween(6,0,330));var enter=new DoubleAnimationUsingKeyFrames {Duration=TimeSpan.FromMilliseconds(330),FillBehavior=FillBehavior.Stop};enter.KeyFrames.Add(new LinearDoubleKeyFrame(0,KeyTime.FromTimeSpan(TimeSpan.Zero)));enter.KeyFrames.Add(new LinearDoubleKeyFrame(0,KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(65))));enter.KeyFrames.Add(new SplineDoubleKeyFrame(1,KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(280)),new KeySpline(.2,.7,.2,1)));cell.Button.BeginAnimation(UIElement.OpacityProperty,null);cell.Button.Opacity=1;cell.Button.BeginAnimation(UIElement.OpacityProperty,enter);}}else{cell.Button.BeginAnimation(UIElement.OpacityProperty,null);cell.Button.Opacity=1;}}
+                    if(animate){cell.Offset.BeginAnimation(TranslateTransform.XProperty,Motion.PanelTween(oldX-x,0,330));if(added||returning){cell.Offset.BeginAnimation(TranslateTransform.YProperty,Motion.PanelTween(6,0,330));var enter=new DoubleAnimationUsingKeyFrames {Duration=TimeSpan.FromMilliseconds(330),FillBehavior=FillBehavior.Stop};enter.KeyFrames.Add(new LinearDoubleKeyFrame(0,KeyTime.FromTimeSpan(TimeSpan.Zero)));enter.KeyFrames.Add(new LinearDoubleKeyFrame(0,KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(65))));enter.KeyFrames.Add(new EasingDoubleKeyFrame(1,KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(320)),SpringEase.Snappy));cell.Button.BeginAnimation(UIElement.OpacityProperty,null);cell.Button.Opacity=1;cell.Button.BeginAnimation(UIElement.OpacityProperty,enter);}}else{cell.Button.BeginAnimation(UIElement.OpacityProperty,null);cell.Button.Opacity=1;}}
                 cell.Dot.Visibility=entry.Windows.Count>0&&Preferences.Current.RunningDots?Visibility.Visible:Visibility.Collapsed;foreach(var window in entry.Windows)indicators[window]=cell.Dot;
             }
             OrientIcons();if(controller.Desktop&&ready)ResizeTo(layout,animate);UpdateActive(controller.LastApplication);
@@ -213,7 +213,7 @@ namespace OneTaskBar
         }
         void ResizeFrame()
         {
-            if(closed||targetLayout==null){resizeTimer.Stop();return;}double progress=Math.Max(0,Math.Min(1,(resizeWatch.Elapsed.TotalMilliseconds-resizeDelay)/(330-resizeDelay))),ease=1-Math.Pow(1-progress,3);
+            if(closed||targetLayout==null){resizeTimer.Stop();return;}double progress=Math.Max(0,Math.Min(1,(resizeWatch.Elapsed.TotalMilliseconds-resizeDelay)/(330-resizeDelay))),ease=SpringEase.Out(progress);
             currentX=fromX+(targetLayout.AppX-fromX)*ease;currentWidth=fromWidth+(targetLayout.AppWidth-fromWidth)*ease;currentY=fromY+(targetLayout.Y-fromY)*ease;currentStartX=fromStartX+(targetLayout.StartX-fromStartX)*ease;PlaceFrame();if(progress>=1)resizeTimer.Stop();
         }
         void PlaceFrame()
@@ -257,7 +257,7 @@ namespace OneTaskBar
         }
         void VisibilityFrame()
         {
-            if(closed){visibilityTimer.Stop();return;}double t=Math.Max(0,Math.Min(1,visibilityWatch.Elapsed.TotalMilliseconds/revealDuration)),ease=1-Math.Pow(1-t,3);reveal=revealFrom+(revealTarget-revealFrom)*ease;ApplyReveal();if(t<1)return;
+            if(closed){visibilityTimer.Stop();return;}double t=Math.Max(0,Math.Min(1,visibilityWatch.Elapsed.TotalMilliseconds/revealDuration)),ease=SpringEase.Out(t);reveal=revealFrom+(revealTarget-revealFrom)*ease;ApplyReveal();if(t<1)return;
             visibilityTimer.Stop();if(!visible){foreach(var w in new[]{Start,Apps,Status})w.HideImmediately();RefreshMedia();if(revealEdge!=null&&!fullScreen&&autoHide)revealEdge.Show(true);}else{foreach(var w in new[]{Start,Apps,Status})w.Surface.IsHitTestVisible=true;QueueHide();}
         }
         bool InUse()

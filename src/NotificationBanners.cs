@@ -172,7 +172,7 @@ namespace OneTaskBar
         }
         void Frame()
         {
-            double t=Math.Min(1,motionWatch.Elapsed.TotalMilliseconds/(to==1?280:160)),ease=1-Math.Pow(1-t,3);progress=from+(to-from)*ease;Position();if(t>=1){motion.Stop();motionWatch.Stop();completion.TrySetResult(true);}
+            double t=Math.Min(1,motionWatch.Elapsed.TotalMilliseconds/(to==1?280:160)),ease=SpringEase.Out(t);progress=from+(to-from)*ease;Position();if(t>=1){motion.Stop();motionWatch.Stop();completion.TrySetResult(true);}
         }
         void Position(){Opacity=progress;Native.BlurOpacity(this,progress);Native.Place(this,monitor,bounds.X+(1-progress)*8,bounds.Y,bounds.Width,bounds.Height);}
         internal void Update(NotificationEntry entry)

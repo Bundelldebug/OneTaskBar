@@ -102,7 +102,7 @@ namespace OneTaskBar
             watts.PreviewTextInput+=(s,e)=>e.Handled=e.Text.Any(c=>c<'0'||c>'9');
             DataObject.AddPastingHandler(watts,(s,e)=> {string value=e.DataObject.GetData(typeof(string)) as string;int number;if(String.IsNullOrEmpty(value)||value.Length>4||!Int32.TryParse(value,out number)||number<0||number>9999)e.CancelCommand();});
             watts.TextChanged+=(s,e)=> {int number;if(Int32.TryParse(watts.Text,out number)&&number>=0&&number<=9999&&Preferences.Current.DesktopPowerWatts!=number)Preferences.Set(p=>p.DesktopPowerWatts=number);};watts.LostKeyboardFocus+=(s,e)=>watts.Text=PowerDisplay.Clamp(Preferences.Current.DesktopPowerWatts).ToString();Grid.SetColumn(watts,1);powerRow.Children.Add(watts);hardware.Children.Add(powerRow);Group(groups,"PC 호환성",hardware);
-            var appearance=new StackPanel();ThemeSetting(appearance);Row(appearance,"동적 블러","배경의 창과 화면 색을 캡슐에 반영합니다",Preferences.Current.Blur,v=>Preferences.Set(p=>p.Blur=v));
+            var appearance=new StackPanel();ThemeSetting(appearance);Row(appearance,"동적 블러","배경의 창과 화면 색을 캡슐에 반영합니다",Preferences.Current.Blur,v=>Preferences.Set(p=>p.Blur=v));Row(appearance,"리퀴드 글래스","실시간 블러에 채도를 더하고 틴트를 얇게 해 배경이 더 투명하게 비치는 재질입니다. UI 9.5와 동적 블러가 켜져 있어야 하며 기본은 꺼짐입니다",Preferences.Current.LiquidGlass,v=>Preferences.Set(p=>p.LiquidGlass=v));
             AppIconSetting(appearance);
             Row(appearance,"듀오 스타일 상태 아이콘","배터리 원 게이지 · Wi-Fi · 음량 네 점을 하나로 표시합니다",Preferences.Current.DuoStatusIcon,v=>Preferences.Set(p=>p.DuoStatusIcon=v));
             StatusItemsSetting(appearance);

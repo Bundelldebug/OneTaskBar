@@ -56,6 +56,7 @@ namespace OneTaskBar
         public int WidgetOpacity=100;
         public int WidgetBlur=0;
         public bool WidgetGlass=true;
+        public bool LiquidGlass=false;
         public bool WidgetsSeeded=false;
         public bool DesktopMenuEntry=true;
         public bool FullscreenWidgets=true;

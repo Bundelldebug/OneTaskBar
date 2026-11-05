@@ -169,7 +169,7 @@ namespace OneTaskBar
         }
         void PlacePreviews(double progress)
         {
-            double eased=1-Math.Pow(1-progress,3);
+            double eased=SpringEase.Out(progress);
             double opacity=leaving?transitionFrom*(1-eased):transitionFrom+(1-transitionFrom)*eased;
             foreach(var preview in previews)
             {

@@ -79,7 +79,8 @@ namespace OneTaskBar
         SpriteVisual blur;
         CompositionBrush originalBackdrop;
         CompositionEffectBrush customBlur;
-        double customRadius=-1;
+        double customRadius=-1,customSaturation=1;
+        bool customVivid;
         bool customBlurUnavailable;
         CompositionRoundedRectangleGeometry shape;
         double backdropScale=1;
@@ -156,20 +157,28 @@ namespace OneTaskBar
         internal double Opacity {get{return root!=null?root.Opacity:0;}}
         internal void Enable(bool value){enabled=value;ApplyOpacity();}
         internal void SetOpacity(double value){opacity=Math.Max(0,Math.Min(1,value));ApplyOpacity();}
-        internal void SetBlurRadius(double value)
+        internal void SetBlurRadius(double value){SetBlurRadius(value,1);}
+        // saturation above 1 adds the vivid lift of the liquid material; changing only the radius or the
+        // saturation updates the running effect and never rebuilds it.
+        internal void SetBlurRadius(double value,double saturation)
         {
-            if(blur==null||value==customRadius)return;
-            customRadius=value;
+            bool vivid=saturation>1.001;
+            if(blur==null||(value==customRadius&&vivid==customVivid&&(!vivid||saturation==customSaturation)))return;
             if(value<0){
+                customRadius=value;
                 if(originalBackdrop!=null)blur.Brush=originalBackdrop;
                 if(customBlur!=null){customBlur.Dispose();customBlur=null;}
                 return;
             }
+            customRadius=value;
             if(customBlurUnavailable)return;
             try{
                 if(originalBackdrop==null)originalBackdrop=blur.Brush;
-                if(customBlur==null)customBlur=CompositionBlur.Create(compositor,originalBackdrop);
+                if(customBlur!=null&&vivid!=customVivid){customBlur.Dispose();customBlur=null;}
+                if(customBlur==null)customBlur=vivid?CompositionBlur.CreateVivid(compositor,originalBackdrop):CompositionBlur.Create(compositor,originalBackdrop);
+                customVivid=vivid;customSaturation=saturation;
                 customBlur.Properties.InsertScalar("SurfaceBlur.BlurAmount",(float)Math.Max(0,Math.Min(40,value)));
+                if(vivid)customBlur.Properties.InsertScalar("Vivid.Saturation",(float)Math.Min(3,saturation));
                 blur.Brush=customBlur;
             }catch(Exception error){
                 blur.Brush=originalBackdrop;

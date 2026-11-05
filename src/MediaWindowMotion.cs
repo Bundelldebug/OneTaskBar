@@ -363,7 +363,7 @@ namespace OneTaskBar
             placing=true;
             try
             {
-                double t=1-Math.Pow(1-progress,3);
+                double t=SpringEase.Out(progress);
                 var bounds=Interpolate(from,to,t);
                 preview.SetPreviewOpacity(restore?(byte)255:(byte)Math.Max(0,255*(1-Math.Pow(progress,5))));
                 preview.PlacePixels((int)bounds.X,(int)bounds.Y,Math.Max(1,(int)bounds.Width),Math.Max(1,(int)bounds.Height));
