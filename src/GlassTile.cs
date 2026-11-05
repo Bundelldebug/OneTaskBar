@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -10,6 +10,17 @@ namespace OneTaskBar
         static readonly Brush lightRim=Rim(false),darkRim=Rim(true),lightDepth=Depth(false),darkDepth=Depth(true);
         static readonly Pen lightStrong=FrozenPen(lightRim,.85),darkStrong=FrozenPen(darkRim,.85),lightSoft=FrozenPen(lightRim,.65),darkSoft=FrozenPen(darkRim,.65);
         static Pen FrozenPen(Brush brush,double width){var pen=new Pen(brush,width);pen.Freeze();return pen;}
+        // Liquid glass catches the light on its upper face. A second painted ring inside the rim read as a gray
+        // double outline, so only the sheen is added to the single specular rim.
+        static readonly Brush lightSheen=Sheen(false),darkSheen=Sheen(true);
+        // A soft sheen across the upper part, where the surface faces the light most directly.
+        static Brush Sheen(bool dark)
+        {
+            var brush=new LinearGradientBrush {StartPoint=new Point(0,0),EndPoint=new Point(0,1)};
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(dark?(byte)26:(byte)40,255,255,255),0));
+            brush.GradientStops.Add(new GradientStop(Colors.Transparent,1));
+            brush.Freeze();return brush;
+        }
         static Brush Rim(bool dark)
         {
             var brush=new LinearGradientBrush {StartPoint=new Point(.18,0),EndPoint=new Point(.78,1)};
@@ -27,7 +38,12 @@ namespace OneTaskBar
             if(!Glass95.Transparent||width<3||height<3)return;bool dark=darkOverride??Glass95.Dark;var box=new Rect(.65,.65,width-1.3,height-1.3);var clip=new RectangleGeometry(box,radius,radius);dc.PushClip(clip);dc.DrawRectangle(dark?darkDepth:lightDepth,null,box);
             // Optical depth comes from the live contour sampler. A second broad
             // painted stroke produces a gray double outline instead of glass.
-            dc.DrawRoundedRectangle(null,dark?(strong?darkStrong:darkSoft):(strong?lightStrong:lightSoft),box,radius,radius);dc.Pop();
+            dc.DrawRoundedRectangle(null,dark?(strong?darkStrong:darkSoft):(strong?lightStrong:lightSoft),box,radius,radius);
+            if(strong&&width>24&&height>24)
+            {
+                dc.DrawRectangle(dark?darkSheen:lightSheen,null,new Rect(box.X,box.Y,box.Width,Math.Min(box.Height*.42,radius*1.6+10)));
+            }
+            dc.Pop();
         }
     }
     internal sealed class GlassTileBorder : Border

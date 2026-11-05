@@ -33,6 +33,15 @@ namespace OneTaskBar
                 var decoded=TrayIcons.Decode(stream.ToArray()) as BitmapSource;
                 Require(decoded!=null&&decoded.PixelWidth==16,"decoding does not disguise upscaling as a higher resolution original");
             }
+            foreach(double scale in new[]{1.0,1.25,1.5,1.75,2.0,2.5})
+            {
+                double snapped=TrayIconVisual.Snap(26,scale)*scale;
+                Require(Math.Abs(snapped-Math.Round(snapped))<1e-9,"the tray picture covers whole pixels at "+scale+"x");
+            }
+            var largeArt=Icon(256,Brushes.Red);
+            var snapshot=Icon(20,Brushes.Red);
+            var improved=TrayIcons.ImproveResolution(snapshot,largeArt) as BitmapSource;
+            Require(improved!=null&&improved.PixelWidth>=96,"a matching large program picture replaces a 20 pixel snapshot");
             var drawing=new DrawingVisual();
             using(var dc=drawing.RenderOpen())
             {
@@ -47,6 +56,19 @@ namespace OneTaskBar
             var rendered=new RenderTargetBitmap(26,26,96,96,PixelFormats.Pbgra32);rendered.Render(mono);
             var center=new byte[4];rendered.CopyPixels(new Int32Rect(13,13,1,1),center,4,0);
             Require(mono.Monochrome&&center[0]>230&&center[1]>230&&center[2]>230,"a black monochrome icon renders with the selected popup ink");
+            // A smooth ring on a flat tray color keeps its soft edge instead of a stair-stepped cut.
+            var ringDrawing=new DrawingVisual();
+            using(var dc=ringDrawing.RenderOpen())
+            {
+                dc.DrawRectangle(new SolidColorBrush(Color.FromRgb(32,32,36)),null,new Rect(0,0,48,48));
+                dc.DrawEllipse(null,new Pen(Brushes.White,5),new Point(24,24),14,14);
+            }
+            var ringImage=new RenderTargetBitmap(48,48,96,96,PixelFormats.Pbgra32);ringImage.Render(ringDrawing);ringImage.Freeze();
+            byte[] ringBytes;Color ringMatte;
+            var extracted=TrayIconPixels.Extract(TrayFrame.For(ringImage,new Rect(0,0,48,48)),new Rect(0,0,48,48),out ringBytes,out ringMatte);
+            int soft=0,solid=0;
+            for(int i=3;i<ringBytes.Length;i+=4){if(ringBytes[i]>20&&ringBytes[i]<235)soft++;else if(ringBytes[i]>=235)solid++;}
+            Require(extracted!=null&&soft>=40&&solid>=40,"tray icon edges keep a soft transparency: "+soft+" soft and "+solid+" solid pixels");
         }
         static BitmapSource Icon(int size,Brush color,bool badge=false)
         {

@@ -33,13 +33,13 @@ namespace OneTaskBar
             DockPanel.SetDock(status,Dock.Top);root.Children.Add(status);
             var groups=new StackPanel();
             Group(groups,"UI 버전",VersionSetting());
-            var desktopRows=new StackPanel();desktop=Row(desktopRows,"Windows 작업표시줄 대체","기본 작업표시줄과 전환합니다",shell.Desktop,v=> {shell.SetDesktop(v,true);Show();Activate();});
+            var desktopRows=new StackPanel();SubHeading(desktopRows,"작업표시줄 동작");desktop=Row(desktopRows,"Windows 작업표시줄 대체","기본 작업표시줄과 전환합니다",shell.Desktop,v=> {shell.SetDesktop(v,true);Show();Activate();});
             autoHide=Row(desktopRows,"작업표시줄 자동 숨기기","선택한 화면 가장자리에 커서를 대면 다시 표시합니다",shell.Demo?shell.DockAutoHide:Native.TaskbarAutoHide(),v=>shell.SetAutoHide(v));
             Row(desktopRows,"최대화 창을 작업표시줄 뒤까지 확장","최대화한 앱이 화면 가장자리까지 채우고 작업표시줄이 그 위에 표시됩니다",Preferences.Current.MaximizedBehindDock,v=>Preferences.Set(p=>p.MaximizedBehindDock=v));
             Row(desktopRows,"앱 드래그로 분할·팝업 열기","독의 앱을 화면 가장자리로 끌면 분할, 중앙으로 끌면 팝업으로 엽니다. 독 안에서는 순서를 바꿉니다",Preferences.Current.DockWindowDrop,v=>Preferences.Set(p=>p.DockWindowDrop=v));
             Row(desktopRows,"작업표시줄 단색 배경","하단 작업표시줄을 블러 없는 회색 단색으로 표시합니다",Preferences.Current.DockSolidBackground,v=>Preferences.Set(p=>{p.DockSolidBackground=v;p.DockBackgroundKind=v?1:0;}));
             startup=Row(desktopRows,"로그인 시 자동 시작","현재 사용자 로그인 작업으로 지연 없이 실행합니다",StartupPreference.Enabled,v=> {try{StartupPreference.Set(v);status.Text=v?"로그인 자동 시작을 켰습니다":"로그인 자동 시작을 껐습니다";}catch(Exception e){status.Text="자동 시작 설정을 저장하지 못했습니다: "+e.Message;if(startup!=null)startup.Refresh(StartupPreference.Enabled);}});
-            PersonalizeDock(desktopRows);Group(groups,"데스크톱",desktopRows);
+            SubHeading(desktopRows,"작업표시줄 모양");PersonalizeDock(desktopRows);Group(groups,"데스크톱",desktopRows);
             Group(groups,"바탕화면 위젯",DesktopWidgetSettings(shell));
             var panels=new StackPanel();
             ChoiceRow(panels,"알림센터","시계와 알림 버튼에서 열 화면",Preferences.Current.NativeNotifications,v=>Preferences.Set(p=>p.NativeNotifications=v));
@@ -67,7 +67,7 @@ namespace OneTaskBar
             });
             MaterialSetting(launcher,false);
             Group(groups,"시작과 검색",launcher);
-            var nowBar=new StackPanel();
+            var nowBar=new StackPanel();SubHeading(nowBar,"작업표시줄 미디어 캡슐");
             Row(nowBar,"작업표시줄 미디어 캡슐 표시","작업표시줄 옆에 재생 중인 미디어를 표시합니다",
                 Preferences.Current.ShowNowBar,v=>Preferences.Set(p=>p.ShowNowBar=v));
             ChoiceRow(nowBar,"미디어 플레이어 펼침 스타일","큰 커버는 앨범 이미지를 위로 펼쳐 표시합니다",
@@ -83,6 +83,7 @@ namespace OneTaskBar
                     Preferences.Current.MediaWindowAnimation,v=>Preferences.Set(p=>p.MediaWindowAnimation=v));
                 Row(nowBar,"측면 미디어 세로 캡슐","왼쪽·오른쪽 작업표시줄에서 커버와 재생 표시를 세로로 배치합니다",
                     Preferences.Current.NowBarSideCapsule,v=>Preferences.Set(p=>p.NowBarSideCapsule=v));
+                SubHeading(nowBar,"전체화면 미디어");
                 var fullscreen=Paint.Action("전체화면 미디어 열기",shell.OpenFullscreenMedia);
                 fullscreen.Margin=new Thickness(15,8,15,12);
                 nowBar.Children.Add(fullscreen);
@@ -125,7 +126,7 @@ namespace OneTaskBar
         static void ChoiceRow(StackPanel parent,string title,string description,bool native,Action<bool> changed,string customLabel="One TaskBar",string windowsLabel="Windows 기본")
         {
             var row=new Grid {Margin=new Thickness(15,13,15,13),MinHeight=54};row.ColumnDefinitions.Add(new ColumnDefinition());row.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(218)});
-            var labels=new StackPanel {VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,16,0)};var heading=Paint.TextBlock(title,15,AppSettingsPalette.Text);heading.FontWeight=FontWeights.SemiBold;heading.TextWrapping=TextWrapping.Wrap;labels.Children.Add(heading);var detail=Paint.TextBlock(description,12.5,AppSettingsPalette.Muted);detail.TextWrapping=TextWrapping.Wrap;detail.LineHeight=18;detail.Margin=new Thickness(0,5,0,0);labels.Children.Add(detail);row.Children.Add(labels);
+            var labels=new StackPanel {VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,16,0)};var heading=Paint.TextBlock(title,15,AppSettingsPalette.Text);heading.FontWeight=FontWeights.SemiBold;heading.TextWrapping=TextWrapping.Wrap;labels.Children.Add(heading);var detail=Paint.TextBlock(description,13,AppSettingsPalette.Muted);detail.TextWrapping=TextWrapping.Wrap;detail.LineHeight=19;detail.Margin=new Thickness(0,5,0,0);labels.Children.Add(detail);row.Children.Add(labels);
             var options=new System.Windows.Controls.Primitives.UniformGrid {Columns=2};Button custom=null,windows=null;
             Action refresh=()=> {custom.Background=!native?AppSettingsPalette.Accent:Brushes.Transparent;windows.Background=native?AppSettingsPalette.Accent:Brushes.Transparent;custom.Foreground=!native?Paint.ControlWhite:AppSettingsPalette.Text;windows.Foreground=native?Paint.ControlWhite:AppSettingsPalette.Text;((TextBlock)custom.Content).Foreground=custom.Foreground;((TextBlock)windows.Content).Foreground=windows.Foreground;};
             custom=Paint.Action(customLabel,()=> {if(!native)return;native=false;refresh();changed(false);});windows=Paint.Action(windowsLabel,()=> {if(native)return;native=true;refresh();changed(true);});
@@ -133,10 +134,19 @@ namespace OneTaskBar
             var frame=new Border {CornerRadius=new CornerRadius(22),Padding=new Thickness(2),Background=AppSettingsPalette.Card,Child=options,VerticalAlignment=VerticalAlignment.Center};Grid.SetColumn(frame,1);row.Children.Add(frame);parent.Children.Add(row);
         }
         internal void Feedback(string message) {status.Text=message;}
+        // A small label that starts a group of rows inside a long page.
+        internal static void SubHeading(StackPanel parent,string text)
+        {
+            var label=Paint.TextBlock(text,13,AppSettingsPalette.Accent);
+            label.FontWeight=FontWeights.SemiBold;
+            label.Tag="sub";
+            label.Margin=new Thickness(17,parent.Children.Count==0?14:18,17,2);
+            parent.Children.Add(label);
+        }
         static ToggleSwitch Row(StackPanel parent,string title,string description,bool value,Action<bool> changed)
         {
             var grid=new Grid {Margin=new Thickness(15,13,15,13),MinHeight=52};grid.ColumnDefinitions.Add(new ColumnDefinition());grid.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(58)});
-            var labels=new StackPanel {VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,18,0)};var heading=Paint.TextBlock(title,15,AppSettingsPalette.Text);heading.FontWeight=FontWeights.SemiBold;heading.TextWrapping=TextWrapping.Wrap;labels.Children.Add(heading);var detail=Paint.TextBlock(description,12.5,AppSettingsPalette.Muted);detail.Margin=new Thickness(0,5,0,0);detail.LineHeight=18;detail.TextWrapping=TextWrapping.Wrap;labels.Children.Add(detail);grid.Children.Add(labels);
+            var labels=new StackPanel {VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,18,0)};var heading=Paint.TextBlock(title,15,AppSettingsPalette.Text);heading.FontWeight=FontWeights.SemiBold;heading.TextWrapping=TextWrapping.Wrap;labels.Children.Add(heading);var detail=Paint.TextBlock(description,13,AppSettingsPalette.Muted);detail.Margin=new Thickness(0,5,0,0);detail.LineHeight=19;detail.TextWrapping=TextWrapping.Wrap;labels.Children.Add(detail);grid.Children.Add(labels);
             var toggle=new ToggleSwitch(title,value,changed) {HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Center};Grid.SetColumn(toggle,1);grid.Children.Add(toggle);parent.Children.Add(grid);return toggle;
         }
         internal void UpdateAutoHide(bool value){autoHide.Refresh(value);}
@@ -149,9 +159,9 @@ namespace OneTaskBar
         internal static Brush Card {get{return Paint.Brush(Dark?"#FF1C1D22":"#FFFFFFFF");}}
         internal static Brush Stroke {get{return Paint.Brush(Dark?"#FF36373D":"#FFE2E2E6");}}
         internal static Brush Text {get{return Paint.Brush(Dark?"#FFF6F6F8":"#FF161619");}}
-        internal static Brush Muted {get{return Paint.Brush(Dark?"#FFABABB5":"#FF73737D");}}
+        internal static Brush Muted {get{return Paint.Brush(Dark?"#FFC4C4CD":"#FF5A5A64");}}
         internal static Brush Accent {get{return Paint.Brush("#FF3478FD");}}
         internal static Brush AccentLight {get{return Paint.Brush(Dark?"#FF30333D":"#FFE9EDF5");}}
-        internal static void Apply(DependencyObject root){var text=root as TextBlock;if(text!=null){if(text.Foreground==Paint.Text||text.Foreground==Paint.Ink)text.Foreground=Text;else if(text.Foreground==Paint.Muted||text.Foreground==LightPanel.Muted)text.Foreground=Muted;if(text.FontSize<12.5)text.FontSize=12.5;}var control=root as Control;if(control!=null&&(control.Foreground==Paint.Text||control.Foreground==Paint.Ink))control.Foreground=Text;var glyph=root as Glyph;if(glyph!=null&&(glyph.Color==Paint.Text||glyph.Color==Paint.Ink))glyph.Color=Text;foreach(object child in LogicalTreeHelper.GetChildren(root)){var node=child as DependencyObject;if(node!=null)Apply(node);}}
+        internal static void Apply(DependencyObject root){var text=root as TextBlock;if(text!=null){if(text.Foreground==Paint.Text||text.Foreground==Paint.Ink)text.Foreground=Text;else if(text.Foreground==Paint.Muted||text.Foreground==LightPanel.Muted)text.Foreground=Muted;if(text.FontSize<13)text.FontSize=13;}var control=root as Control;if(control!=null&&(control.Foreground==Paint.Text||control.Foreground==Paint.Ink))control.Foreground=Text;var glyph=root as Glyph;if(glyph!=null&&(glyph.Color==Paint.Text||glyph.Color==Paint.Ink))glyph.Color=Text;foreach(object child in LogicalTreeHelper.GetChildren(root)){var node=child as DependencyObject;if(node!=null)Apply(node);}}
     }
 }

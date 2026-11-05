@@ -79,12 +79,12 @@ namespace OneTaskBar
                     var decoder=BitmapDecoder.Create(stream,BitmapCreateOptions.PreservePixelFormat,BitmapCacheOption.OnLoad);
                     BitmapSource image=decoder.Frames.OrderByDescending(frame=>(long)frame.PixelWidth*frame.PixelHeight).FirstOrDefault();
                     if(image==null||image.PixelWidth>4096||image.PixelHeight>4096)return null;
-                    return CopyPixels(image,64);
+                    return CopyPixels(image,128);
                 }
             }
             catch{return null;}
         }
-        internal static BitmapSource CopyPixels(BitmapSource image,int limit=96)
+        internal static BitmapSource CopyPixels(BitmapSource image,int limit=128)
         {
             if(image==null||image.PixelWidth<1||image.PixelHeight<1||image.PixelWidth>4096||image.PixelHeight>4096)return null;
             double scale=Math.Min(1,limit/(double)Math.Max(image.PixelWidth,image.PixelHeight));
@@ -157,7 +157,13 @@ namespace OneTaskBar
                     ImageSource image=match==null?null:Decode(match.Image);
                     if(image==null&&match!=null&&File.Exists(match.Path))image=Native.AppIcon(match.Path);
                     var bitmap=image as BitmapSource;
-                    if(apps!=null&&(image==null||(bitmap!=null&&Math.Max(bitmap.PixelWidth,bitmap.PixelHeight)<48))){
+                    // The shell's own large picture of the program is the sharpest source. It replaces a small snapshot
+                    // only when its outline and colors match, so a status icon is never swapped for the logo.
+                    if(match!=null&&File.Exists(match.Path)&&(bitmap==null||Math.Max(bitmap.PixelWidth,bitmap.PixelHeight)<128)){
+                        var large=Native.AppIcon(match.Path);
+                        if(large!=null){image=ImproveResolution(image,large);bitmap=image as BitmapSource;}
+                    }
+                    if(apps!=null&&(image==null||(bitmap!=null&&Math.Max(bitmap.PixelWidth,bitmap.PixelHeight)<96))){
                         var app=apps.OrderByDescending(a=>LabelScore(normalized,a.Name)).FirstOrDefault();
                         if(app!=null&&LabelScore(normalized,app.Name)>0)image=ImproveResolution(image,AppIcons.Get(app));
                     }

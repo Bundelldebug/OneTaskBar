@@ -16,7 +16,7 @@ namespace OneTaskBar
         internal bool LightPlate {get{return plate;}}
         internal TrayIconVisual(ImageSource image,Brush foreground=null)
         {
-            source=image;ink=foreground??Paint.Text;Width=Height=26;IsHitTestVisible=false;
+            source=image;ink=foreground??Paint.Text;Width=Height=26;IsHitTestVisible=false;SnapsToDevicePixels=true;UseLayoutRounding=true;
             RenderOptions.SetBitmapScalingMode(this,BitmapScalingMode.HighQuality);
             var bitmap=image as BitmapSource;
             if(bitmap!=null&&IsMonochrome(bitmap)){
@@ -59,9 +59,12 @@ namespace OneTaskBar
             }
             return visible>0&&opaque>0&&visible<image.PixelWidth*image.PixelHeight*.97&&colored<=visible/100&&maximum-minimum<=24;
         }
+        // A picture placed on a fraction of a pixel is blended with its neighbors and looks soft.
+        internal static double Snap(double size,double scale){return scale<=0?size:Math.Max(1,Math.Round(size*scale))/scale;}
         protected override void OnRender(DrawingContext dc)
         {
-            var bounds=new Rect(0,0,ActualWidth,ActualHeight);
+            var dpi=VisualTreeHelper.GetDpi(this);
+            var bounds=new Rect(0,0,Snap(ActualWidth,dpi.DpiScaleX),Snap(ActualHeight,dpi.DpiScaleY));
             if(mask==null)
             {
                 if(plate)

@@ -51,7 +51,7 @@ namespace OneTaskBar
             var number=Paint.TextBlock(initial+unit,13,AppSettingsPalette.Muted);
             DockPanel.SetDock(number,Dock.Right);heading.Children.Add(number);
             heading.Children.Add(Paint.TextBlock(name,14,AppSettingsPalette.Text));row.Children.Add(heading);
-            var slider=new Slider {Minimum=0,Maximum=maximum,Value=initial,TickFrequency=1,IsSnapToTickEnabled=true,Margin=new Thickness(0,10,0,0)};
+            var slider=new Slider {Minimum=0,Maximum=maximum,Value=initial,TickFrequency=1,IsSnapToTickEnabled=true,Margin=new Thickness(0,12,0,2)};
             AutomationProperties.SetName(slider,name);
             int saved=initial;
             Action save=()=>{int value=(int)Math.Round(slider.Value);if(value==saved)return;saved=value;commit(value);};
@@ -59,7 +59,7 @@ namespace OneTaskBar
             slider.PreviewMouseLeftButtonUp+=(s,e)=>save();slider.LostMouseCapture+=(s,e)=>save();slider.KeyUp+=(s,e)=>save();
             // Resetting values does not emit a preference write during teardown.
             slider.ValueChanged+=(s,e)=>{if(!parent.IsEnabled)saved=(int)Math.Round(slider.Value);};
-            row.Children.Add(slider);parent.Children.Add(row);return slider;
+            row.Children.Add(SettingsSliderStyle.WithSymbol(slider,SettingsSliderStyle.SymbolFor(name)));parent.Children.Add(row);return slider;
         }
     }
 }

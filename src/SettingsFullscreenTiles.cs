@@ -9,16 +9,34 @@ namespace OneTaskBar
     {
         void FullscreenTileSettings(StackPanel rows)
         {
+            SubHeading(rows,"접힌 화면 위젯");
             Row(rows,"접힌 화면 위젯","전체화면 미디어를 접으면 시간 아래에 위젯을 표시합니다",Preferences.Current.FullscreenWidgets,v=>Preferences.SetMediaAppearance(p=>p.FullscreenWidgets=v));
-            foreach(var family in InfoTileCatalog.Families)TileSizePicker(rows,family);
+            var hint=Paint.TextBlock("위젯은 접힌 화면에서 우클릭하거나 길게 누르면 그 자리에서 바로 편집됩니다. 끌어서 옮기고, 아래 막대로 크기를 바꾸거나 추가·제거할 수 있습니다. 왼쪽·오른쪽 아래 앱은 버튼을 눌러 선택하고 우클릭으로 바꿉니다.",13,AppSettingsPalette.Muted);
+            hint.TextWrapping=TextWrapping.Wrap;
+            hint.LineHeight=19;
+            hint.Margin=new Thickness(17,10,17,10);
+            rows.Children.Add(hint);
+            // Sizes are chosen on the screen itself; this list stays for anyone who prefers it.
+            var sizes=new StackPanel {Visibility=Visibility.Collapsed};
+            foreach(var family in InfoTileCatalog.Families)TileSizePicker(sizes,family);
+            var toggle=Paint.Action("위젯별 크기를 목록에서 고르기",()=>{});
+            toggle.HorizontalAlignment=HorizontalAlignment.Left;
+            toggle.Margin=new Thickness(12,0,12,10);
+            var label=(TextBlock)toggle.Content;
+            toggle.Click+=(s,e)=>
+            {
+                bool show=sizes.Visibility!=Visibility.Visible;
+                sizes.Visibility=show?Visibility.Visible:Visibility.Collapsed;
+                label.Text=show?"위젯별 크기 목록 접기":"위젯별 크기를 목록에서 고르기";
+            };
+            rows.Children.Add(toggle);
+            rows.Children.Add(sizes);
+            SubHeading(rows,"빠른 실행 버튼");
             ActionPicker(rows,"첫 번째 빠른 실행 버튼",0);
             ActionPicker(rows,"두 번째 빠른 실행 버튼",1);
+            SubHeading(rows,"시계와 날씨");
             ZonePicker(rows);
             WeatherPlaceRow(rows);
-            var hint=Paint.TextBlock("접힌 화면의 위젯을 우클릭하거나 길게 누르면 그 자리에서 바로 편집됩니다. 끌어서 옮기고, 아래 막대로 크기를 바꾸거나 추가·제거할 수 있습니다. 왼쪽·오른쪽 아래 앱은 버튼을 눌러 선택하고 우클릭으로 바꿉니다.",12,Paint.Muted);
-            hint.TextWrapping=TextWrapping.Wrap;
-            hint.Margin=new Thickness(15,8,15,12);
-            rows.Children.Add(hint);
         }
         static ComboBox Picker(StackPanel rows,string title)
         {

@@ -16,6 +16,11 @@ namespace OneTaskBar
         internal readonly BitmapSource Image;
         internal readonly Rect Bounds;
 
+        internal static TrayFrame For(BitmapSource image, Rect bounds)
+        {
+            return new TrayFrame(image, new Native.RectI {Left=(int)bounds.Left,Top=(int)bounds.Top,Right=(int)bounds.Right,Bottom=(int)bounds.Bottom});
+        }
+
         TrayFrame(BitmapSource image, Native.RectI bounds)
         {
             Image = image;

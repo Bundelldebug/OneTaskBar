@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -62,7 +62,7 @@ namespace OneTaskBar
         static Border SettingSeparator(){return new Border {Height=.6,Background=AppSettingsPalette.Stroke,Margin=new Thickness(16,0,16,0),IsHitTestVisible=false};}
         Border SettingsCard(UIElement content,bool separators=true)
         {
-            var stack=content as StackPanel;if(separators&&stack!=null)for(int i=stack.Children.Count-1;i>0;i--)stack.Children.Insert(i,SettingSeparator());
+            var stack=content as StackPanel;if(separators&&stack!=null)for(int i=stack.Children.Count-1;i>0;i--){var before=stack.Children[i-1] as TextBlock;if(before!=null&&"sub".Equals(before.Tag))continue;stack.Children.Insert(i,SettingSeparator());}
             AppSettingsPalette.Apply(content);return new Border {Background=AppSettingsPalette.Card,CornerRadius=new CornerRadius(24),Padding=new Thickness(3),Child=content,Margin=new Thickness(0,0,0,16)};
         }
         void Group(StackPanel target,string label,UIElement content)

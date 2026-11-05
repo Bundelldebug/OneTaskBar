@@ -39,7 +39,7 @@ namespace OneTaskBar
             slider.PreviewMouseLeftButtonUp+=(s,e)=>commit();
             slider.LostMouseCapture+=(s,e)=>commit();
             slider.KeyUp+=(s,e)=>commit();
-            group.Children.Add(slider);rows.Children.Add(group);
+            group.Children.Add(SettingsSliderStyle.WithSymbol(slider,"desktops"));rows.Children.Add(group);
         }
     }
 }

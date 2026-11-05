@@ -134,7 +134,15 @@ namespace OneTaskBar
             defocused.Source=MediaFlightBackdrop.Blur(occlusion.Source as BitmapSource,host.Width/dpi);
             // Never bake a stationary copy of the dock into its receiving
             // animation. Cover only the native window that is being restored.
-            var visible=Rect.Intersect(sourceBounds,host);
+            // The restoring window also draws a shadow and a thin frame outside its rectangle. Cover those too,
+            // so no outline shows where the window will appear. The taskbar area is left alone.
+            double margin=Math.Ceiling(40*dpi);
+            var visible=new Rect(sourceBounds.X-margin,sourceBounds.Y-margin,sourceBounds.Width+margin*2,sourceBounds.Height+margin*2);
+            visible.Intersect(host);
+            var work=System.Windows.Forms.Screen.FromPoint(new System.Drawing.Point((int)(sourceBounds.X+sourceBounds.Width/2),(int)(sourceBounds.Y+sourceBounds.Height/2))).WorkingArea;
+            var allowed=new Rect(work.X,work.Y,work.Width,work.Height);
+            if(!visible.IsEmpty&&!allowed.IsEmpty)visible.Intersect(allowed);
+            if(visible.IsEmpty)visible=Rect.Intersect(sourceBounds,host);
             var clip=new RectangleGeometry(new Rect((visible.X-host.X)/dpi,(visible.Y-host.Y)/dpi,
                 visible.Width/dpi,visible.Height/dpi));
             clip.Freeze();
