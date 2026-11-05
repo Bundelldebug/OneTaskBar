@@ -25,7 +25,7 @@ namespace OneTaskBar
                 var pin=new MenuItem {Header=shell.Pins.Any(a=>Catalog.Same(a,entry))?"독에서 고정 해제":"독에 고정",Icon=new Glyph("pin",18){Color=Paint.Ink}};pin.Click+=(s,e)=>shell.Pin(entry,!shell.Pins.Any(a=>Catalog.Same(a,entry)));menu.Items.Add(pin);
                 menu.Opened+=(s,e)=> {startPin.Header=shell.StartPins.Contains(entry)?"시작 화면에서 고정 해제":"시작 화면에 고정";pin.Header=shell.Pins.Any(a=>Catalog.Same(a,entry))?"독에서 고정 해제":"독에 고정";};
                 var taskManager=new MenuItem {Header="작업 관리자 열기",Icon=new Glyph("window",18){Color=Paint.Ink}};taskManager.Click+=(s,e)=>shell.OpenTaskManager();menu.Items.Add(taskManager);
-                if(entry.Windows.Count>0) {var close=new MenuItem {Header="창 닫기",Foreground=Paint.Brush("#FF9A3025"),Icon=new Glyph("close",18) {Color=Paint.Brush("#FF9A3025")}};close.Click+=(s,e)=> {foreach(var h in entry.Windows) Native.PostMessage(h,0x10,IntPtr.Zero,IntPtr.Zero);};menu.Items.Add(close);}
+                if(entry.Windows.Count>0) {var close=new MenuItem {Header="창 닫기",Foreground=Paint.Brush("#FF9A3025"),Icon=new Glyph("close",18) {Color=Paint.Brush("#FF9A3025")}};close.Click+=(s,e)=> {foreach(var h in entry.Windows) ElevatedWindows.Close(h);};menu.Items.Add(close);}
             }
             return menu;
         }

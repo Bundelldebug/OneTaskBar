@@ -27,8 +27,32 @@ namespace OneTaskBar
             return screens.Where(screen=>names.Contains(screen.DeviceName,StringComparer.OrdinalIgnoreCase)).ToArray();
         }
 
+        // Off by default. On a non-primary monitor this leaves only apps with a window on that monitor.
+        internal static System.Collections.Generic.List<AppEntry> ForScreen(System.Collections.Generic.List<AppEntry> entries,Forms.Screen screen)
+        {
+            if(!Preferences.Current.SecondaryDockOpenWindowsOnly||screen==null||screen.Primary)return entries;
+            return OpenWindowsOn(entries,window=>String.Equals(Forms.Screen.FromHandle(window).DeviceName,screen.DeviceName,StringComparison.OrdinalIgnoreCase));
+        }
+        internal static System.Collections.Generic.List<AppEntry> OpenWindowsOn(System.Collections.Generic.List<AppEntry> entries,Func<IntPtr,bool> onScreen)
+        {
+            return entries.Where(entry=>entry.Windows.Any(onScreen)).ToList();
+        }
+        // Which monitor each window is on, so moving a window to another monitor refreshes the docks.
+        internal static string Placement(System.Collections.Generic.IEnumerable<AppEntry> entries)
+        {
+            if(!Preferences.Current.SecondaryDockOpenWindowsOnly||Forms.Screen.AllScreens.Length<2)return "";
+            return String.Join("|",entries.SelectMany(entry=>entry.Windows).Select(window=>Forms.Screen.FromHandle(window).DeviceName));
+        }
+
         internal static void Check()
         {
+            var here=new AppEntry {Name="here"};
+            here.Windows.Add(new IntPtr(1));
+            var there=new AppEntry {Name="there"};
+            there.Windows.Add(new IntPtr(2));
+            var pinned=new AppEntry {Name="pinned",Pinned=true};
+            var kept=OpenWindowsOn(new System.Collections.Generic.List<AppEntry>{pinned,here,there},window=>window==new IntPtr(1));
+            if(kept.Count!=1||kept[0]!=here)throw new InvalidOperationException("A secondary dock keeps only apps with a window on its monitor");
             var names=new[]{"display-one","display-two","display-three"};
             if(Resolve(names,names[1],null).Length!=3)throw new InvalidOperationException("Existing display settings must keep all monitors");
             if(Resolve(names,names[1],Primary).Single()!=names[1])throw new InvalidOperationException("Primary display selection must follow Windows");

@@ -354,7 +354,7 @@ namespace OneTaskBar
         {
             if(disposed||iconsBusy||!DesktopWidgetNative.Available(parent))return;
             iconsBusy=true;
-            iconsAt=DateTime.UtcNow.AddSeconds(30);
+            iconsAt=DateTime.UtcNow.AddSeconds(120);
             IntPtr view=parent;
             try
             {

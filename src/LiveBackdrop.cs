@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -40,14 +40,7 @@ namespace OneTaskBar
         double customRadius=-1;
         bool customBlurUnavailable;
         CompositionRoundedRectangleGeometry shape;
-        GlassRefraction refraction;
-        readonly System.Collections.Generic.List<Rect> refractionRegions=new System.Collections.Generic.List<Rect>();
-        readonly System.Collections.Generic.List<Rect> previousRefractionRegions=new System.Collections.Generic.List<Rect>();
-        int refractedWidth,refractedHeight,refractedCorner;
         double backdropScale=1;
-        Rect refractedClip;
-        bool refractionConfigured;
-        bool refractionUnavailable;
         bool motionTransform;
         readonly Window window;
         readonly ContextMenu menu;
@@ -60,15 +53,12 @@ namespace OneTaskBar
         internal bool Realtime {get{return blur!=null&&(blur.Brush is CompositionBackdropBrush||blur.Brush==customBlur);}}
         internal double BlurRadius {get{return customRadius;}}
         internal bool CustomBlurAvailable {get{return customBlur!=null;}}
-        internal int RefractedRegions {get{return refraction==null?0:refraction.Count;}}
-        internal int RefractionLayers {get{return refraction==null?0:refraction.LayerCount;}}
         internal LiveBackdrop(Window window,double radius)
         {
             this.window=window;this.radius=radius;
             try{Initialize(window.Topmost);}catch{Dispose();throw;}
             window.IsVisibleChanged+=(s,e)=>Sync();window.LocationChanged+=(s,e)=>Sync();
             window.Activated+=(s,e)=>Sync(true);
-            window.LayoutUpdated+=RefreshRefraction;
         }
         internal LiveBackdrop(ContextMenu menu,double radius)
         {
@@ -161,51 +151,7 @@ namespace OneTaskBar
             if(clip.HasValue){var boundsClip=Native.InputBounds(clip.Value,scale);if(glass is NowBar&&ReleaseFeatures.GlassUI)boundsClip=new Native.RectI {Right=w,Bottom=h};if(!inputClip.HasValue||!inputClip.Value.Equals(boundsClip)){if(Native.ClipWindow(background,boundsClip))inputClip=boundsClip;}}
             shape.Offset=clip.HasValue?new Vector2((float)(clip.Value.X*scale),(float)(clip.Value.Y*scale)):Vector2.Zero;shape.Size=new Vector2(cw,ch);shape.CornerRadius=new Vector2(Math.Min(c,cw/2f),Math.Min(c,ch/2f));
             Sync();
-            RefreshRefraction(null,EventArgs.Empty);
         }
-        void RefreshRefraction(object sender,EventArgs args)
-        {
-            if(motionTransform)return;
-            var glass=window as GlassWindow;
-            bool active=root!=null&&glass!=null&&glass.IsVisible&&!(glass is DesktopOverview)&&glass.GlassMaterial&&Glass95.Enabled&&Glass95.Transparent&&enabled;
-            if(!active){if(refractionConfigured&&refraction!=null){refraction.Begin();refraction.End();}refractionConfigured=false;return;}
-            if(refractionUnavailable||width<4||height<4)return;
-            var media=glass as NowBar;
-            if(media!=null&&media.GlassMotion)
-            {
-                if(refractionConfigured&&refraction!=null){refraction.Begin();refraction.End();}
-                refractionConfigured=false;
-                return;
-            }
-            double scale=backdropScale;
-            refractionRegions.Clear();
-            var quick=window as QuickWindow;
-            if(quick!=null&&quick.GridUI!=null){
-                foreach(var frame in quick.GridUI.Board.Frames.Values){
-                    var body=frame.Body;
-                    if(!body.IsVisible||body.ActualWidth<4||body.ActualHeight<4)continue;
-                    var point=body.TranslatePoint(new Point(),window);
-                    refractionRegions.Add(new Rect(point.X*scale,point.Y*scale,body.ActualWidth*scale,body.ActualHeight*scale));
-                }
-            }
-            var outer=glass.BackdropClip.HasValue?new Rect(glass.BackdropClip.Value.X*scale,glass.BackdropClip.Value.Y*scale,glass.BackdropClip.Value.Width*scale,glass.BackdropClip.Value.Height*scale):new Rect(0,0,width,height);
-            bool same=refractionConfigured&&refractedClip==outer&&refractedWidth==width&&refractedHeight==height&&refractedCorner==corner&&refractionRegions.Count==previousRefractionRegions.Count;
-            for(int i=0;same&&i<refractionRegions.Count;i++)same=refractionRegions[i]==previousRefractionRegions[i];
-            if(same)return;
-            try {
-                if(refraction==null)refraction=new GlassRefraction(compositor,root,blur);
-                refraction.Begin();
-                refraction.Add((float)outer.X,(float)outer.Y,(float)outer.Width,(float)outer.Height,corner,(float)(1.5*scale));
-                foreach(var region in refractionRegions)refraction.Add((float)region.X,(float)region.Y,(float)region.Width,(float)region.Height,(float)Math.Min(30*scale,Math.Min(region.Width,region.Height)/2),(float)(2.2*scale));
-                refraction.End();refractionConfigured=true;refractedClip=outer;refractedWidth=width;refractedHeight=height;refractedCorner=corner;
-                previousRefractionRegions.Clear();previousRefractionRegions.AddRange(refractionRegions);
-            }catch(Exception error){
-                refractionUnavailable=true;
-                if(refraction!=null){refraction.Dispose();refraction=null;}
-                AppLog.Once("glass-refraction",error.ToString());
-            }
-        }
-        internal void RefreshOptics(){RefreshRefraction(null,EventArgs.Empty);}
         internal void BeginMotionTransform()
         {
             motionTransform=true;
@@ -235,9 +181,7 @@ namespace OneTaskBar
         public void Dispose()
         {
             instances.Remove(this);
-            if(window!=null)window.LayoutUpdated-=RefreshRefraction;
             if(popupTimer!=null)popupTimer.Stop();
-            if(refraction!=null){refraction.Dispose();refraction=null;}
             if(target!=null){target.Root=null;target.Dispose();target=null;}
             if(root!=null)root.Children.RemoveAll();
             if(blur!=null){

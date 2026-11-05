@@ -73,31 +73,29 @@ namespace OneTaskBar
         bool ShouldWatch {get{return !disposed&&shell.Desktop&&shell.DisplayAwake;}}
         internal string ConnectedCaption {get;private set;}
         internal bool HasConnectedBuds {get;private set;}
-        internal Guid? ConnectedBudsContainer
+        // Each connected device once; Windows lists classic and LE endpoints of one device separately.
+        internal List<BluetoothPeer> ConnectedPeers()
         {
-            get
+            var seen=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var peers=new List<BluetoothPeer>();
+            foreach(var device in devices.Values)
             {
-                foreach(var device in devices.Values)
+                var peer=BluetoothPeer.Read(device);
+                if(!peer.Connected)continue;
+                string identity=peer.Container.HasValue?peer.Container.Value.ToString("N"):BudsConnectionTracker.Normalize(peer.Name);
+                if(!seen.Add(identity))
                 {
-                    var peer=BluetoothPeer.Read(device);
-                    if(BudsInfo.IsBuds(device.Name)&&peer.Connected&&peer.Container.HasValue)return peer.Container;
+                    if(!BudsInfo.Battery(device.Properties).HasValue)continue;
+                    peers.RemoveAll(p=>(p.Container.HasValue?p.Container.Value.ToString("N"):BudsConnectionTracker.Normalize(p.Name))==identity);
                 }
-                return null;
+                peers.Add(peer);
             }
+            return peers;
         }
-        internal int? ConnectedBudsBattery
+        internal int? AppBatteryFor(string name,out DateTime at)
         {
-            get
-            {
-                foreach(var device in devices.Values)
-                {
-                    if(!BudsInfo.IsBuds(device.Name)||!BluetoothPeer.Read(device).Connected)continue;
-                    if(appBattery.HasValue&&(DateTime.UtcNow-appBatteryAt).TotalMinutes<60&&appBatteryName==BudsConnectionTracker.Normalize(device.Name))return appBattery;
-                    int? level=BudsInfo.Battery(device.Properties);
-                    if(level.HasValue)return level;
-                }
-                return null;
-            }
+            at=appBatteryAt;
+            return appBattery.HasValue&&appBatteryName==BudsConnectionTracker.Normalize(name)?appBattery:null;
         }
         internal string ModelName {get;private set;}
         internal string BudsCaption {get;private set;}
@@ -113,7 +111,7 @@ namespace OneTaskBar
         internal static DeviceWatcher PairedWatcher(){string query="("+BluetoothDevice.GetDeviceSelectorFromPairingState(true)+") OR ("+BluetoothLEDevice.GetDeviceSelectorFromPairingState(true)+")";return DeviceInformation.CreateWatcher(query,new[]{"System.Devices.Aep.IsConnected","System.Devices.BatteryLife","System.Devices.Aep.ContainerId"},DeviceInformationKind.AssociationEndpoint);}
         void Queue(DeviceWatcher sender,Action action){if(disposed||dispatcher.HasShutdownStarted)return;try{dispatcher.BeginInvoke(new Action(()=>{if(!disposed&&watcher==sender&&ShouldWatch)action();}));}catch(InvalidOperationException){}}
         void Added(DeviceWatcher sender,DeviceInformation device){Queue(sender,()=>{if(devices.Count>=128&&!devices.ContainsKey(device.Id))return;devices[device.Id]=device;Observe(device);});}
-        void Updated(DeviceWatcher sender,DeviceInformationUpdate update){Queue(sender,()=>{DeviceInformation device;if(devices.TryGetValue(update.Id,out device)){device.Update(update);Observe(device);}});}
+        void Updated(DeviceWatcher sender,DeviceInformationUpdate update){Queue(sender,()=>{DeviceInformation device;if(devices.TryGetValue(update.Id,out device)){device.Update(update);TileDevices.ReadSoon();Observe(device);}});}
         void Removed(DeviceWatcher sender,DeviceInformationUpdate update){Queue(sender,()=>{devices.Remove(update.Id);tracker.Remove(update.Id);UpdateCaption(devices.Values.Select(BluetoothPeer.Read));});}
         void Complete(DeviceWatcher sender,object args){Queue(sender,()=>baseline=true);}
         void Stopped(DeviceWatcher sender,object args){Queue(sender,()=>{Stop();retryAfter=DateTime.UtcNow.AddMinutes(1);});}
@@ -129,7 +127,7 @@ namespace OneTaskBar
         }
         internal void UpdateCaption(IEnumerable<BluetoothPeer> peers){var list=peers.ToArray();var buds=list.Where(p=>BudsInfo.IsBuds(p.Name)).ToArray();string text=BluetoothDeviceView.ConnectedCaption(list),caption=BluetoothDeviceView.ConnectedCaption(buds);bool connected=buds.Any(p=>p.Connected);string model=buds.Where(p=>p.Connected).Select(p=>p.Name).FirstOrDefault();if(text==ConnectedCaption&&caption==BudsCaption&&connected==HasConnectedBuds&&model==ModelName)return;ModelName=model;ConnectedCaption=text;BudsCaption=caption;HasConnectedBuds=connected;if(shell.Quick!=null&&shell.Quick.IsVisible)shell.Quick.Refresh(shell.Power,shell.Brightness,shell.Audio.Value,shell.Audio.Muted,shell.Audio.Available,shell.Brightness>=0);}
         int? appBattery;DateTime appBatteryAt;string appBatteryName;
-        internal bool ShowNative(NotificationEntry entry){var info=BudsInfo.Toast(entry);if(info==null)return false;var fromApp=BudsInfo.AppBattery(info.Detail);if(fromApp.HasValue){appBattery=fromApp;appBatteryAt=DateTime.UtcNow;appBatteryName=BudsConnectionTracker.Normalize(info.Name);}if(!Enabled)return false;var device=devices.Values.FirstOrDefault(d=>BudsConnectionTracker.Normalize(d.Name)==BudsConnectionTracker.Normalize(info.Name));if(device!=null)info.Container=BluetoothPeer.ContainerId(device.Properties);if(shell.Demo)Show(info,false);else EnrichNative(info,generation);return true;}
+        internal bool ShowNative(NotificationEntry entry){var info=BudsInfo.Toast(entry);if(info==null)return false;var fromApp=BudsInfo.AppBattery(info.Detail);if(fromApp.HasValue){appBattery=fromApp;appBatteryAt=DateTime.UtcNow;appBatteryName=BudsConnectionTracker.Normalize(info.Name);TileDevices.ReadSoon();}if(!Enabled)return false;var device=devices.Values.FirstOrDefault(d=>BudsConnectionTracker.Normalize(d.Name)==BudsConnectionTracker.Normalize(info.Name));if(device!=null)info.Container=BluetoothPeer.ContainerId(device.Properties);if(shell.Demo)Show(info,false);else EnrichNative(info,generation);return true;}
         async void EnrichNative(BudsInfo info,int token){try{info=await BackgroundWork.Run(()=>BudsDeviceData.Enrich(info));if(token==generation&&Enabled)Show(info,false);}catch(Exception error){AppLog.Once("buds-native-data",error.GetType().Name);if(token==generation&&Enabled)Show(info,false);}}
         internal void Show(BudsInfo info,bool connection=false)
         {

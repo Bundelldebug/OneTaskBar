@@ -98,7 +98,8 @@ namespace OneTaskBar
             var label=Paint.TextBlock("날씨 위치",13,Paint.Text);
             label.Margin=new Thickness(15,10,15,2);
             rows.Children.Add(label);
-            var note=Paint.TextBlock("입력한 지역 이름과 좌표가 날씨 조회를 위해 Open-Meteo로 전송됩니다. 비워 두면 전송하지 않습니다.",12,Paint.Muted);
+            Row(rows,"PC 위치 자동 사용","Windows 위치 서비스로 찾은 대략의 좌표로 날씨를 조회합니다. Windows 위치 권한이 켜져 있어야 합니다",Preferences.Current.WeatherAutoLocation,v=>{Preferences.SetMediaAppearance(p=>p.WeatherAutoLocation=v);WeatherService.Reset();});
+            var note=Paint.TextBlock("입력한 지역 이름과 좌표가 날씨 조회를 위해 날씨 제공 서비스로 전송됩니다. 자동 위치를 끄고 비워 두면 전송하지 않습니다.",12,Paint.Muted);
             note.TextWrapping=TextWrapping.Wrap;
             note.Margin=new Thickness(15,0,15,6);
             rows.Children.Add(note);
@@ -123,6 +124,27 @@ namespace OneTaskBar
             line.Children.Add(box);
             rows.Children.Add(line);
             rows.Children.Add(result);
+            var channelLabel=Paint.TextBlock("The Weather Channel API 키",13,Paint.Text);
+            channelLabel.Margin=new Thickness(15,10,15,2);
+            rows.Children.Add(channelLabel);
+            var channelNote=Paint.TextBlock("The Weather Company에서 발급받은 키가 있어야 합니다. 키가 없거나 조회에 실패하면 Open-Meteo를 사용합니다. 키는 이 PC의 설정 파일에 그대로 저장됩니다.",12,Paint.Muted);
+            channelNote.TextWrapping=TextWrapping.Wrap;
+            channelNote.Margin=new Thickness(15,0,15,6);
+            rows.Children.Add(channelNote);
+            var channelLine=new DockPanel {Margin=new Thickness(15,0,15,12)};
+            var channelKey=new PasswordBox {Password=Preferences.Current.WeatherChannelKey??"",Background=Paint.ControlWhite,Foreground=Paint.OnLight,BorderThickness=new Thickness(0),FontSize=14,Padding=new Thickness(12,8,12,8),MaxLength=128};
+            System.Windows.Automation.AutomationProperties.SetName(channelKey,"The Weather Channel API 키");
+            var channelSave=Paint.Action("저장",()=>
+            {
+                string value=channelKey.Password.Trim();
+                Preferences.SetMediaAppearance(p=>p.WeatherChannelKey=value.Length==0?null:value);
+                WeatherService.Reset();
+            });
+            channelSave.Margin=new Thickness(8,0,0,0);
+            DockPanel.SetDock(channelSave,Dock.Right);
+            channelLine.Children.Add(channelSave);
+            channelLine.Children.Add(channelKey);
+            rows.Children.Add(channelLine);
         }
     }
 }

@@ -95,7 +95,8 @@ namespace OneTaskBar
             if(!waveMode||!IsVisible||!Motion.Enabled){StopWave();return;}
             var frame=args as RenderingEventArgs;if(frame!=null){if(frame.RenderingTime==waveRendering)return;waveRendering=frame.RenderingTime;}
             double now=waveClock.Elapsed.TotalSeconds;
-            if(now==lastWaveFrame)return;lastWaveFrame=now;
+            // The wave is decoration; thirty updates a second look the same on a 120 Hz display.
+            if(now==lastWaveFrame||lastWaveFrame>=0&&now-lastWaveFrame<.03&&waveStrength==waveTarget)return;lastWaveFrame=now;
             double t=Math.Min(1,(now-waveAt)/.26),ease=t*t*(3-2*t);
             waveStrength=waveFrom+(waveTarget-waveFrom)*ease;
             if(!dragging&&WaveProgress!=null&&!WaveDecoration)Value=WaveProgress();

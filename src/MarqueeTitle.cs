@@ -8,8 +8,7 @@ namespace OneTaskBar
 {
     internal sealed class MarqueeTitle : FrameworkElement
     {
-        string text="";FormattedText formatted;bool running,conservePower,engaged,completed,active,frameHooked;readonly Stopwatch clock=new Stopwatch();
-        TimeSpan lastRendering=TimeSpan.MinValue;
+        string text="";FormattedText formatted;bool running,conservePower,engaged,completed,active;readonly Stopwatch clock=new Stopwatch();
         double lastOffset=Double.NaN;
         double textSize=12;bool centered;FontWeight weight=FontWeights.SemiBold;
         internal double TextSize {get{return textSize;}set{if(textSize==value)return;textSize=value;ResetFormat();}}
@@ -31,9 +30,7 @@ namespace OneTaskBar
         internal double LineHeight {get{return Math.Ceiling(Formatted.Height)+2;}}
         internal double Offset {get{double distance=Distance;if(distance<=0||!active)return 0;double travel=distance/25.0,phase=clock.Elapsed.TotalSeconds%Cycle;return phase<1.2?0:phase<1.2+travel?(phase-1.2)*25:phase<2.4+travel?distance:Math.Max(0,distance-(phase-2.4-travel)*25);}}
         internal MarqueeTitle(){Height=22;ClipToBounds=true;IsHitTestVisible=false;timer.Tick+=(s,e)=>Frame();SizeChanged+=(s,e)=> {completed=false;clock.Restart();UpdateTimer();};IsVisibleChanged+=(s,e)=>UpdateTimer();Unloaded+=(s,e)=>Stop();}
-        void StopFrames(){if(frameHooked)CompositionTarget.Rendering-=RenderFrame;frameHooked=false;}
-        void Stop(){timer.Stop();StopFrames();active=false;clock.Reset();}
-        void RenderFrame(object sender,EventArgs args){var frame=args as RenderingEventArgs;if(frame!=null){if(lastRendering==frame.RenderingTime)return;lastRendering=frame.RenderingTime;}Frame();}
+        void Stop(){timer.Stop();active=false;clock.Reset();}
         void UpdateTimer()
         {
             bool enabled=running&&IsVisible&&ActualWidth>1&&Distance>.5&&Motion.Enabled&&(!conservePower||engaged||!completed);
@@ -49,8 +46,8 @@ namespace OneTaskBar
             // The title is stationary at either end: sleep through those pauses.
             if(phase<1.2)delay=(1.2-phase)*1000;
             else if(phase>=1.2+travel&&phase<2.4+travel)delay=(2.4+travel-phase)*1000;
-            if(delay>0){StopFrames();timer.Interval=TimeSpan.FromMilliseconds(Math.Max(1,delay));timer.Start();}
-            else{timer.Stop();if(!frameHooked){lastRendering=TimeSpan.MinValue;frameHooked=true;CompositionTarget.Rendering+=RenderFrame;}}
+            // 25 DIP per second moves about a pixel per tick at this rate; following a 120 Hz display adds only cost.
+            timer.Interval=TimeSpan.FromMilliseconds(delay>0?Math.Max(1,delay):33);if(!timer.IsEnabled)timer.Start();
         }
         protected override Size MeasureOverride(Size constraint){return new Size(Math.Min(NaturalWidth,Double.IsInfinity(constraint.Width)?NaturalWidth:constraint.Width),Math.Min(Math.Max(22,Formatted.Height),constraint.Height));}
         protected override void OnRender(DrawingContext dc){RenderCount++;dc.PushClip(new RectangleGeometry(new Rect(0,0,ActualWidth,ActualHeight)));dc.DrawText(Formatted,new Point(TextOrigin,Math.Max(0,(ActualHeight-Formatted.Height)/2)));dc.Pop();}

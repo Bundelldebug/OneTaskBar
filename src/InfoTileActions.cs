@@ -14,6 +14,7 @@ namespace OneTaskBar
     {
         readonly ShellController shell;
         readonly Border art=new Border();
+        readonly Button artButton;
         readonly TextBlock title=Label("미디어 없음",12);
         readonly Glyph play=new Glyph("play",22){Color=TileScheme.Creating.Ink};
         System.Windows.Media.Imaging.BitmapSource shownArt;
@@ -28,11 +29,16 @@ namespace OneTaskBar
             transport.Children.Add(Control(play,"play","재생 · 일시정지"));
             transport.Children.Add(Control(new Glyph("next",18){Color=TileScheme.Creating.Ink},"next","다음"));
             art.Background=TileScheme.Creating.Track;
+            artButton=Paint.Button(new Border(),OpenApp,"현재 재생 앱 열기");
+            artButton.Background=Brushes.Transparent;
+            artButton.Padding=new Thickness(0);
+            artButton.IsEnabled=false;
             if(rows==2)
             {
                 RowDefinitions.Add(new RowDefinition());
                 RowDefinitions.Add(new RowDefinition {Height=new GridLength(70)});
                 Children.Add(art);
+                Children.Add(artButton);
                 var bottom=new StackPanel {VerticalAlignment=VerticalAlignment.Center};
                 title.HorizontalAlignment=HorizontalAlignment.Center;
                 title.Margin=new Thickness(10,0,10,2);
@@ -48,6 +54,11 @@ namespace OneTaskBar
             art.HorizontalAlignment=HorizontalAlignment.Left;
             art.Margin=new Thickness(10,0,0,0);
             Children.Add(art);
+            artButton.Width=artButton.Height=68;
+            artButton.HorizontalAlignment=HorizontalAlignment.Left;
+            artButton.Margin=art.Margin;
+            artButton.Resources["ButtonRadius"]=new CornerRadius(34);
+            Children.Add(artButton);
             var side=new StackPanel {VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(90,0,24,0)};
             title.HorizontalAlignment=HorizontalAlignment.Center;
             side.Children.Add(title);
@@ -55,6 +66,12 @@ namespace OneTaskBar
             side.Children.Add(transport);
             Children.Add(side);
         }
+        void OpenApp()
+        {
+            var media=shell.Services.Media;
+            if(media!=null&&media.Active&&!String.IsNullOrEmpty(media.AppId))shell.OpenMediaApplication(media.AppId);
+        }
+        internal bool CanOpenApp {get{return artButton.IsEnabled;}}
         Button Control(UIElement glyph,string command,string hint)
         {
             var button=Paint.Button(glyph,()=>shell.Media(command),hint);
@@ -68,6 +85,8 @@ namespace OneTaskBar
         {
             var media=controller.Services.Media;
             bool active=media!=null&&media.Active;
+            bool openable=active&&!String.IsNullOrEmpty(media.AppId);
+            if(artButton.IsEnabled!=openable)artButton.IsEnabled=openable;
             string text=!active?"미디어 없음":String.IsNullOrEmpty(media.Artist)?media.Title:media.Title+" - "+media.Artist;
             if(text!=shownTitle)
             {

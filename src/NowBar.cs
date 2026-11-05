@@ -156,7 +156,6 @@ namespace OneTaskBar
                 StopMotion();
                 if(!expanded)expandedContent.Visibility=Visibility.Collapsed;
                 EnsureHost(false);
-                Native.RefreshOptics(this);
                 title.Running=!expanded&&Motion.Enabled;
             }
         }

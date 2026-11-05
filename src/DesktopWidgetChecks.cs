@@ -149,6 +149,14 @@ namespace OneTaskBar
                         buttonDown=false;
                         await Task.Delay(200);
                     }
+                    System.Diagnostics.ProcessStartInfo started=null;
+                    ElevatedWindows.StartDispatch=info=>started=info;
+                    ElevatedWindows.ShowTaskManager();
+                    Require(started!=null&&started.FileName.EndsWith("Taskmgr.exe",StringComparison.OrdinalIgnoreCase)&&started.Verb=="","Task Manager is shown by starting it, with no permission prompt");
+                    var request=ElevatedWindows.CloseRequest(1234);
+                    Require(request.Verb=="runas"&&request.Arguments=="/PID 1234"&&Path.IsPathRooted(request.FileName),"closing an administrator window asks Windows for permission, for that process only");
+                    Require(!ElevatedWindows.IsTaskManager(parent),"ordinary windows do not use the Task Manager path");
+                    ElevatedWindows.StartDispatch=null;
                     checks.Add("presses and moves that lose their mouse-up release the mouse; capture-loss path "+(lostCaptureChecked?"checked":"not reached"));
                     int chosen=0;
                     var gestureSlot=new DesktopWidgetSlot {Id=Guid.NewGuid().ToString("N"),Key="calendar:2x2",Width=190,Height=190};

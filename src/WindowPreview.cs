@@ -57,7 +57,7 @@ namespace OneTaskBar
             foreach(var preview in previews){if(preview.Thumbnail==IntPtr.Zero||preview.Image.ActualWidth<1)continue;SizeI size;if(DwmQueryThumbnailSourceSize(preview.Thumbnail,out size)!=0||size.Width<=0||size.Height<=0)continue;var p=preview.Image.TranslatePoint(new Point(),this);double width=preview.Image.ActualWidth,height=preview.Image.ActualHeight,factor=Math.Min(width/size.Width,height/size.Height),w=size.Width*factor,h=size.Height*factor;var bounds=new Native.RectI {Left=(int)Math.Round((p.X+(width-w)/2)*dpi),Top=(int)Math.Round((p.Y+(height-h)/2)*dpi),Right=(int)Math.Round((p.X+(width+w)/2)*dpi),Bottom=(int)Math.Round((p.Y+(height+h)/2)*dpi)};var properties=new ThumbnailProperties {Flags=1|4|8|16,Destination=bounds,Opacity=255,Visible=true,ClientOnly=true};DwmUpdateThumbnailProperties(preview.Thumbnail,ref properties);}
         }
         void Open(IntPtr source){if(Native.IsWindow(source))Native.Activate(source);Close();}
-        async void CloseSource(IntPtr source){if(Native.IsWindow(source))PostMessage(source,0x10,IntPtr.Zero,IntPtr.Zero);await System.Threading.Tasks.Task.Delay(170);if(closed)return;Rebuild();if(sources.Count==0)Close();}
+        async void CloseSource(IntPtr source){if(Native.IsWindow(source))ElevatedWindows.Close(source);await System.Threading.Tasks.Task.Delay(170);if(closed)return;Rebuild();if(sources.Count==0)Close();}
         protected override void OnPreviewKeyDown(KeyEventArgs e){if(e.Key==Key.Escape){Close();e.Handled=true;return;}base.OnPreviewKeyDown(e);}
     }
     internal sealed class WindowPreviewManager : IDisposable

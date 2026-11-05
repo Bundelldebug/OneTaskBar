@@ -61,6 +61,9 @@ namespace OneTaskBar
         public string FullscreenAppLeft,FullscreenAppRight;
         public string WeatherPlace;
         public double WeatherLatitude,WeatherLongitude;
+        public bool WeatherAutoLocation=false;
+        public string WeatherChannelKey;
+        public bool SecondaryDockOpenWindowsOnly=false;
         public string DualClockZone="GMT Standard Time";
         public bool YouTubeHighResArtwork=false;
         public string YouTubeArtworkTrack;

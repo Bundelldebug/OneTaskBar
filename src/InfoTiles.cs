@@ -235,7 +235,7 @@ namespace OneTaskBar
         readonly TextBlock temperature=Label("--°",24),summary=Label("",11),place=Label("",10,Faint);
         readonly Path symbol=new Path {Width=40,Height=40,Stretch=Stretch.Uniform,Fill=TileScheme.Creating.Ink,HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Top,Margin=new Thickness(0,14,14,0)};
         WeatherReport shown;
-        string shownPlace;
+        string shownPlace,shownProblem;
         bool loaded;
         internal WeatherTile(int columns,int rows):base(columns,rows)
         {
@@ -254,14 +254,15 @@ namespace OneTaskBar
         {
             WeatherService.Request();
             var report=WeatherService.Current;
-            string where=Preferences.Current.WeatherPlace;
-            if(report==shown&&where==shownPlace&&loaded)return;
+            string where=WeatherService.PlaceName;
+            if(report==shown&&where==shownPlace&&loaded&&WeatherService.Problem==shownProblem)return;
+            shownProblem=WeatherService.Problem;
             shown=report;
             shownPlace=where;
             loaded=true;
             symbol.Data=WeatherService.Symbol(report);
             temperature.Text=report==null?"--°":Math.Round(report.Temperature).ToString(CultureInfo.InvariantCulture)+"°";
-            summary.Text=report!=null?report.Summary:WeatherService.Configured?"날씨를 불러오는 중입니다":"설정에서 위치를 입력하세요";
+            summary.Text=report!=null?report.Summary:WeatherService.Problem??(WeatherService.Configured?"날씨를 불러오는 중입니다":"설정에서 위치를 입력하세요");
             place.Text=where??"";
         }
     }

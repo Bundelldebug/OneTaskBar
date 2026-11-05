@@ -23,6 +23,8 @@ Starting with stable 9.5.0, all former beta features are available alongside UI 
 
 Keep normal control flow on separate lines in touched/new code. Split by responsibility rather than adding another large mixed file. Reuse frozen brushes/artwork; unchanged refreshes should not allocate or restart animations. Release timers, backdrop hosts and image caches when their owners retire. Do not force GC or trim the working set to manufacture measurements.
 
+Right before publishing any release, run an optimization pass on the build to ship: measure idle CPU and memory with `tools/Measure-Runtime.ps1`, fix what the numbers or the release's new code show, re-measure, and only then package and upload. Report what was measured and any case that was not reached.
+
 Public GitHub writing: describe the user-visible change and necessary usage details in plain language. Release notes should be short; keep implementation logs, request history and repeated validation boilerplate in development documents. Retain material limitations, licensing and unsigned-build notices.
 
 ## Working across Codex and Claude Code

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -17,10 +17,11 @@ namespace OneTaskBar
         [DllImport("user32.dll")]static extern bool IsWindowEnabled(IntPtr window);
         [DllImport("user32.dll")]static extern bool GetLastInputInfo(ref InputInfo info);
         [StructLayout(LayoutKind.Sequential)]struct InputInfo {internal uint Size,Time;}
-        [DllImport("user32.dll")]static extern IntPtr SendMessageTimeout(IntPtr window,uint message,IntPtr wp,IntPtr lp,uint flags,uint timeout,out IntPtr result);
+        [DllImport("user32.dll",SetLastError=true)]static extern IntPtr SendMessageTimeout(IntPtr window,uint message,IntPtr wp,IntPtr lp,uint flags,uint timeout,out IntPtr result);
         static int links,sourceJoinError,targetJoinError,inputJoinError;
         internal static int AttachedQueues {get{return Volatile.Read(ref links);}}
-        static bool Responsive(IntPtr window,uint message=0,uint timeout=60){IntPtr result;return SendMessageTimeout(ResponseTarget(window),message,IntPtr.Zero,IntPtr.Zero,3,timeout,out result)!=IntPtr.Zero;}
+        // An administrator window refuses the probe (access denied) without being hung, so it must not stop a switch.
+        static bool Responsive(IntPtr window,uint message=0,uint timeout=60){IntPtr result;return SendMessageTimeout(ResponseTarget(window),message,IntPtr.Zero,IntPtr.Zero,3,timeout,out result)!=IntPtr.Zero||Marshal.GetLastWin32Error()==5;}
         static bool ForegroundIs(IntPtr window)
         {
             var foreground=Native.GetForegroundWindow();return foreground==window||foreground!=IntPtr.Zero&&Native.GetAncestor(foreground,2)==Native.GetAncestor(window,2);
@@ -38,7 +39,9 @@ namespace OneTaskBar
         }
         internal static async void Activate(IntPtr window)
         {
-            window=Target(window);if(window==IntPtr.Zero)return;var source=Native.GetForegroundWindow();uint input=LastInput();bool confirmed=TryActivate(window);
+            window=Target(window);if(window==IntPtr.Zero)return;
+            if(ElevatedWindows.IsTaskManager(window)){ElevatedWindows.ShowTaskManager();return;}
+            var source=Native.GetForegroundWindow();uint input=LastInput();bool confirmed=TryActivate(window);
             // WinUI activation can complete after the foreground request returns.
             // Recheck once after Alt-up dispatch, without overriding subsequent user input.
             await Task.Delay(60);if(!Native.IsWindow(window)||LastInput()!=input)return;var current=Native.GetForegroundWindow();
@@ -56,6 +59,7 @@ namespace OneTaskBar
         {
             sourceJoinError=targetJoinError=inputJoinError=0;
             window=Target(window);if(window==IntPtr.Zero)return false;
+            if(ElevatedWindows.IsTaskManager(window)){ElevatedWindows.ShowTaskManager();return true;}
             var original=Native.GetForegroundWindow();if(original==IntPtr.Zero)return false;
             if(!Responsive(window)||original!=window&&!Responsive(original))return false;
             if(Native.IsIconic(window))

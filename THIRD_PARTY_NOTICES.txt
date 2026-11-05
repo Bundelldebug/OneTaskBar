@@ -90,4 +90,4 @@ The One TaskBar contour sampler is an independent Windows Composition implementa
 No Android/Xposed/Compose or React/SVG runtime code or binaries from these projects
 are incorporated or executed. Existing slider shapes and content are retained.
 
-Weather data: Open-Meteo / https://open-meteo.com / CC BY 4.0. Requested only after the user enters a location.
+Weather data: Open-Meteo / https://open-meteo.com / CC BY 4.0. Requested only after the user enters a location or turns on the PC location. The Weather Channel is used only with an API key the user supplies from The Weather Company.

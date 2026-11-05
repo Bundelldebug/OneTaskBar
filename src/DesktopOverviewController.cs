@@ -32,7 +32,7 @@ namespace OneTaskBar
             if(Overview!=null&&(Overview.Retiring||Overview.IsClosed)){Overview.Close();Overview=null;}
             var clock=Stopwatch.StartNew();DesktopSnapshot value=null;
             var panel=Overview;
-            if(panel==null){panel=new DesktopOverview((id,window,operation)=>{if(overviewCache!=null)ApplyDesktopCommand(overviewCache,id,window,operation);},window=>PostMessage(window,0x10,IntPtr.Zero,IntPtr.Zero));Overview=panel;panel.Closed+=(s,e)=>{if(Overview==panel)Overview=null;};}
+            if(panel==null){panel=new DesktopOverview((id,window,operation)=>{if(overviewCache!=null)ApplyDesktopCommand(overviewCache,id,window,operation);},ElevatedWindows.Close);Overview=panel;panel.Closed+=(s,e)=>{if(Overview==panel)Overview=null;};}
             bool cached=overviewCache!=null&&DateTime.UtcNow-overviewCachedAt<TimeSpan.FromSeconds(2)&&overviewCache.Current==VirtualDesktops.CurrentId();
             if(cached)value=overviewCache;
             else{panel.ShowLoading(monitor.Bounds);value=await Task.Run(()=>VirtualDesktops.Read(apps,foreground));}

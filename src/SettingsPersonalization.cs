@@ -21,6 +21,7 @@ namespace OneTaskBar
         {
             MaterialSetting(rows,true);
             DockDisplaySetting(rows);
+            Row(rows,"보조 모니터에 열린 창만 표시","주 모니터가 아닌 작업표시줄에는 고정 앱을 빼고 그 모니터에 열린 창만 표시합니다",Preferences.Current.SecondaryDockOpenWindowsOnly,v=>Preferences.Set(p=>p.SecondaryDockOpenWindowsOnly=v));
             DockScaleSetting(rows);
             ClockSetting(rows);
             Row(rows,"패널 색상을 작업표시줄과 맞추기","빠른 설정·알림·시작 메뉴에 선택한 작업표시줄 색상을 사용합니다",Preferences.Current.PanelsUseDockColor,v=>Preferences.Set(p=>p.PanelsUseDockColor=v));

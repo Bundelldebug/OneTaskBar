@@ -21,19 +21,24 @@ namespace OneTaskBar
         internal string Summary;
     }
 
-    // Optional. Nothing is sent until the user enters a place. Requests carry only
-    // that place name or its coordinates, run only while a weather tile is shown,
-    // and are spaced at least 30 minutes apart.
+    // Optional. Nothing is sent until the user enters a place or turns on the PC's location.
+    // Requests carry only that place name or rounded coordinates, run only while a weather
+    // tile is shown, and are spaced at least 30 minutes apart. The Weather Channel needs the
+    // user's own API key; without one, or if it fails, Open-Meteo answers.
     internal static class WeatherService
     {
         static DateTime nextAt=DateTime.MinValue;
         static bool busy;
         internal static WeatherReport Current {get;private set;}
         internal static int Requests {get;private set;}
-        internal static bool Configured {get{return !String.IsNullOrWhiteSpace(Preferences.Current.WeatherPlace);}}
+        internal static bool Configured {get{return Preferences.Current.WeatherAutoLocation||!String.IsNullOrWhiteSpace(Preferences.Current.WeatherPlace);}}
+        internal static string Problem {get;private set;}
+        internal static string Source {get;private set;}
+        internal static string PlaceName {get{return Preferences.Current.WeatherAutoLocation?"현재 위치":Preferences.Current.WeatherPlace;}}
         internal static void Reset()
         {
             Current=null;
+            Problem=null;
             nextAt=DateTime.MinValue;
         }
         internal static void Request()
@@ -43,16 +48,31 @@ namespace OneTaskBar
             busy=true;
             nextAt=now.AddMinutes(30);
             Requests++;
-            double latitude=Preferences.Current.WeatherLatitude,longitude=Preferences.Current.WeatherLongitude;
-            Fetch(latitude,longitude);
+            Fetch();
         }
-        static async void Fetch(double latitude,double longitude)
+        static async void Fetch()
         {
             try
             {
+                double latitude=Preferences.Current.WeatherLatitude,longitude=Preferences.Current.WeatherLongitude;
+                if(Preferences.Current.WeatherAutoLocation)
+                {
+                    var position=await Locate();
+                    if(position==null)
+                    {
+                        nextAt=DateTime.UtcNow.AddMinutes(5);
+                        return;
+                    }
+                    latitude=Math.Round(position.Coordinate.Point.Position.Latitude,2);
+                    longitude=Math.Round(position.Coordinate.Point.Position.Longitude,2);
+                }
+                Problem=null;
+                string key=Preferences.Current.WeatherChannelKey;
+                if(!String.IsNullOrWhiteSpace(key)&&await FetchWeatherChannel(latitude,longitude,key.Trim()))return;
                 string url=String.Format(CultureInfo.InvariantCulture,"https://api.open-meteo.com/v1/forecast?latitude={0:0.###}&longitude={1:0.###}&current=temperature_2m,weather_code,is_day&hourly=precipitation_probability&forecast_days=2&timezone=auto",latitude,longitude);
                 string json=await BackgroundWork.Run(()=>Download(url));
                 Current=Parse(json,DateTime.Now);
+                Source="Open-Meteo";
             }
             catch(Exception e)
             {
@@ -60,6 +80,81 @@ namespace OneTaskBar
                 AppLog.Once("weather",e.GetType().Name);
             }
             finally{busy=false;}
+        }
+        // Windows' own location service, subject to the user's privacy setting. It is held only for this request.
+        static async Task<Windows.Devices.Geolocation.Geoposition> Locate()
+        {
+            try
+            {
+                var access=await SystemServices.Wait(Windows.Devices.Geolocation.Geolocator.RequestAccessAsync());
+                if(access!=Windows.Devices.Geolocation.GeolocationAccessStatus.Allowed)
+                {
+                    Problem="Windows 설정에서 위치 권한을 켜 주세요";
+                    AppLog.Once("weather-location",access.ToString());
+                    return null;
+                }
+                return await SystemServices.Wait(new Windows.Devices.Geolocation.Geolocator().GetGeopositionAsync());
+            }
+            catch(Exception e)
+            {
+                Problem="현재 위치를 찾지 못했습니다";
+                AppLog.Once("weather-location",e.GetType().Name);
+                return null;
+            }
+        }
+        static async Task<bool> FetchWeatherChannel(double latitude,double longitude,string key)
+        {
+            try
+            {
+                string query=String.Format(CultureInfo.InvariantCulture,"?geocode={0:0.##},{1:0.##}&format=json&units=m&language=ko-KR&apiKey=",latitude,longitude)+Uri.EscapeDataString(key);
+                string current=await BackgroundWork.Run(()=>Download("https://api.weather.com/v3/wx/observations/current"+query));
+                string hourly=await BackgroundWork.Run(()=>Download("https://api.weather.com/v3/wx/forecast/hourly/2day"+query));
+                Current=ParseWeatherChannel(current,hourly,DateTime.Now);
+                Source="The Weather Channel";
+                return true;
+            }
+            catch(Exception e)
+            {
+                // The exception text can hold the request URL, and so the key. Only its type is logged.
+                AppLog.Once("weather-channel",e.GetType().Name);
+                return false;
+            }
+        }
+        internal static WeatherReport ParseWeatherChannel(string currentJson,string hourlyJson,DateTime now)
+        {
+            var serializer=new JavaScriptSerializer();
+            var current=(Dictionary<string,object>)serializer.DeserializeObject(currentJson);
+            var report=new WeatherReport
+            {
+                Temperature=Convert.ToDouble(current["temperature"],CultureInfo.InvariantCulture),
+                Code=CodeFromIcon(Convert.ToInt32(current["iconCode"],CultureInfo.InvariantCulture)),
+                Day=Convert.ToString(current["dayOrNight"],CultureInfo.InvariantCulture)!="N",
+                Summary=Convert.ToString(current["wxPhraseLong"],CultureInfo.InvariantCulture)
+            };
+            var hourly=(Dictionary<string,object>)serializer.DeserializeObject(hourlyJson);
+            var times=(IList)hourly["validTimeLocal"];
+            var chances=(IList)hourly["precipChance"];
+            int seen=0;
+            for(int i=0;i<times.Count&&i<chances.Count&&seen<6;i++)
+            {
+                DateTimeOffset at;
+                if(chances[i]==null||!DateTimeOffset.TryParseExact(Convert.ToString(times[i],CultureInfo.InvariantCulture),"yyyy-MM-dd'T'HH:mm:sszzz",CultureInfo.InvariantCulture,DateTimeStyles.None,out at)||at.DateTime.AddHours(1)<=now)continue;
+                report.RainPercent=Math.Max(report.RainPercent,Convert.ToInt32(chances[i],CultureInfo.InvariantCulture));
+                seen++;
+            }
+            if(String.IsNullOrEmpty(report.Summary))report.Summary=Describe(report.Code);
+            return report;
+        }
+        // The Weather Channel's icon numbers, as the weather kinds the tiles draw.
+        internal static int CodeFromIcon(int icon)
+        {
+            if(icon<=4||icon==37||icon==38||icon==47)return 95;
+            if(icon>=13&&icon<=16||icon>=41&&icon<=43||icon==46)return 71;
+            if(icon>=5&&icon<=12||icon>=17&&icon<=18||icon==35||icon==39||icon==40||icon==45)return 61;
+            if(icon>=19&&icon<=22)return 45;
+            if(icon>=23&&icon<=28)return 3;
+            if(icon==29||icon==30)return 2;
+            return 0;
         }
         static string Download(string url)
         {
