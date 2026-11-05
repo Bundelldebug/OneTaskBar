@@ -53,7 +53,7 @@ namespace OneTaskBar
             DockPanel.SetDock(searchBox,Dock.Top);root.Children.Add(searchBox);
 
             var footer=new Grid {Height=52,Margin=new Thickness(0,14,0,0)};
-            var userRow=new StackPanel {Orientation=Orientation.Horizontal};userRow.Children.Add(new Glyph("user",20){Margin=new Thickness(0,0,9,0)});userRow.Children.Add(Paint.TextBlock(Environment.UserName,12,Paint.Text));
+            var userRow=new StackPanel {Orientation=Orientation.Horizontal};userRow.Children.Add(new Glyph("user",20){Margin=new Thickness(0,0,9,0)});userRow.Children.Add(Paint.TextBlock(AccountName.Display(),12,Paint.Text));
             var user=Paint.Button(userRow,()=>OpenFolder(Environment.SpecialFolder.UserProfile),"사용자 폴더 열기");user.HorizontalAlignment=HorizontalAlignment.Left;user.MaxWidth=240;user.Background=Brushes.Transparent;footer.Children.Add(user);
             var tools=new StackPanel {Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right};
             tools.Children.Add(Tool("folder","문서",()=>OpenFolder(Environment.SpecialFolder.MyDocuments)));
@@ -130,7 +130,7 @@ namespace OneTaskBar
             pinHeading.Visibility=openFolder==null?Visibility.Visible:Visibility.Collapsed;folderHeading.Visibility=openFolder==null?Visibility.Collapsed:Visibility.Visible;recentHeading.Visibility=recent.Visibility=openFolder==null?Visibility.Visible:Visibility.Collapsed;
             if(openFolder!=null){var folder=pinned.First(t=>t.Key==openFolder);folderName.Text=folder.Name;}
             foreach(var item in current.Skip(pinPage*18).Take(18)){
-                var tile=item;var content=new StackPanel();var icon=tile.Folder?FolderIcon(tile):AppIcons.Visual(tile.App,40);icon.HorizontalAlignment=HorizontalAlignment.Center;icon.Margin=new Thickness(0,2,0,7);content.Children.Add(icon);
+                var tile=item;var content=new StackPanel {Height=77,VerticalAlignment=VerticalAlignment.Top};var icon=tile.Folder?FolderIcon(tile):AppIcons.Visual(tile.App,40);icon.HorizontalAlignment=HorizontalAlignment.Center;icon.Margin=new Thickness(0,2,0,7);content.Children.Add(icon);
                 var name=Paint.TextBlock(tile.Name,11,Paint.Text);name.TextAlignment=TextAlignment.Center;name.TextWrapping=TextWrapping.Wrap;name.TextTrimming=TextTrimming.CharacterEllipsis;name.MaxHeight=30;content.Children.Add(name);
                 var button=Paint.Button(content,()=> {if(tile.Folder)OpenPinFolder(tile.Key);else Launch(tile.App);},tile.Folder?tile.Name+" · 앱 "+tile.Children.Count+"개":tile.Name);button.Height=89;button.Margin=new Thickness(1);button.Padding=new Thickness(4,5,4,5);button.Background=Brushes.Transparent;button.ContextMenu=PinMenu(tile);button.RenderTransform=new TranslateTransform();pins.Children.Add(button);pinButtons[tile.Key]=button;
                 DragReorder.Attach(button,button,"start.pins",tile.Key,Orientation.Horizontal,()=>!closed&&IsVisible,MovePin,PreviewPin);

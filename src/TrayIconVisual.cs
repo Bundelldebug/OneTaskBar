@@ -16,11 +16,11 @@ namespace OneTaskBar
         internal bool LightPlate {get{return plate;}}
         internal TrayIconVisual(ImageSource image,Brush foreground=null)
         {
-            source=image;ink=foreground??Paint.Text;Width=Height=26;IsHitTestVisible=false;SnapsToDevicePixels=true;UseLayoutRounding=true;
+            source=TrayIconSmoother.Smooth(image as BitmapSource)??image;ink=foreground??Paint.Text;Width=Height=26;IsHitTestVisible=false;SnapsToDevicePixels=true;UseLayoutRounding=true;
             RenderOptions.SetBitmapScalingMode(this,BitmapScalingMode.HighQuality);
-            var bitmap=image as BitmapSource;
+            var bitmap=source as BitmapSource;
             if(bitmap!=null&&IsMonochrome(bitmap)){
-                mask=new ImageBrush(image) {Stretch=Stretch.Uniform};mask.Freeze();
+                mask=new ImageBrush(source) {Stretch=Stretch.Uniform};mask.Freeze();
             }
             else if(bitmap!=null)plate=NeedsLightPlate(bitmap);
         }

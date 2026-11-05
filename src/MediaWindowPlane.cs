@@ -101,6 +101,14 @@ namespace OneTaskBar
             UpdateLayout();
         }
 
+        // A built plane stays good while the window is where it was and the pill is still inside the plane's room.
+        // The pill drifts by a pixel or two as its title and wave change; rebuilding then, at the moment the window
+        // is minimized, is what made the window vanish and reappear halfway.
+        internal bool CanServe(Rect initial,Rect capsule)
+        {
+            return Math.Abs(sourceBounds.X-initial.X)<=2&&Math.Abs(sourceBounds.Y-initial.Y)<=2&&Math.Abs(sourceBounds.Width-initial.Width)<=2&&Math.Abs(sourceBounds.Height-initial.Height)<=2&&host.Contains(capsule);
+        }
+
         internal void Present(IntPtr recipient=default(IntPtr))
         {
             // A prepared flight owns no full-display blur target while idle.

@@ -25,13 +25,14 @@ namespace OneTaskBar
             double morph=MediaFlightTiming.Smooth((p-.38)/.62);
             double width=window.Width*zoom-(window.Width*end-capsule.Width)*morph;
             double height=window.Height*zoom-(window.Height*end-capsule.Height)*morph;
-            double envelope=16*p*p*u*u;
+            // The reference tilts hardest while the window is still small and next to the pill, then flattens as it opens.
+            double envelope=Math.Min(1,1.35*Math.Pow(p,.8)*(1-Math.Pow(p,6)));
             double direction=delta.X>=0?1:-1;
             double radius=18+(Math.Min(width,height)/2-18)*morph;
             return new MediaWindowPose {
                 Center=center,Width=width,Height=height,Radius=Math.Max(0,Math.Min(Math.Min(width,height)/2,radius)),
-                Tilt=-5*direction*envelope,Turn=-5*direction*envelope,
-                Opacity=1-MediaFlightTiming.Smooth((p-.73)/.27),Defocus=.72*envelope
+                Tilt=-15*direction*envelope,Turn=-9*direction*envelope,
+                Opacity=1-MediaFlightTiming.Smooth((p-.73)/.27),Defocus=.8*envelope
             };
         }
     }

@@ -82,7 +82,7 @@ namespace OneTaskBar
                     Require(view.LargeCover&&!view.Morphing,"the surface is back to the large cover for the checks that follow");
                     view.ToggleArtwork();await Task.Delay(420);view.Update(media,"Fixture output");
                     Require(view.CoverBounds.Width==44&&view.CoverBounds.Top>=view.CardBounds.Top&&view.CoverBounds.Bottom<=view.CardBounds.Bottom,"compact cover stays inside its reserved pill slot");
-                    Require(view.CardBounds.Height==84&&view.CardBounds.Width<=380&&view.Player.FullscreenPill,"collapsed media uses a smaller and thinner pill");
+                    Require(view.CardBounds.Height==84&&view.CardBounds.Width<=380&&view.Player.FullscreenPill,"collapsed media uses a smaller and thinner pill");Require(view.Player.CenterTitle.IsVisible&&view.Player.CenterTitle.ActualWidth>10&&view.Player.CenterTitle.Text.Length>0,"the collapsed pill shows the track title");
                     Require(view.Player.PreviousButton.Visibility==Visibility.Collapsed&&view.SeekBar.WaveDecoration,"pill keeps play/next and a decorative bottom wave");
                     view.Player.NextButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Require(command=="next","pill next button keeps the shared media command");
                     int pillPasses=view.LayoutPasses;
@@ -106,7 +106,7 @@ namespace OneTaskBar
                     finally {Preferences.SetMediaAppearance(p=>p.FullscreenClockPercent=previousClock);}
                     media.Playing=false;view.Update(media);Require(!view.SeekBar.WavePlaying,"pausing uses the shared wave decay");media.Playing=true;
                     view.ToggleArtwork();await Task.Delay(420);
-                    Require(!view.Player.FullscreenPill&&!view.SeekBar.WaveDecoration&&view.Player.PreviousButton.Visibility==Visibility.Visible,"expanding restores the full shared controller");
+                    Require(!view.Player.FullscreenPill&&!view.SeekBar.WaveDecoration&&view.Player.PreviousButton.Visibility==Visibility.Visible,"expanding restores the full shared controller");Require(!view.Player.CenterTitle.IsVisible,"expanded, the title is on the cover and not in the card");
                     foreach(var size in new[]{new Size(640,480),new Size(1280,720),new Size(2160,1440)}){view.Width=size.Width;view.Height=size.Height;await Task.Delay(30);view.Update(media);Require(view.CoverBounds.Left>=0&&view.CoverBounds.Right<=size.Width&&view.CoverBounds.Bottom<view.CardBounds.Top,"responsive cover remains clear of transport");}
                     foreach(int version in new[]{85,90}){
                         Preferences.Current.UIVersion=version;

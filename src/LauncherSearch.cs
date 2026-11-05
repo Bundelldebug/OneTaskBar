@@ -51,6 +51,21 @@ namespace OneTaskBar
     }
     internal static class LauncherSearch
     {
+        static readonly System.Text.RegularExpressions.Regex site=new System.Text.RegularExpressions.Regex(@"^(https?://)?([a-z0-9-]+\.)+[a-z]{2,}(:\d+)?(/\S*)?$",System.Text.RegularExpressions.RegexOptions.IgnoreCase|System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+        internal static bool LooksLikeSite(string text){text=(text??"").Trim();return text.IndexOf(' ')<0&&site.IsMatch(text);}
+        // A typed address opens as it is; anything else becomes a web search.
+        internal static string WebAddress(string text)
+        {
+            text=(text??"").Trim();
+            if(LooksLikeSite(text))return text.StartsWith("http",StringComparison.OrdinalIgnoreCase)?text:"https://"+text;
+            return "https://www.google.com/search?q="+Uri.EscapeDataString(text);
+        }
+        // ShellExecute on an https address starts the browser the user has chosen as default.
+        internal static void OpenWeb(string address)
+        {
+            try{Process.Start(new ProcessStartInfo(address){UseShellExecute=true});}
+            catch(Exception error){AppLog.Once("web-search",error.GetType().Name);}
+        }
         internal static readonly SearchSetting[] Settings=CreateSettings();
         static SearchSetting[] CreateSettings()
         {

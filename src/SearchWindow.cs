@@ -55,7 +55,22 @@ namespace OneTaskBar
             var settings=LauncherSearch.Settings.Where(s=>LauncherSearch.Matches(s.Name+" "+s.Keywords,query)).ToList();
             if(settings.Count>0)SettingCard("설정 및 제어판",settings);
             files=new StackPanel();files.Children.Add(Label("파일과 사진을 찾고 있습니다…",12,LightPanel.Muted));filesCard=Card("내 파일",files);
+            WebCard(query);
             debounce.Start();
+        }
+        // The typed text can always be sent on to the web, in whichever browser Windows has as the default.
+        void WebCard(string query)
+        {
+            string address=LauncherSearch.WebAddress(query);
+            bool site=LauncherSearch.LooksLikeSite(query);
+            var row=new StackPanel {Orientation=Orientation.Horizontal};
+            row.Children.Add(new Glyph("search",18){Color=Paint.Text,Margin=new Thickness(0,0,9,0)});
+            row.Children.Add(Label(site?""+query+" 열기":"웹에서 "+query+" 검색",14,Paint.Ink));
+            Action launch=()=>Open(()=>LauncherSearch.OpenWeb(address),query);
+            var button=Paint.Button(row,launch,site?"기본 브라우저에서 열기":"기본 브라우저로 웹 검색");
+            button.Background=Paint.Brush(QuickPanel.Inactive);button.HorizontalContentAlignment=HorizontalAlignment.Left;button.Padding=new Thickness(15,11,15,11);
+            Navigation.Add(button,launch);
+            Card("웹",button);
         }
         internal List<AppEntry> Recommendations() {return shell.RecentApps.Recommend(shell.Apps,shell.Running,12);}
         Border Card(string title,UIElement body,Action extra=null)

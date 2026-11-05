@@ -15,7 +15,8 @@ namespace OneTaskBar
     internal sealed class FullscreenMedia : GlassWindow
     {
         readonly Canvas canvas=new Canvas();
-        readonly Border cover=new Border(),card=new Border();
+        readonly Border cover=new Border(),card=new Border(),fill=new Border();
+        readonly FullscreenCaption caption=new FullscreenCaption();
         readonly Border wallpaper=new Border(),artworkWash=new Border();
         readonly TextBlock clock=Paint.TextBlock("",36,Paint.ControlWhite),date=Paint.TextBlock("",16,Paint.ControlWhite);
         readonly MediaPlayerView player;
@@ -82,8 +83,11 @@ namespace OneTaskBar
             artButton=Paint.Button(cover,ToggleArtwork,"커버 크게 · 작게");artButton.Padding=new Thickness(0);
             artButton.Background=Brushes.Transparent;canvas.Children.Add(artButton);Panel.SetZIndex(artButton,2);
             player=new MediaPlayerView(dispatch,seekCommand,()=>{HideImmediately();output();},sourceApp:sourceApp);
-            card.Child=player;card.CornerRadius=new CornerRadius(28);card.BorderBrush=Paint.Brush("#35FFFFFF");
-            card.BorderThickness=new Thickness(.6);card.Clip=cardClip;canvas.Children.Add(card);
+            // The card's own fill and edge fade out as the cover opens, so the expanded player has no panel.
+            fill.BorderBrush=Paint.Brush("#35FFFFFF");fill.BorderThickness=new Thickness(.6);fill.IsHitTestVisible=false;
+            var cardContent=new Grid();cardContent.Children.Add(fill);cardContent.Children.Add(player);
+            card.Child=cardContent;card.CornerRadius=new CornerRadius(28);card.Clip=cardClip;canvas.Children.Add(card);
+            canvas.Children.Add(caption);Panel.SetZIndex(caption,3);
             var close=Icon("close",Hide,"전체화면 닫기 · Esc");close.Tag="close";canvas.Children.Add(close);
             lockButton=Icon("lock",lockPC,"PC 잠금");lockButton.Tag="lock";canvas.Children.Add(lockButton);
             SizeChanged+=(s,e)=>Layout(false);
@@ -250,13 +254,14 @@ namespace OneTaskBar
             Canvas.SetLeft(artButton,box.X);Canvas.SetTop(artButton,box.Y);
             coverClip.Rect=new Rect(0,0,box.Width,box.Height);coverClip.RadiusX=coverClip.RadiusY=coverRadius;
             artButton.Visibility=artwork!=null?Visibility.Visible:Visibility.Collapsed;
+            caption.Place(box,coverRadius,artwork!=null?Unit((washSpring.Value-.55)/.45):0);
         }
         void PlaceCard(Rect box)
         {
             cardBox=box;
             card.Width=box.Width;card.Height=box.Height;
             Canvas.SetLeft(card,box.X);Canvas.SetTop(card,box.Y);
-            card.CornerRadius=new CornerRadius(cardRadius);
+            card.CornerRadius=fill.CornerRadius=new CornerRadius(cardRadius);
             cardClip.Rect=new Rect(0,0,box.Width,box.Height);
             cardClip.RadiusX=cardClip.RadiusY=cardRadius;
         }
@@ -318,6 +323,7 @@ namespace OneTaskBar
             clock.FontSize=Math.Max(1,clockSizeSpring.Value);
             Canvas.SetTop(date,dateTopSpring.Value);
             artworkWash.Opacity=Unit(washSpring.Value);
+            fill.Opacity=1-Unit(washSpring.Value);
             shade.Opacity=Unit(shadeSpring.Value);
             if(tiles!=null)
             {
@@ -336,7 +342,8 @@ namespace OneTaskBar
             if(closed||!IsVisible)return;
             var media=state??new MediaState();player.FitFullscreen(CardBounds.Height,large);player.Update(media,outputName);
             if(!player.Modern&&player.FullscreenPill)player.SeekBar.WavePlaying=media.Available&&media.Active&&media.Playing;
-            card.Background=player.MediaBackground;
+            fill.Background=player.MediaBackground;
+            caption.Set(media.Title,media.Artist,player.SourceLogo);
             var now = DateTime.Now;
             clock.Text = FormatTime(now);
             date.Text = now.ToString("M월 d일 dddd",System.Globalization.CultureInfo.GetCultureInfo("ko-KR"));

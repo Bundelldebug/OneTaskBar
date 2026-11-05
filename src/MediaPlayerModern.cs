@@ -10,6 +10,7 @@ namespace OneTaskBar
         internal readonly bool Modern;
         internal Button ShuffleButton {get;private set;}
         internal MarqueeTitle CenterTitle {get{return modernTitle;}}
+        internal ImageSource SourceLogo {get{return sourceIcon==null?null:sourceIcon.Source;}}
         internal MarqueeTitle CenterArtist {get{return modernArtist;}}
         MarqueeTitle modernTitle,modernArtist;Image sourceIcon;
         Grid titleLine,modernWords,transport;Button fold;string logoApp;int logoRequest;MediaState modernState;double popupHeight=130;bool showArtist,compactPopup;
@@ -45,6 +46,7 @@ namespace OneTaskBar
         void FitModernControls()
         {
             if(FullscreenPill){FitFullscreenPillControls();return;}
+            if(fullscreenMode){FitFullscreenExpandedControls();return;}
             if(titleLine==null)return;double width=header.ActualWidth>1?header.ActualWidth:Math.Max(1,(widgetWidth>0?widgetWidth:ActualWidth)-28);bool narrow=width<210;
             double font=usingPoster?Math.Max(14,Math.Min(20,posterEdge/15)):CompactMedia?(narrow?11:13):15;
             modernTitle.TextSize=font;modernTitle.Height=modernTitle.LineHeight;modernArtist.TextSize=usingPoster?12:CompactMedia?10:11;modernArtist.Height=modernArtist.LineHeight;modernArtist.Margin=new Thickness(0,showArtist?3:0,0,0);modernArtist.Visibility=showArtist?Visibility.Visible:Visibility.Collapsed;modernWords.Height=modernTitle.Height+(showArtist?modernArtist.Height+3:0);

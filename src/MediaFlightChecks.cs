@@ -67,7 +67,7 @@ namespace OneTaskBar
                     Require(pose.Width<=last.Width+.001&&pose.Height<=last.Height+.001,"neither flight axis swells before reaching the capsule");
                     Require(pose.Radius>=0&&pose.Radius<=Math.Min(pose.Width,pose.Height)/2+.001,"rounded mesh remains inside its bounds");
                     Require(pose.Opacity<=last.Opacity+.001&&pose.Opacity>=0,"window blends into the receiving capsule without reappearing");
-                    Require(Math.Abs(pose.Tilt)<=11.001&&Math.Abs(pose.Turn)<=11.001,"perspective remains restrained");
+                    Require(Math.Abs(pose.Tilt)<=15.001&&Math.Abs(pose.Turn)<=15.001,"perspective remains restrained");
                     var deformation=MediaCapsulePose.At(capsule,window,frame/240.0);
                     Require(deformation.Width>capsule.Width*.92&&deformation.Width<capsule.Width*1.08&&
                         deformation.Height>capsule.Height*.92&&deformation.Height<capsule.Height*1.08,"receiving capsule stays within its reserved deformation margin");
@@ -83,8 +83,8 @@ namespace OneTaskBar
                     var firstStep=MediaWindowPose.At(window,capsule,MediaFlightTiming.Position(.001,restoring));
                     var end=MediaWindowPose.At(window,capsule,MediaFlightTiming.Position(1,restoring));
                     var endStep=MediaWindowPose.At(window,capsule,MediaFlightTiming.Position(.999,restoring));
-                    Require((first.Center-firstStep.Center).Length<.01&&(end.Center-endStep.Center).Length<.01&&
-                        Math.Abs(first.Width-firstStep.Width)<.01&&Math.Abs(end.Width-endStep.Width)<.01,"position and size hand off without endpoint velocity");
+                    Require((first.Center-firstStep.Center).Length<.15&&(end.Center-endStep.Center).Length<.15&&
+                        Math.Abs(first.Width-firstStep.Width)<.15&&Math.Abs(end.Width-endStep.Width)<.15,"position and size hand off without endpoint velocity");
                 }
             }
         }

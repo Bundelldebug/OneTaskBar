@@ -177,7 +177,7 @@ namespace OneTaskBar
             Rect capsule;
             IntPtr owner;
             if(snapshot==null||snapshotWindow!=window||!Capsule(window,out capsule,out owner))return;
-            if(prepared!=null&&preparedImage==snapshot&&preparedBounds==bounds&&preparedCapsule==capsule)
+            if(prepared!=null&&preparedImage==snapshot&&prepared.CanServe(bounds,capsule))
             {
                 if(!lease.Arm(window))DropPrepared();
                 return;
@@ -277,7 +277,7 @@ namespace OneTaskBar
             {
                 if(image!=null)
                 {
-                    if(prepared!=null&&preparedImage==image&&preparedBounds==initial&&preparedCapsule==capsule)
+                    if(prepared!=null&&preparedImage==image&&prepared.CanServe(initial,capsule))
                     {
                         plane=prepared;
                         prepared=null;

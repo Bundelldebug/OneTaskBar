@@ -13,6 +13,7 @@ namespace OneTaskBar
     // Run with --media-foreign-diag. It never touches saved settings or other windows.
     internal static class MediaForeignDiag
     {
+        [System.Runtime.InteropServices.DllImport("user32.dll")]static extern bool PrintWindow(IntPtr window,IntPtr dc,uint flags);
         internal static int Run()
         {
             var application=new Application {ShutdownMode=ShutdownMode.OnExplicitShutdown};
@@ -42,18 +43,30 @@ namespace OneTaskBar
                     var capsule=new Rect(screen.Left+screen.Width/2-170,screen.Bottom-150,340,56);
                     using(var enter=new MediaWindowMotion(null,null))
                     {
-                        enter.Begin(window,null,IntPtr.Zero,bounds,capsule,true,false,image,null);
+                        enter.Begin(window,null,IntPtr.Zero,bounds,capsule,false,false,image,null);
                         Native.ShowWindow(window,6);
-                        for(int step=0;step<6;step++)
+                        var log=new List<string>();
+                        var clock=System.Diagnostics.Stopwatch.StartNew();
+                        for(int step=0;step<9;step++)
                         {
-                            await Task.Delay(75);
-                            using(var bitmap=new System.Drawing.Bitmap(screen.Width,screen.Height))
-                            using(var graphics=System.Drawing.Graphics.FromImage(bitmap))
+                            await Task.Delay(step==0?20:42);
+                            var plane=enter.PreviewHandle;
+                            Native.RectI pr;bool got=plane!=IntPtr.Zero&&Native.GetWindowRect(plane,out pr);
+                            pr=new Native.RectI();if(got)Native.GetWindowRect(plane,out pr);
+                            log.Add(clock.ElapsedMilliseconds+"ms visible="+(plane!=IntPtr.Zero&&Native.IsWindowVisible(plane))+" rect="+pr.Left+","+pr.Top+","+pr.Right+","+pr.Bottom+" frames="+enter.FrameCount+" sourceVisible="+Native.IsWindowVisible(window));
+                            if(got&&pr.Right>pr.Left)
                             {
-                                graphics.CopyFromScreen(screen.Left,screen.Top,0,0,bitmap.Size);
-                                bitmap.Save(Path.Combine(AppLog.Data,"foreign-enter-"+step+".png"));
+                                using(var bitmap=new System.Drawing.Bitmap(pr.Right-pr.Left,pr.Bottom-pr.Top))
+                                using(var graphics=System.Drawing.Graphics.FromImage(bitmap))
+                                {
+                                    graphics.Clear(System.Drawing.Color.FromArgb(255,60,60,70));
+                                    var dc=graphics.GetHdc();
+                                    try{PrintWindow(plane,dc,2);}finally{graphics.ReleaseHdc(dc);}
+                                    bitmap.Save(Path.Combine(AppLog.Data,"foreign-enter-"+step+".png"));
+                                }
                             }
                         }
+                        File.WriteAllLines(Path.Combine(AppLog.Data,"foreign-enter.txt"),log);
                         await Task.Delay(700);
                     }
                     Native.ShowWindow(window,6);

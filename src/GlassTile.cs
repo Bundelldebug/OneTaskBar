@@ -33,6 +33,37 @@ namespace OneTaskBar
         {
             var brush=new LinearGradientBrush {StartPoint=new Point(0,0),EndPoint=new Point(0,1)};brush.GradientStops.Add(new GradientStop(Colors.Transparent,0));brush.GradientStops.Add(new GradientStop(Colors.Transparent,.64));brush.GradientStops.Add(new GradientStop(Color.FromArgb(dark?(byte)27:(byte)19,8,16,27),1));brush.Freeze();return brush;
         }
+        // The optional liquid material: light collects along the thick edge of the glass and fades inward, and a
+        // specular glint sits on the upper face. Built from several thin soft strokes, not one hard ring, so it
+        // reads as a glow and never as a second outline.
+        static readonly Pen[] liquidEdge=LiquidEdgePens();
+        static readonly Brush liquidGlint=LiquidGlint();
+        static Pen[] LiquidEdgePens()
+        {
+            var pens=new Pen[3];
+            for(int i=0;i<pens.Length;i++)
+            {
+                var brush=new LinearGradientBrush {StartPoint=new Point(.1,0),EndPoint=new Point(.9,1)};
+                byte strong=(byte)(13-i*3),weak=(byte)(4-i);
+                brush.GradientStops.Add(new GradientStop(Color.FromArgb(strong,255,255,255),0));
+                brush.GradientStops.Add(new GradientStop(Color.FromArgb(weak,225,238,255),.5));
+                brush.GradientStops.Add(new GradientStop(Color.FromArgb((byte)(strong*2/3),255,255,255),1));
+                brush.Freeze();
+                var pen=new Pen(brush,3+i*3);pen.Freeze();pens[i]=pen;
+            }
+            return pens;
+        }
+        static Brush LiquidGlint()
+        {
+            var brush=new RadialGradientBrush(Color.FromArgb(26,255,255,255),Colors.Transparent){Center=new Point(.16,.06),GradientOrigin=new Point(.16,.06),RadiusX=.5,RadiusY=.28};
+            brush.Freeze();return brush;
+        }
+        internal static void LiquidEdge(DrawingContext dc,Rect box,double radius)
+        {
+            if(box.Width<24||box.Height<24)return;
+            for(int i=liquidEdge.Length-1;i>=0;i--)dc.DrawRoundedRectangle(null,liquidEdge[i],box,radius,radius);
+            dc.DrawRectangle(liquidGlint,null,new Rect(box.X,box.Y,box.Width,Math.Min(box.Height*.5,radius*2+30)));
+        }
         internal static void Draw(DrawingContext dc,double width,double height,double radius,bool strong=true,bool? darkOverride=null)
         {
             if(!Glass95.Transparent||width<3||height<3)return;bool dark=darkOverride??Glass95.Dark;var box=new Rect(.65,.65,width-1.3,height-1.3);var clip=new RectangleGeometry(box,radius,radius);dc.PushClip(clip);dc.DrawRectangle(dark?darkDepth:lightDepth,null,box);
@@ -42,6 +73,7 @@ namespace OneTaskBar
             if(strong&&width>24&&height>24)
             {
                 dc.DrawRectangle(dark?darkSheen:lightSheen,null,new Rect(box.X,box.Y,box.Width,Math.Min(box.Height*.42,radius*1.6+10)));
+                if(LiquidGlass.Enabled)LiquidEdge(dc,box,radius);
             }
             dc.Pop();
         }

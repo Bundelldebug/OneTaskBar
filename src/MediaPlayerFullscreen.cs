@@ -62,13 +62,25 @@ namespace OneTaskBar
                     PlayButton.Margin=new Thickness(24,0,24,0);
                 }
                 else{
-                    header.Margin=new Thickness(0,2,0,0);
+                    // The track is shown on the cover. What is left here is the output, the timeline and the controls.
+                    header.Visibility=Visibility.Collapsed;
+                    Height=fullscreenHeight-1.2;
+                    Margin=new Thickness(24,8,24,12);
+                    double inner=Height-20,controlsRow=72,routeRow=30;
+                    double[] heights={routeRow,0,Math.Max(30,inner-routeRow-controlsRow),controlsRow};
+                    for(int i=0;i<4;i++)RowDefinitions[i].Height=new GridLength(heights[i]);
+                    Grid.SetRow(route,0);
                     Grid.SetRow(transport,3);
+                    transport.Margin=new Thickness(0);
+                    route.Visibility=timeline.Visibility=transport.Visibility=Visibility.Visible;
+                    SeekBar.Height=Math.Max(16,heights[2]-22);
+                    FitFullscreenExpandedControls();
                 }
                 Grid.SetRow(timeline,2);
                 timeline.VerticalAlignment=VerticalAlignment.Stretch;
                 return;
             }
+            header.Visibility=Visibility.Visible;
             Height=fullscreenHeight-1.2;
             Margin=new Thickness(0);
             double[] rows={10,22,Math.Max(30,Height-48),16};
@@ -94,6 +106,19 @@ namespace OneTaskBar
                 artist.Visibility=Visibility.Collapsed;
                 FitFullscreenPillButtons();
             }
+        }
+
+        // The expanded player's transport: larger glass circles, the shuffle at the left edge, the output line above.
+        void FitFullscreenExpandedControls()
+        {
+            PreviousButton.Width=PreviousButton.Height=NextButton.Width=NextButton.Height=54;
+            PlayButton.Width=PlayButton.Height=64;
+            PlayButton.Margin=new Thickness(22,0,22,0);
+            NextButton.Margin=new Thickness(0);
+            ShuffleButton.Width=ShuffleButton.Height=36;
+            foreach(var button in new[]{PreviousButton,PlayButton,NextButton}){button.Background=controlGlass;button.Resources["ButtonRadius"]=new CornerRadius(40);}
+            device.FontSize=14;elapsed.FontSize=duration.FontSize=12;device.Visibility=Visibility.Visible;
+            route.ColumnDefinitions[1].Width=new GridLength(1,GridUnitType.Star);
         }
 
         void FitFullscreenPillControls()

@@ -56,7 +56,7 @@ namespace OneTaskBar
             if(disposed)return 0;
             var screen=Forms.Screen.PrimaryScreen;
             double scale=Native.DropMonitorScale(screen.Bounds);
-            var available=new Size(screen.WorkingArea.Width/scale,screen.WorkingArea.Height/scale);
+            var available=new Size(Work(screen).Width/scale,Work(screen).Height/scale);
             var layout=DesktopWidgetLayouts.Default(available,shell.Power.Known,WeatherService.Configured);
             if(layout.Count==0)return 0;
             Deselect();
@@ -359,8 +359,8 @@ namespace OneTaskBar
         {
             if(disposed||screen==null)return;
             double scale=Native.DropMonitorScale(screen.Bounds);
-            Point? near=anchor.HasValue?(Point?)new Point((anchor.Value.X-screen.WorkingArea.Left)/scale,(anchor.Value.Y-screen.WorkingArea.Top)/scale):null;
-            var item=Store.Add(key,screen.DeviceName,new Size(screen.WorkingArea.Width/scale,screen.WorkingArea.Height/scale),IconRects(screen,scale),near);
+            Point? near=anchor.HasValue?(Point?)new Point((anchor.Value.X-Work(screen).Left)/scale,(anchor.Value.Y-Work(screen).Top)/scale):null;
+            var item=Store.Add(key,screen.DeviceName,new Size(Work(screen).Width/scale,Work(screen).Height/scale),IconRects(screen,scale),near);
             RefreshIcons();
             if(item==null)
             {
@@ -379,7 +379,7 @@ namespace OneTaskBar
         internal int IconCount {get{return iconPixels.Count;}}
         List<Rect> IconRects(Forms.Screen screen,double scale)
         {
-            var area=screen.WorkingArea;
+            var area=Work(screen);
             return iconPixels.Where(r=>screen.Bounds.IntersectsWith(new System.Drawing.Rectangle((int)r.X,(int)r.Y,(int)r.Width,(int)r.Height)))
                 .Select(r=>new Rect((r.X-area.Left)/scale,(r.Y-area.Top)/scale,r.Width/scale,r.Height/scale)).ToList();
         }
@@ -403,7 +403,7 @@ namespace OneTaskBar
         List<Rect> Blockers(DesktopWidgetSlot item,Forms.Screen screen,double scale)
         {
             var blocked=IconRects(screen,scale);
-            var available=new Size(screen.WorkingArea.Width/scale,screen.WorkingArea.Height/scale);
+            var available=new Size(Work(screen).Width/scale,Work(screen).Height/scale);
             foreach(var other in Store.Items)
             {
                 if(other!=item&&ScreenFor(other).DeviceName==screen.DeviceName)blocked.Add(DesktopWidgetStore.Fit(other,available));
@@ -415,7 +415,7 @@ namespace OneTaskBar
         {
             var screen=ScreenFor(item);
             double scale=Native.DropMonitorScale(screen.Bounds);
-            var available=new Size(screen.WorkingArea.Width/scale,screen.WorkingArea.Height/scale);
+            var available=new Size(Work(screen).Width/scale,Work(screen).Height/scale);
             var fitted=DesktopWidgetStore.Fit(item,available);
             var blocked=Blockers(item,screen,scale);
             if(!always&&!blocked.Any(r=>fitted.IntersectsWith(r)))return false;
@@ -471,13 +471,20 @@ namespace OneTaskBar
             Pulse();
             if(gallery!=null)gallery.RefreshStatus();
         }
+        // The monitor's work area as the system reports it now. A cached Screen keeps the old one when the dock
+        // reserves a different edge, which left widgets under the dock after it moved to a side.
+        internal static System.Drawing.Rectangle Work(Forms.Screen screen)
+        {
+            var area=Native.WorkArea(screen);
+            return area.Right>area.Left&&area.Bottom>area.Top?new System.Drawing.Rectangle(area.Left,area.Top,area.Right-area.Left,area.Bottom-area.Top):screen.WorkingArea;
+        }
         static Forms.Screen ScreenFor(DesktopWidgetSlot item)
         {
             return Forms.Screen.AllScreens.FirstOrDefault(s=>String.Equals(s.DeviceName,item.Monitor,StringComparison.OrdinalIgnoreCase))??Forms.Screen.PrimaryScreen;
         }
         internal static Rect Physical(DesktopWidgetSlot item,Forms.Screen screen,double scale)
         {
-            var area=screen.WorkingArea;
+            var area=Work(screen);
             var fitted=DesktopWidgetStore.Fit(item,new Size(area.Width/scale,area.Height/scale));
             // The size is rounded on its own, so equal widgets are equal pixels wherever they sit.
             return new Rect(area.Left+Math.Round(fitted.X*scale),area.Top+Math.Round(fitted.Y*scale),Math.Round(fitted.Width*scale),Math.Round(fitted.Height*scale));
@@ -510,11 +517,11 @@ namespace OneTaskBar
             else
             {
                 item.Monitor=screen.DeviceName;
-                item.X=(dragPixels.X+end.X-start.X-screen.WorkingArea.Left)/scale;
-                item.Y=(dragPixels.Y+end.Y-start.Y-screen.WorkingArea.Top)/scale;
+                item.X=(dragPixels.X+end.X-start.X-Work(screen).Left)/scale;
+                item.Y=(dragPixels.Y+end.Y-start.Y-Work(screen).Top)/scale;
             }
             DesktopWidgetStore.Normalize(item);
-            var fit=DesktopWidgetStore.Fit(item,new Size(screen.WorkingArea.Width/scale,screen.WorkingArea.Height/scale));
+            var fit=DesktopWidgetStore.Fit(item,new Size(Work(screen).Width/scale,Work(screen).Height/scale));
             item.X=fit.X;
             item.Y=fit.Y;
             item.Width=fit.Width;

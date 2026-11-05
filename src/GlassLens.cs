@@ -45,7 +45,7 @@ namespace OneTaskBar
             }
             edge.StartPoint=new Point(light.X*.5,0);
             edge.EndPoint=new Point(.65+light.X*.3,1);
-            dc.PushClip(shape);dc.DrawRoundedRectangle(null,rim,bounds,radius,radius);dc.Pop();
+            dc.PushClip(shape);dc.DrawRoundedRectangle(null,rim,bounds,radius,radius);if(LiquidGlass.Enabled)GlassOptics.LiquidEdge(dc,bounds,radius);dc.Pop();
         }
     }
 }
