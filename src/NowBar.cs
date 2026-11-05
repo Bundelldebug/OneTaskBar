@@ -99,12 +99,23 @@ namespace OneTaskBar
         internal void CollapseOutside(){SetExpanded(false);if(DismissedOutside!=null)DismissedOutside();}
         bool ContainsScreenPoint(Native.PointI point){if(!expanded||!IsVisible)return false;Point first=Surface.PointToScreen(new Point()),last=Surface.PointToScreen(new Point(Surface.ActualWidth,Surface.ActualHeight));return point.X>=first.X&&point.X<last.X&&point.Y>=first.Y&&point.Y<last.Y;}
         void SetActivation(bool value){var h=new WindowInteropHelper(this).Handle;if(h==IntPtr.Zero)return;int style=Native.GetWindowLong(h,-20);Native.SetWindowLong(h,-20,value?style&~0x08000000:style|0x08000000);}
+        // The bar moves along one spring from where it is to where it should be. A new target while it is
+        // moving keeps the speed it already has in the direction it now needs, so an interrupted
+        // expand or collapse bends instead of stopping and starting over.
+        readonly SpringValue slide=new SpringValue(.002) {Omega=36};
+        readonly SpringClock slideClock=new SpringClock();
+        void Retarget(Rect bounds)
+        {
+            SpringValue.Handoff(slide,animating,current,from,target,bounds);
+            from=current;
+            target=bounds;
+            slideClock.Restart();
+        }
         void Resize(Rect bounds)
         {
             if(Math.Abs(target.X-bounds.X)<.1&&Math.Abs(target.Y-bounds.Y)<.1&&Math.Abs(target.Width-bounds.Width)<.1&&Math.Abs(target.Height-bounds.Height)<.1)return;
             if(flight!=null)flight.Dispose();
-            from=current;
-            target=bounds;
+            Retarget(bounds);
             StopMotion();
             FrameCount=0;
             MaximumFrameGap=MaximumPlaceMilliseconds=0;
@@ -146,12 +157,12 @@ namespace OneTaskBar
             if(lastFrame>0)MaximumFrameGap=Math.Max(MaximumFrameGap,milliseconds-lastFrame);
             lastFrame=milliseconds;
             FrameCount++;
-            double t=Math.Min(1,milliseconds/300),progress=1-Math.Pow(1-t,3);
+            slide.Step(slideClock.Next(TimeSpan.FromMilliseconds(milliseconds)));bool settled=slide.AtRest;double progress=settled?1:slide.Value;
             current=new Rect(from.X+(target.X-from.X)*progress,from.Y+(target.Y-from.Y)*progress,from.Width+(target.Width-from.Width)*progress,from.Height+(target.Height-from.Height)*progress);
             long stamp=Program.Inspectable?Stopwatch.GetTimestamp():0;
             Place();
             if(stamp!=0)MaximumPlaceMilliseconds=Math.Max(MaximumPlaceMilliseconds,(Stopwatch.GetTimestamp()-stamp)*1000.0/Stopwatch.Frequency);
-            if(t>=1)
+            if(settled)
             {
                 StopMotion();
                 if(!expanded)expandedContent.Visibility=Visibility.Collapsed;

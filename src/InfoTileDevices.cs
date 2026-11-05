@@ -62,7 +62,8 @@ namespace OneTaskBar
         {
             var now=DateTime.UtcNow;
             if(now<readAt)return levels;
-            readAt=now.AddSeconds(ReadSeconds);
+            // On battery power the device list is read less often.
+            readAt=now.AddSeconds(shell.Power.Known&&!shell.Power.Connected?ReadSeconds*3:ReadSeconds);
             var peers=shell.Buds.ConnectedPeers();
             var next=new List<DeviceLevel>();
             foreach(var peer in peers)

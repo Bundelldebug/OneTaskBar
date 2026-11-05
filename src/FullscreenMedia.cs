@@ -20,20 +20,31 @@ namespace OneTaskBar
         readonly TextBlock clock=Paint.TextBlock("",36,Paint.ControlWhite),date=Paint.TextBlock("",16,Paint.ControlWhite);
         readonly MediaPlayerView player;
         readonly Button artButton,lockButton;
-        readonly Stopwatch morph=new Stopwatch();
         readonly RectangleGeometry coverClip=new RectangleGeometry();
         readonly RectangleGeometry cardClip=new RectangleGeometry();
         BitmapSource artwork;
         IntPtr mediaSurface;
-        Rect coverBox,from,to;
-        Rect cardBox,cardFrom,cardTo;
-        double coverRadius,fromCoverRadius,toCoverRadius,cardRadius,fromCardRadius,toCardRadius;
+        Rect coverBox,cardBox;
+        double coverRadius,cardRadius;
+        // Every moving part follows its own spring toward the layout it should have. They share one
+        // clock, so the cover, card, clock and tiles move as one continuous gesture, and turning
+        // around mid-way keeps their speed.
+        readonly SpringValue coverX=new SpringValue(),coverY=new SpringValue(),coverW=new SpringValue(),coverH=new SpringValue();
+        readonly SpringValue cardX=new SpringValue(),cardY=new SpringValue(),cardW=new SpringValue(),cardH=new SpringValue();
+        readonly SpringValue coverRound=new SpringValue(),cardRound=new SpringValue();
+        readonly SpringValue clockTopSpring=new SpringValue(),clockSizeSpring=new SpringValue(),dateTopSpring=new SpringValue();
+        readonly SpringValue washSpring=new SpringValue(.003),shadeSpring=new SpringValue(.003),tilesSpring=new SpringValue(.003);
+        readonly TranslateTransform tilesShift=new TranslateTransform();
+        SpringValue[] springs;
+        bool springsReady,motionHooked;
+        readonly SpringClock motionClock=new SpringClock();
+        TimeSpan lastMotion=TimeSpan.MinValue;
         bool large=true,closed;
         bool layoutValid,layoutLarge;
         double layoutWidth,layoutHeight;
         int wallpaperRequest;
         internal bool LargeCover {get{return large;}}
-        internal bool Morphing {get{return morph.IsRunning;}}
+        internal bool Morphing {get{return motionHooked;}}
         internal int LayoutPasses {get;private set;}
         internal Rect CoverBounds {get{return coverBox;}}
         internal Rect CardBounds {get;private set;}
@@ -84,7 +95,7 @@ namespace OneTaskBar
             };
             IsVisibleChanged+=(s,e)=>{
                 if(IsVisible)LoadWallpaper();
-                else{StopMorph();player.StopFullscreenMedia();wallpaperRequest++;wallpaper.Background=null;WallpaperReady=false;}
+                else{FinishMotion();player.StopFullscreenMedia();wallpaperRequest++;wallpaper.Background=null;WallpaperReady=false;}
             };
             Closed += (s, e) =>
             {
@@ -93,7 +104,7 @@ namespace OneTaskBar
                 if(tiles!=null)tiles.Retire();
                 closed = true;
                 wallpaperRequest++;
-                StopMorph();
+                StopMotion();
                 cover.Background = artworkWash.Background = wallpaper.Background = null;
                 artwork = null;
                 player.StopFullscreenMedia();
@@ -142,6 +153,7 @@ namespace OneTaskBar
             if(!animate&&layoutValid&&layoutWidth==w&&layoutHeight==h&&layoutLarge==large)return;
             LayoutPasses++;
             layoutValid=true;layoutWidth=w;layoutHeight=h;layoutLarge=large;
+            bool run=animate&&Motion.Enabled&&IsVisible&&springsReady;
             double cardWidth=Math.Max(240,Math.Min(large?640:MediaPlayerView.FullscreenPillWidth,w-48));
             double cardHeight=large?Math.Min(216,Math.Max(180,h*.27)):MediaPlayerView.FullscreenPillHeight;
             CardBounds=new Rect((w-cardWidth)/2,h-cardHeight-24,cardWidth,cardHeight);
@@ -152,11 +164,11 @@ namespace OneTaskBar
             double clockSize=(large?32:64)*Preferences.Current.FullscreenClockPercent/100.0;
             // Collapsed, the date sits above the clock so tiles can follow the time directly.
             double clockLine=large?clockTop:clockTop+28;
-            Animate(clock,Canvas.TopProperty,clockLine,animate);
-            Animate(clock,TextBlock.FontSizeProperty,clockSize,animate);
-            Animate(date,Canvas.TopProperty,large?clockLine+clockSize*1.15+6:clockTop,animate);
+            Aim(clockTopSpring,clockLine,run);
+            Aim(clockSizeSpring,clockSize,run);
+            Aim(dateTopSpring,large?clockLine+clockSize*1.15+6:clockTop,run);
             ClockBottom=clockLine+clockSize*1.3;
-            PlaceCompanions(w,h,animate);
+            PlaceCompanions(w,h,run);
             foreach(UIElement child in canvas.Children){
                 var button=child as Button;
                 if(button!=null&&button.Tag is string){Canvas.SetLeft(button,(string)button.Tag=="close"?w-54:w-104);Canvas.SetTop(button,16);}
@@ -166,24 +178,21 @@ namespace OneTaskBar
                 var slot=player.FullscreenArtworkSlot;
                 target=new Rect(CardBounds.X+slot.X,CardBounds.Y+slot.Y,slot.Width,slot.Height);
             }
-            Animate(artworkWash,OpacityProperty,large?1:0,animate);
-            toCoverRadius=large?Math.Min(24,target.Width*.2):target.Width/2;
-            toCardRadius=large?28:cardHeight/2;
-            if(animate&&Motion.Enabled&&IsVisible){
-                from=coverBox;to=target;cardFrom=cardBox;cardTo=CardBounds;
-                fromCoverRadius=coverRadius;fromCardRadius=cardRadius;
-                StopMorph();morph.Restart();CompositionTarget.Rendering+=OnMorph;
-            }
-            else{
-                StopMorph();coverRadius=toCoverRadius;cardRadius=toCardRadius;
-                PlaceCard(CardBounds);PlaceCover(target);
-            }
+            Aim(washSpring,large?1:0,run);
+            Aim(coverRound,large?Math.Min(24,target.Width*.2):target.Width/2,run);
+            Aim(cardRound,large?28:cardHeight/2,run);
+            Aim(coverX,target.X,run);Aim(coverY,target.Y,run);Aim(coverW,target.Width,run);Aim(coverH,target.Height,run);
+            Aim(cardX,CardBounds.X,run);Aim(cardY,CardBounds.Y,run);Aim(cardW,CardBounds.Width,run);Aim(cardH,CardBounds.Height,run);
+            springsReady=true;
+            if(run)StartMotion();
+            else FinishMotion();
         }
         // Collapsed, the wallpaper shows undimmed and the text takes its color from it.
         void ApplyInk(bool animate)
         {
-            Animate(shade,OpacityProperty,large?1:0,animate);
+            Aim(shadeSpring,large?1:0,animate);
             clock.Foreground=date.Foreground=large?Paint.ControlWhite:scheme.Ink;
+            if(!animate)ApplyMotion();
         }
         void PlaceCompanions(double w,double h,bool animate)
         {
@@ -203,15 +212,22 @@ namespace OneTaskBar
                 var room=showTiles?tiles.Fit(w-96,CardBounds.Top-ClockBottom-20):new Size(0,0);
                 bool fits=room.Width>0;
                 if(!fits)tiles.EndEdit(false);
-                tiles.Visibility=fits?Visibility.Visible:Visibility.Collapsed;
                 if(fits)
                 {
+                    tiles.Visibility=Visibility.Visible;
+                    tiles.RenderTransform=tilesShift;
                     TilesBounds=new Rect((w-room.Width)/2,ClockBottom+6,room.Width,room.Height);
                     Canvas.SetLeft(tiles,TilesBounds.X);
                     Canvas.SetTop(tiles,TilesBounds.Y);
-                    Animate(tiles,OpacityProperty,1,animate);
+                    Aim(tilesSpring,1,animate);
                     tiles.Refresh(DateTime.Now);
                     tiles.PlaceEditing();
+                }
+                else
+                {
+                    // Fading out, the tiles stay where they were until they are gone.
+                    Aim(tilesSpring,0,animate);
+                    if(!animate||tilesSpring.Value<=.01)tiles.Visibility=Visibility.Collapsed;
                 }
             }
             if(!large&&corners==null)
@@ -221,12 +237,12 @@ namespace OneTaskBar
             }
             if(corners!=null)corners.Place(w,h,!large&&w>=MediaPlayerView.FullscreenPillWidth+2*(56+FullscreenAppCorners.Size+16));
         }
-        static void Animate(FrameworkElement element,DependencyProperty property,double value,bool animate)
+        void Aim(SpringValue spring,double value,bool run)
         {
-            double from=(double)element.GetValue(property);if(Double.IsNaN(from))from=value;
-            element.BeginAnimation(property,null);element.SetValue(property,value);
-            if(animate&&Motion.Enabled)element.BeginAnimation(property,new DoubleAnimation(from,value,TimeSpan.FromMilliseconds(360)){
-                EasingFunction=new CubicEase {EasingMode=EasingMode.EaseOut},FillBehavior=FillBehavior.Stop});
+            spring.Target=value;
+            if(run)return;
+            spring.Value=value;
+            spring.Velocity=0;
         }
         void PlaceCover(Rect box)
         {
@@ -245,18 +261,72 @@ namespace OneTaskBar
             cardClip.RadiusX=cardClip.RadiusY=cardRadius;
         }
         internal void ToggleArtwork(){large=!large;Layout(true);}
-        void OnMorph(object sender,EventArgs args)
+        void StartMotion()
         {
-            double p=Math.Min(1,morph.Elapsed.TotalMilliseconds/360),t=1-Math.Pow(1-p,3);
-            coverRadius=fromCoverRadius+(toCoverRadius-fromCoverRadius)*t;
-            cardRadius=fromCardRadius+(toCardRadius-fromCardRadius)*t;
-            PlaceCard(new Rect(cardFrom.X+(cardTo.X-cardFrom.X)*t,cardFrom.Y+(cardTo.Y-cardFrom.Y)*t,
-                cardFrom.Width+(cardTo.Width-cardFrom.Width)*t,cardFrom.Height+(cardTo.Height-cardFrom.Height)*t));
-            PlaceCover(new Rect(from.X+(to.X-from.X)*t,from.Y+(to.Y-from.Y)*t,
-                from.Width+(to.Width-from.Width)*t,from.Height+(to.Height-from.Height)*t));
-            if(p>=1)StopMorph();
+            if(motionHooked)return;
+            motionHooked=true;
+            lastMotion=TimeSpan.MinValue;
+            motionClock.Restart();
+            CompositionTarget.Rendering+=OnMotion;
         }
-        void StopMorph(){CompositionTarget.Rendering-=OnMorph;morph.Stop();}
+        void StopMotion()
+        {
+            CompositionTarget.Rendering-=OnMotion;
+            motionHooked=false;
+        }
+        SpringValue[] Springs()
+        {
+            if(springs==null)springs=new[]{coverX,coverY,coverW,coverH,cardX,cardY,cardW,cardH,coverRound,cardRound,clockTopSpring,clockSizeSpring,dateTopSpring,washSpring,shadeSpring,tilesSpring};
+            foreach(var spring in springs)spring.Omega=32;
+            return springs;
+        }
+        // Settles every part on its target at once, for a hidden window or a plain resize.
+        void FinishMotion()
+        {
+            foreach(var spring in Springs())spring.Snap();
+            StopMotion();
+            ApplyMotion();
+        }
+        void OnMotion(object sender,EventArgs args)
+        {
+            var frame=args as RenderingEventArgs;
+            if(frame!=null&&frame.RenderingTime==lastMotion)return;
+            lastMotion=frame!=null?frame.RenderingTime:lastMotion;
+            double seconds=motionClock.Next(frame!=null?frame.RenderingTime:TimeSpan.FromMilliseconds(Environment.TickCount));
+            bool rest=true;
+            foreach(var spring in Springs())
+            {
+                spring.Step(seconds);
+                rest&=spring.AtRest;
+            }
+            if(rest)
+            {
+                FinishMotion();
+                return;
+            }
+            ApplyMotion();
+        }
+        static double Unit(double value){return Math.Max(0,Math.Min(1,value));}
+        void ApplyMotion()
+        {
+            if(!springsReady)return;
+            coverRadius=Math.Max(0,coverRound.Value);
+            cardRadius=Math.Max(0,cardRound.Value);
+            PlaceCard(new Rect(cardX.Value,cardY.Value,Math.Max(1,cardW.Value),Math.Max(1,cardH.Value)));
+            PlaceCover(new Rect(coverX.Value,coverY.Value,Math.Max(1,coverW.Value),Math.Max(1,coverH.Value)));
+            Canvas.SetTop(clock,clockTopSpring.Value);
+            clock.FontSize=Math.Max(1,clockSizeSpring.Value);
+            Canvas.SetTop(date,dateTopSpring.Value);
+            artworkWash.Opacity=Unit(washSpring.Value);
+            shade.Opacity=Unit(shadeSpring.Value);
+            if(tiles!=null)
+            {
+                double shown=Unit(tilesSpring.Value);
+                tiles.Opacity=shown;
+                tilesShift.Y=(1-shown)*18;
+                if(tilesSpring.Target<=0&&shown<=.01&&tiles.Visibility==Visibility.Visible)tiles.Visibility=Visibility.Collapsed;
+            }
+        }
         internal static string FormatTime(DateTime value)
         {
             return value.ToString("h:mm", CultureInfo.InvariantCulture);
@@ -269,7 +339,7 @@ namespace OneTaskBar
             card.Background=player.MediaBackground;
             var now = DateTime.Now;
             clock.Text = FormatTime(now);
-            date.Text = now.ToString("M월 d일 dddd");
+            date.Text = now.ToString("M월 d일 dddd",System.Globalization.CultureInfo.GetCultureInfo("ko-KR"));
             if(!large&&tiles!=null&&tiles.Visibility==Visibility.Visible)tiles.Refresh(now);
             if(!large&&corners!=null)corners.Refresh();
             if(artwork!=media.Artwork){

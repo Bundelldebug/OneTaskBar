@@ -52,6 +52,8 @@ namespace OneTaskBar
         Rect host,current,from,target;
         double currentRadius=10,fromRadius,targetRadius;
         TimeSpan lastRendering=TimeSpan.MinValue;
+        readonly SpringValue slide=new SpringValue(.002) {Omega=38};
+        readonly SpringClock slideClock=new SpringClock();
         bool animating,closed,placingHost,placementQueued;
         IDisposable outsideClick;
         IntPtr previousWindow;
@@ -391,6 +393,8 @@ namespace OneTaskBar
         void MoveTo(Rect next)
         {
             if(target==next)return;
+            SpringValue.Handoff(slide,animating,current,from,target,next);
+            slideClock.Restart();
             target=next;from=current;
             body.Width=next.Width;body.Height=next.Height;
             fromRadius=currentRadius;
@@ -404,11 +408,11 @@ namespace OneTaskBar
         {
             var rendering=e as RenderingEventArgs;
             if(rendering!=null){if(rendering.RenderingTime==lastRendering)return;lastRendering=rendering.RenderingTime;}
-            double t=Math.Min(1,motion.Elapsed.TotalMilliseconds/220),ease=1-Math.Pow(1-t,3);
+            slide.Step(slideClock.Next(rendering!=null?rendering.RenderingTime:motion.Elapsed));bool settled=slide.AtRest;double ease=settled?1:slide.Value;
             current=new Rect(from.X+(target.X-from.X)*ease,from.Y+(target.Y-from.Y)*ease,from.Width+(target.Width-from.Width)*ease,from.Height+(target.Height-from.Height)*ease);
             currentRadius=fromRadius+(targetRadius-fromRadius)*ease;
             PlaceShape();
-            if(t>=1)StopMotion();
+            if(settled)StopMotion();
         }
         void PlaceShape()
         {

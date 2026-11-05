@@ -16,7 +16,8 @@ Use `OneTaskBar-Setup.exe` to install for the current user, or extract the entir
 - Open fullscreen media controls, choose a vertical capsule for side docks, or enable Dynamic Island for media, new notifications and charging, volume and brightness feedback. The dock media capsule, window transitions and Duo status icon each have their own switch.
 - Switch windows and desktops with previews. Windows' original Start, search, notifications and Alt+Tab remain selectable in settings.
 - Place clock, calendar, battery, player, reminder, weather and other widgets on the desktop in sizes from 2×1 to 4×2. Click or long-press a widget to edit it; dragging snaps to a grid and avoids desktop icons. Opacity and blur are adjustable.
-- Collapsing the fullscreen media screen shows widgets below the time and your chosen apps in the lower corners.
+- Collapsing the fullscreen media screen shows widgets below the time and your chosen apps in the lower corners. Right-click or long-press a widget there to move, resize, add or remove it on the spot.
+- Desktop widgets are always their tile's exact size, get the 9.5 glass material, and the desktop right-click menu offers "위젯 추가" (under "Show more options" in Windows 11). Turning widgets on for the first time places a tidy default set along the right edge.
 - Group, expand and swipe away notifications. Custom notification sounds use a local file you choose.
 
 The dock's Start button opens the app screen or Start menu according to settings. Click it again or click outside to close the menu. App context menus provide pinning, folders and supported desktop-app actions.

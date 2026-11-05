@@ -1,5 +1,16 @@
 # Validation
 
+## 9.5.5
+
+- Desktop widgets are always their tile's exact size (fixture: odd saved sizes load as the tile size; equal widgets are equal pixels at 1x to 2x). The 9.5 glass material, the desktop menu entry, the default arrangement and the fullscreen tile editor are covered by `desktop-widgets-probe` and `fullscreen-tiles-probe`. The desktop menu entry was confirmed present by the running app; Explorer's menu itself was not opened. Windows 11 lists it under "Show more options".
+- The collapsed-media tile editor was checked through its handlers and screenshots, not with a physical mouse.
+- The blurred, empty keyboard volume bar and the Windows bar showing behind ours during games were not reproduced. The likely cause is that the cover over Windows' bar was released whenever audio or brightness was briefly unreadable (earbuds connecting). It is now held for 60 seconds, and a blur left behind by a hidden or cloaked window is cleaned up on the shell tick. Neither was exercised with real earbuds or a game.
+- The volume bar takes the sound output's symbol (earbuds, headphones, display); names are matched in English and Korean only.
+- Fullscreen media, the media pill and the Dynamic Island use one critically damped spring with speed carried across reversals. `fullscreen-media-probe` traces the cover frame by frame: many frames, no jump above a fifth of the way, no overshoot, smooth bend at a reversal. No perceptual comparison with the reference videos was made.
+- All 33 fixtures pass when each is run alone, with retries for focus checks. `dynamic-island-probe` and `nowbar9-probe` failed on window focus checks in some runs on this PC; the island fixture failed 4 of 6 runs both before and after the spring change in the same session, so it is not caused by it.
+- Idle with media playing, on battery: 0.05-0.08% CPU, 270-350 MiB total with glass widgets on (default). With glass off, CPU was 0.46-0.62% in two samples and total memory up to 425 MiB; not investigated. The foreground media case (media window captures) was not reached.
+- Other-PC compatibility was reviewed in code only: no hard-coded user paths, no culture-dependent number parsing, dates pinned to Korean. Nothing was run on another PC, Windows build or monitor setup.
+
 ## 9.5.4
 
 - A press released outside a desktop widget left it capturing the mouse once the long-press timer fired. `desktop-widgets-probe` reproduced this against the 9.5.3 code before the fix. Presses now follow the physical button while it is down, end on capture loss, and editing ends on clicks shorter than the selection timer and on a switch to another app. The fixture calls the gesture code directly in a test window. Physical mouse input was not tested, and the report was intermittent, so it is not confirmed that this was the only cause.

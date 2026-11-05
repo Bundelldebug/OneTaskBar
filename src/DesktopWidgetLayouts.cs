@@ -23,7 +23,7 @@ namespace OneTaskBar
                 new[]{weather?"weather:2x2":"todo:2x2",battery?"power-list:2x2":"care:2x2"},
                 new[]{"player:4x1"},
                 new[]{"search:4x1"},
-                new[]{battery?"care:4x1":"gauges:4x1"}
+                new[]{battery?"care:4x1":"clock-dual:4x1"}
             };
             double y=top;
             foreach(var row in rows)

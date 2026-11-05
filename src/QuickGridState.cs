@@ -76,7 +76,7 @@ namespace OneTaskBar
             if(day!=now.Date.Ticks)
             {
                 day=now.Date.Ticks;
-                date.Text=now.ToString("M월 d일 dddd");
+                date.Text=now.ToString("M월 d일 dddd",System.Globalization.CultureInfo.GetCultureInfo("ko-KR"));
             }
             battery.Update(power);
             batteryButton.Visibility=PowerDisplay.Slot(power,Preferences.Current.DesktopPowerWatts)>0?Visibility.Visible:Visibility.Collapsed;
