@@ -1,5 +1,12 @@
 # Validation
 
+## 9.5.4
+
+- A press released outside a desktop widget left it capturing the mouse once the long-press timer fired. `desktop-widgets-probe` reproduced this against the 9.5.3 code before the fix. Presses now follow the physical button while it is down, end on capture loss, and editing ends on clicks shorter than the selection timer and on a switch to another app. The fixture calls the gesture code directly in a test window. Physical mouse input was not tested, and the report was intermittent, so it is not confirmed that this was the only cause.
+- In the fixture a move loses capture immediately, so the capture-loss path ran; a move whose mouse-up goes missing while capture is held was not reached.
+- Selecting a widget reads desktop icons through UI Automation, measured at 178 ms for 21 icons. Its effect on input while Explorer answers was not measured.
+- Square and rounded-square artwork now fills the squircle, ignoring transparent margins. The icon fixture covers these, plus circles, wide and freeform artwork staying on a tile. Of the installed icons previewed, Microsoft Store fills the tile and loses a little of its handles; calculator, Notepad and File Explorer are not square and keep their tile.
+
 ## 9.5.3
 
 - Desktop widgets are native children of the Explorer desktop view. The live diagnostic `--desktop-widgets-live` confirmed parenting and read 21 real desktop icons through UI Automation. ``--desktop-widgets-live`` now also drives the real widget manager on the real desktop with isolated data: selection, toolbar, move, grid snap, icon clearance, corner resize to the matching tile, blur, deselect and removal. It calls the gesture handlers directly; physical mouse input was checked by hand only for click and toolbar.
