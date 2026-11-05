@@ -288,7 +288,7 @@ namespace OneTaskBar
         internal bool GlassMaterial {get{return glassEdge!=null;}}
         internal Point GlassHighlight {get{return glassEdge==null?new Point():glassEdge.StartPoint;}}
         public readonly Border Surface;
-        public double Radius=28; public bool Dark=true; public bool HasBlur;internal bool SoftCorners=true,OpaqueSurface,DockSurface,DockPalette;
+        public double Radius=28; public bool Dark=true; public bool HasBlur;internal int LiquidLevel;internal bool SoftCorners=true,OpaqueSurface,DockSurface,DockPalette;
         internal bool StableSurface=true,UnifiedFade,SmoothLauncher;internal FrameworkElement TransitionContent;
         GlassLens lens;
         static readonly DependencyProperty SurfaceFadeProperty=DependencyProperty.Register("SurfaceFade",typeof(double),typeof(GlassWindow),new PropertyMetadata(1.0,(d,e)=>{var window=(GlassWindow)d;if(window.Surface!=null)window.Surface.Opacity=(double)e.NewValue;Native.BlurOpacity(window,(double)e.NewValue);}));
@@ -376,7 +376,7 @@ namespace OneTaskBar
                 else Surface.Background=enabled?glassTint:solidTint??Paint.Brush(Dark?"#FF344139":"#FFE0E5E2");
             }
             if(tunedStart)Surface.Background=SurfaceMaterial.Tint(false,!Preferences.Current.Blur||!HasBlur);
-            if(liquid&&LiquidGlass.Enabled&&!(this is NowBar)&&!DockSurface)Surface.Background=LiquidGlass.Tint(panel||popup||Dark);
+            if(liquid&&LiquidGlass.Enabled&&!(this is NowBar)&&!DockSurface){Surface.Background=LiquidGlass.Tint(panel||popup||Dark,LiquidLevel);LiquidReadability.Watch(this,panel||popup||Dark);}else LiquidReadability.Release(this);
             if(!OpaqueSurface&&!(this is NowBar)&&!DockSurface)PanelMaterial.RefreshCards(Surface);
         }
         internal virtual void RefreshGlassMaterial(){ApplyMaterial();if(DockSurface)Glass95.DockInk(Surface);else Glass95.RefreshColors(Surface);}
