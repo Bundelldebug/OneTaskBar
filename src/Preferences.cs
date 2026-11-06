@@ -57,6 +57,7 @@ namespace OneTaskBar
         public int WidgetBlur=0;
         public bool WidgetGlass=true;
         public bool LiquidGlass=false;
+        public int TrayPanelPercent=100;
         public bool WidgetsSeeded=false;
         public bool DesktopMenuEntry=true;
         public bool FullscreenWidgets=true;
@@ -83,7 +84,7 @@ namespace OneTaskBar
         internal static event Action MediaAppearanceChanged;
         internal static event Action DesktopWidgetsChanged;
         internal static event Action WidgetMaterialChanged;
-        internal static PreferenceData Normalize(PreferenceData value){if(!ReleaseFeatures.GlassUI&&value.UIVersion>=95)value.UIVersion=90;value.UITheme=Math.Max(0,Math.Min(2,value.UITheme));value.DockTheme=Math.Max(0,Math.Min(2,value.DockTheme));value.DockScalePercent=DockSizing.Clamp(value.DockScalePercent);value.FullscreenClockPercent=Math.Max(50,Math.Min(200,value.FullscreenClockPercent));value.WidgetOpacity=Math.Max(10,Math.Min(100,value.WidgetOpacity));value.WidgetBlur=Math.Max(0,Math.Min(40,value.WidgetBlur));SurfaceMaterial.Normalize(value);return value;}
+        internal static PreferenceData Normalize(PreferenceData value){if(!ReleaseFeatures.GlassUI&&value.UIVersion>=95)value.UIVersion=90;value.UITheme=Math.Max(0,Math.Min(2,value.UITheme));value.DockTheme=Math.Max(0,Math.Min(2,value.DockTheme));value.DockScalePercent=DockSizing.Clamp(value.DockScalePercent);value.FullscreenClockPercent=Math.Max(50,Math.Min(200,value.FullscreenClockPercent));value.WidgetOpacity=Math.Max(10,Math.Min(100,value.WidgetOpacity));value.WidgetBlur=Math.Max(0,Math.Min(40,value.WidgetBlur));value.TrayPanelPercent=TrayPanelSizing.Clamp(value.TrayPanelPercent);SurfaceMaterial.Normalize(value);return value;}
         static PreferenceData Load(){try{if(File.Exists(file))return Normalize(new JavaScriptSerializer().Deserialize<PreferenceData>(File.ReadAllText(file))??new PreferenceData());}catch(Exception e){AppLog.Once("settings-read",e.Message);}return Normalize(new PreferenceData());}
         internal static void Set(Action<PreferenceData> change)
         {

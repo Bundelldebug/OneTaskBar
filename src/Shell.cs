@@ -522,7 +522,15 @@ namespace OneTaskBar
             foreach(var host in docks)if(host.MediaBar!=null)host.MediaBar.SetExpanded(false);
             var screen=dock!=null?dock.Screen:Forms.Screen.FromPoint(Forms.Cursor.Position);double scale=dock!=null?dock.Scale:MonitorScale(screen,StartMenu);
             var fit=StartMenuLayout.Fit(screen.Bounds,Native.WorkArea(screen),scale,620,dock!=null?dock.Edge:DockGeometry.Edge);
-            StartMenu.Configure(fit.Width,fit.Height);StartMenu.Reload();StartMenu.ShowForMonitor(screen,scale,dock!=null?dock.Edge:DockGeometry.Edge);StartMenu.Pop();StartMenu.Activate();StartMenu.Search.Focus();
+            StartMenu.Configure(fit.Width,fit.Height);StartMenu.Reload();StartMenu.ShowForMonitor(screen,scale,dock!=null?dock.Edge:DockGeometry.Edge);StartMenu.Pop();StartMenu.Activate();StartMenu.Search.Focus();RevealAutoHideDock(dock);
+        }
+        // With auto-hide on, the Windows key and the search box bring the whole dock up with their panel, on the
+        // monitor the panel opens on. It goes away again by itself once the panel is closed and the pointer is elsewhere.
+        void RevealAutoHideDock(DockHost dock)
+        {
+            if(!DockAutoHide)return;
+            var target=dock??docks.FirstOrDefault(d=>d.Screen.Bounds.Contains(Forms.Cursor.Position))??docks.FirstOrDefault();
+            if(target!=null)target.Reveal();
         }
         internal bool ContainsStartButton(Native.PointI point)
         {
@@ -552,6 +560,7 @@ namespace OneTaskBar
             CloseTrayOverflow();CloseDesktopOverview();
             Previews.Close();
             if(Preferences.Current.NativeSearch){
+                RevealAutoHideDock(dock);
                 var closing=new List<Task<bool>>();foreach(var panel in new GlassWindow[]{Quick,Center,Detail,Drawer,Finder,StartMenu})if(panel!=null)closing.Add(panel.DismissAsync());
                 var completed=await Task.WhenAll(closing);if(disposed||completed.Any(done=>!done))return;
                 if(!await Task.Run(()=>SystemPanels.Search(query))){ShowWelcome();Welcome.Feedback("Windows 검색을 열지 못했습니다. 다시 눌러 주세요.");}return;
@@ -559,7 +568,7 @@ namespace OneTaskBar
             if(Finder==null)Finder=new SearchWindow(this);if(Finder.IsVisible){Finder.Hide();return;}
             foreach(var panel in new GlassWindow[]{Quick,Center,Detail,Drawer,StartMenu})if(panel!=null)panel.HideImmediately();
             var screen=dock!=null?dock.Screen:Forms.Screen.FromPoint(Forms.Cursor.Position);double scale=dock!=null?dock.Scale:MonitorScale(screen,Finder);var layout=LauncherLayout.Fit(screen.Bounds,Native.WorkArea(screen),scale,dock!=null?dock.Edge:DockGeometry.Edge);
-            Finder.Configure(layout.Width,layout.Height);Finder.Reset();if(!String.IsNullOrEmpty(query)){Finder.Query.Text=query;Finder.Reload();}Finder.ShowAt(screen.Bounds,layout.X,layout.Y,layout.Width,layout.Height);Finder.Pop();Finder.Activate();Finder.Query.Focus();Finder.Query.CaretIndex=Finder.Query.Text.Length;
+            Finder.Configure(layout.Width,layout.Height);Finder.Reset();if(!String.IsNullOrEmpty(query)){Finder.Query.Text=query;Finder.Reload();}Finder.ShowAt(screen.Bounds,layout.X,layout.Y,layout.Width,layout.Height);Finder.Pop();Finder.Activate();Finder.Query.Focus();Finder.Query.CaretIndex=Finder.Query.Text.Length;RevealAutoHideDock(dock);
         }
         internal async void OpenScreenCapture()
         {

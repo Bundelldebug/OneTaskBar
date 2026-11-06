@@ -14,9 +14,9 @@ namespace OneTaskBar
         readonly bool plate;
         internal bool Monochrome {get{return mask!=null;}}
         internal bool LightPlate {get{return plate;}}
-        internal TrayIconVisual(ImageSource image,Brush foreground=null)
+        internal TrayIconVisual(ImageSource image,Brush foreground=null,double size=26)
         {
-            source=TrayIconSmoother.Smooth(image as BitmapSource)??image;ink=foreground??Paint.Text;Width=Height=26;IsHitTestVisible=false;SnapsToDevicePixels=true;UseLayoutRounding=true;
+            source=TrayIconSmoother.Smooth(image as BitmapSource)??image;ink=foreground??Paint.Text;Width=Height=size;IsHitTestVisible=false;SnapsToDevicePixels=true;UseLayoutRounding=true;
             RenderOptions.SetBitmapScalingMode(this,BitmapScalingMode.HighQuality);
             var bitmap=source as BitmapSource;
             if(bitmap!=null&&IsMonochrome(bitmap)){

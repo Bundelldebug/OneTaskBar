@@ -20,6 +20,7 @@ namespace OneTaskBar
         readonly Grid icons=new Grid {Margin=new Thickness(12)};
         IDisposable outside;
         bool closing,closed,refreshing;
+        readonly double cell=48,icon=26;
         internal int IconCount {get;private set;}
         internal bool Watching {get{return timer.IsEnabled;}}
         internal TrayOverflowWindow(TrayIconSession session,Action<TrayIconItem,bool> action)
@@ -28,11 +29,13 @@ namespace OneTaskBar
             Radius=28;ShowActivated=false;Surface.CornerRadius=new CornerRadius(28);
             SetMaterial(QuickPanel.Glass,PanelMaterial.Solid(Glass95.DockDark));Surface.Child=icons;
             int count=session.Items.Count,columns=Math.Min(5,Math.Max(1,(int)Math.Ceiling(Math.Sqrt(count))));
-            for(int i=0;i<columns;i++)icons.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(48)});
-            for(int i=0;i<(count+columns-1)/columns;i++)icons.RowDefinitions.Add(new RowDefinition {Height=new GridLength(48)});
+            cell=48*TrayPanelSizing.Scale;icon=26*TrayPanelSizing.Scale;
+            icons.Margin=new Thickness(12*TrayPanelSizing.Scale);
+            for(int i=0;i<columns;i++)icons.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(cell)});
+            for(int i=0;i<(count+columns-1)/columns;i++)icons.RowDefinitions.Add(new RowDefinition {Height=new GridLength(cell)});
             for(int i=0;i<count;i++){
-                var item=session.Items[i];UIElement image=item.Icon==null?(UIElement)new Glyph(item.Fallback,23) {Color=Paint.Text}:new TrayIconVisual(item.Icon,Paint.Text);
-                var button=Paint.Button(image,()=>ActivateItem(item,false),item.Name);button.Margin=new Thickness(2);button.Padding=new Thickness(8);button.Background=Brushes.Transparent;button.Resources["ButtonRadius"]=new CornerRadius(18);
+                var item=session.Items[i];UIElement image=item.Icon==null?(UIElement)new Glyph(item.Fallback,23*TrayPanelSizing.Scale) {Color=Paint.Text}:new TrayIconVisual(item.Icon,Paint.Text,icon);
+                var button=Paint.Button(image,()=>ActivateItem(item,false),item.Name);button.Margin=new Thickness(2);button.Padding=new Thickness(8*TrayPanelSizing.Scale);button.Background=Brushes.Transparent;button.Resources["ButtonRadius"]=new CornerRadius(18*TrayPanelSizing.Scale);
                 System.Windows.Automation.AutomationProperties.SetName(button,item.Name);
                 buttons.Add(item,button);
                 button.PreviewMouseRightButtonUp+=(s,e)=>{e.Handled=true;ActivateItem(item,true);};
@@ -46,7 +49,7 @@ namespace OneTaskBar
         }
         internal void Present(TrayPlacement placement,bool watch=true)
         {
-            double width=icons.ColumnDefinitions.Count*48+26,height=icons.RowDefinitions.Count*48+26;
+            double width=icons.ColumnDefinitions.Count*cell+26*TrayPanelSizing.Scale,height=icons.RowDefinitions.Count*cell+26*TrayPanelSizing.Scale;
             var point=placement.Target((int)Math.Round(width*placement.Scale),(int)Math.Round(height*placement.Scale));
             ShowAt(placement.Monitor,(point.X-placement.Monitor.Left)/placement.Scale,(point.Y-placement.Monitor.Top)/placement.Scale,width,height);Pop();
             if(watch){timer.Start();outside=MenuDismiss.Watch(Contains,Dismiss);}
@@ -68,7 +71,7 @@ namespace OneTaskBar
                     if(update.Image!=null)
                     {
                         update.Item.Icon=update.Image;
-                        button.Content=new TrayIconVisual(update.Image,Paint.Text);
+                        button.Content=new TrayIconVisual(update.Image,Paint.Text,icon);
                     }
                     update.Item.Name=update.Name;
                     button.ToolTip=update.Name;
