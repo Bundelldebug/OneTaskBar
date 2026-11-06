@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
@@ -55,7 +55,7 @@ namespace OneTaskBar
             Require(!new PreferenceData().DynamicIsland,"existing installations do not enable an overlay on upgrade");
             var state=new DynamicIslandState();
             var now=DateTime.UtcNow;
-            Require(state.Size(false,now)==new Size(56,18)&&state.Size(true,now)==new Size(112,28),"idle and media shapes stay compact");
+            Require(state.Size(false,now)==new Size(DynamicIslandLayout.IdleWidth,DynamicIslandLayout.CompactHeight)&&state.Size(true,now)==new Size(DynamicIslandLayout.MediaWidth,DynamicIslandLayout.CompactHeight),"idle and media shapes stay compact");
             state.Feedback("volume",135,false,now);
             Require(state.Value==100&&state.FeedbackVisible(now)&&!state.FeedbackVisible(now.AddSeconds(2)),"level values and transient lifetime are bounded");
             state.Expanded=true;
@@ -74,7 +74,7 @@ namespace OneTaskBar
                 var host=DynamicIslandLayout.Host(screen,work,dpi,bottom);
                 var physical=Native.PlacementBounds(screen,dpi,host.X,host.Y,host.Width,host.Height);
                 Require(physical.Left>=work.Left&&physical.Top>=work.Top&&physical.Right<=work.Right&&physical.Bottom<=work.Bottom,"host respects negative origins, dock edges and mixed DPI");
-                var compact=DynamicIslandLayout.Capsule(new Size(112,28),host.Width,host.Height,bottom);
+                var compact=DynamicIslandLayout.Capsule(new Size(DynamicIslandLayout.MediaWidth,DynamicIslandLayout.CompactHeight),host.Width,host.Height,bottom);
                 var expanded=DynamicIslandLayout.Capsule(new Size(360,host.Height),host.Width,host.Height,bottom);
                 Require(bottom?compact.Bottom==expanded.Bottom&&compact.Top>expanded.Top:compact.Top==0&&expanded.Top==0,"the top dock places the island below, with expansion anchored to the same bottom edge");
                 Require(DynamicIslandLayout.Clear(screen,work,dpi,new FullscreenCandidate[0]),"empty desktop permits the capsule");
@@ -116,12 +116,12 @@ namespace OneTaskBar
                     CheckSurface(media.Artwork);
                     view.Present(media,"헤드폰",screen,dpi);
                     await Task.Delay(330);
-                    Require(view.IsVisible&&!view.Animating&&view.Shape.Width==112&&view.Shape.Height==28,"media geometry settles without retaining resize callbacks");
+                    Require(view.IsVisible&&!view.Animating&&view.Shape.Width==DynamicIslandLayout.MediaWidth&&view.Shape.Height==DynamicIslandLayout.CompactHeight,"media geometry settles without retaining resize callbacks");
                     var handle=new WindowInteropHelper(view).Handle;
                     Require((Native.GetWindowLong(handle,-20)&0x08000000)!=0,"a compact capsule keeps its no-activate window style");
                     Require(Native.GetForegroundWindow()==new WindowInteropHelper(source).Handle,"showing a compact capsule preserves foreground focus");
                     Require(!view.HasBlur,"a solid black island creates no live backdrop renderer");
-                    Program.Save(view.Surface,112,28,Path.Combine(AppLog.Data,"island-media.png"));
+                    Program.Save(view.Surface,(int)DynamicIslandLayout.MediaWidth,(int)DynamicIslandLayout.CompactHeight,Path.Combine(AppLog.Data,"island-media.png"));
                     view.SetExpanded(true);await Task.Delay(330);
                     Require(view.Expanded&&!view.Animating&&view.Shape.Height==204,"media expands and settles");
                     Require(view.Player.ActualHeight>0&&view.Player.ActualHeight+28<=view.Shape.Height+.5,"transport and timeline fit below the black header");
@@ -144,7 +144,7 @@ namespace OneTaskBar
                     Program.Save(view.Surface,286,88,Path.Combine(AppLog.Data,"island-volume.png"));
                     var expiryDeadline=DateTime.UtcNow.AddSeconds(3);
                     while((view.FeedbackVisible||view.ExpiryActive||view.Animating)&&DateTime.UtcNow<expiryDeadline)await Task.Delay(25);
-                    Require(!view.FeedbackVisible&&!view.ExpiryActive&&!view.Animating&&view.Shape.Width==112,"feedback expires once and restores media without polling");
+                    Require(!view.FeedbackVisible&&!view.ExpiryActive&&!view.Animating&&view.Shape.Width==DynamicIslandLayout.MediaWidth,"feedback expires once and restores media without polling");
                     view.ShowFeedback("brightness",62,false);await Task.Delay(280);
                     Require(view.LevelSlider.Kind=="brightness"&&view.LevelSlider.Value==62,
                         "brightness feedback resets the sound icon and retains the shared capsule style");
@@ -170,10 +170,10 @@ namespace OneTaskBar
                     view.SetExpanded(true);view.ShowFeedback("brightness",62,false);view.Suspend();
                     Require(!view.IsVisible&&!view.Expanded&&!view.Animating&&!view.ExpiryActive&&!MenuDismiss.Active,"hiding releases input observers and motion timers");
                     view.Present(new MediaState(),null,screen,dpi);await Task.Delay(280);
-                    Require(view.Shape.Width==56&&view.Shape.Height==18,"inactive media returns to the small pill");
+                    Require(view.Shape.Width==DynamicIslandLayout.IdleWidth&&view.Shape.Height==DynamicIslandLayout.CompactHeight,"inactive media returns to the small pill");
                     view.SetExpanded(true);Require(!view.Expanded,"an empty capsule cannot open inactive controls");
                     view.ShowFeedback("charge",85,false);await Task.Delay(280);
-                    Program.Save(view.Surface,240,28,Path.Combine(AppLog.Data,"island-charging.png"));
+                    Program.Save(view.Surface,(int)DynamicIslandLayout.ChargeWidth,(int)DynamicIslandLayout.ChargeHeight,Path.Combine(AppLog.Data,"island-charging.png"));
                     view.Suspend();
                     view.Present(media,"헤드폰",screen,dpi,null,true);
                     await Task.Delay(280);
@@ -190,7 +190,7 @@ namespace OneTaskBar
                     await Task.Delay(70);
                     Require(Math.Abs(view.Shape.Bottom-bottomEdge)<.01,"collapse also keeps the lower edge fixed");
                     await Task.Delay(220);
-                    Require(!view.Animating&&view.Shape.Height==28&&Math.Abs(view.Shape.Bottom-bottomEdge)<.01,"bottom motion settles and releases its rendering callback");
+                    Require(!view.Animating&&view.Shape.Height==DynamicIslandLayout.CompactHeight&&Math.Abs(view.Shape.Bottom-bottomEdge)<.01,"bottom motion settles and releases its rendering callback");
                     if(inspect){AppLog.Json("island-preview.json",new {ready=true});for(int i=0;i<120&&!File.Exists(Path.Combine(AppLog.Data,"preview-done"));i++)await Task.Delay(250);}
                     view.Suspend();
                     AppLog.Json("dynamic-island-probe.json",new {passed=true,disabledByDefault=true,sharedMediaCommands=true,blackHeaderWithArtworkBlur=true,sharedCapsuleLevels=true,acceptedNotificationRouting=true,topDockMovesIslandBelow=true,bottomExpansionAnchored=true,nativeSafeAreaVerified=safeAreaVerified,fullscreenReleasesWorkspace=safeAreaVerified,crashRestoresWorkspace=safeAreaVerified,mixedDpiAndFourEdges=true,compactDoesNotStealFocus=true,rapidReversalsSettle=true,expiryTimerStops=true,hiddenInputAndMotionReleased=true,noLiveBackdrop=true,deviceValuesChanged=false});

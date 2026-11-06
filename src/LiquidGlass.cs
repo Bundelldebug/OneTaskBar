@@ -15,7 +15,7 @@ namespace OneTaskBar
         internal const double Saturation=1.65,PanelBlur=22,DockBlur=16;
         static readonly Brush[] tints=new Brush[10];
         static readonly Brush[] rims=new Brush[2];
-        internal static bool Enabled {get{return Preferences.Current.LiquidGlass&&Glass95.Enabled&&Glass95.Transparent;}}
+        internal static bool Enabled {get{return Preferences.Current.LiquidGlass&&!Performance.Light&&Glass95.Enabled&&Glass95.Transparent;}}
         // Radius for a surface: the liquid radius when the material is on, otherwise what the caller already chose.
         internal static double Radius(double current,bool live,bool dock)
         {

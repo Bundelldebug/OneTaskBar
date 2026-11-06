@@ -47,7 +47,7 @@ namespace OneTaskBar
             if(phase<1.2)delay=(1.2-phase)*1000;
             else if(phase>=1.2+travel&&phase<2.4+travel)delay=(2.4+travel-phase)*1000;
             // 25 DIP per second moves about a pixel per tick at this rate; following a 120 Hz display adds only cost.
-            timer.Interval=TimeSpan.FromMilliseconds(delay>0?Math.Max(1,delay):33);if(!timer.IsEnabled)timer.Start();
+            timer.Interval=TimeSpan.FromMilliseconds(delay>0?Math.Max(1,delay):Performance.MarqueeStep);if(!timer.IsEnabled)timer.Start();
         }
         protected override Size MeasureOverride(Size constraint){return new Size(Math.Min(NaturalWidth,Double.IsInfinity(constraint.Width)?NaturalWidth:constraint.Width),Math.Min(Math.Max(22,Formatted.Height),constraint.Height));}
         protected override void OnRender(DrawingContext dc){RenderCount++;dc.PushClip(new RectangleGeometry(new Rect(0,0,ActualWidth,ActualHeight)));dc.DrawText(Formatted,new Point(TextOrigin,Math.Max(0,(ActualHeight-Formatted.Height)/2)));dc.Pop();}

@@ -160,6 +160,8 @@ namespace OneTaskBar
         {
             bounds=Rect.Empty;
             owner=IntPtr.Zero;
+            Rect islandBounds;IntPtr islandOwner;
+            if(shell.MediaMotionIsland(window,out islandBounds,out islandOwner)){bounds=islandBounds;owner=islandOwner;return true;}
             var bar=shell.MediaMotionTarget(window);
             if(bar==null||!bar.IsVisible)return false;
             var point=bar.Surface.PointToScreen(new Point());
@@ -252,7 +254,7 @@ namespace OneTaskBar
                 bounds=new Rect(restored.Left,restored.Top,restored.Right-restored.Left,restored.Bottom-restored.Top);
             }
             Begin(window,app,owner,minimize?bounds:capsule,minimize?capsule:bounds,!minimize||!Native.IsIconic(window),!minimize,
-                recipient:shell.MediaMotionTarget(window));
+                recipient:shell.MediaMotionToIsland(window)?null:shell.MediaMotionTarget(window));
             return Active;
         }
 
@@ -437,6 +439,19 @@ namespace OneTaskBar
     internal sealed partial class ShellController
     {
         MediaWindowMotion mediaMotion;
+        // The capsule a window flies to: the Dynamic Island when it is on and chosen, otherwise the media pill.
+        internal bool MediaMotionToIsland(IntPtr window)
+        {
+            Rect bounds;IntPtr owner;
+            return MediaMotionIsland(window,out bounds,out owner);
+        }
+        internal bool MediaMotionIsland(IntPtr window,out Rect bounds,out IntPtr owner)
+        {
+            bounds=Rect.Empty;owner=IntPtr.Zero;
+            if(!Preferences.Current.MediaFlightToIsland||!IslandEnabled||Island==null||!Island.IsVisible||Island.Expanded)return false;
+            var screen=System.Windows.Forms.Screen.FromHandle(window);
+            return Island.MediaCapsule(screen,out bounds,out owner);
+        }
         internal NowBar MediaMotionTarget(IntPtr window)
         {
             var screen=System.Windows.Forms.Screen.FromHandle(window);

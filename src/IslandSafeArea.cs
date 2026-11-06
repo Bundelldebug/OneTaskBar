@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -11,7 +11,9 @@ namespace OneTaskBar
 {
     internal sealed class IslandSafeArea : IDisposable
     {
-        internal const double Height=32;
+        // The idle island is 22 tall and sits 2 from the edge; the reserved band is that plus the same gap below. The top
+        // status bar uses this thickness as well.
+        internal const double Height=26;
         const uint Callback=0x8058;
         const string LeaseFile="island-safe-area.json";
         static IslandSafeArea current;

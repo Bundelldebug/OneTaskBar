@@ -31,15 +31,16 @@ namespace OneTaskBar
                 // A small frozen bitmap avoids a live effect during island morphs.
                 var cover=new System.Windows.Controls.Border
                 {
-                    Width=192,Height=108,Background=Read(image).PlayerSurface(image),
-                    Effect=new System.Windows.Media.Effects.BlurEffect {Radius=4,RenderingBias=System.Windows.Media.Effects.RenderingBias.Performance}
+                    Width=384,Height=216,Background=Read(image).PlayerSurface(image),
+                    Effect=new System.Windows.Media.Effects.BlurEffect {Radius=8,RenderingBias=System.Windows.Media.Effects.RenderingBias.Quality}
                 };
-                cover.Measure(new System.Windows.Size(192,108));
-                cover.Arrange(new System.Windows.Rect(0,0,192,108));
-                var bitmap=new RenderTargetBitmap(192,108,96,96,PixelFormats.Pbgra32);
+                cover.Measure(new System.Windows.Size(384,216));
+                cover.Arrange(new System.Windows.Rect(0,0,384,216));
+                var bitmap=new RenderTargetBitmap(384,216,96,96,PixelFormats.Pbgra32);
                 bitmap.Render(cover);
                 bitmap.Freeze();
                 var picture=new ImageBrush(bitmap){Stretch=Stretch.UniformToFill};
+                RenderOptions.SetBitmapScalingMode(picture,BitmapScalingMode.HighQuality);
                 picture.Freeze();
                 return IslandDrawing(picture);
             });

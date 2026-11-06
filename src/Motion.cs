@@ -31,13 +31,14 @@ namespace OneTaskBar
             motion.KeyFrames.Add(new LinearDoubleKeyFrame(from,KeyTime.FromTimeSpan(TimeSpan.Zero)));
             motion.KeyFrames.Add(new EasingDoubleKeyFrame(target,KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(milliseconds)),SpringEase.Snappy));return motion;
         }
-        internal static DoubleAnimation Launcher(FrameworkElement content,bool opening)
+        // fromTop: the panel drops down from a bar along the top edge instead of rising from the bottom.
+        internal static DoubleAnimation Launcher(FrameworkElement content,bool opening,bool fromTop=false)
         {
             var old=content.RenderTransform as TransformGroup;var oldScale=old==null?null:old.Children.OfType<ScaleTransform>().FirstOrDefault();var oldShift=old==null?null:old.Children.OfType<TranslateTransform>().FirstOrDefault();
-            double fromScale=oldScale!=null?oldScale.ScaleX:opening?.965:1,fromY=oldShift!=null?oldShift.Y:opening?12:0,fromOpacity=old!=null?content.Opacity:opening?.12:content.Opacity;
-            content.BeginAnimation(UIElement.OpacityProperty,null);var scale=new ScaleTransform(opening?1:.985,opening?1:.985);var shift=new TranslateTransform(0,opening?0:12);var group=new TransformGroup();group.Children.Add(scale);group.Children.Add(shift);content.RenderTransformOrigin=new Point(.5,1);content.RenderTransform=group;
-            if(opening){scale.BeginAnimation(ScaleTransform.ScaleXProperty,Spring(Math.Min(1,fromScale),.999,1,340));scale.BeginAnimation(ScaleTransform.ScaleYProperty,Spring(Math.Min(1,fromScale),.999,1,340));shift.BeginAnimation(TranslateTransform.YProperty,Spring(Math.Max(0,Math.Min(12,fromY)),.4,0,340));}
-            else {scale.BeginAnimation(ScaleTransform.ScaleXProperty,Tween(fromScale,.985,145));scale.BeginAnimation(ScaleTransform.ScaleYProperty,Tween(fromScale,.985,145));shift.BeginAnimation(TranslateTransform.YProperty,Tween(fromY,12,145));}
+            double fromScale=oldScale!=null?oldScale.ScaleX:opening?.965:1,rise=fromTop?-22:12,fromY=oldShift!=null?oldShift.Y:opening?rise:0,fromOpacity=old!=null?content.Opacity:opening?.12:content.Opacity;
+            content.BeginAnimation(UIElement.OpacityProperty,null);var scale=new ScaleTransform(opening?1:.985,opening?1:.985);var shift=new TranslateTransform(0,opening?0:rise);var group=new TransformGroup();group.Children.Add(scale);group.Children.Add(shift);content.RenderTransformOrigin=new Point(.5,fromTop?0:1);content.RenderTransform=group;
+            if(opening){scale.BeginAnimation(ScaleTransform.ScaleXProperty,Spring(Math.Min(1,fromScale),.999,1,340));scale.BeginAnimation(ScaleTransform.ScaleYProperty,Spring(Math.Min(1,fromScale),.999,1,340));shift.BeginAnimation(TranslateTransform.YProperty,Spring(fromTop?Math.Min(0,Math.Max(rise,fromY)):Math.Max(0,Math.Min(12,fromY)),.4,0,340));}
+            else {scale.BeginAnimation(ScaleTransform.ScaleXProperty,Tween(fromScale,.985,145));scale.BeginAnimation(ScaleTransform.ScaleYProperty,Tween(fromScale,.985,145));shift.BeginAnimation(TranslateTransform.YProperty,Tween(fromY,rise,145));}
             content.Opacity=opening?1:0;var fade=Tween(fromOpacity,opening?1:0,opening?135:145);if(opening)content.BeginAnimation(UIElement.OpacityProperty,fade);return fade;
         }
         internal static void Fade(FrameworkElement element,double from,double to,int milliseconds)

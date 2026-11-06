@@ -32,7 +32,7 @@ namespace OneTaskBar
             NoTrackBorder=true,GlassStandalone=false,Height=60
         };
         readonly IslandNotificationView notification;
-        readonly Border art=new Border {Width=20,Height=20,CornerRadius=new CornerRadius(6)};
+        readonly Border art=new Border {Width=16,Height=16,CornerRadius=new CornerRadius(5)};
         readonly TextBlock status=Paint.TextBlock("",12,Paint.ControlWhite),number=Paint.TextBlock("",13,Paint.ControlWhite);
         readonly IslandActivity activity=new IslandActivity();
         readonly Glyph feedbackGlyph=new Glyph("volume",20){Color=Paint.ControlWhite};
@@ -84,9 +84,9 @@ namespace OneTaskBar
             root.HorizontalAlignment=HorizontalAlignment.Center;
             root.VerticalAlignment=VerticalAlignment.Top;
             compact.Margin=new Thickness(9,0,9,0);
-            compact.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(24)});
+            compact.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(20)});
             compact.ColumnDefinitions.Add(new ColumnDefinition());
-            compact.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(24)});
+            compact.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(20)});
             compact.Children.Add(art);
             Grid.SetColumn(activity,2);compact.Children.Add(activity);
             feedback.Margin=new Thickness(14,0,14,0);
@@ -170,7 +170,7 @@ namespace OneTaskBar
                 PlaceHost();
                 if(!IsVisible)
                 {
-                    current=DynamicIslandLayout.Capsule(new Size(56,18),host.Width,host.Height,bottom);
+                    current=DynamicIslandLayout.Capsule(new Size(DynamicIslandLayout.IdleWidth,DynamicIslandLayout.CompactHeight),host.Width,host.Height,bottom);
                     currentRadius=9;
                     PlaceShape();
                     ((Window)this).Show();
@@ -184,7 +184,7 @@ namespace OneTaskBar
                 {
                     artwork=media.Artwork;
                     if(artwork==null)art.Background=null;
-                    else{var brush=new ImageBrush(artwork){Stretch=Stretch.UniformToFill};brush.Freeze();art.Background=brush;}
+                    else{var brush=new ImageBrush(ArtworkThumbnail.Square(artwork,Math.Max(40,(int)Math.Ceiling(28*scale)))){Stretch=Stretch.UniformToFill};RenderOptions.SetBitmapScalingMode(brush,BitmapScalingMode.HighQuality);brush.Freeze();art.Background=brush;}
                 }
                 if(state.Expanded)
                 {
@@ -439,6 +439,17 @@ namespace OneTaskBar
             media=null;artwork=null;surfaceArtwork=null;art.Background=expanded.Background=null;target=Rect.Empty;
             symbolRequest++;symbolKey=null;feedbackGlyph.SetDeviceIcon(null);levelSlider.SetDeviceIcon(null);
             ((Window)this).Hide();
+        }
+        // Where a flying media window should land, in screen pixels: the compact media shape, whatever the island shows now.
+        internal bool MediaCapsule(Forms.Screen monitor,out Rect bounds,out IntPtr owner)
+        {
+            bounds=Rect.Empty;owner=IntPtr.Zero;
+            if(closed||!IsVisible||screen==null||monitor.DeviceName!=screen.DeviceName||host.IsEmpty)return false;
+            var shape=DynamicIslandLayout.Capsule(new Size(DynamicIslandLayout.MediaWidth,DynamicIslandLayout.CompactHeight),host.Width,host.Height,bottom);
+            var box=Native.PlacementBounds(screen.Bounds,scale,host.X+shape.X,host.Y+shape.Y,shape.Width,shape.Height);
+            bounds=new Rect(box.Left,box.Top,box.Right-box.Left,box.Bottom-box.Top);
+            owner=new WindowInteropHelper(this).Handle;
+            return bounds.Width>0&&bounds.Height>0;
         }
         internal object Inspect()
         {

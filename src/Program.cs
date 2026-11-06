@@ -94,7 +94,7 @@ namespace OneTaskBar
             if(args.Contains("--desktop-behavior-probe"))return DesktopBehaviorChecks.Run();
             if(args.Contains("--desktop-widgets-probe"))return DesktopWidgetChecks.Run();
             if(args.Contains("--desktop-widgets-live"))return DesktopWidgetChecks.Live();
-            if(args.Contains("--media-foreign-diag"))return MediaForeignDiag.Run();if(args.Contains("--liquid-diag"))return LiquidDiag.Run();if(args.Contains("--tray-smooth-diag"))return TraySmoothDiag.Run();
+            if(args.Contains("--media-foreign-diag"))return MediaForeignDiag.Run();if(args.Contains("--liquid-diag"))return LiquidDiag.Run();if(args.Contains("--tray-smooth-diag"))return TraySmoothDiag.Run();if(args.Contains("--topbar-diag"))return TopBarDiag.Run();
             if(args.Contains("--fullscreen-tiles-probe"))return FullscreenTileChecks.Run();
             if(args.Contains("--taskbar-state-probe"))return DesktopBehaviorChecks.NativeState();
             if(args.Contains("--taskbar-logo-probe"))return TaskbarLogoChecks.Probe();

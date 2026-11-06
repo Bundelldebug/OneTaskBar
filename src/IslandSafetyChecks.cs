@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
@@ -23,7 +23,7 @@ namespace OneTaskBar
                 int height=(int)Math.Ceiling(IslandSafeArea.Height*dpi);
                 Require(reserved.Top>=before.Top+height&&reserved.Bottom==before.Bottom,"a real top appbar reserves the capsule band without changing the dock's bottom space");
                 var host=DynamicIslandLayout.Host(screen.Bounds,area.PlacementArea(),dpi);
-                Require(screen.Bounds.Top+(host.Top+28)*dpi<=reserved.Top+1,"compact media and feedback fit above application content");
+                Require(screen.Bounds.Top+(host.Top+DynamicIslandLayout.CompactHeight)*dpi<=reserved.Top+1,"compact media and feedback fit above application content");
                 var capsule=new DynamicIsland(command=>{},value=>Task.FromResult(true),()=>{},id=>{});
                 try
                 {
@@ -67,10 +67,10 @@ namespace OneTaskBar
                         var reserved=Native.WorkArea(screen);
                         Require(reserved.Top>=before.Top+dockHeight&&reserved.Bottom<=before.Bottom-islandHeight,"the top dock and lower island reserve opposite edges");
                         var rect=DockGeometry.Rect(screen.Bounds,dpi,1,new Rect(40,screen.Bounds.Height/dpi-56,220,44));
-                        Require(rect.Top*dpi>=before.Top-screen.Bounds.Top&&rect.Bottom*dpi<=reserved.Top-screen.Bounds.Top,"top dock icons remain within their own upper band");
+                        Require(rect.Top*dpi>=before.Top-screen.Bounds.Top&&rect.Bottom*dpi<=reserved.Top-screen.Bounds.Top,"top dock icons remain within their own upper band: rect="+rect.Top*dpi+".."+rect.Bottom*dpi+" before="+before.Top+" reserved="+reserved.Top+" screenTop="+screen.Bounds.Top+" dpi="+dpi);
                         Require(Math.Abs(DockGeometry.Reserved(screen.Bounds,Native.WorkArea(screen),dpi,1)-68)<2,"the safe band is excluded from the dock's balancing gap");
                         var host=DynamicIslandLayout.Host(screen.Bounds,area.PlacementArea(),dpi,true);
-                        var compact=DynamicIslandLayout.Capsule(new Size(112,28),host.Width,host.Height,true);
+                        var compact=DynamicIslandLayout.Capsule(new Size(DynamicIslandLayout.MediaWidth,DynamicIslandLayout.CompactHeight),host.Width,host.Height,true);
                         Require(screen.Bounds.Top+(host.Top+compact.Top)*dpi>=reserved.Bottom-1&&screen.Bounds.Top+(host.Top+compact.Bottom)*dpi<=area.Bounds.Bottom,"lower media and feedback fit entirely below maximized content");
                         source.WindowState=WindowState.Maximized;
                         await Task.Delay(200);

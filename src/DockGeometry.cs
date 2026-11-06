@@ -70,7 +70,7 @@ namespace OneTaskBar
             if(DockGeometry.Vertical(Edge)){var position=DockGeometry.Rect(Screen.Bounds,ContentScale,Edge,new Rect(layout.StatusX,y,layout.StatusWidth,DockGeometry.SideStatusWidth));rect=new Rect(position.X,position.Y,DockGeometry.SideStatusWidth,layout.StatusWidth);}
             else rect=DockGeometry.Rect(Screen.Bounds,ContentScale,Edge,new Rect(layout.StatusX,y,layout.StatusWidth,44));
             rect=DockSizing.DisplayRect(rect,Zoom);
-            Status.DockBounds=Native.PlacementBounds(Screen.Bounds,Scale,rect.X,rect.Y,rect.Width,rect.Height);Status.Width=rect.Width;Status.Height=rect.Height;if(show)Status.ShowAt(Screen.Bounds,rect.X,rect.Y,rect.Width,rect.Height);else Native.Place(Status,Screen.Bounds,rect.X,rect.Y,rect.Width,rect.Height);
+            Status.DockBounds=Native.PlacementBounds(Screen.Bounds,Scale,rect.X,rect.Y,rect.Width,rect.Height);Status.Width=rect.Width;Status.Height=rect.Height;if(show&&!controller.TopBarActive)Status.ShowAt(Screen.Bounds,rect.X,rect.Y,rect.Width,rect.Height);else Native.Place(Status,Screen.Bounds,rect.X,rect.Y,rect.Width,rect.Height);
         }
     }
 }

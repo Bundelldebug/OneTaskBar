@@ -58,6 +58,9 @@ namespace OneTaskBar
         public bool WidgetGlass=true;
         public bool LiquidGlass=false;
         public int TrayPanelPercent=100;
+        public bool MediaFlightToIsland=true;
+        public bool TopStatusBar=false;
+        public bool LightEffects=false;
         public bool WidgetsSeeded=false;
         public bool DesktopMenuEntry=true;
         public bool FullscreenWidgets=true;

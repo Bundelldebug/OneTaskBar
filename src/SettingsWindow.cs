@@ -81,6 +81,12 @@ namespace OneTaskBar
                     Preferences.Current.DynamicIsland,v=>Preferences.Set(p=>p.DynamicIsland=v));
                 Row(nowBar,"미디어 앱 전환 애니메이션","재생 앱을 최소화하거나 복원할 때 미디어 캡슐로 연결합니다",
                     Preferences.Current.MediaWindowAnimation,v=>Preferences.Set(p=>p.MediaWindowAnimation=v));
+                Row(nowBar,"가벼운 효과","포인터를 따라 움직이는 유리 빛, 리퀴드 글래스, 미디어 전환의 배경 흐림을 끄고 파형·제목 갱신을 줄입니다. 사양이 낮은 PC는 자동으로 켜집니다",
+                    Preferences.Current.LightEffects,v=>Preferences.Set(p=>p.LightEffects=v));
+                Row(nowBar,"상단 상태 표시줄","안드로이드처럼 화면 위쪽에 시계·알림(왼쪽), 재생 중인 미디어, 알림 앱 아이콘, 빠른 설정(오른쪽)을 배치합니다. Dynamic Island와 같은 두께의 위쪽 공간을 씁니다",
+                    Preferences.Current.TopStatusBar,v=>Preferences.Set(p=>p.TopStatusBar=v));
+                ChoiceRow(nowBar,"미디어 앱 전환 애니메이션 목적지","Dynamic Island가 켜져 있을 때 창이 들어가고 나오는 자리를 고릅니다. 꺼져 있으면 나우바로 갑니다",
+                    Preferences.Current.MediaFlightToIsland,v=>Preferences.Set(p=>p.MediaFlightToIsland=v),"나우바","Dynamic Island");
                 Row(nowBar,"측면 미디어 세로 캡슐","왼쪽·오른쪽 작업표시줄에서 커버와 재생 표시를 세로로 배치합니다",
                     Preferences.Current.NowBarSideCapsule,v=>Preferences.Set(p=>p.NowBarSideCapsule=v));
                 SubHeading(nowBar,"전체화면 미디어");

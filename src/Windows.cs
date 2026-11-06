@@ -229,15 +229,15 @@ namespace OneTaskBar
             if(!value&&Overflow!=null)Overflow.Hide();
             if(closed)return;if(visible==value&&!visibilityTimer.IsEnabled){if(value)EnsureVisibleWindows();return;}visibilityTimer.Stop();visible=value;reveal=value?1:0;
             // Fullscreen/capture can reverse before a popup fade finishes.
-            foreach(var w in new[]{Start,Apps,Status}){w.Opacity=1;Native.BlurOpacity(w,1);if(value)w.Show();else w.HideImmediately();}if(ready)PlaceFrame();RefreshMedia();
+            foreach(var w in DockWindows){w.Opacity=1;Native.BlurOpacity(w,1);if(value)w.Show();else w.HideImmediately();}if(ready)PlaceFrame();RefreshMedia();
         }
         void AnimateAutoHide(bool value)
         {
             if(closed)return;if(!Motion.Enabled){SetVisible(value);if(!value&&revealEdge!=null)revealEdge.Show(true);return;}if(visible==value&&!visibilityTimer.IsEnabled){if(value)EnsureVisibleWindows();return;}
-            bool hidden=!Apps.IsVisible;visible=value;if(hidden){reveal=0;foreach(var w in new[]{Start,Apps,Status}){w.Opacity=0;Native.BlurOpacity(w,0);w.Show();}}
+            bool hidden=!Apps.IsVisible;visible=value;if(hidden){reveal=0;foreach(var w in DockWindows){w.Opacity=0;Native.BlurOpacity(w,0);w.Show();}}
             revealFrom=reveal;revealTarget=value?1:0;revealDuration=value?230:160;visibilityWatch.Restart();visibilityTimer.Start();ApplyReveal();
         }
-        void EnsureVisibleWindows(bool raise=false){foreach(var window in new[]{Start,Apps,Status})Native.EnsureDockVisible(window,raise);}
+        void EnsureVisibleWindows(bool raise=false){foreach(var window in DockWindows)Native.EnsureDockVisible(window,raise);}
         void RecoverPlacement()
         {
             if(targetLayout==null||resizeTimer.IsEnabled||visibilityTimer.IsEnabled)return;
@@ -253,13 +253,15 @@ namespace OneTaskBar
         }
         void ApplyReveal()
         {
-            foreach(var w in new[]{Start,Apps,Status}){w.Opacity=reveal;w.Surface.IsHitTestVisible=visible&&reveal>.1;Native.BlurOpacity(w,reveal);}PlaceFrame();
+            foreach(var w in DockWindows){w.Opacity=reveal;w.Surface.IsHitTestVisible=visible&&reveal>.1;Native.BlurOpacity(w,reveal);}PlaceFrame();
         }
         void VisibilityFrame()
         {
             if(closed){visibilityTimer.Stop();return;}double t=Math.Max(0,Math.Min(1,visibilityWatch.Elapsed.TotalMilliseconds/revealDuration)),ease=SpringEase.Out(t);reveal=revealFrom+(revealTarget-revealFrom)*ease;ApplyReveal();if(t<1)return;
-            visibilityTimer.Stop();if(!visible){foreach(var w in new[]{Start,Apps,Status})w.HideImmediately();RefreshMedia();if(revealEdge!=null&&!fullScreen&&autoHide)revealEdge.Show(true);}else{foreach(var w in new[]{Start,Apps,Status})w.Surface.IsHitTestVisible=true;QueueHide();}
+            visibilityTimer.Stop();if(!visible){foreach(var w in DockWindows)w.HideImmediately();RefreshMedia();if(revealEdge!=null&&!fullScreen&&autoHide)revealEdge.Show(true);}else{foreach(var w in DockWindows)w.Surface.IsHitTestVisible=true;QueueHide();}
         }
+        // The three dock windows, or two while the top status bar carries the status: the old capsule stays hidden for good instead of being hidden again on every pass.
+        GlassWindow[] DockWindows {get{return controller.TopBarActive?new GlassWindow[]{Start,Apps}:new GlassWindow[]{Start,Apps,Status};}}
         bool InUse()
         {
             if(DateTime.UtcNow<interactionUntil||DragReorder.Active||Overflow.IsOpen||Start.IsMouseOver||Apps.IsMouseOver||Status.IsMouseOver||(Start.ContextMenu!=null&&Start.ContextMenu.IsOpen)||cells.Values.Any(c=>c.Button.ContextMenu!=null&&c.Button.ContextMenu.IsOpen)||controller.DockInUse(this))return true;
@@ -317,13 +319,14 @@ namespace OneTaskBar
         internal void Refresh(PowerState state)
         {
             if(closed) return;
-            bool reserve=Preferences.Current.ShowNowBar&&controller.Desktop&&(controller.Services.Media.Active||MediaBar!=null&&MediaBar.ReservesSpace);
+            bool top=controller.TopBarActive;
+            bool reserve=!top&&Preferences.Current.ShowNowBar&&controller.Desktop&&(controller.Services.Media.Active||MediaBar!=null&&MediaBar.ReservesSpace);
             double expected=PowerDisplay.DockSlot(state,Preferences.Current.DesktopPowerWatts);
             if(expected!=powerWidth||reserve!=mediaSpace)Rebuild();
-            if(MediaBar!=null&&(MediaBar.InterfaceVersion!=Preferences.Current.UIVersion||MediaBar.SideCapsuleStyle!=(ReleaseFeatures.GlassUI&&Preferences.Current.NowBarSideCapsule&&DockGeometry.Vertical(Edge)))){MediaBar.Close();MediaBar=null;}
-            if(MediaBar==null&&Preferences.Current.ShowNowBar&&controller.Services.Media.Active&&controller.Desktop)
+            if(MediaBar!=null&&(top||MediaBar.InterfaceVersion!=Preferences.Current.UIVersion||MediaBar.SideCapsuleStyle!=(ReleaseFeatures.GlassUI&&Preferences.Current.NowBarSideCapsule&&DockGeometry.Vertical(Edge)))){MediaBar.Close();MediaBar=null;}
+            if(MediaBar==null&&!top&&Preferences.Current.ShowNowBar&&controller.Services.Media.Active&&controller.Desktop)
                 MediaBar=new NowBar(controller,Screen){DismissedOutside=HideAfterMediaDismissed};
-            RefreshMedia();powerAccess.ToolTip=state.Known?"배터리 · 빠른 설정":"직접 입력한 PC 전력값 · 실시간 측정 아님";
+            RefreshMedia();if(top&&Status.IsVisible){Status.HideImmediately();Native.BlurOpacity(Status,0);}powerAccess.ToolTip=state.Known?"배터리 · 빠른 설정":"직접 입력한 PC 전력값 · 실시간 측정 아님";
             Battery.Update(state);var now=DateTime.Now;clockFace.Update(now,Edge);clockAccess.ToolTip=now.ToString("yyyy-MM-dd ddd tt h:mm:ss",System.Globalization.CultureInfo.GetCultureInfo("ko-KR"))+" · 알림센터";
             bool radioOff=controller.Services.WifiOn==false;string wifiKind=NetworkRouteInfo.Glyph(controller.Services.NetworkRoute,controller.Services.WifiPresent,radioOff,controller.Wifi!=null,controller.Services.NetworkConnected);
             string soundKind=SoundIcon.For(controller.Audio.Value,controller.Audio.Muted,controller.Audio.Available);

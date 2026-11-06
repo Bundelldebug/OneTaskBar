@@ -84,6 +84,37 @@ namespace OneTaskBar
             window.LiquidLevel=0;
         }
         internal static double Measure(GlassWindow window){return Brightness(window);}
+        // The average brightness (0..1) of a patch of screen, read with a handful of samples; -1 if it cannot be read.
+        internal static double Sample(System.Drawing.Rectangle area)
+        {
+            var screen=System.Windows.Forms.Screen.FromRectangle(area).Bounds;
+            var clipped=System.Drawing.Rectangle.Intersect(area,screen);
+            if(clipped.Width<4||clipped.Height<2)return -1;
+            var screenDc=GetDC(IntPtr.Zero);
+            if(screenDc==IntPtr.Zero)return -1;
+            var memory=CreateCompatibleDC(screenDc);
+            var bitmap=CreateCompatibleBitmap(screenDc,Grid,Grid);
+            var old=SelectObject(memory,bitmap);
+            double total=0;int count=0;
+            try
+            {
+                SetStretchBltMode(memory,3);
+                if(StretchBlt(memory,0,0,Grid,Grid,screenDc,clipped.X,clipped.Y,clipped.Width,clipped.Height,0x00CC0020))
+                {
+                    for(int y=0;y<Grid;y++)for(int x=0;x<Grid;x++)
+                    {
+                        uint pixel=GetPixel(memory,x,y);
+                        double r=pixel&0xFF,g=(pixel>>8)&0xFF,b=(pixel>>16)&0xFF;
+                        total+=(.2126*r+.7152*g+.0722*b)/255.0;count++;
+                    }
+                }
+            }
+            finally
+            {
+                SelectObject(memory,old);DeleteObject(bitmap);DeleteDC(memory);ReleaseDC(IntPtr.Zero,screenDc);
+            }
+            return count==0?-1:total/count;
+        }
         static double Brightness(GlassWindow window)
         {
             Native.RectI box;

@@ -288,7 +288,7 @@ namespace OneTaskBar
         internal bool GlassMaterial {get{return glassEdge!=null;}}
         internal Point GlassHighlight {get{return glassEdge==null?new Point():glassEdge.StartPoint;}}
         public readonly Border Surface;
-        public double Radius=28; public bool Dark=true; public bool HasBlur;internal int LiquidLevel;internal bool SoftCorners=true,OpaqueSurface,DockSurface,DockPalette;
+        public double Radius=28; public bool Dark=true; public bool HasBlur;internal int LiquidLevel;internal bool PopFromTop;internal bool SoftCorners=true,OpaqueSurface,DockSurface,DockPalette;
         internal bool StableSurface=true,UnifiedFade,SmoothLauncher;internal FrameworkElement TransitionContent;
         GlassLens lens;
         static readonly DependencyProperty SurfaceFadeProperty=DependencyProperty.Register("SurfaceFade",typeof(double),typeof(GlassWindow),new PropertyMetadata(1.0,(d,e)=>{var window=(GlassWindow)d;if(window.Surface!=null)window.Surface.Opacity=(double)e.NewValue;Native.BlurOpacity(window,(double)e.NewValue);}));
@@ -382,6 +382,7 @@ namespace OneTaskBar
         internal virtual void RefreshGlassMaterial(){ApplyMaterial();if(DockSurface)Glass95.DockInk(Surface);else Glass95.RefreshColors(Surface);}
         internal void MoveGlassHighlight(Point point)
         {
+            if(Performance.Light)return;
             if(glassEdge==null||!Motion.Enabled||!Preferences.Current.Hover||!IsVisible||IsDismissing||Surface.ActualWidth<1||Surface.ActualHeight<1)return;
             var next=new Point(Math.Max(0,Math.Min(1,point.X/Surface.ActualWidth)),Math.Max(0,Math.Min(1,point.Y/Surface.ActualHeight)));if(Math.Abs(next.X-glassPointer.X)+Math.Abs(next.Y-glassPointer.Y)<.03)return;glassPointer=next;
             glassEdge.StartPoint=new Point(next.X*.55,next.Y*.25);glassEdge.EndPoint=new Point(.55+next.X*.45,.75+next.Y*.25);
@@ -398,7 +399,7 @@ namespace OneTaskBar
         public new void Show()
         {
             bool resume=StableSurface&&!UnifiedFade&&IsVisible&&hiding;++motion;hiding=false;CompleteDismissal(false);if(UnifiedFade)ResetFade();Surface.IsHitTestVisible=true;Surface.BeginAnimation(UIElement.OpacityProperty,null);Surface.Opacity=1;Surface.RenderTransform=Transform.Identity;
-            if(StableSurface&&TransitionContent!=null){if(resume&&Motion.Enabled){if(SmoothLauncher)LauncherMotion.Run(TransitionContent,true);else Motion.Launcher(TransitionContent,true);}else{if(SmoothLauncher)LauncherMotion.Cancel(TransitionContent);TransitionContent.BeginAnimation(OpacityProperty,null);TransitionContent.Opacity=1;TransitionContent.RenderTransform=Transform.Identity;}}
+            if(StableSurface&&TransitionContent!=null){if(resume&&Motion.Enabled){if(SmoothLauncher)LauncherMotion.Run(TransitionContent,true,PopFromTop);else Motion.Launcher(TransitionContent,true,PopFromTop);}else{if(SmoothLauncher)LauncherMotion.Cancel(TransitionContent);TransitionContent.BeginAnimation(OpacityProperty,null);TransitionContent.Opacity=1;TransitionContent.RenderTransform=Transform.Identity;}}
             base.Show();
             ShellWindowPolicy.Apply(this);
         }
@@ -406,7 +407,7 @@ namespace OneTaskBar
         {
             if(TransitionContent==null)TransitionContent=Surface.Child as FrameworkElement;
             if(!Motion.Enabled){if(SmoothLauncher)LauncherMotion.Cancel(TransitionContent);return;}
-            if(StableSurface&&TransitionContent!=null){++motion;Surface.RenderTransform=Transform.Identity;Surface.Opacity=1;if(SmoothLauncher)LauncherMotion.Run(TransitionContent,true);else Motion.Launcher(TransitionContent,true);return;}
+            if(StableSurface&&TransitionContent!=null){++motion;Surface.RenderTransform=Transform.Identity;Surface.Opacity=1;if(SmoothLauncher)LauncherMotion.Run(TransitionContent,true,PopFromTop);else Motion.Launcher(TransitionContent,true,PopFromTop);return;}
             ++motion;Surface.RenderTransformOrigin=new Point(.5,.5);var scale=new ScaleTransform(.94,.94);double offset=Math.Min(14,Math.Max(0,Surface.ActualHeight)*.025);var translate=new TranslateTransform(0,offset);var group=new TransformGroup();group.Children.Add(scale);group.Children.Add(translate);Surface.RenderTransform=group;
             scale.BeginAnimation(ScaleTransform.ScaleXProperty,Motion.PanelTween(.94,1,310));scale.BeginAnimation(ScaleTransform.ScaleYProperty,Motion.PanelTween(.94,1,310));translate.BeginAnimation(TranslateTransform.YProperty,Motion.PanelTween(offset,0,310));
             Surface.BeginAnimation(UIElement.OpacityProperty,new DoubleAnimation(0,1,TimeSpan.FromMilliseconds(150)));

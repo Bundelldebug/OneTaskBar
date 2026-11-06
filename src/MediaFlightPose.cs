@@ -32,7 +32,7 @@ namespace OneTaskBar
             return new MediaWindowPose {
                 Center=center,Width=width,Height=height,Radius=Math.Max(0,Math.Min(Math.Min(width,height)/2,radius)),
                 Tilt=-15*direction*envelope,Turn=-9*direction*envelope,
-                Opacity=1-MediaFlightTiming.Smooth((p-.73)/.27),Defocus=.8*envelope
+                Opacity=1-MediaFlightTiming.Smooth((p-.73)/.27),Defocus=Performance.Light?0:.8*envelope
             };
         }
     }
