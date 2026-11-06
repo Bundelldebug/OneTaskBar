@@ -60,6 +60,12 @@ namespace OneTaskBar
                     Require(snapped.X==600&&snapped.Y==408,"an open drop snaps to the nearest grid position");
                     var full=new Rect(0,0,1200,900);
                     Require(DesktopWidgetStore.FindFree(new Rect(30,30,190,88),new List<Rect>{full},area)==new Rect(30,30,190,88),"a full screen keeps the position instead of failing");
+            {
+                var main=System.Windows.Forms.Screen.PrimaryScreen;string id=MonitorIdentity.Of(main);
+                Require(id.StartsWith("id:",StringComparison.Ordinal)&&MonitorIdentity.Find(id)!=null&&MonitorIdentity.Find(id).DeviceName==main.DeviceName,"a monitor identity finds the same screen again");
+                Require(MonitorIdentity.Find(main.DeviceName)!=null&&MonitorIdentity.Find("id:MONITOR-THAT-IS-NOT-CONNECTED")==null&&MonitorIdentity.Find("\\\\.\\DISPLAY99")==null,"a saved display name still resolves, and an absent monitor resolves to nothing");
+                Require(System.Windows.Forms.Screen.AllScreens.Select(MonitorIdentity.Of).Distinct().Count()==System.Windows.Forms.Screen.AllScreens.Length,"every connected monitor has its own identity");
+            }
                     store.Items.Clear();
                     var beside=store.Add("clock-digital:2x1","fixture-a",area,new[]{icon});
                     Require(!new Rect(beside.X,beside.Y,beside.Width,beside.Height).IntersectsWith(icon),"new widgets avoid desktop icons");

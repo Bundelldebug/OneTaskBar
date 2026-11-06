@@ -65,7 +65,7 @@ namespace OneTaskBar
                 Clear();
                 Store.Items.Clear();
             }
-            foreach(var entry in layout)Store.Place(entry.Key,screen.DeviceName,entry.Value);
+            foreach(var entry in layout)Store.Place(entry.Key,MonitorIdentity.Of(screen),entry.Value);
             Store.Save();
             Preferences.SetWidgetMaterial(p=>p.WidgetsSeeded=true);
             discoveryAt=DateTime.MinValue;
@@ -360,7 +360,7 @@ namespace OneTaskBar
             if(disposed||screen==null)return;
             double scale=Native.DropMonitorScale(screen.Bounds);
             Point? near=anchor.HasValue?(Point?)new Point((anchor.Value.X-Work(screen).Left)/scale,(anchor.Value.Y-Work(screen).Top)/scale):null;
-            var item=Store.Add(key,screen.DeviceName,new Size(Work(screen).Width/scale,Work(screen).Height/scale),IconRects(screen,scale),near);
+            var item=Store.Add(key,MonitorIdentity.Of(screen),new Size(Work(screen).Width/scale,Work(screen).Height/scale),IconRects(screen,scale),near);
             RefreshIcons();
             if(item==null)
             {
@@ -389,10 +389,14 @@ namespace OneTaskBar
             iconsBusy=true;
             iconsAt=DateTime.UtcNow.AddSeconds(120);
             IntPtr view=parent;
+            int revision=displayRevision;
             try
             {
                 iconPixels=await BackgroundWork.Run(()=>DesktopIcons.Read(view));
-                if(!disposed)Settle();
+                // Icon positions read while the monitors were changing describe a layout that is gone. Tidying widgets
+                // around them moved widgets for good, so a read that overlapped a change is read again instead.
+                if(!disposed&&revision==displayRevision)Settle();
+                else if(!disposed)iconsAt=DateTime.UtcNow.AddSeconds(2);
             }
             catch(Exception e)
             {
@@ -406,13 +410,14 @@ namespace OneTaskBar
             var available=new Size(Work(screen).Width/scale,Work(screen).Height/scale);
             foreach(var other in Store.Items)
             {
-                if(other!=item&&ScreenFor(other).DeviceName==screen.DeviceName)blocked.Add(DesktopWidgetStore.Fit(other,available));
+                if(other!=item&&OnScreen(other)&&MonitorIdentity.Of(ScreenFor(other))==MonitorIdentity.Of(screen))blocked.Add(DesktopWidgetStore.Fit(other,available));
             }
             return blocked;
         }
         // Moves a widget to the nearest free position only when something actually overlaps it.
         bool Clear(DesktopWidgetSlot item,bool always)
         {
+            if(!OnScreen(item))return false;
             var screen=ScreenFor(item);
             double scale=Native.DropMonitorScale(screen.Bounds);
             var available=new Size(Work(screen).Width/scale,Work(screen).Height/scale);
@@ -478,9 +483,11 @@ namespace OneTaskBar
             var area=Native.WorkArea(screen);
             return area.Right>area.Left&&area.Bottom>area.Top?new System.Drawing.Rectangle(area.Left,area.Top,area.Right-area.Left,area.Bottom-area.Top):screen.WorkingArea;
         }
+        // A widget whose monitor is not connected is simply not shown. It keeps its saved place and returns with the monitor.
+        static bool OnScreen(DesktopWidgetSlot item){return MonitorIdentity.Find(item.Monitor)!=null;}
         static Forms.Screen ScreenFor(DesktopWidgetSlot item)
         {
-            return Forms.Screen.AllScreens.FirstOrDefault(s=>String.Equals(s.DeviceName,item.Monitor,StringComparison.OrdinalIgnoreCase))??Forms.Screen.PrimaryScreen;
+            return MonitorIdentity.Find(item.Monitor)??Forms.Screen.PrimaryScreen;
         }
         internal static Rect Physical(DesktopWidgetSlot item,Forms.Screen screen,double scale)
         {
@@ -516,7 +523,7 @@ namespace OneTaskBar
             }
             else
             {
-                item.Monitor=screen.DeviceName;
+                item.Monitor=MonitorIdentity.Of(screen);
                 item.X=(dragPixels.X+end.X-start.X-Work(screen).Left)/scale;
                 item.Y=(dragPixels.Y+end.Y-start.Y-Work(screen).Top)/scale;
             }
@@ -576,9 +583,17 @@ namespace OneTaskBar
             {
                 foreach(var above in hosts.Values)above.Raise();
             }
+            MigrateMonitors();
             foreach(var item in Store.Items)
             {
                 DesktopWidgetHost host;
+                if(!OnScreen(item))
+                {
+                    // Its monitor is not connected: leave the saved place alone and show it again when the monitor returns.
+                    DesktopWidgetHost away;
+                    if(hosts.TryGetValue(item.Id,out away))away.Present(false);
+                    continue;
+                }
                 if(hosts.TryGetValue(item.Id,out host)&&!host.Alive)
                 {
                     host.Dispose();
@@ -604,9 +619,11 @@ namespace OneTaskBar
                 var screen=ScreenFor(item);
                 double scale=Native.DropMonitorScale(screen.Bounds);
                 host.Place(Physical(item,screen,scale),scale);
-                bool visible=item.Id==selectedId||bounds.IsEmpty||!bounds.Contains(host.Pixels);
-                host.Present(visible);
-                if(visible)host.View.Refresh();
+                // A window over a widget covers it by itself. Hiding the widget as well made it flash away and back
+                // as windows moved, so it stays up; only the redraw is skipped while a window fully hides it.
+                bool hidden=item.Id!=selectedId&&!bounds.IsEmpty&&bounds.Contains(host.Pixels);
+                host.Present(true);
+                if(!hidden)host.View.Refresh();
             }
             Status=Store.Items.Count==0?"추가할 위젯을 선택하세요":Store.Items.Count+"개 위젯 · "+"바탕화면에 표시 중";
         }
@@ -617,9 +634,29 @@ namespace OneTaskBar
         }
         internal void DisplayChanged()
         {
+            MonitorIdentity.Refresh();
+            displayRevision++;
+            iconsAt=DateTime.UtcNow.AddSeconds(2);
             wallpapers.Clear();
             dragging=null;
             Pulse();
+        }
+        int displayRevision;
+        bool monitorsMigrated;
+        // Placements saved before monitors had identities name a display number. They take the identity of the monitor
+        // that has that number now, or of the main monitor if it is gone, once.
+        void MigrateMonitors()
+        {
+            if(monitorsMigrated)return;
+            monitorsMigrated=true;
+            bool changed=false;
+            foreach(var item in Store.Items)
+            {
+                if(item.Monitor!=null&&item.Monitor.StartsWith("id:",StringComparison.Ordinal))continue;
+                item.Monitor=MonitorIdentity.Of(MonitorIdentity.Find(item.Monitor)??Forms.Screen.PrimaryScreen);
+                changed=true;
+            }
+            if(changed)Store.Save();
         }
         void Clear()
         {
