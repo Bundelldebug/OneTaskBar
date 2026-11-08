@@ -55,11 +55,12 @@ namespace OneTaskBar
             edge.GradientStops.Add(new GradientStop(Color.FromArgb(isDark?(byte)24:(byte)45,221,232,249),.45));
             edge.GradientStops.Add(new GradientStop(Color.FromArgb(isDark?(byte)28:(byte)58,119,140,170),1));if(freeze)edge.Freeze();return edge;
         }
-        internal static void DockInk(DependencyObject root)
+        internal static void DockInk(DependencyObject root,Brush ink=null)
         {
-            var text=root as TextBlock;if(text!=null){text.Foreground=DockForeground;text.Effect=DockAppearance.Readability;}
-            var glyph=root as Glyph;if(glyph!=null){glyph.Effect=DockAppearance.Readability;if(glyph.Kind!="windows-start")glyph.Color=DockForeground;glyph.InvalidateVisual();}
-            foreach(object child in LogicalTreeHelper.GetChildren(root)){var node=child as DependencyObject;if(node!=null)DockInk(node);}
+            if(ink==null)ink=DockForeground;
+            var text=root as TextBlock;if(text!=null){text.Foreground=ink;text.Effect=DockAppearance.Readability;}
+            var glyph=root as Glyph;if(glyph!=null){glyph.Effect=DockAppearance.Readability;if(glyph.Kind!="windows-start")glyph.Color=ink;glyph.InvalidateVisual();}
+            foreach(object child in LogicalTreeHelper.GetChildren(root)){var node=child as DependencyObject;if(node!=null)DockInk(node,ink);}
         }
         internal static void MediaInk(DependencyObject root)
         {

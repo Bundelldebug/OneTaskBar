@@ -28,8 +28,9 @@ namespace OneTaskBar
             Target=60;
             try
             {
-                int hz=Math.Max(60,Math.Min(144,Refresh()));
-                if(hz<=60||Performance.Light)return;
+                // Animations follow the display rate, up to 120. The 60Hz mode in settings (and light effects) keeps them at 60.
+                int hz=Math.Max(60,Math.Min(120,Refresh()));
+                if(hz<=60||Performance.Light||Preferences.Current.Limit60Hz)return;
                 Timeline.DesiredFrameRateProperty.OverrideMetadata(typeof(Timeline),new FrameworkPropertyMetadata(hz));
                 Target=hz;
             }

@@ -2,11 +2,34 @@ using System;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Media;
 
 namespace OneTaskBar
 {
     internal sealed partial class WelcomeWindow
     {
+        static Tuple<Border,Image> PresetPreview()
+        {
+            var image=new Image {Stretch=Stretch.UniformToFill};
+            var frame=new Border {Height=96,Margin=new Thickness(0,0,6,0),CornerRadius=new CornerRadius(12),ClipToBounds=true,Background=AppSettingsPalette.AccentLight,Child=image};
+            return Tuple.Create(frame,image);
+        }
+        static ImageSource PresetThumbnail(string file)
+        {
+            if(!WallpaperPreset.Usable(file))return null;
+            try
+            {
+                var image=new System.Windows.Media.Imaging.BitmapImage();
+                using(var stream=File.OpenRead(file))
+                {
+                    image.BeginInit();image.CacheOption=System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;image.DecodePixelWidth=360;image.StreamSource=stream;image.EndInit();
+                }
+                image.Freeze();
+                return image;
+            }
+            catch(Exception error){AppLog.Once("preset-thumbnail",error.GetType().Name);return null;}
+        }
         // Saves one desktop wallpaper and one lock screen picture as a pair and applies them together.
         void WallpaperPresetSetting(StackPanel rows)
         {
@@ -20,6 +43,17 @@ namespace OneTaskBar
                 desktopName.Text="바탕화면 · "+(String.IsNullOrEmpty(Preferences.Current.PresetDesktopWallpaper)?"선택 안 함":Path.GetFileName(Preferences.Current.PresetDesktopWallpaper));
                 lockName.Text="잠금화면 · "+(String.IsNullOrEmpty(Preferences.Current.PresetLockScreen)?"선택 안 함":Path.GetFileName(Preferences.Current.PresetLockScreen));
             };
+            var previews=new UniformGrid {Columns=2,Margin=new Thickness(0,0,0,10)};
+            var desktopPreview=PresetPreview();var lockPreview=PresetPreview();
+            previews.Children.Add(desktopPreview.Item1);previews.Children.Add(lockPreview.Item1);
+            box.Children.Add(previews);
+            Action showPreviews=()=>
+            {
+                desktopPreview.Item2.Source=PresetThumbnail(Preferences.Current.PresetDesktopWallpaper);
+                lockPreview.Item2.Source=PresetThumbnail(Preferences.Current.PresetLockScreen);
+            };
+            var showNames=show;
+            show=()=>{showNames();showPreviews();};
             show();box.Children.Add(desktopName);box.Children.Add(lockName);
             Func<string,string> pick=heading=>
             {

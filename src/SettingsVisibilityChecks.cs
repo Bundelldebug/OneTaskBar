@@ -36,6 +36,19 @@ namespace OneTaskBar
                     }
                 }
                 finally{Preferences.Set(p=>p.DockMonitor=savedMonitor);}
+                // Desktop styles are presets: Mac changes liquid glass and the Now Bar, and leaving it puts them back.
+                bool keepGlass=Preferences.Current.LiquidGlass,keepBlur=Preferences.Current.Blur,keepNowBar=Preferences.Current.ShowNowBar,keepIsland=Preferences.Current.DynamicIsland,keepTop=Preferences.Current.TopStatusBar,keepDuo=Preferences.Current.DuoStatusIcon;string keepBackup=Preferences.Current.DesktopStyleBackup;
+                try
+                {
+                    Preferences.Set(p=>{p.DynamicIsland=false;p.TopStatusBar=false;p.LiquidGlass=false;p.Blur=false;p.ShowNowBar=true;p.DuoStatusIcon=false;p.DesktopStyleBackup=null;});
+                    window.ChooseDesktopStyle(1);
+                    if(!Preferences.Current.DynamicIsland||!Preferences.Current.LiquidGlass||Preferences.Current.ShowNowBar||!Preferences.Current.DuoStatusIcon)throw new InvalidOperationException("Mac style does not apply its preset");
+                    window.ChooseDesktopStyle(2);
+                    if(Preferences.Current.DynamicIsland||!Preferences.Current.TopStatusBar||Preferences.Current.LiquidGlass||Preferences.Current.Blur||!Preferences.Current.ShowNowBar||Preferences.Current.DuoStatusIcon)throw new InvalidOperationException("Leaving the Mac style does not restore liquid glass, blur and the Now Bar");
+                    window.ChooseDesktopStyle(1);window.ChooseDesktopStyle(0);
+                    if(Preferences.Current.DynamicIsland||Preferences.Current.TopStatusBar||Preferences.Current.LiquidGlass||!Preferences.Current.ShowNowBar)throw new InvalidOperationException("Windows style does not return the earlier settings");
+                }
+                finally{Preferences.Set(p=>{p.LiquidGlass=keepGlass;p.Blur=keepBlur;p.ShowNowBar=keepNowBar;p.DynamicIsland=keepIsland;p.TopStatusBar=keepTop;p.DuoStatusIcon=keepDuo;p.DesktopStyleBackup=keepBackup;});}
                 await Task.Delay(300);
                 foreach(var choice in UIVersions.Available)
                 {

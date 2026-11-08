@@ -346,8 +346,9 @@ namespace OneTaskBar
                 if(down||up)try{uint flags=(uint)Marshal.ReadInt32(info,8);bool alt=(flags&0x20)!=0||(GetAsyncKeyState(0x12)&0x8000)!=0,ctrl=(GetAsyncKeyState(0x11)&0x8000)!=0,shift=(GetAsyncKeyState(0x10)&0x8000)!=0,win=(GetAsyncKeyState(0x5b)&0x8000)!=0||(GetAsyncKeyState(0x5c)&0x8000)!=0;if(AltTabGesture.Observe(key,down,Enabled&&InterceptAltTab!=null&&InterceptAltTab(),alt,ctrl,shift,win,(flags&0x10)!=0))return new IntPtr(1);}catch(Exception error){AppLog.Once("switcher-key",error.GetType().Name);}
                 // Win+S opens One TaskBar's own search. The S key is swallowed so Windows never starts its search.
                 if(key==0x53&&up&&searchKeyHeld){searchKeyHeld=false;return new IntPtr(1);}
-                if(key==0x53&&down&&Enabled&&InterceptSearch!=null&&InterceptSearch()&&(bufferedWin!=0||(GetAsyncKeyState(0x5b)&0x8000)!=0||(GetAsyncKeyState(0x5c)&0x8000)!=0)&&(GetAsyncKeyState(0x11)&0x8000)==0&&(GetAsyncKeyState(0x12)&0x8000)==0)
+                if(key==0x53&&down&&Enabled&&InterceptSearch!=null&&InterceptSearch()&&(bufferedWin!=0||(GetAsyncKeyState(0x5b)&0x8000)!=0||(GetAsyncKeyState(0x5c)&0x8000)!=0)&&(GetAsyncKeyState(0x10)&0x8000)==0&&(GetAsyncKeyState(0x11)&0x8000)==0&&(GetAsyncKeyState(0x12)&0x8000)==0)
                 {
+                    // Only a plain Win+S: Win+Shift+S (and the Print Screen key, which starts the same capture) must reach Windows.
                     if(!searchKeyHeld){searchKeyHeld=true;if(bufferedWin==0)SystemPanels.CancelStart();bufferedWin=0;if(OnSearch!=null)OnSearch();}
                     return new IntPtr(1);
                 }

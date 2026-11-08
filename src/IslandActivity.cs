@@ -24,6 +24,8 @@ namespace OneTaskBar
                 bars[i]=new ScaleTransform(1,.3+i*.12);
                 var bar=new Border {Width=2.4,Height=14,Margin=new Thickness(1,0,1,0),CornerRadius=new CornerRadius(1.2),Background=Paint.ControlWhite,RenderTransformOrigin=new Point(.5,.5),RenderTransform=bars[i]};
                 motion[i]=new DoubleAnimation(.25+i*.06,1,TimeSpan.FromMilliseconds(350+i*65)) {AutoReverse=true,RepeatBehavior=RepeatBehavior.Forever,BeginTime=TimeSpan.FromMilliseconds(i*80)};
+                // Endless decoration: thirty frames a second look the same and cost a quarter of the work at 120 Hz.
+                Timeline.SetDesiredFrameRate(motion[i],30);
                 motion[i].Freeze();
                 Children.Add(bar);
             }

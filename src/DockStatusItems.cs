@@ -58,7 +58,7 @@ namespace OneTaskBar
             {
                 var glyph=button.Content as Glyph;
                 if(glyph==null)continue;
-                glyph.Update(glyph.Kind,Glass95.DockForeground);
+                glyph.Update(glyph.Kind,StatusInk);
                 if((string)button.Tag=="buds")glyph.SetDeviceIcon(statusBudsIcon);
             }
         }
@@ -66,7 +66,7 @@ namespace OneTaskBar
         void RebuildStatusItems()
         {
             var keys=DockStatusItems.Clean(Preferences.Current.DockStatusItems);string signature=String.Join("|",keys);bool vertical=DockGeometry.Vertical(Edge);extraStatus.Orientation=vertical?Orientation.Vertical:Orientation.Horizontal;
-            if(extraStatusKey!=signature){extraStatusKey=signature;extraStatus.Children.Clear();foreach(string key in keys){var choice=DockStatusItems.Choices.First(c=>c[0]==key);var glyph=new Glyph(choice[1],17){Color=Glass95.DockForeground};var button=Paint.Button(glyph,()=>DockStatusItems.Invoke(key,controller,Status),choice[2]);button.Tag=key;button.Width=24;button.Height=24;button.Padding=new Thickness(0);button.Background=Brushes.Transparent;extraStatus.Children.Add(button);}}
+            if(extraStatusKey!=signature){extraStatusKey=signature;extraStatus.Children.Clear();foreach(string key in keys){var choice=DockStatusItems.Choices.First(c=>c[0]==key);var glyph=new Glyph(choice[1],17){Color=StatusInk};var button=Paint.Button(glyph,()=>DockStatusItems.Invoke(key,controller,Status),choice[2]);button.Tag=key;button.Width=24;button.Height=24;button.Padding=new Thickness(0);button.Background=Brushes.Transparent;extraStatus.Children.Add(button);}}
             UpdateStatusSymbols();
             string budsName=BudsDeviceData.ConnectedName(controller);
             if(keys.Contains("buds")&&statusBudsModel!=BudsDeviceData.SymbolFile(budsName))LoadStatusBuds(budsName);

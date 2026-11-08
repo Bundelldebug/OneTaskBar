@@ -19,7 +19,28 @@ namespace OneTaskBar
         {
             // Mac turns the liquid material on too. LiquidGlass.Enabled still holds it back on a weak PC,
             // so the material follows the hardware without a second switch.
-            Preferences.Set(p=>{p.DynamicIsland=style==1;p.TopStatusBar=style==2;if(style==1){p.LiquidGlass=true;p.Blur=true;p.ShowNowBar=false;p.DuoStatusIcon=true;}else p.DuoStatusIcon=false;});
+            // A style is applied as a preset: entering Mac remembers the options it changes, and leaving it puts them back.
+            int from=CurrentDesktopStyle();
+            Preferences.Set(p=>
+            {
+                p.DynamicIsland=style==1;p.TopStatusBar=style==2;
+                if(style==1)
+                {
+                    if(from!=1||String.IsNullOrEmpty(p.DesktopStyleBackup))p.DesktopStyleBackup=(p.LiquidGlass?"1":"0")+","+(p.Blur?"1":"0")+","+(p.ShowNowBar?"1":"0");
+                    p.LiquidGlass=true;p.Blur=true;p.ShowNowBar=false;p.DuoStatusIcon=true;
+                    return;
+                }
+                p.DuoStatusIcon=false;
+                if(from==1)
+                {
+                    var saved=(p.DesktopStyleBackup??"").Split(',');
+                    bool known=saved.Length==3;
+                    p.LiquidGlass=known?saved[0]=="1":false;
+                    p.Blur=known?saved[1]=="1":p.Blur;
+                    p.ShowNowBar=known?saved[2]=="1":true;
+                }
+                p.DesktopStyleBackup=null;
+            });
         }
         // Three miniature desktops side by side; the chosen one gets an accent frame.
         void DesktopStyleSetting(StackPanel rows)

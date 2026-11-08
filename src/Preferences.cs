@@ -28,6 +28,8 @@ namespace OneTaskBar
         public int DockBackgroundKind=0,DockEdge=3;
         public int DockScalePercent=100;        public string DockMonitor;
         public string PresetDesktopWallpaper,PresetLockScreen;
+        // Liquid glass, blur and bottom Now Bar as they were before the Mac style changed them; "lg,blur,nowbar" as 0/1.
+        public string DesktopStyleBackup;
         public int DockClockMode=0;
         public string DockBackgroundColor="#FFBAC1C7",DockBackgroundImage;
         public bool DockMaterialCustom=false,StartMaterialCustom=false;
@@ -62,6 +64,8 @@ namespace OneTaskBar
         public bool TopStatusBar=false;
         public bool FullscreenBand=true;
         public bool LightEffects=false;
+        // Keeps animations at 60 frames per second on a faster display; read once at startup.
+        public bool Limit60Hz=false;
         public bool WidgetsSeeded=false;
         public bool DesktopMenuEntry=true;
         public bool FullscreenWidgets=true;

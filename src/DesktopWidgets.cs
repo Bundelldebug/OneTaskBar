@@ -113,9 +113,30 @@ namespace OneTaskBar
             Application.Current.Dispatcher.BeginInvoke(new Action(()=>
             {
                 if(disposed)return;
-                wallpapers.Clear();
-                PaintAll();
+                // Windows raises this before the new picture is written (and a slideshow fades in later), so read again after it settles.
+                wallpaperRetries=2;
+                if(wallpaperDelay==null)
+                {
+                    wallpaperDelay=new DispatcherTimer();
+                    wallpaperDelay.Tick+=(s,args)=>
+                    {
+                        wallpaperDelay.Stop();
+                        if(disposed)return;
+                        ReloadWallpapers();
+                        if(--wallpaperRetries>0){wallpaperDelay.Interval=TimeSpan.FromMilliseconds(2500);wallpaperDelay.Start();}
+                    };
+                }
+                wallpaperDelay.Stop();
+                wallpaperDelay.Interval=TimeSpan.FromMilliseconds(500);
+                wallpaperDelay.Start();
             }));
+        }
+        DispatcherTimer wallpaperDelay;int wallpaperRetries,wallpaperGeneration;
+        void ReloadWallpapers()
+        {
+            wallpaperGeneration++;
+            wallpapers.Clear();
+            PaintAll();
         }
         // Slider drags arrive quickly, and each one can redraw every widget.
         void MaterialChanged()
@@ -163,10 +184,14 @@ namespace OneTaskBar
             string device=screen.DeviceName;
             if(!wallpapersLoading.Add(device))return;
             var bounds=screen.Bounds;
+            int generation=wallpaperGeneration;
+            bool stale=false;
             try
             {
                 var snapshot=await BackgroundWork.Run(()=>DesktopWallpaper.Read(bounds));
                 if(disposed)return;
+                // The picture changed while this read was running, so it is the old one.
+                if(generation!=wallpaperGeneration){stale=true;return;}
                 wallpapers[device]=snapshot.Brush;
                 if(tintedInk)
                 {
@@ -180,7 +205,11 @@ namespace OneTaskBar
             {
                 AppLog.Once("widget-wallpaper",e.GetType().Name);
             }
-            finally{wallpapersLoading.Remove(device);}
+            finally
+            {
+                wallpapersLoading.Remove(device);
+                if(stale&&!disposed)LoadWallpaper(screen);
+            }
         }
         Brush WallpaperFor(Forms.Screen screen)
         {
@@ -681,6 +710,7 @@ namespace OneTaskBar
             Preferences.WidgetMaterialChanged-=MaterialChanged;
             Microsoft.Win32.SystemEvents.UserPreferenceChanged-=SystemPreferenceChanged;
             if(materialDelay!=null)materialDelay.Stop();
+            if(wallpaperDelay!=null)wallpaperDelay.Stop();
             if(gallery!=null)gallery.Close();
             Clear();
         }

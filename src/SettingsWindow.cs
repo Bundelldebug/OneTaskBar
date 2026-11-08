@@ -85,6 +85,8 @@ namespace OneTaskBar
                     Preferences.Current.MediaWindowAnimation,v=>Preferences.Set(p=>p.MediaWindowAnimation=v));
                 Row(hardware,"가벼운 효과","포인터를 따라 움직이는 유리 빛, 리퀴드 글래스, 미디어 전환의 배경 흐림을 끄고 파형·제목 갱신을 줄입니다. 사양이 낮은 PC는 자동으로 켜집니다",
                     Preferences.Current.LightEffects,v=>Preferences.Set(p=>p.LightEffects=v));
+                Row(hardware,"60Hz 모드","120Hz 화면에서도 애니메이션을 60프레임으로 제한해 발열과 전력 사용을 줄입니다. 앱을 다시 시작하면 적용됩니다",
+                    Preferences.Current.Limit60Hz,v=>Preferences.Set(p=>p.Limit60Hz=v));
                 Row(island,"상단 상태 표시줄","안드로이드처럼 화면 위쪽에 시계·알림(왼쪽), 재생 중인 미디어, 알림 앱 아이콘, 빠른 설정(오른쪽)을 배치합니다. Dynamic Island와 같은 두께의 위쪽 공간을 씁니다",
                     Preferences.Current.TopStatusBar,v=>Preferences.Set(p=>p.TopStatusBar=v));
                 Row(island,"전체화면 검은 띠","브라우저·동영상 플레이어가 전체화면일 때 위쪽 안전 영역을 검게 채우고, 포인터를 올리면 상태 표시줄을 보여 줍니다. 게임에는 적용하지 않습니다",
