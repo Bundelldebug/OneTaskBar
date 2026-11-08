@@ -275,7 +275,8 @@ namespace OneTaskBar
             wifi.Effect=volume.Effect=effect;
             var power=shell.Power;
             bool known=power!=null&&power.Known;
-            bool together=OnBlack&&Preferences.Current.DynamicIsland&&power!=null;
+            // The top bar keeps the regular Wi-Fi, volume and battery icons, also over the black band.
+            bool together=false;
             if(together!=duoMode)
             {
                 duoMode=together;layoutKey="";
