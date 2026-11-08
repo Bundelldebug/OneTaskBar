@@ -55,7 +55,8 @@ namespace OneTaskBar
             if(root==null||!root.ContainsKey("tag_name"))return null;
             string tag=Convert.ToString(root["tag_name"]);
             Version version;
-            if(!Version.TryParse(Regex.Replace(tag,"^[vV]",""),out version))return null;
+            // A re-release of the same version carries a letter after it (v9.5.12b); the number is what is compared.
+            if(!Version.TryParse(Regex.Replace(Regex.Replace(tag,"^[vV]",""),"(?<=[0-9])[A-Za-z]$",""),out version))return null;
             var info=new ReleaseInfo {Tag=tag,Version=version,Notes=root.ContainsKey("body")?Convert.ToString(root["body"]):""};
             var assets=root.ContainsKey("assets")?root["assets"] as object[]:null;
             if(assets!=null)

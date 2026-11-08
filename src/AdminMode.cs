@@ -37,13 +37,43 @@ namespace OneTaskBar
             }
         }
         // The sign-in task starts the new instance once this one has released its single-instance lock.
+        // A copy of this program waits for the current process to exit, then runs the task; no shell or delay trick is involved.
         static void Restart()
         {
-            var launch=new ProcessStartInfo(Path.Combine(Environment.SystemDirectory,"cmd.exe"),
-                "/c ping -n 4 127.0.0.1 >nul & \""+Path.Combine(Environment.SystemDirectory,"schtasks.exe")+"\" /run /tn "+LogonStartup.TaskName)
+            int id=Process.GetCurrentProcess().Id;
+            var launch=new ProcessStartInfo(NotificationIdentity.PhysicalFile(Path.Combine(AppLog.Root,"OneTaskBar.exe")),"--run-startup-after "+id)
                 {UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden};
             using(Process.Start(launch)){}
             Application.Current.Dispatcher.BeginInvoke(new Action(()=>Application.Current.Shutdown()),System.Windows.Threading.DispatcherPriority.Background);
+        }
+        // Entry point of that waiting copy. It never loads the interface.
+        internal static int RunAfter(string text)
+        {
+            int id;
+            if(!Int32.TryParse(text,out id)||id<=0)return 2;
+            try
+            {
+                using(var parent=Process.GetProcessById(id))
+                {
+                    if(!parent.WaitForExit(15000))return 3;
+                }
+            }
+            catch(ArgumentException){}
+            try
+            {
+                var run=new ProcessStartInfo(Path.Combine(Environment.SystemDirectory,"schtasks.exe"),"/run /tn "+LogonStartup.TaskName)
+                    {UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden};
+                using(var task=Process.Start(run))
+                {
+                    task.WaitForExit(10000);
+                    return task.HasExited?task.ExitCode:4;
+                }
+            }
+            catch(Exception error)
+            {
+                AppLog.Once("admin-restart",error.Message);
+                return 1;
+            }
         }
     }
 }
