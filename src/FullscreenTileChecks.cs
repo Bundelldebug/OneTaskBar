@@ -94,7 +94,7 @@ namespace OneTaskBar
                     await Task.Delay(1000);
                     int titleRate=scrolling.RenderCount-titleFrames;
                     titleWindow.Close();
-                    Require(titleRate>10&&titleRate<=40,"a scrolling title moves at about 30 updates a second, not the display rate: "+titleRate);
+                    Require(titleRate>=45,"a scrolling title follows the display's frames instead of a coarse timer: "+titleRate);
                     shell=new ShellController(true);
                     shell.Apps.Add(new AppEntry {Name="메모 앱",AppID="OneTaskBar.Fixture!Notes"});
                     shell.Apps.Add(new AppEntry {Name="카메라 앱",AppID="OneTaskBar.Fixture!Camera"});

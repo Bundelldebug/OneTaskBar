@@ -316,6 +316,19 @@ namespace OneTaskBar
             }
             QueueHide();
         }
+        static readonly System.Globalization.CultureInfo KoreanCulture=System.Globalization.CultureInfo.GetCultureInfo("ko-KR");
+        long clockToolSecond=-1;
+        sealed class QuickTipKey
+        {
+            internal string Kind,Wifi;internal bool? WifiOn;internal bool Muted,Available,Duo,Known;internal double Volume;internal int Generation,Level;
+            public override bool Equals(object other)
+            {
+                var o=other as QuickTipKey;
+                return o!=null&&Kind==o.Kind&&Wifi==o.Wifi&&WifiOn==o.WifiOn&&Muted==o.Muted&&Available==o.Available&&Duo==o.Duo&&Known==o.Known&&Volume==o.Volume&&Generation==o.Generation&&Level==o.Level;
+            }
+            public override int GetHashCode(){return 0;}
+        }
+        QuickTipKey lastQuickTip;
         internal void Refresh(PowerState state)
         {
             if(closed) return;
@@ -327,7 +340,9 @@ namespace OneTaskBar
             if(MediaBar==null&&!top&&Preferences.Current.ShowNowBar&&controller.Services.Media.Active&&controller.Desktop)
                 MediaBar=new NowBar(controller,Screen){DismissedOutside=HideAfterMediaDismissed};
             RefreshMedia();if(top&&Status.IsVisible){Status.HideImmediately();Native.BlurOpacity(Status,0);}powerAccess.ToolTip=state.Known?"배터리 · 빠른 설정":"직접 입력한 PC 전력값 · 실시간 측정 아님";
-            Battery.Update(state);var now=DateTime.Now;clockFace.Update(now,Edge);clockAccess.ToolTip=now.ToString("yyyy-MM-dd ddd tt h:mm:ss",System.Globalization.CultureInfo.GetCultureInfo("ko-KR"))+" · 알림센터";
+            Battery.Update(state);var now=DateTime.Now;clockFace.Update(now,Edge);
+            long clockSecond=now.Ticks/TimeSpan.TicksPerSecond;
+            if(clockSecond!=clockToolSecond){clockToolSecond=clockSecond;clockAccess.ToolTip=now.ToString("yyyy-MM-dd ddd tt h:mm:ss",KoreanCulture)+" · 알림센터";}
             bool radioOff=controller.Services.WifiOn==false;string wifiKind=NetworkRouteInfo.Glyph(controller.Services.NetworkRoute,controller.Services.WifiPresent,radioOff,controller.Wifi!=null,controller.Services.NetworkConnected);
             string soundKind=SoundIcon.For(controller.Audio.Value,controller.Audio.Muted,controller.Audio.Available);
             if(wifiStatus.Kind!=wifiKind){wifiStatus.Kind=wifiKind;wifiStatus.InvalidateVisual();}wifiStatus.Opacity=wifiKind=="wifi"||wifiKind=="network"||wifiKind=="ethernet"?1:.55;
@@ -336,9 +351,12 @@ namespace OneTaskBar
             if(volumeStatus.Kind!=soundKind){volumeStatus.Kind=soundKind;volumeStatus.InvalidateVisual();}volumeStatus.Opacity=controller.Audio.Available?1:.4;
             if(Preferences.Current.DuoStatusIcon)duoStatus.Update(state,wifiKind,signal,controller.Audio.Value,controller.Audio.Muted,controller.Audio.Available,StatusInk);
             RefreshInk();
+            var quickTip=new QuickTipKey {Kind=wifiKind,Wifi=controller.Wifi,WifiOn=controller.Services.WifiOn,Muted=controller.Audio.Muted,Available=controller.Audio.Available,Volume=controller.Audio.Value,Generation=generation,Duo=Preferences.Current.DuoStatusIcon,Known=state.Known,Level=state.Level};
+            if(quickTip.Equals(lastQuickTip)){}
+            else {lastQuickTip=quickTip;
             quickAccess.ToolTip=(wifiKind=="ethernet"?"유선랜 연결됨":wifiKind=="ethernet-off"?"유선랜 연결 안 됨":wifiKind=="network"?"네트워크 연결됨":radioOff?"Wi-Fi 꺼짐":controller.Wifi??(controller.Services.WifiOn.HasValue?"Wi-Fi 연결 안 됨":"Wi-Fi 상태 확인 중"))+" · "+(controller.Audio.Muted?"음소거":!controller.Audio.Available?"소리 장치 없음":"음량 "+controller.Audio.Value);
             if(generation>0)quickAccess.ToolTip="Wi-Fi "+generation+" · "+quickAccess.ToolTip;
-            if(Preferences.Current.DuoStatusIcon&&state.Known)quickAccess.ToolTip+=" · 배터리 "+state.Level+"%";System.Windows.Automation.AutomationProperties.SetHelpText(quickAccess,(string)quickAccess.ToolTip);
+            if(Preferences.Current.DuoStatusIcon&&state.Known)quickAccess.ToolTip+=" · 배터리 "+state.Level+"%";System.Windows.Automation.AutomationProperties.SetHelpText(quickAccess,(string)quickAccess.ToolTip);}
             if(Battery.ActualWidth>0){double right=Battery.TranslatePoint(new Point(Battery.ActualWidth,0),Status.Surface).X;Battery.ExpandedWidth=Math.Max(Battery.ActualWidth,Math.Min(164,right-12));}
         }
         void RefreshMedia()

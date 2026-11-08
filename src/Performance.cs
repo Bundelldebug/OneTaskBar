@@ -3,8 +3,8 @@ using System.Windows.Media;
 
 namespace OneTaskBar
 {
-    // Decorative work that a modest PC should not do: pointer-following glass light, the liquid edge, a smooth
-    // 30 fps wave and title scroll, and the blurred backdrop copy during a media flight. It turns on by itself for
+    // Decorative work that a modest PC should not do: pointer-following glass light, the liquid edge,
+    // and the blurred backdrop copy during a media flight. The wave and title scroll always run every frame. It turns on by itself for
     // a PC with a weak graphics tier, four or fewer logical processors or 6 GB or less of memory, and can be
     // forced on in the settings. Layout, content and the main motion of every panel stay the same.
     internal static class Performance
@@ -34,8 +34,5 @@ namespace OneTaskBar
             var status=new MemoryStatus {Length=(uint)System.Runtime.InteropServices.Marshal.SizeOf(typeof(MemoryStatus))};
             return GlobalMemoryStatusEx(ref status)?status.TotalPhysical/1073741824.0:64;
         }
-        // Milliseconds between frames for the two decorative loops.
-        internal static int WaveStep {get{return Light?66:30;}}
-        internal static int MarqueeStep {get{return Light?66:33;}}
     }
 }

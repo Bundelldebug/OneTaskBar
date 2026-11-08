@@ -106,7 +106,7 @@ namespace OneTaskBar
                 FullscreenTileSettings(nowBar);
             }
             Group(groups,"미디어 플레이어",nowBar);
-            var safety=new StackPanel();Row(safety,"긴급 종료 단축키","Ctrl + Shift + Tab + 1 · One TaskBar 종료 및 Windows 작업표시줄 복원",Preferences.Current.EmergencyExit,v=>Preferences.Set(p=>p.EmergencyExit=v));Group(groups,"복구",safety);
+            var safety=new StackPanel();Row(safety,"긴급 종료 단축키","Ctrl + Shift + Tab + 1 · One TaskBar 종료 및 Windows 작업표시줄 복원",Preferences.Current.EmergencyExit,v=>Preferences.Set(p=>p.EmergencyExit=v));Group(groups,"복구",safety);Group(groups,"소프트웨어 정보",AboutSection());
             ToggleSwitch adminToggle=null;
             adminToggle=Row(hardware,"관리자 권한으로 실행","관리자 권한으로 실행 중인 게임에서도 Win 키와 Alt+Tab을 가로챕니다. 켜거나 끌 때 Windows 확인이 한 번 나오고 앱이 다시 시작됩니다. 켜져 있는 동안에는 독에서 여는 앱도 관리자 권한으로 실행됩니다. Windows가 관리자 권한 앱에는 알림 연결을 허용하지 않아 이 모드에서는 알림 연결을 쓸 수 없습니다",
                 AdminMode.Enabled,v=>{string message=AdminMode.Set(v);if(message!=null)status.Text=message;if(message==null||message.IndexOf("다시 시작")<0)adminToggle.Refresh(AdminMode.Enabled);});
@@ -136,7 +136,7 @@ namespace OneTaskBar
             soundActions.Children.Add(Paint.Action("파일 지우기",()=> {Preferences.Set(p=> {p.ChargeSoundFile=null;p.ChargeSoundEnabled=false;});soundName.Text="선택한 파일 없음";soundToggle.Refresh(false);}));sounds.Children.Add(soundActions);Group(groups,"충전 소리",sounds);
             if(island.Children.Count>0)Group(groups,"Dynamic Island와 상단바",island);
             // Ordered by what people reach for: the bar itself, how it looks and moves, panels, launcher, media, then upkeep.
-            var order=new[]{"데스크톱","Dynamic Island와 상단바","화면","움직임","패널 선택","시작과 검색","바탕화면 위젯","미디어 플레이어","충전 소리","PC 호환성","복구"};
+            var order=new[]{"데스크톱","Dynamic Island와 상단바","화면","움직임","패널 선택","시작과 검색","바탕화면 위젯","미디어 플레이어","충전 소리","PC 호환성","복구","소프트웨어 정보"};
             sections.Sort((a,b)=>Array.IndexOf(order,a.Name)-Array.IndexOf(order,b.Name));
             SettingsPages(root,groups);Surface.Child=root;AppSettingsPalette.Apply(root);
             Closing+=(s,e)=> {if(!releasing&&!shell.IsDisposing&&!Application.Current.Dispatcher.HasShutdownStarted){e.Cancel=true;Hide();}};
