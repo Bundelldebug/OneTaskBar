@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -33,10 +33,30 @@ namespace OneTaskBar
         // The dock's own battery pill, so the icon and the charging animation are the same ones.
         internal readonly BatteryPill Battery=new BatteryPill {Width=46,Height=18,Compact=true,Margin=new Thickness(7,0,0,0),VerticalAlignment=VerticalAlignment.Center};
         bool charging;
+        // Over the black band beside a Dynamic Island the three status icons collapse into the dock's Duo glyph.
+        readonly DuoStatusGlyph duo=new DuoStatusGlyph {Width=22.6,Height=24,Margin=new Thickness(2,0,2,0),VerticalAlignment=VerticalAlignment.Center,Visibility=Visibility.Collapsed};
+        bool duoMode;
         Popup card;MediaPlayerView player;Border cardSurface;
         Forms.Screen screen;double scale=1;bool bottom,closed;
         Rect host;string iconKey="";ImageSource chipArtwork;
         internal Side Placement {get{return side;}}
+        bool concealed;
+        readonly TranslateTransform lift=new TranslateTransform();
+        internal bool OnBlack {get;private set;}
+        // Over the black safe-area band the bar is light-on-dark, and it can be tucked away until the pointer reaches the edge.
+        internal void Conceal(bool hidden,bool onBlack)
+        {
+            if(closed)return;
+            if(OnBlack!=onBlack){OnBlack=onBlack;layoutKey="";if(IsVisible)Refresh();}
+            if(concealed==hidden)return;
+            concealed=hidden;
+            IsHitTestVisible=!hidden;
+            var fade=new System.Windows.Media.Animation.DoubleAnimation(hidden?0:1,TimeSpan.FromMilliseconds(hidden?140:180)){FillBehavior=System.Windows.Media.Animation.FillBehavior.HoldEnd};
+            row.BeginAnimation(UIElement.OpacityProperty,fade);
+            row.RenderTransform=lift;
+            var slide=new System.Windows.Media.Animation.DoubleAnimation(hidden?-6:0,TimeSpan.FromMilliseconds(hidden?140:220)){EasingFunction=new System.Windows.Media.Animation.CubicEase {EasingMode=System.Windows.Media.Animation.EasingMode.EaseOut},FillBehavior=System.Windows.Media.Animation.FillBehavior.HoldEnd};
+            lift.BeginAnimation(TranslateTransform.YProperty,slide);
+        }
         internal bool CardOpen {get{return card!=null&&card.IsOpen;}}
         internal TopStatusBar(ShellController controller,Side placement)
         {
@@ -52,7 +72,7 @@ namespace OneTaskBar
             row.VerticalAlignment=VerticalAlignment.Top;
             // A nearly clear fill makes every pixel of the piece take the click, including gaps between its parts.
             Surface.Background=Hit;
-            Surface.MouseLeftButtonUp+=(s,e)=>{if(e.Handled)return;e.Handled=true;if(side==Side.Left)shell.ToggleNotifications(Dock());else shell.ToggleQuick(Dock());};
+            Surface.MouseLeftButtonUp+=(s,e)=>{if(e.Handled)return;e.Handled=true;if(side==Side.Left)shell.ToggleNotifications(Dock(),true);else shell.ToggleQuick(Dock(),false,true);};
             Surface.Child=row;
             SourceInitialized+=(s,e)=>
             {
@@ -73,6 +93,7 @@ namespace OneTaskBar
         {
             get
             {
+                if(OnBlack)return lightInk;
                 if(DateTime.UtcNow>=inkAt&&screen!=null&&host.Width>0&&!sampling)
                 {
                     inkAt=DateTime.UtcNow.AddSeconds(2.5);
@@ -108,7 +129,7 @@ namespace OneTaskBar
             time.FontWeight=FontWeights.SemiBold;
             date.Margin=new Thickness(9,0,0,0);
             clock.Children.Add(time);clock.Children.Add(date);
-            var clockButton=Paint.Button(clock,()=>shell.ToggleNotifications(Dock()),"알림센터");
+            var clockButton=Paint.Button(clock,()=>shell.ToggleNotifications(Dock(),true),"알림센터");
             clockButton.Background=Hit;clock.Background=Hit;clockButton.Padding=new Thickness(8,0,8,0);clockButton.VerticalAlignment=VerticalAlignment.Stretch;
             row.Children.Add(clockButton);
             var content=new StackPanel {Orientation=Orientation.Horizontal};
@@ -118,7 +139,7 @@ namespace OneTaskBar
             chipButton=Paint.Button(chip,ToggleCard,"미디어 컨트롤");
             chipButton.Background=Hit;chipButton.Padding=new Thickness(10,0,0,0);chipButton.VerticalAlignment=VerticalAlignment.Stretch;
             row.Children.Add(chipButton);
-            var iconButton=Paint.Button(icons,()=>shell.ToggleNotifications(Dock()),"알림센터");
+            var iconButton=Paint.Button(icons,()=>shell.ToggleNotifications(Dock(),true),"알림센터");
             iconButton.Background=Hit;icons.Background=Hit;iconButton.RenderTransform=iconShift;iconButton.Padding=new Thickness(8,0,8,0);iconButton.VerticalAlignment=VerticalAlignment.Stretch;
             row.Children.Add(iconButton);
         }
@@ -127,10 +148,10 @@ namespace OneTaskBar
             var cluster=new StackPanel {Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center};
             wifi.Margin=new Thickness(0,0,7,0);
             cluster.Children.Add(wifi);cluster.Children.Add(volume);
-            cluster.Children.Add(Battery);
+            cluster.Children.Add(Battery);cluster.Children.Add(duo);
             Battery.MorphChanged=morph=>{bool next=morph>.001;if(next==charging)return;charging=next;if(!closed)Refresh();};
             row.HorizontalAlignment=HorizontalAlignment.Right;row.VerticalAlignment=VerticalAlignment.Top;
-            var button=Paint.Button(cluster,()=>shell.ToggleQuick(Dock()),"빠른 설정");
+            var button=Paint.Button(cluster,()=>shell.ToggleQuick(Dock(),false,true),"빠른 설정");
             button.Background=Hit;cluster.Background=Hit;button.Padding=new Thickness(8,0,8,0);button.VerticalAlignment=VerticalAlignment.Stretch;
             row.Children.Add(button);
         }
@@ -146,10 +167,10 @@ namespace OneTaskBar
         {
             var ink=Ink;
             // A faint halo in the opposite tone keeps the text readable where the picture behind it is busy.
-            var effect=lightText==false?lightHalo:null;
+            var effect=!OnBlack&&lightText==false?lightHalo:null;
             if(side==Side.Left)RefreshLeft(ink,effect);else RefreshRight(ink,effect);
             // Measuring and moving the window cost real time on every shell pass; they happen only when what is shown changed.
-            string key=side==Side.Left?time.Text+"|"+date.Text+"|"+chip.Visibility+chipTitle.Text+"|"+iconKey+"|"+shifted+"|"+(lightText==true):wifi.Kind+"|"+volume.Kind+"|"+Battery.Visibility+"|"+Battery.State.Level+"|"+Battery.State.Connected+"|"+charging+"|"+(lightText==true);
+            string key=side==Side.Left?time.Text+"|"+date.Text+"|"+chip.Visibility+chipTitle.Text+"|"+iconKey+"|"+shifted+"|"+(lightText==true):wifi.Kind+"|"+volume.Kind+"|"+duoMode+"|"+Battery.Visibility+"|"+Battery.State.Level+"|"+Battery.State.Connected+"|"+charging+"|"+(lightText==true);
             if(key==layoutKey&&IsVisible&&screen!=null&&host.Width>0)return;
             layoutKey=key;
             if(key!=checkedKey){checkedKey=key;Dispatcher.BeginInvoke(new Action(()=>
@@ -254,6 +275,21 @@ namespace OneTaskBar
             wifi.Effect=volume.Effect=effect;
             var power=shell.Power;
             bool known=power!=null&&power.Known;
+            bool together=OnBlack&&Preferences.Current.DynamicIsland&&power!=null;
+            if(together!=duoMode)
+            {
+                duoMode=together;layoutKey="";
+                var separate=together?Visibility.Collapsed:Visibility.Visible;
+                wifi.Visibility=volume.Visibility=separate;
+                duo.Visibility=together?Visibility.Visible:Visibility.Collapsed;
+            }
+            if(together)
+            {
+                duo.Update(power,wifiKind,signal,shell.Audio.Value,shell.Audio.Muted,shell.Audio.Available,ink);
+                duo.Effect=effect;
+                Battery.Visibility=Visibility.Collapsed;
+                return;
+            }
             Battery.Visibility=known?Visibility.Visible:Visibility.Collapsed;
             if(known){Battery.ExpandedWidth=96;Battery.Update(power);}
         }
@@ -308,9 +344,28 @@ namespace OneTaskBar
             // The notification icons move left into the place the chip leaves.
             shiftBy=-(chipButton.ActualWidth);shifted=true;
             card.IsOpen=true;
+            // The card's own corner has to sit exactly on the chip's, or it opens and folds at a different place.
+            AlignCard();
+            Dispatcher.BeginInvoke(new Action(AlignCard),System.Windows.Threading.DispatcherPriority.Loaded);
             Morph(true);
             StopOutside();
             outside=MenuDismiss.Watch(ContainsPoint,CloseCard);
+        }
+        // Measures where the card and the chip really are on screen and moves the popup by the difference. Popup
+        // placement alone drifts with the window's DPI and the way the bar is positioned.
+        void AlignCard()
+        {
+            if(card==null||!card.IsOpen||closing||cardSurface==null||!cardSurface.IsVisible||!chip.IsVisible)return;
+            try
+            {
+                var dpi=VisualTreeHelper.GetDpi(chip);
+                var chipAt=chip.PointToScreen(new Point(0,0));
+                var cardAt=cardSurface.PointToScreen(new Point(0,0));
+                double dx=(chipAt.X-cardAt.X)/dpi.DpiScaleX,dy=(chipAt.Y-cardAt.Y)/dpi.DpiScaleY;
+                if(Math.Abs(dx)<.5&&Math.Abs(dy)<.5)return;
+                card.HorizontalOffset+=dx;card.VerticalOffset+=dy;
+            }
+            catch(InvalidOperationException){}
         }
         const double CardWidth=352,CardPad=14;
         double cardHeight=164,drop=30;Grid content,holder;

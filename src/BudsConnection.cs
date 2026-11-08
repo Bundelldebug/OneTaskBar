@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -133,6 +133,13 @@ namespace OneTaskBar
         {
             if(disposed||info==null)return;string name=BudsConnectionTracker.Normalize(info.Name);
             if(Popup==null&&!connection&&name==lastName&&(DateTime.UtcNow-lastShown).TotalSeconds<15)return;
+            // With the Dynamic Island on, the connection notice drops out of it like any other notification.
+            if(Popup==null&&!shell.Demo)
+            {
+                var entry=new NotificationEntry {Id=0xB0D5,App="Bluetooth",AppId="OneTaskBar.Buds",Title=info.Name,Body=info.Detail,Created=DateTimeOffset.Now,Icon=info.Image};
+                var source=info.Notification;
+                if(shell.IslandNotification(entry,e=>{if(source!=null)Task.Run(()=>NotificationActivation.Open(source,false));else shell.ShowDetail("bluetooth");})){lastName=name;lastShown=DateTime.UtcNow;return;}
+            }
             bool same=Popup!=null&&(BudsConnectionTracker.Normalize(Popup.Info.Name)==name||info.Container.HasValue&&Popup.Info.Container==info.Container);if(same&&Popup.Info.Notification!=null&&info.Notification==null){Popup.Expires=DateTime.UtcNow.AddSeconds(7);return;}if(Popup!=null&&!same)Hide(false);
             bool fresh=Popup==null;if(fresh){Popup=new BudsConnectionPopup(Open,()=>Hide(true),OpenAction);Shown++;}Popup.Update(info);lastName=name;lastShown=DateTime.UtcNow;
             Popup.Position();if(fresh)Popup.Appear();expiry.Start();

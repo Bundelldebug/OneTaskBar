@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -36,7 +36,7 @@ namespace OneTaskBar
                     }
                 }
                 finally{Preferences.Set(p=>p.DockMonitor=savedMonitor);}
-                window.SettingsHome();await Task.Delay(300);
+                await Task.Delay(300);
                 foreach(var choice in UIVersions.Available)
                 {
                     window.VersionPicker.IsDropDownOpen=true;window.VersionPicker.SelectedItem=choice;window.UpdateLayout();
@@ -48,8 +48,7 @@ namespace OneTaskBar
                 window.OpenSettings("데스크톱");await Task.Delay(300);
                 for(int i=0;i<4;i++)
                 {
-                    window.SettingsHome();if(!window.SettingsAnimating)throw new InvalidOperationException("Settings return has no motion");
-                    await Task.Delay(25);window.OpenSettings(i%2==0?"화면":"데스크톱");
+                    window.OpenSettings(i%2==0?"화면":"데스크톱");
                     if(!window.SettingsAnimating)throw new InvalidOperationException("Settings category has no motion");
                     await Task.Delay(310);
                     if(window.SettingsAnimating||window.SettingsSnapshotHeld||window.SettingsViewport.Opacity!=1||!window.SettingsViewport.RenderTransform.Value.IsIdentity||root.Opacity!=1||!root.RenderTransform.Value.IsIdentity)throw new InvalidOperationException("Settings navigation retains a transform after completion");

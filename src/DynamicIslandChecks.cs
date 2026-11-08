@@ -184,7 +184,7 @@ namespace OneTaskBar
                     await Task.Delay(70);
                     Require(Math.Abs(view.Shape.Bottom-bottomEdge)<.01,"expansion keeps the lower edge fixed on every frame");
                     await Task.Delay(220);
-                    Require(view.Shape.Top==0&&view.Shape.Height==204,"the lower capsule expands upward into the media card");
+                    Require(view.Shape.Top==DynamicIslandLayout.MaximumHeight-204&&view.Shape.Height==204,"the lower capsule expands upward into the media card");
                     Program.Save(view.Surface,360,204,Path.Combine(AppLog.Data,"island-bottom-expanded.png"));
                     view.SetExpanded(false);
                     await Task.Delay(70);

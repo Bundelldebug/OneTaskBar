@@ -38,6 +38,7 @@ namespace OneTaskBar
         readonly Glyph feedbackGlyph=new Glyph("volume",20){Color=Paint.ControlWhite};
         readonly Glyph foldGlyph=new Glyph("chevron",15){Color=Paint.ControlWhite,RenderTransform=new RotateTransform(-90),RenderTransformOrigin=new Point(.5,.5)};
         readonly MediaPlayerView player;
+        readonly IslandSearchView search;
         readonly Stopwatch motion=new Stopwatch();
         readonly DispatcherTimer expiry=new DispatcherTimer {Interval=TimeSpan.FromSeconds(1.6)};
         readonly Action opening;
@@ -67,7 +68,7 @@ namespace OneTaskBar
         internal Brush MediaSurface {get{return expanded.Background;}}
         internal IslandNotificationView NotificationView {get{return notification;}}
         internal bool NotificationVisible {get{return IsVisible&&state.NotificationVisible(DateTime.UtcNow);}}
-        internal DynamicIsland(Action<string> command,Func<double,Task<bool>> seek,Action output,Action<string> openApp,Action opening=null,Func<string,AppEntry> sourceApp=null)
+        internal DynamicIsland(Action<string> command,Func<double,Task<bool>> seek,Action output,Action<string> openApp,Action opening=null,Func<string,AppEntry> sourceApp=null,Func<string,List<AppEntry>> findApps=null,Action<AppEntry> launchApp=null,Action<string> searchWeb=null)
         {
             this.opening=opening;
             Title="One TaskBar · Dynamic Island";
@@ -125,7 +126,10 @@ namespace OneTaskBar
             player.FitPopup(164);
             mediaSurface.Child=player;
             Grid.SetRow(mediaSurface,1);expanded.Children.Add(mediaSurface);root.Children.Add(expanded);
-            compact.Visibility=feedback.Visibility=expanded.Visibility=level.Visibility=notification.Visibility=Visibility.Hidden;
+            search=new IslandSearchView(findApps??(q=>new List<AppEntry>()),app=>{CloseSearch();if(launchApp!=null)launchApp(app);},text=>{CloseSearch();if(searchWeb!=null)searchWeb(text);},CloseSearch);
+            search.Changed=()=>{if(state.Searching&&state.SearchRows!=search.RowCount){state.SearchRows=search.RowCount;RefreshPresentation();}};
+            root.Children.Add(search);
+            compact.Visibility=feedback.Visibility=expanded.Visibility=level.Visibility=notification.Visibility=search.Visibility=Visibility.Hidden;
             Surface.Child=root;
             var decorator=(AdornerDecorator)Content;
             decorator.Child=null;
@@ -137,14 +141,14 @@ namespace OneTaskBar
                 Native.SetWindowLong(handle,-20,(Native.GetWindowLong(handle,-20)|0x80|0x08000000)&~0x40000);
                 HwndSource.FromHwnd(handle).AddHook((IntPtr h,int msg,IntPtr w,IntPtr l,ref bool handled)=>
                 {
-                    if(msg==0x21&&!state.Expanded){handled=true;return new IntPtr(3);}
+                    if(msg==0x21&&!state.Expanded&&!state.Searching){handled=true;return new IntPtr(3);}
                     if(msg==0x2E0)QueuePlacement();
                     return IntPtr.Zero;
                 });
             };
             Loaded+=(s,e)=>QueuePlacement();
             LocationChanged+=(s,e)=>{if(!placingHost)QueuePlacement();};
-            Deactivated+=(s,e)=>{if(state.Expanded&&!IsMouseOver)SetExpanded(false);};
+            Deactivated+=(s,e)=>{if(state.Expanded&&!IsMouseOver)SetExpanded(false);if(state.Searching&&!IsMouseOver)CloseSearch();};
             Closed+=(s,e)=>{closed=true;activity.SetPlaying(false);StopMotion();StopOutside();expiry.Stop();ClearNotification();player.Update(new MediaState(),null);media=null;artwork=null;surfaceArtwork=null;art.Background=expanded.Background=null;};
         }
         internal override void RefreshGlassMaterial()
@@ -292,11 +296,13 @@ namespace OneTaskBar
         }
         void RefreshPresentation()
         {
-            bool active=media!=null,detail=state.Expanded&&active;
-            bool notice=state.NotificationVisible(DateTime.UtcNow)&&!detail;
-            bool show=state.FeedbackVisible(DateTime.UtcNow)&&!detail&&!notice;
+            bool searching=state.Searching;
+            bool active=media!=null,detail=state.Expanded&&active&&!searching;
+            bool notice=state.NotificationVisible(DateTime.UtcNow)&&!detail&&!searching;
+            bool show=state.FeedbackVisible(DateTime.UtcNow)&&!detail&&!notice&&!searching;
             bool charge=show&&state.FeedbackKind=="charge";
-            bool compactVisible=active&&!show&&!detail&&!notice;
+            bool compactVisible=active&&!show&&!detail&&!notice&&!searching;
+            ShowContent(search,searching);
             ShowContent(compact,compactVisible);
             activity.SetPlaying(compactVisible&&media.Playing&&Motion.Enabled);
             ShowContent(feedback,charge);
@@ -377,6 +383,33 @@ namespace OneTaskBar
             }
             RefreshPresentation();
         }
+        // Opens the search out of the island, or closes it when it is already open. False when the island cannot take it.
+        internal bool ToggleSearch()
+        {
+            if(closed||!IsVisible)return false;
+            if(state.Searching){CloseSearch();return true;}
+            if(state.Expanded)SetExpanded(false);
+            state.Searching=true;state.SearchRows=0;StopOutside();
+            var handle=new WindowInteropHelper(this).Handle;
+            Native.SetWindowLong(handle,-20,Native.GetWindowLong(handle,-20)&~0x08000000);
+            previousWindow=Native.GetForegroundWindow();
+            if(opening!=null)opening();
+            search.Reset();
+            outsideClick=MenuDismiss.Watch(ContainsScreenPoint,CloseSearch);
+            RefreshPresentation();
+            Activate();search.Focus();
+            return true;
+        }
+        internal bool Searching {get{return state.Searching;}}
+        void CloseSearch()
+        {
+            if(closed||!state.Searching)return;
+            state.Searching=false;state.SearchRows=0;StopOutside();
+            var handle=new WindowInteropHelper(this).Handle;
+            Native.SetWindowLong(handle,-20,Native.GetWindowLong(handle,-20)|0x08000000);
+            if(Native.GetForegroundWindow()==handle&&Native.IsWindow(previousWindow))Native.Activate(previousWindow);
+            RefreshPresentation();
+        }
         bool ContainsScreenPoint(Native.PointI point)
         {
             if(!IsVisible)return false;
@@ -387,6 +420,7 @@ namespace OneTaskBar
         }
         protected override void OnPreviewKeyDown(KeyEventArgs e)
         {
+            if(e.Key==Key.Escape&&state.Searching){CloseSearch();e.Handled=true;return;}
             if(e.Key==Key.Escape&&state.Expanded){SetExpanded(false);e.Handled=true;return;}
             base.OnPreviewKeyDown(e);
         }
@@ -398,7 +432,7 @@ namespace OneTaskBar
             target=next;from=current;
             body.Width=next.Width;body.Height=next.Height;
             fromRadius=currentRadius;
-            bool card=state.Expanded||NotificationVisible||next.Height>32;
+            bool card=state.Expanded||state.Searching||NotificationVisible||next.Height>32;
             targetRadius=Math.Min(Math.Min(next.Width,next.Height)/2,card?29:100);
             if(!Motion.Enabled||current.IsEmpty){StopMotion();current=target;currentRadius=targetRadius;PlaceShape();return;}
             motion.Restart();

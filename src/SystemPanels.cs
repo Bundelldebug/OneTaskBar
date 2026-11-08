@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Runtime.InteropServices;
 using System.Threading;
 
@@ -19,6 +19,8 @@ namespace OneTaskBar
         static bool ModifiersHeld() {foreach(int key in new[]{0x10,0x11,0x12,0x5b,0x5c})if((GetAsyncKeyState(key)&0x8000)!=0)return true;return false;}
         internal static bool Toggle(bool notifications)
         {return Shortcut((ushort)(notifications?0x4e:0x41));}
+        // A harmless key between a Win press and its release keeps Windows from treating the release as a Start press.
+        internal static void CancelStart(){SendInput(2,new[]{Key(0xE8,0),Key(0xE8,2)},Marshal.SizeOf(typeof(Input)));}
         internal static bool TaskView(){return Shortcut(0x09);}
         internal static bool Cast(){return Shortcut(0x4b);}
         internal static bool ShowDesktop(){return Shortcut(0x44);}

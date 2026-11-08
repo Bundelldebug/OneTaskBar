@@ -18,12 +18,11 @@ namespace OneTaskBar
     }
     internal sealed partial class WelcomeWindow
     {
-        sealed class Section {internal string Name,Search;internal UIElement Content;internal Border Card;internal Button Entry;}
+        sealed class Section {internal string Name,Search;internal UIElement Content;internal Border Card,Highlight;internal Button Entry;}
         sealed class Category {internal StackPanel Rows;internal Border Card;internal Section[] Sections;}
         readonly List<Section> sections=new List<Section>();readonly List<Category> categories=new List<Category>();readonly List<UIElement> versionElements=new List<UIElement>();
-        StackPanel settingsHome,settingsDetail;SmoothScrollViewer settingsScroll;TextBlock settingsHeading,emptySettings;Button settingsBack;TextBox settingsSearch;
+        StackPanel settingsHome,settingsDetail;SmoothScrollViewer settingsScroll,homeScroll;TextBlock settingsHeading,emptySettings;TextBox settingsSearch;
         SettingsPageMotion pageMotion;
-        double settingsHomeOffset;
         Border settingsExit;
         internal Button ExitSettingsButton {get;private set;}
         internal bool SettingsAnimating {get{return pageMotion!=null&&pageMotion.Active;}}
@@ -38,8 +37,7 @@ namespace OneTaskBar
         Grid SettingsHeader()
         {
             var header=new Grid {Height=68,Margin=new Thickness(0,0,0,12),Background=Brushes.Transparent};
-            settingsHeading=Paint.TextBlock("설정",28,AppSettingsPalette.Text);settingsHeading.FontWeight=FontWeights.SemiBold;settingsHeading.Margin=new Thickness(7,0,48,0);header.Children.Add(settingsHeading);
-            settingsBack=Paint.Button(new Glyph("back",23){Color=AppSettingsPalette.Text},SettingsHome,"설정 홈으로 돌아가기");settingsBack.Width=settingsBack.Height=38;settingsBack.Padding=new Thickness(0);settingsBack.Background=Brushes.Transparent;settingsBack.HorizontalAlignment=HorizontalAlignment.Left;settingsBack.Visibility=Visibility.Collapsed;header.Children.Add(settingsBack);
+            settingsHeading=Paint.TextBlock("설정",32,AppSettingsPalette.Text);settingsHeading.FontWeight=FontWeights.Bold;settingsHeading.Margin=new Thickness(7,0,48,0);header.Children.Add(settingsHeading);
             var close=Paint.Button(new Glyph("close",19){Color=AppSettingsPalette.Text},()=>Hide(),"설정 닫기");close.Width=close.Height=36;close.Padding=new Thickness(0);close.Background=Brushes.Transparent;close.HorizontalAlignment=HorizontalAlignment.Right;header.Children.Add(close);
             return header;
         }
@@ -63,7 +61,7 @@ namespace OneTaskBar
         Border SettingsCard(UIElement content,bool separators=true)
         {
             var stack=content as StackPanel;if(separators&&stack!=null)for(int i=stack.Children.Count-1;i>0;i--){var before=stack.Children[i-1] as TextBlock;if(before!=null&&"sub".Equals(before.Tag))continue;stack.Children.Insert(i,SettingSeparator());}
-            AppSettingsPalette.Apply(content);return new Border {Background=AppSettingsPalette.Card,CornerRadius=new CornerRadius(24),Padding=new Thickness(3),Child=content,Margin=new Thickness(0,0,0,16)};
+            AppSettingsPalette.Apply(content);return new Border {Background=AppSettingsPalette.Card,CornerRadius=new CornerRadius(30),Padding=new Thickness(4),Child=content,Margin=new Thickness(0,0,0,14)};
         }
         void Group(StackPanel target,string label,UIElement content)
         {
@@ -76,7 +74,8 @@ namespace OneTaskBar
             {
                 case "데스크톱":return "desktops";
                 case "바탕화면 위젯":return "apps";
-                case "패널 선택":return "notification";
+                case "패널 선택":
+                case "Dynamic Island와 상단바":return "notification";
                 case "시작과 검색":return "search";
                 case "미디어 플레이어":return "play";
                 case "복구":return "shield";
@@ -89,73 +88,77 @@ namespace OneTaskBar
         }
         void FilterSettings()
         {
+            FilterSettingsList();
+            if(settingsSearch==null||settingsSearch.Text.Trim().Length==0)return;
+            // A search follows the first match on the right, like the Settings app.
+            var current=sections.FirstOrDefault(s=>s.Name==SettingsPage);
+            if(current==null||current.Entry.Visibility!=Visibility.Visible)
+            {
+                var first=sections.FirstOrDefault(s=>s.Entry.Visibility==Visibility.Visible);
+                if(first!=null)OpenSettings(first.Name);
+            }
+        }
+        void FilterSettingsList()
+        {
             if(settingsSearch==null)return;string term=settingsSearch.Text.Trim();bool searching=term.Length>0;foreach(var element in versionElements)element.Visibility=searching?Visibility.Collapsed:Visibility.Visible;
             foreach(var category in categories){category.Rows.Children.Clear();foreach(var section in category.Sections){bool match=!searching||section.Search.IndexOf(term,StringComparison.CurrentCultureIgnoreCase)>=0;section.Entry.Visibility=match?Visibility.Visible:Visibility.Collapsed;if(!match)continue;if(category.Rows.Children.Count>0)category.Rows.Children.Add(SettingSeparator());category.Rows.Children.Add(section.Entry);}category.Card.Visibility=category.Rows.Children.Count==0?Visibility.Collapsed:Visibility.Visible;}
             bool exitMatch=!searching||"종료 Windows 작업표시줄 복원".IndexOf(term,StringComparison.CurrentCultureIgnoreCase)>=0;
             if(settingsExit!=null)settingsExit.Visibility=exitMatch?Visibility.Visible:Visibility.Collapsed;
-            emptySettings.Visibility=searching&&VisibleSettingsSections==0&&!exitMatch?Visibility.Visible:Visibility.Collapsed;if(String.IsNullOrEmpty(SettingsPage))settingsHeading.Text=searching?"검색 결과":"설정";
-            settingsHomeOffset=0;
-            settingsScroll.ResetForNavigation();
+            emptySettings.Visibility=searching&&VisibleSettingsSections==0&&!exitMatch?Visibility.Visible:Visibility.Collapsed;
+            homeScroll.ResetForNavigation();
         }
         void SettingsPages(DockPanel root,StackPanel groups)
         {
-            settingsHome=groups;settingsDetail=new StackPanel();settingsScroll=new SmoothScrollViewer {Content=groups,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,Padding=new Thickness(0,0,5,0)};settingsScroll.Resources[SystemParameters.VerticalScrollBarWidthKey]=4.0;
+            settingsHome=groups;settingsDetail=new StackPanel();settingsScroll=new SmoothScrollViewer {Content=settingsDetail,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,Padding=new Thickness(0,0,5,0)};settingsScroll.Resources[SystemParameters.VerticalScrollBarWidthKey]=4.0;
+            homeScroll=new SmoothScrollViewer {Content=groups,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,Padding=new Thickness(0,0,5,0)};homeScroll.Resources[SystemParameters.VerticalScrollBarWidthKey]=4.0;
             var searchGrid=new Grid {Margin=new Thickness(14,0,8,0)};searchGrid.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(30)});searchGrid.ColumnDefinitions.Add(new ColumnDefinition());searchGrid.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(30)});searchGrid.Children.Add(new Glyph("search",18){Color=AppSettingsPalette.Muted});
             settingsSearch=new TextBox {FontSize=15,Foreground=AppSettingsPalette.Text,Background=Brushes.Transparent,BorderThickness=new Thickness(0),Padding=new Thickness(4,9,4,9),MaxLength=100};Grid.SetColumn(settingsSearch,1);searchGrid.Children.Add(settingsSearch);
             var hint=Paint.TextBlock("설정 검색",15,AppSettingsPalette.Muted);hint.IsHitTestVisible=false;hint.Margin=new Thickness(4,0,0,0);Grid.SetColumn(hint,1);searchGrid.Children.Add(hint);
             var clear=Paint.Button(new Glyph("close",15){Color=AppSettingsPalette.Muted},()=>settingsSearch.Clear(),"검색어 지우기");clear.Width=clear.Height=28;clear.Padding=new Thickness(0);clear.Background=Brushes.Transparent;clear.Visibility=Visibility.Collapsed;Grid.SetColumn(clear,2);searchGrid.Children.Add(clear);
-            settingsSearch.TextChanged+=(s,e)=>{hint.Visibility=settingsSearch.Text.Length==0?Visibility.Visible:Visibility.Collapsed;clear.Visibility=settingsSearch.Text.Length==0?Visibility.Collapsed:Visibility.Visible;if(!String.IsNullOrEmpty(SettingsPage))SettingsHome();FilterSettings();};
+            settingsSearch.TextChanged+=(s,e)=>{hint.Visibility=settingsSearch.Text.Length==0?Visibility.Visible:Visibility.Collapsed;clear.Visibility=settingsSearch.Text.Length==0?Visibility.Collapsed:Visibility.Visible;FilterSettings();};
             settingsSearch.PreviewKeyDown+=(s,e)=>{if(e.Key==Key.Enter){var section=sections.FirstOrDefault(t=>t.Entry.Visibility==Visibility.Visible);if(section!=null)OpenSettings(section.Name);e.Handled=true;}else if(e.Key==Key.Escape&&!String.IsNullOrEmpty(settingsSearch.Text)){settingsSearch.Clear();e.Handled=true;}};
-            var searchPill=new Border {Background=AppSettingsPalette.Card,BorderBrush=AppSettingsPalette.Stroke,BorderThickness=new Thickness(.7),CornerRadius=new CornerRadius(23),Height=46,MaxWidth=420,Margin=new Thickness(35,10,35,0),Child=searchGrid};DockPanel.SetDock(searchPill,Dock.Bottom);root.Children.Add(searchPill);
+            var searchPill=new Border {Background=AppSettingsPalette.Card,BorderBrush=AppSettingsPalette.Stroke,BorderThickness=new Thickness(.7),CornerRadius=new CornerRadius(23),Height=46,Margin=new Thickness(0,10,5,0),Child=searchGrid};
+            var left=new DockPanel();DockPanel.SetDock(searchPill,Dock.Bottom);left.Children.Add(searchPill);left.Children.Add(homeScroll);
             var colors=new[]{"#FF3478FD","#FFEF741D","#FF7868CF","#FF55AF39","#FF6D63B9","#FFDA9B20","#FF3B92CC","#FF5DA540","#FF7868CF"};
-            foreach(var section in sections){int index=sections.IndexOf(section);var row=new Grid {Height=66,Margin=new Thickness(15,5,15,5)};row.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(46)});row.ColumnDefinitions.Add(new ColumnDefinition());row.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(24)});
-                row.Children.Add(new Border {Width=32,Height=32,CornerRadius=new CornerRadius(16),Background=Paint.Brush(colors[index%colors.Length]),Child=new Glyph(SettingsIcon(section.Name),19){Color=Paint.ControlWhite},HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center});
-                var name=Paint.TextBlock(section.Name,18,AppSettingsPalette.Text);Grid.SetColumn(name,1);row.Children.Add(name);var chevron=new Glyph("chevron",16){Color=AppSettingsPalette.Muted};Grid.SetColumn(chevron,2);row.Children.Add(chevron);
-                var selected=section;section.Entry=Paint.Button(row,()=>OpenSettings(selected.Name),section.Name);section.Entry.Background=Brushes.Transparent;section.Entry.Padding=new Thickness(0);section.Entry.HorizontalContentAlignment=HorizontalAlignment.Stretch;section.Entry.VerticalContentAlignment=VerticalAlignment.Stretch;
+            foreach(var section in sections){int index=sections.IndexOf(section);var row=new Grid {Height=60,Margin=new Thickness(12,0,8,0)};row.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(52)});row.ColumnDefinitions.Add(new ColumnDefinition());
+                row.Children.Add(new Border {Width=38,Height=38,CornerRadius=new CornerRadius(19),Background=Paint.Brush(colors[index%colors.Length]),Child=new Glyph(SettingsIcon(section.Name),21){Color=Paint.ControlWhite},HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center});
+                var name=Paint.TextBlock(section.Name,17,AppSettingsPalette.Text);name.VerticalAlignment=VerticalAlignment.Center;Grid.SetColumn(name,1);row.Children.Add(name);
+                section.Highlight=new Border {CornerRadius=new CornerRadius(22),Margin=new Thickness(3,2,3,2),Background=Brushes.Transparent,Child=row};
+                var selected=section;section.Entry=Paint.Button(section.Highlight,()=>OpenSettings(selected.Name),section.Name);section.Entry.Background=Brushes.Transparent;section.Entry.Padding=new Thickness(0);section.Entry.HorizontalContentAlignment=HorizontalAlignment.Stretch;section.Entry.VerticalContentAlignment=VerticalAlignment.Stretch;
             }
             for(int start=0;start<sections.Count;start+=3){var category=new Category {Rows=new StackPanel(),Sections=sections.Skip(start).Take(3).ToArray()};category.Card=SettingsCard(category.Rows,false);categories.Add(category);groups.Children.Add(category.Card);}
             emptySettings=Paint.TextBlock("검색 결과가 없습니다",16,AppSettingsPalette.Muted);emptySettings.Margin=new Thickness(15,20,15,20);emptySettings.HorizontalAlignment=HorizontalAlignment.Center;emptySettings.Visibility=Visibility.Collapsed;groups.Children.Add(emptySettings);
             settingsExit=SettingsExitRow();groups.Children.Add(settingsExit);
-            pageMotion=new SettingsPageMotion(settingsScroll);root.Children.Add(pageMotion.View);FilterSettings();SettingsHome();
+            // The categories come first; the UI version choice sits under them.
+            foreach(var element in versionElements){groups.Children.Remove(element);groups.Children.Add(element);}
+            pageMotion=new SettingsPageMotion(settingsScroll);
+            // The category list stays on the left; the chosen page fills the right.
+            var body=new Grid();body.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(300)});body.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(22)});body.ColumnDefinitions.Add(new ColumnDefinition());
+            body.Children.Add(left);Grid.SetColumn(pageMotion.View,2);body.Children.Add(pageMotion.View);root.Children.Add(body);
+            FilterSettings();SettingsHome();
         }
         internal void OpenSettings(string name)
         {
             var section=sections.FirstOrDefault(s=>s.Name==name);
             if(section==null||SettingsPage==name)return;
-            if(SettingsPage==null)settingsHomeOffset=settingsScroll.VerticalOffset;
+            var before=sections.FirstOrDefault(s=>s.Name==SettingsPage);
+            bool forward=before==null||sections.IndexOf(section)>=sections.IndexOf(before);
             pageMotion.Prepare();
             SettingsPage=section.Name;
-            settingsHeading.Text=section.Name;
-            settingsHeading.Margin=new Thickness(48,0,48,0);
-            settingsBack.Visibility=Visibility.Visible;
+            foreach(var item in sections)item.Highlight.Background=item==section?AppSettingsPalette.AccentLight:Brushes.Transparent;
             settingsDetail.Children.Clear();
+            var title=Paint.TextBlock(section.Name,28,AppSettingsPalette.Text);title.FontWeight=FontWeights.Bold;title.Margin=new Thickness(8,0,0,14);
+            settingsDetail.Children.Add(title);
             if(section.Card==null)section.Card=SettingsCard(section.Content);
             settingsDetail.Children.Add(section.Card);
-            settingsScroll.Content=settingsDetail;
             settingsScroll.ResetForNavigation();
-            pageMotion.Start(true);
+            pageMotion.Start(forward);
         }
+        // Without a chosen page the right side would be empty, so "home" selects the first listed page.
         internal void SettingsHome()
         {
-            bool returning=SettingsPage!=null;
-            if(pageMotion!=null)
-            {
-                if(returning)pageMotion.Prepare();
-                else pageMotion.Cancel();
-            }
-            SettingsPage=null;
-            if(settingsHeading!=null)
-            {
-                settingsHeading.Text=settingsSearch!=null&&!String.IsNullOrWhiteSpace(settingsSearch.Text)?"검색 결과":"설정";
-                settingsHeading.Margin=new Thickness(7,0,48,0);
-            }
-            if(settingsBack!=null)settingsBack.Visibility=Visibility.Collapsed;
-            if(settingsScroll!=null)
-            {
-                settingsScroll.Content=settingsHome;
-                settingsScroll.ResetForNavigation(settingsHomeOffset);
-            }
-            if(returning&&pageMotion!=null)pageMotion.Start(false);
+            var first=sections.FirstOrDefault(s=>s.Entry.Visibility==Visibility.Visible)??sections.FirstOrDefault();
+            if(first!=null)OpenSettings(first.Name);
         }
         Border SettingsExitRow()
         {

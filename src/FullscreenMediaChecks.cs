@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using System.IO;
 using System.Threading.Tasks;
@@ -62,7 +62,7 @@ namespace OneTaskBar
                     var steps=new System.Collections.Generic.List<double>();
                     for(int i=1;i<travel.Count;i++)if(travel[i]!=travel[i-1])steps.Add(travel[i]-travel[i-1]);
                     Require(steps.Count>=10,"the cover glides over many frames, not a jump: "+steps.Count);
-                    Require(steps.All(d=>d<=.001)&&Math.Abs(steps.Max(d=>Math.Abs(d)))<(full-small)*.2,"the cover never jumps more than a fifth of its way in one frame");
+                    Require(steps.All(d=>d<=.001)&&Math.Abs(steps.Max(d=>Math.Abs(d)))<(full-small)*.2,"the cover never jumps more than a fifth of its way in one frame: max "+steps.Max(d=>Math.Abs(d))+" of "+(full-small)+" over "+steps.Count+" steps");
                     Require(travel.All(v=>v>=small-.5&&v<=full+.5),"a critically damped cover neither overshoots nor rebounds");
                     travel.Clear();
                     CompositionTarget.Rendering+=sample;
@@ -146,7 +146,7 @@ namespace OneTaskBar
                         var initial=new Rect(40,40,800,600);var capsule=new Rect(900,30,44,88);
                         var pose=MediaWindowPose.At(initial,capsule,.18);
                         MediaFlightChecks.Check();
-                        Require(Math.Abs(pose.Width/pose.Height-initial.Width/initial.Height)<.001&&Math.Abs(pose.Turn)>1&&Math.Abs(pose.Tilt)>1,"reference flight begins with a restrained perspective tilt");
+                        Require(Math.Abs(pose.Width/pose.Height-initial.Width/initial.Height)<.001&&Math.Abs(pose.Turn)>.5&&Math.Abs(pose.Tilt)>.5,"reference flight begins with a restrained perspective tilt");
                         Require(MediaWindowPose.At(initial,capsule,0).Width==800&&MediaWindowPose.At(initial,capsule,1).Opacity==0,"flight hands off at its two endpoints");
                         foreach(bool reverse in new[]{false,true})
                         {

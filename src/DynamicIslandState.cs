@@ -7,7 +7,7 @@ namespace OneTaskBar
     // Presentation only. The island shares the shell's existing audio, power and media services.
     internal sealed class DynamicIslandState
     {
-        internal bool Expanded;
+        internal bool Expanded,Searching;internal int SearchRows;
         internal string FeedbackKind;
         internal double Value;
         internal bool Muted;
@@ -24,17 +24,18 @@ namespace OneTaskBar
         }
         internal Size Size(bool media,DateTime now)
         {
+            if(Searching)return new Size(360,SearchRows==0?IslandSearchView.HeaderHeight:IslandSearchView.HeaderHeight+SearchRows*IslandSearchView.RowHeight+8);
             if(Expanded&&media)return new Size(360,204);
             if(NotificationVisible(now))return new Size(360,156);
             if(FeedbackVisible(now))return FeedbackKind=="charge"?new Size(DynamicIslandLayout.ChargeWidth,DynamicIslandLayout.ChargeHeight):new Size(286,88);
             // Same height with or without media: playing only widens the island, it never grows downward.
             return media?new Size(DynamicIslandLayout.MediaWidth,DynamicIslandLayout.CompactHeight):new Size(DynamicIslandLayout.IdleWidth,DynamicIslandLayout.CompactHeight);
         }
-        internal void Reset(){Expanded=false;FeedbackKind=null;FeedbackUntil=NotificationUntil=DateTime.MinValue;}
+        internal void Reset(){Expanded=Searching=false;FeedbackKind=null;FeedbackUntil=NotificationUntil=DateTime.MinValue;}
     }
     internal static class DynamicIslandLayout
     {
-        internal const double MaximumWidth=360,MaximumHeight=204,TopInset=2,CompactHeight=22,ChargeHeight=22,IdleWidth=44,MediaWidth=88,ChargeWidth=208;
+        internal const double MaximumWidth=360,MaximumHeight=244,TopInset=2,CompactHeight=22,ChargeHeight=22,IdleWidth=44,MediaWidth=88,ChargeWidth=208;
         internal static Rect Host(System.Drawing.Rectangle screen,System.Drawing.Rectangle work,double scale,bool bottom=false)
         {
             scale=Math.Max(1,scale);

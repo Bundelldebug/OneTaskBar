@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -13,6 +13,8 @@ namespace OneTaskBar
         internal Native.RectI Bounds,Client;
         internal Rectangle Monitor;
         internal bool Maximized,Framed;
+        internal string Kind="";
+        internal int ExStyle;
     }
     internal static class FullscreenVisibility
     {
@@ -112,7 +114,9 @@ namespace OneTaskBar
                 Client = new Native.RectI { Left = first.X, Top = first.Y, Right = last.X, Bottom = last.Y },
                 Monitor = System.Windows.Forms.Screen.FromHandle(window).Bounds,
                 Maximized = Native.IsZoomed(window),
-                Framed = (Native.GetWindowLong(window, -16) & 0xC40000) != 0
+                Framed = (Native.GetWindowLong(window, -16) & 0xC40000) != 0,
+                Kind = kind,
+                ExStyle = Native.GetWindowLong(window, -20)
             };
             if ((Native.GetWindowLong(window, -20) & 0x80) != 0 && !ClientCovers(candidate.Client, candidate.Monitor)
                 && !Native.CoversMonitor(candidate.Bounds, candidate.Monitor, candidate.Maximized, candidate.Framed))
@@ -122,11 +126,43 @@ namespace OneTaskBar
         static bool ClientCovers(Native.RectI rect,Rectangle screen){return rect.Left<=screen.Left+1&&rect.Top<=screen.Top+1&&rect.Right>=screen.Right-1&&rect.Bottom>=screen.Bottom-1;}
         internal static bool IsFullScreen(Rectangle screen,IEnumerable<FullscreenCandidate> windows)
         {
+            return Cover(screen,windows)!=null;
+        }
+        // Browsers and video players: fullscreen windows that can share the screen with a black band at the top.
+        // Games are left alone, since the band would cover part of their picture.
+        internal static bool BandFriendly(FullscreenCandidate window)
+        {
+            string kind=window==null?"":window.Kind??"";
+            return kind.StartsWith("Chrome_WidgetWin",StringComparison.Ordinal)||kind=="MozillaWindowClass"||kind=="ApplicationFrameWindow"||
+                kind.StartsWith("PotPlayer",StringComparison.OrdinalIgnoreCase)||kind.StartsWith("mpv",StringComparison.OrdinalIgnoreCase)||kind.StartsWith("VLC",StringComparison.OrdinalIgnoreCase);
+        }
+        // Like Cover, but unframed tool windows (other overlays and floating widgets) are not the app on screen.
+        internal static FullscreenCandidate BandCover(Rectangle screen,IEnumerable<FullscreenCandidate> windows)
+        {
+            var apps=new List<FullscreenCandidate>();
+            foreach(var window in windows)if(window.Framed||window.Maximized||(window.ExStyle&0x80)==0)apps.Add(window);
+            return Cover(screen,apps);
+        }
+        internal static FullscreenCandidate Cover(Rectangle screen,IEnumerable<FullscreenCandidate> windows)
+        {
+            // The window being used decides first. After Alt-Tab back to a borderless game, another app's overlay or a
+            // window that has not finished leaving can still sit above it in stacking order, which left the dock up.
+            IntPtr front=Native.GetAncestor(Native.GetForegroundWindow(),3);
+            if(front!=IntPtr.Zero)
+            {
+                foreach(var window in windows)
+                {
+                    if(window.Window!=front||window.Monitor!=screen)continue;
+                    bool intended=window.Maximized&&Preferences.Current.MaximizedBehindDock;
+                    if(!intended&&(ClientCovers(window.Client,screen)||Native.CoversMonitor(window.Bounds,screen,window.Maximized,window.Framed)))return window;
+                    break;
+                }
+            }
             // EnumWindows is in stacking order. An inactive fullscreen window on a
             // second monitor still hides that monitor's dock; a normal app above it does not.
             foreach(var window in windows){var overlap=Rectangle.Intersect(screen,Rectangle.FromLTRB(window.Bounds.Left,window.Bounds.Top,window.Bounds.Right,window.Bounds.Bottom));if(overlap.Width<=0||overlap.Height<=0)continue;// With "maximize to the taskbar" on, a maximized window is meant to fill the monitor. Office windows draw their own title bar, so their client area also covers it and they looked like a fullscreen app, which hid the dock and left auto-hide unable to reveal it again.
                 bool intended=window.Maximized&&Preferences.Current.MaximizedBehindDock;
-                if(!intended&&(ClientCovers(window.Client,screen)||Native.CoversMonitor(window.Bounds,screen,window.Maximized,window.Framed)))return true;if(window.Monitor==screen)return false;}return false;
+                if(!intended&&(ClientCovers(window.Client,screen)||Native.CoversMonitor(window.Bounds,screen,window.Maximized,window.Framed)))return window;if(window.Monitor==screen)return null;}return null;
         }
     }
 }

@@ -27,13 +27,13 @@ namespace OneTaskBar
             internal object Find(string name){try{return Keep(Invoke(Root,"GetTask",BindingFlags.InvokeMethod,name));}catch(Exception error){var inner=error;while(inner.InnerException!=null)inner=inner.InnerException;if(inner.HResult==unchecked((int)0x80070002)||inner.HResult==unchecked((int)0x8004130F))return null;throw;}}
             public void Dispose(){for(int i=objects.Count-1;i>=0;i--)try{Marshal.FinalReleaseComObject(objects[i]);}catch{}objects.Clear();}
         }
-        internal static string Definition(string executable,string userSid,bool enabled=true)
+        internal static string Definition(string executable,string userSid,bool enabled=true,bool elevated=false)
         {
             var text=new StringBuilder();using(var writer=XmlWriter.Create(text,new XmlWriterSettings {OmitXmlDeclaration=true})){
                 writer.WriteStartElement("Task",TaskNamespace);writer.WriteAttributeString("version","1.2");
                 writer.WriteStartElement("RegistrationInfo");writer.WriteElementString("Description","One TaskBar sign-in startup, managed by the app's automatic startup setting.");writer.WriteElementString("Source","OneTaskBar.Logon.v1|"+userSid);writer.WriteEndElement();
                 writer.WriteStartElement("Triggers");writer.WriteStartElement("LogonTrigger");writer.WriteElementString("Enabled",enabled?"true":"false");writer.WriteElementString("UserId",userSid);writer.WriteElementString("Delay","PT0S");writer.WriteEndElement();writer.WriteEndElement();
-                writer.WriteStartElement("Principals");writer.WriteStartElement("Principal");writer.WriteAttributeString("id","CurrentUser");writer.WriteElementString("UserId",userSid);writer.WriteElementString("LogonType","InteractiveToken");writer.WriteElementString("RunLevel","LeastPrivilege");writer.WriteEndElement();writer.WriteEndElement();
+                writer.WriteStartElement("Principals");writer.WriteStartElement("Principal");writer.WriteAttributeString("id","CurrentUser");writer.WriteElementString("UserId",userSid);writer.WriteElementString("LogonType","InteractiveToken");writer.WriteElementString("RunLevel",elevated?"HighestAvailable":"LeastPrivilege");writer.WriteEndElement();writer.WriteEndElement();
                 writer.WriteStartElement("Settings");writer.WriteElementString("MultipleInstancesPolicy","IgnoreNew");writer.WriteElementString("DisallowStartIfOnBatteries","false");writer.WriteElementString("StopIfGoingOnBatteries","false");writer.WriteElementString("AllowHardTerminate","false");writer.WriteElementString("StartWhenAvailable","true");writer.WriteElementString("Enabled",enabled?"true":"false");writer.WriteElementString("ExecutionTimeLimit","PT0S");writer.WriteElementString("Priority","5");writer.WriteEndElement();
                 writer.WriteStartElement("Actions");writer.WriteAttributeString("Context","CurrentUser");writer.WriteStartElement("Exec");writer.WriteElementString("Command",executable);writer.WriteElementString("Arguments",Arguments);writer.WriteElementString("WorkingDirectory",Path.GetDirectoryName(executable));writer.WriteEndElement();writer.WriteEndElement();writer.WriteEndElement();
             }return text.ToString();
@@ -87,12 +87,42 @@ namespace OneTaskBar
             if(previous==null)throw new InvalidOperationException("같은 이름의 다른 시작 작업이 있어 변경하지 않았습니다.");
             return previous;
         }
-        static string RegisterOwnedTask(Scheduler scheduler,string name,string executable,string user,bool enabled)
+        // True when the sign-in task is set to run with the full administrator token.
+        internal static bool Elevated
+        {
+            get
+            {
+                try
+                {
+                    using(var scheduler=new Scheduler())
+                    {
+                        var task=scheduler.Find(TaskName);
+                        if(task==null)return false;
+                        string xml=(string)Invoke(task,"Xml",BindingFlags.GetProperty);
+                        return Owned(xml,Exe,Sid)&&xml.IndexOf("<RunLevel>HighestAvailable</RunLevel>",StringComparison.OrdinalIgnoreCase)>=0;
+                    }
+                }
+                catch(Exception error){AppLog.Once("startup-elevated-read",error.GetType().Name);return false;}
+            }
+        }
+        internal static bool IsAdministrator{get{using(var identity=WindowsIdentity.GetCurrent())return new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);}}
+        // Runs in the elevated helper process: registers the sign-in task with or without the administrator token.
+        internal static int ElevatedHelper(bool on)
+        {
+            try
+            {
+                if(!IsAdministrator)return 2;
+                lock(gate)using(var scheduler=new Scheduler())RegisterOwnedTask(scheduler,TaskName,Exe,Sid,true,on);
+                return 0;
+            }
+            catch(Exception error){AppLog.Once("startup-elevated-write",error.ToString());return 1;}
+        }
+        static string RegisterOwnedTask(Scheduler scheduler,string name,string executable,string user,bool enabled,bool elevated=false)
         {
             var task=scheduler.Find(name);
             string previous=OwnedPath(task,user);
             scheduler.Keep(Invoke(scheduler.Root,"RegisterTask",BindingFlags.InvokeMethod,
-                name,Definition(executable,user,enabled),task==null?2:6,null,null,3,null));
+                name,Definition(executable,user,enabled,elevated),task==null?2:6,null,null,3,null));
             var registered=scheduler.Find(name);
             if(registered==null||(bool)Invoke(registered,"Enabled",BindingFlags.GetProperty)!=enabled||
                 !Owned((string)Invoke(registered,"Xml",BindingFlags.GetProperty),executable,user))

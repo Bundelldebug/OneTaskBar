@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -28,7 +28,7 @@ namespace OneTaskBar
         internal static bool Inspectable;
         internal static bool TestProcess;
         internal static bool CaptureReview;
-        [STAThread] static int Main(string[] args){int code=Run(args);Environment.Exit(code);return code;}
+        [STAThread] static int Main(string[] args){FrameRate.Raise();int code=Run(args);Environment.Exit(code);return code;}
         static int Run(string[] args)
         {
             StartupTrace.Mark("entry");
@@ -40,6 +40,7 @@ namespace OneTaskBar
             if(args.Length==2&&args[0]=="--open-panel"&&new[]{"notifications","quick","start","search","desktops","media-screen","widgets"}.Contains(args[1])){Signal("Panel-"+args[1]);return 0;}
             if(args.Length==2&&args[0]=="--review-edge"&&new[]{"0","1","2","3"}.Contains(args[1])){Signal("Panel-edge"+args[1]);return 0;}
             if(args.Length==2&&args[0]=="--review-background"&&new[]{"0","1","2","3"}.Contains(args[1])){Signal("Panel-background"+args[1]);return 0;}
+            if(args.Length==2&&args[0]=="--elevated-startup")return LogonStartup.ElevatedHelper(args[1]=="on");
             if(args.Length==3&&args[0]=="--register-notifications")return NotificationIdentity.RegisterHelper(args[1],args[2]);
             if(args.Length>0&&args[0]=="--notification-restart")return NotificationIdentity.RestartHelper(args);
             if(args.Contains("--notification-probe")) { Signal("ProbeNotifications"); return 0; }
@@ -94,7 +95,7 @@ namespace OneTaskBar
             if(args.Contains("--desktop-behavior-probe"))return DesktopBehaviorChecks.Run();
             if(args.Contains("--desktop-widgets-probe"))return DesktopWidgetChecks.Run();
             if(args.Contains("--desktop-widgets-live"))return DesktopWidgetChecks.Live();
-            if(args.Contains("--media-foreign-diag"))return MediaForeignDiag.Run();if(args.Contains("--liquid-diag"))return LiquidDiag.Run();if(args.Contains("--tray-smooth-diag"))return TraySmoothDiag.Run();if(args.Contains("--topbar-diag"))return TopBarDiag.Run();
+            if(args.Contains("--media-foreign-diag"))return MediaForeignDiag.Run();if(args.Contains("--liquid-diag"))return LiquidDiag.Run();if(args.Contains("--tray-smooth-diag"))return TraySmoothDiag.Run();if(args.Contains("--topbar-diag"))return TopBarDiag.Run();if(args.Contains("--flight-diag"))return FlightDiag.Run();
             if(args.Contains("--fullscreen-tiles-probe"))return FullscreenTileChecks.Run();
             if(args.Contains("--taskbar-state-probe"))return DesktopBehaviorChecks.NativeState();
             if(args.Contains("--taskbar-logo-probe"))return TaskbarLogoChecks.Probe();

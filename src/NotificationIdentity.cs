@@ -12,7 +12,7 @@ using Windows.Foundation;
 using Windows.Management.Deployment;
 namespace OneTaskBar
 {
-    internal sealed class IdentityResult {public bool Registered,AdministratorRequired,ChangedLocation;public string AppId,Error;public int ErrorCode;}
+    internal sealed class IdentityResult {public bool Registered,AdministratorRequired,ChangedLocation;public string AppId,FullName,Error;public int ErrorCode;}
     internal static class NotificationIdentity
     {
         internal const string Name="OneTaskBar.Desktop",Publisher="CN=OneTaskBar, OID.2.25.311729368913984317654407730594956997722=1";
@@ -26,13 +26,15 @@ namespace OneTaskBar
                     .Where(p=>p.Id.Name==Name&&String.Equals(p.Id.Publisher,Publisher,StringComparison.OrdinalIgnoreCase)).ToArray();
                 var package=packages.FirstOrDefault(p=>NotificationRegistration.SameDirectory(p.EffectiveExternalPath,external));
                 return package==null?new IdentityResult {ChangedLocation=packages.Length!=0}:
-                    new IdentityResult {Registered=true,AppId=package.Id.FamilyName+"!OneTaskBar"};
+                    new IdentityResult {Registered=true,AppId=package.Id.FamilyName+"!OneTaskBar",FullName=package.Id.FullName};
             }
             catch(Exception error){return new IdentityResult {Error=error.Message,ErrorCode=error.HResult};}
         }
         internal static bool Bootstrap(string[] args)
         {
-            if(IsCurrent||args.Contains("--identity-activation"))return false;
+            // Package activation always yields a normal-token process, so an administrator launch stays unpackaged.
+            // Windows also refuses to start a packaged app with an administrator token.
+            if(IsCurrent||args.Contains("--identity-activation")||LogonStartup.IsAdministrator)return false;
             try{var registration=Find();if(!registration.Registered)return false;var allowed=new[]{"--desktop","--logon","--settings","--connect-notifications","--qa","--review-ui"};string forwarded=String.Join(" ",args.Where(a=>allowed.Contains(a)).Concat(new[]{"--identity-activation"}));object instance=Activator.CreateInstance(Type.GetTypeFromCLSID(new Guid("45BA127D-10A8-46EA-8AB7-56EA9078943C")));try{uint pid;((IApplicationActivation)instance).ActivateApplication(registration.AppId,forwarded,0,out pid);}finally{Marshal.ReleaseComObject(instance);}return true;}
             catch(Exception error){AppLog.Once("identity-startup",error.Message);return false;}
         }

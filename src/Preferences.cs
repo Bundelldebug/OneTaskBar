@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Web.Script.Serialization;
 using Microsoft.Win32;
@@ -26,8 +26,8 @@ namespace OneTaskBar
         public int DockTheme=0;
         public bool DockSolidBackground=false;
         public int DockBackgroundKind=0,DockEdge=3;
-        public int DockScalePercent=100;
-        public string DockMonitor;
+        public int DockScalePercent=100;        public string DockMonitor;
+        public string PresetDesktopWallpaper,PresetLockScreen;
         public int DockClockMode=0;
         public string DockBackgroundColor="#FFBAC1C7",DockBackgroundImage;
         public bool DockMaterialCustom=false,StartMaterialCustom=false;
@@ -60,6 +60,7 @@ namespace OneTaskBar
         public int TrayPanelPercent=100;
         public bool MediaFlightToIsland=true;
         public bool TopStatusBar=false;
+        public bool FullscreenBand=true;
         public bool LightEffects=false;
         public bool WidgetsSeeded=false;
         public bool DesktopMenuEntry=true;

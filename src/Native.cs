@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -331,7 +331,7 @@ namespace OneTaskBar
         [DllImport("user32.dll")] static extern IntPtr CallNextHookEx(IntPtr hook,int code,IntPtr message,IntPtr info);
         [DllImport("kernel32.dll",CharSet=CharSet.Unicode)] static extern IntPtr GetModuleHandle(string module);
         readonly Hook callback; IntPtr handle;
-        public bool Enabled; public Func<int,bool> OnKey;internal Func<bool> InterceptStart,InterceptAltTab,InterceptTaskView;internal Action OnStart,OnNativeStart,OnTaskView;internal readonly WindowSwitchGesture AltTabGesture=new WindowSwitchGesture();
+        public bool Enabled; public Func<int,bool> OnKey;internal Func<bool> InterceptStart,InterceptAltTab,InterceptTaskView,InterceptSearch;internal Action OnStart,OnNativeStart,OnTaskView,OnSearch;bool searchKeyHeld;internal readonly WindowSwitchGesture AltTabGesture=new WindowSwitchGesture();
         readonly TaskViewGesture taskView=new TaskViewGesture();
         readonly StartKeyGesture start=new StartKeyGesture();
         int bufferedWin,nativeWins;
@@ -344,6 +344,13 @@ namespace OneTaskBar
             if(code>=0) {
                 bool down=message==new IntPtr(0x100)||message==new IntPtr(0x104),up=message==new IntPtr(0x101)||message==new IntPtr(0x105);
                 if(down||up)try{uint flags=(uint)Marshal.ReadInt32(info,8);bool alt=(flags&0x20)!=0||(GetAsyncKeyState(0x12)&0x8000)!=0,ctrl=(GetAsyncKeyState(0x11)&0x8000)!=0,shift=(GetAsyncKeyState(0x10)&0x8000)!=0,win=(GetAsyncKeyState(0x5b)&0x8000)!=0||(GetAsyncKeyState(0x5c)&0x8000)!=0;if(AltTabGesture.Observe(key,down,Enabled&&InterceptAltTab!=null&&InterceptAltTab(),alt,ctrl,shift,win,(flags&0x10)!=0))return new IntPtr(1);}catch(Exception error){AppLog.Once("switcher-key",error.GetType().Name);}
+                // Win+S opens One TaskBar's own search. The S key is swallowed so Windows never starts its search.
+                if(key==0x53&&up&&searchKeyHeld){searchKeyHeld=false;return new IntPtr(1);}
+                if(key==0x53&&down&&Enabled&&InterceptSearch!=null&&InterceptSearch()&&(bufferedWin!=0||(GetAsyncKeyState(0x5b)&0x8000)!=0||(GetAsyncKeyState(0x5c)&0x8000)!=0)&&(GetAsyncKeyState(0x11)&0x8000)==0&&(GetAsyncKeyState(0x12)&0x8000)==0)
+                {
+                    if(!searchKeyHeld){searchKeyHeld=true;if(bufferedWin==0)SystemPanels.CancelStart();bufferedWin=0;if(OnSearch!=null)OnSearch();}
+                    return new IntPtr(1);
+                }
                 if(down||up){bool modifiers=(GetAsyncKeyState(0x10)&0x8000)!=0||(GetAsyncKeyState(0x11)&0x8000)!=0||(GetAsyncKeyState(0x12)&0x8000)!=0;
                     bool interceptStart=Enabled&&InterceptStart!=null&&InterceptStart(),interceptTask=Enabled&&InterceptTaskView!=null&&InterceptTaskView();
                     bool open;if(taskView.Observe(key,down,bufferedWin,interceptTask,modifiers,(Marshal.ReadInt32(info,8)&0x10)!=0,out open)){if(open){start.Observe(bufferedWin,false,false,false);bufferedWin=0;if(OnTaskView!=null)OnTaskView();}return new IntPtr(1);}

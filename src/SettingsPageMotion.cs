@@ -80,7 +80,8 @@ namespace OneTaskBar
                 if(revision!=token)return;
                 page.Opacity=1;
                 page.RenderTransform=incoming;
-                var completion=Motion.PanelTween(forward?18:-18,0,220);
+                // One UI pushes the new page in from the side while the old one drifts away more slowly.
+                var completion=Motion.PanelTween(forward?48:-48,0,260);
                 completion.Completed+=(s,e)=>{if(revision==token)Cancel();};
                 incoming.BeginAnimation(TranslateTransform.XProperty,completion);
                 page.BeginAnimation(UIElement.OpacityProperty,Motion.Tween(0,1,180));
@@ -88,7 +89,7 @@ namespace OneTaskBar
                 {
                     previous.RenderTransform=outgoing;
                     previous.Opacity=0;
-                    outgoing.BeginAnimation(TranslateTransform.XProperty,Motion.PanelTween(0,forward?-12:12,220));
+                    outgoing.BeginAnimation(TranslateTransform.XProperty,Motion.PanelTween(0,forward?-24:24,260));
                     previous.BeginAnimation(UIElement.OpacityProperty,Motion.Tween(1,0,180));
                 }
             }),DispatcherPriority.Loaded);

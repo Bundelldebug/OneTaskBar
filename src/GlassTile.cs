@@ -44,18 +44,41 @@ namespace OneTaskBar
             for(int i=0;i<pens.Length;i++)
             {
                 var brush=new LinearGradientBrush {StartPoint=new Point(.1,0),EndPoint=new Point(.9,1)};
-                byte strong=(byte)(13-i*3),weak=(byte)(4-i);
+                byte strong=(byte)(30-i*9),weak=(byte)(10-i*3);
                 brush.GradientStops.Add(new GradientStop(Color.FromArgb(strong,255,255,255),0));
                 brush.GradientStops.Add(new GradientStop(Color.FromArgb(weak,225,238,255),.5));
                 brush.GradientStops.Add(new GradientStop(Color.FromArgb((byte)(strong*2/3),255,255,255),1));
                 brush.Freeze();
-                var pen=new Pen(brush,3+i*3);pen.Freeze();pens[i]=pen;
+                var pen=new Pen(brush,3+i*4);pen.Freeze();pens[i]=pen;
             }
             return pens;
         }
         static Brush LiquidGlint()
         {
-            var brush=new RadialGradientBrush(Color.FromArgb(26,255,255,255),Colors.Transparent){Center=new Point(.16,.06),GradientOrigin=new Point(.16,.06),RadiusX=.5,RadiusY=.28};
+            var brush=new RadialGradientBrush(Color.FromArgb(54,255,255,255),Colors.Transparent){Center=new Point(.16,.06),GradientOrigin=new Point(.16,.06),RadiusX=.62,RadiusY=.34};
+            brush.Freeze();return brush;
+        }
+        // The crisp edge of the glass: a thin bright line, strongest where the light comes from (upper left),
+        // fading along the sides and returning faintly on the far corner.
+        static readonly Pen liquidRim=LiquidRim();
+        static Pen LiquidRim()
+        {
+            var brush=new LinearGradientBrush {StartPoint=new Point(.05,0),EndPoint=new Point(.95,1)};
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(170,255,255,255),0));
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(95,255,255,255),.22));
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(22,255,255,255),.55));
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(44,255,255,255),.85));
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(110,255,255,255),1));
+            brush.Freeze();
+            var pen=new Pen(brush,1.2);pen.Freeze();return pen;
+        }
+        // Light gathered under the top edge, the thick part of the glass.
+        static readonly Brush liquidLip=LiquidLip();
+        static Brush LiquidLip()
+        {
+            var brush=new LinearGradientBrush {StartPoint=new Point(0,0),EndPoint=new Point(0,1)};
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(48,255,255,255),0));
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(0,255,255,255),1));
             brush.Freeze();return brush;
         }
         internal static void LiquidEdge(DrawingContext dc,Rect box,double radius)
@@ -63,6 +86,8 @@ namespace OneTaskBar
             if(box.Width<24||box.Height<24)return;
             for(int i=liquidEdge.Length-1;i>=0;i--)dc.DrawRoundedRectangle(null,liquidEdge[i],box,radius,radius);
             dc.DrawRectangle(liquidGlint,null,new Rect(box.X,box.Y,box.Width,Math.Min(box.Height*.5,radius*2+30)));
+            dc.DrawRectangle(liquidLip,null,new Rect(box.X,box.Y,box.Width,Math.Min(box.Height*.5,16)));
+            dc.DrawRoundedRectangle(null,liquidRim,new Rect(box.X+.6,box.Y+.6,box.Width-1.2,box.Height-1.2),Math.Max(0,radius-.6),Math.Max(0,radius-.6));
         }
         internal static void Draw(DrawingContext dc,double width,double height,double radius,bool strong=true,bool? darkOverride=null)
         {

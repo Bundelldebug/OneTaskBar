@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -54,7 +54,7 @@ namespace OneTaskBar
             OpenButton.VerticalContentAlignment=VerticalAlignment.Stretch;
             var surface=new Border
             {
-                Background=Paint.Brush("#ED30383D"),Child=OpenButton
+                Background=Brushes.Transparent,Child=OpenButton
             };
             Grid.SetRow(surface,1);Children.Add(surface);
         }

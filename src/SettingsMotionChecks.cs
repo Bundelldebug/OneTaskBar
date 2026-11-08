@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -53,30 +53,22 @@ namespace OneTaskBar
         }
         internal static async Task Navigate(WelcomeWindow window)
         {
-            window.SettingsHome();
-            await Task.Delay(280);
+            window.OpenSettings("데스크톱");
+            await Task.Delay(300);
             var viewport=window.SettingsViewport;
             viewport.ScrollToVerticalOffset(Math.Min(130,viewport.ScrollableHeight));
             await Task.Delay(60);
-            double homeOffset=viewport.VerticalOffset;
-            if(homeOffset<30)throw new InvalidOperationException("Settings scroll fixture has no home scroll range");
-            window.OpenSettings("데스크톱");
-            await Task.Delay(280);
-            viewport.CheckWheel(-120);
-            await Task.Delay(30);
-            window.SettingsHome();
-            await Task.Delay(60);
-            double firstOffset=viewport.VerticalOffset;
-            Program.Save(window.Surface,(int)window.Width,(int)window.Height,System.IO.Path.Combine(AppLog.Data,"settings-return-midpoint.png"));
-            await Task.Delay(250);
-            if(Math.Abs(firstOffset-homeOffset)>.5||Math.Abs(viewport.VerticalOffset-homeOffset)>.5)
-                throw new InvalidOperationException("Returning from a scrolling settings page moves the home list after the transition begins");
+            if(viewport.VerticalOffset<30)throw new InvalidOperationException("Settings page fixture has no scroll range");
             window.OpenSettings("화면");
             await Task.Delay(25);
+            if(!window.SettingsAnimating)throw new InvalidOperationException("Choosing a settings category has no motion");
+            await Task.Delay(300);
+            if(viewport.VerticalOffset>.5)throw new InvalidOperationException("Choosing another category keeps the previous scroll offset");
+            Program.Save(window.Surface,(int)window.Width,(int)window.Height,System.IO.Path.Combine(AppLog.Data,"settings-two-pane.png"));
             window.SearchSettings.Text="미디어 플레이어";
             await Task.Delay(300);
-            if(window.SettingsPage!=null||window.VisibleSettingsSections!=1||viewport.VerticalOffset>.5)
-                throw new InvalidOperationException("Search interrupts a settings return with stale content or offset");
+            if(window.VisibleSettingsSections!=1||window.SettingsPage!="미디어 플레이어")
+                throw new InvalidOperationException("Search does not filter the list and follow the first match");
             window.SearchSettings.Clear();
             await Task.Delay(80);
             if(window.SettingsSnapshotHeld||viewport.Opacity!=1||!viewport.RenderTransform.Value.IsIdentity)

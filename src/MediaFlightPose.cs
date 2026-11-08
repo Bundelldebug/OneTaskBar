@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Windows;
 
 namespace OneTaskBar
@@ -14,25 +14,27 @@ namespace OneTaskBar
             var a=new Point(window.X+window.Width/2,window.Y+window.Height/2);
             var b=new Point(capsule.X+capsule.Width/2,capsule.Y+capsule.Height/2);
             var delta=b-a;
-            var c1=a+new Vector(delta.X*.24,delta.Y*.12);
-            var c2=b-new Vector(delta.X*.12,delta.Y*.28);
+            // The window slides straight to the pill, the way an app folds into the Dynamic Island: no sideways swing.
+            var c1=a+new Vector(delta.X*.32,delta.Y*.32);
+            var c2=b-new Vector(delta.X*.18,delta.Y*.18);
             var center=new Point(u*u*u*a.X+3*u*u*p*c1.X+3*u*p*p*c2.X+p*p*p*b.X,
                 u*u*u*a.Y+3*u*u*p*c1.Y+3*u*p*p*c2.Y+p*p*p*b.Y);
             // Cover the destination before rounding into its aspect. Both axes
             // keep shrinking; fitting first makes a wide capsule swell at the end.
             double end=Math.Max(capsule.Width/window.Width,capsule.Height/window.Height);
             double zoom=1+(end-1)*p;
-            double morph=MediaFlightTiming.Smooth((p-.38)/.62);
+            // The corners start rounding early, so the window is already pill-shaped as it reaches the pill.
+            double morph=MediaFlightTiming.Smooth((p-.16)/.84);
             double width=window.Width*zoom-(window.Width*end-capsule.Width)*morph;
             double height=window.Height*zoom-(window.Height*end-capsule.Height)*morph;
             // The reference tilts hardest while the window is still small and next to the pill, then flattens as it opens.
             double envelope=Math.Min(1,1.35*Math.Pow(p,.8)*(1-Math.Pow(p,6)));
             double direction=delta.X>=0?1:-1;
-            double radius=18+(Math.Min(width,height)/2-18)*morph;
+            double radius=26+(Math.Min(width,height)/2-26)*morph;
             return new MediaWindowPose {
                 Center=center,Width=width,Height=height,Radius=Math.Max(0,Math.Min(Math.Min(width,height)/2,radius)),
-                Tilt=-15*direction*envelope,Turn=-9*direction*envelope,
-                Opacity=1-MediaFlightTiming.Smooth((p-.73)/.27),Defocus=Performance.Light?0:.8*envelope
+                Tilt=-4*direction*envelope,Turn=-2.5*direction*envelope,
+                Opacity=Math.Max(0,1-MediaFlightTiming.Smooth((p-.78)/.22)),Defocus=Performance.Light?0:.3*envelope*envelope
             };
         }
     }

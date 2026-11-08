@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Forms=System.Windows.Forms;
@@ -11,6 +11,7 @@ namespace OneTaskBar
         IslandSafeArea islandSpace;
         bool lastIslandPreference=ReleaseFeatures.GlassUI&&Preferences.Current.DynamicIsland||Preferences.Current.TopStatusBar;
         TopStatusBar topLeft,topRight;
+        SafeAreaCurtain curtain;
         bool TopBarEnabled {get{return Preferences.Current.TopStatusBar&&Desktop&&!disposed;}}
         internal bool TopBarActive {get{return TopBarEnabled&&topLeft!=null&&topLeft.IsVisible;}}
         internal DockHost DockFor(Forms.Screen screen){return docks.FirstOrDefault(d=>d.Screen.DeviceName==screen.DeviceName)??docks.FirstOrDefault();}
@@ -31,10 +32,13 @@ namespace OneTaskBar
             var monitor=dock.Screen;
             double dpi=dock.Scale;
             bool full=!DisplayAwake||Overview!=null&&Overview.IsVisible||FullscreenVisibility.IsFullScreen(monitor.Bounds,windows);
+            if(!full&&Preferences.Current.FullscreenBand&&FullscreenVisibility.BandFriendly(FullscreenVisibility.BandCover(monitor.Bounds,windows)))full=true;
             if(full)
             {
                 if(Island!=null)Island.Suspend();
+                if(FullscreenBand(monitor,dpi,windows,dock))return;
                 CloseTopBar();
+                CloseCurtain();
                 if(islandSpace!=null)islandSpace.SetActive(false);
                 return;
             }
@@ -46,11 +50,13 @@ namespace OneTaskBar
                 if(!DynamicIslandLayout.Clear(monitor.Bounds,work,dpi,windows)){CloseIsland();return;}
                 if(IslandEnabled)
                 {
-                    if(Island==null)Island=new DynamicIsland(Media,SeekMedia,()=>ShowDetail("sound"),OpenMediaApplication,()=>PrepareWindowSwitcher(),id=>MediaApplication.Resolve(id,Running.Concat(Apps)));
+                    if(Island==null)Island=new DynamicIsland(Media,SeekMedia,()=>ShowDetail("sound"),OpenMediaApplication,()=>PrepareWindowSwitcher(),id=>MediaApplication.Resolve(id,Running.Concat(Apps)),IslandFind,app=>LaunchApp(app,System.Windows.Input.Keyboard.Modifiers),text=>LauncherSearch.OpenWeb(LauncherSearch.WebAddress(text)));
                     Lap("island-prep");Island.Present(Services.Media,Services.OutputName,monitor,dpi,work,islandSpace.Bottom);Lap("island-present");
                 }
                 else if(Island!=null){Island.Close();Island=null;}
-                if(TopBarEnabled)
+                bool shade=ShadeWanted(monitor,windows);
+                // With the band turned black the status bar is still built: it is what the pointer reveals.
+                if(TopBarEnabled||shade&&!Preferences.Current.TopStatusBar&&Desktop&&!disposed)
                 {
                     if(topLeft==null)topLeft=new TopStatusBar(this,TopStatusBar.Side.Left);
                     if(topRight==null)topRight=new TopStatusBar(this,TopStatusBar.Side.Right);
@@ -58,8 +64,14 @@ namespace OneTaskBar
                     topRight.Present(monitor,dpi,islandSpace.Bottom);Lap("top-right");
                 }
                 else CloseTopBar();
+                UpdateCurtain(monitor,dpi,shade,islandSpace.Bottom);
             }
             catch(Exception error){CloseIsland();AppLog.Once("island-safety-area",error.ToString());}
+        }
+        List<AppEntry> IslandFind(string text)
+        {
+            if(String.IsNullOrWhiteSpace(text))return RecentApps.Recommend(Apps,Running,4);
+            return LauncherSearch.Apps(Apps,text.Trim()).Take(4).ToList();
         }
         void PrepareIslandSpace(Forms.Screen monitor,double dpi)
         {
@@ -88,6 +100,67 @@ namespace OneTaskBar
         {
             return IslandEnabled&&Island!=null&&Island.ShowNotification(entry,open);
         }
+        // A maximized window under the island turns the reserved band black; the status bar returns on hover.
+        // A browser or video player in fullscreen still gets the black band, with the status bar on hover.
+        bool FullscreenBand(Forms.Screen monitor,double dpi,IEnumerable<FullscreenCandidate> windows,DockHost dock)
+        {
+            if(!Preferences.Current.FullscreenBand||!Desktop||disposed||!(IslandEnabled||TopBarEnabled)||!DisplayAwake)return false;
+            if(Overview!=null&&Overview.IsVisible)return false;
+            var cover=FullscreenVisibility.BandCover(monitor.Bounds,windows);
+            if(!FullscreenVisibility.BandFriendly(cover))return false;
+            bool bottom=islandSpace!=null?islandSpace.Bottom:dock.Edge==1;
+            if(islandSpace!=null)islandSpace.SetActive(false);
+            if(topLeft==null)topLeft=new TopStatusBar(this,TopStatusBar.Side.Left);
+            if(topRight==null)topRight=new TopStatusBar(this,TopStatusBar.Side.Right);
+            topLeft.Present(monitor,dpi,bottom);
+            topRight.Present(monitor,dpi,bottom);
+            UpdateCurtain(monitor,dpi,true,bottom);
+            return true;
+        }
+        bool ShadeWanted(Forms.Screen monitor,IEnumerable<FullscreenCandidate> windows)
+        {
+            return (IslandEnabled||TopBarEnabled)&&!Preferences.Current.MaximizedBehindDock&&MaximizedAbove(monitor,windows);
+        }
+        void UpdateCurtain(Forms.Screen monitor,double dpi,bool wanted,bool bottom)
+        {
+            if(!wanted){CloseCurtain();return;}
+            bool fresh=curtain==null;
+            if(fresh)
+            {
+                curtain=new SafeAreaCurtain(monitor,dpi,bottom);
+                curtain.Hold=()=>Quick!=null&&Quick.IsVisible||Center!=null&&Center.IsVisible||topLeft!=null&&topLeft.CardOpen;
+                curtain.RevealChanged=revealed=>{if(topLeft!=null)topLeft.Conceal(!revealed,true);if(topRight!=null)topRight.Conceal(!revealed,true);};
+            }
+            curtain.Present();
+            if(topLeft!=null)topLeft.Conceal(!curtain.Revealed,true);
+            if(topRight!=null)topRight.Conceal(!curtain.Revealed,true);
+            // Created last, the curtain would sit over the island and the bar: raise them once above it.
+            if(fresh)
+            {
+                if(Island!=null&&Island.IsVisible)Native.SetWindowPos(new System.Windows.Interop.WindowInteropHelper(Island).Handle,new IntPtr(-1),0,0,0,0,0x53);
+                if(topLeft!=null&&topLeft.IsVisible)Native.SetWindowPos(new System.Windows.Interop.WindowInteropHelper(topLeft).Handle,new IntPtr(-1),0,0,0,0,0x53);
+                if(topRight!=null&&topRight.IsVisible)Native.SetWindowPos(new System.Windows.Interop.WindowInteropHelper(topRight).Handle,new IntPtr(-1),0,0,0,0,0x53);
+            }
+        }
+        static bool MaximizedAbove(Forms.Screen monitor,IEnumerable<FullscreenCandidate> windows)
+        {
+            foreach(var window in windows)
+            {
+                var overlap=System.Drawing.Rectangle.Intersect(monitor.Bounds,System.Drawing.Rectangle.FromLTRB(window.Bounds.Left,window.Bounds.Top,window.Bounds.Right,window.Bounds.Bottom));
+                if(overlap.Width<=0||overlap.Height<=0)continue;
+                // Overlays and pop-ups without a frame are not the app being used; the first real window decides.
+                if(window.Monitor==monitor.Bounds&&(window.Maximized||window.Framed))return window.Maximized;
+            }
+            return false;
+        }
+        void CloseCurtain()
+        {
+            if(curtain==null)return;
+            curtain.Retire();
+            curtain=null;
+            if(topLeft!=null)topLeft.Conceal(false,false);
+            if(topRight!=null)topRight.Conceal(false,false);
+        }
         void CloseTopBar()
         {
             if(topLeft!=null){topLeft.Close();topLeft=null;}
@@ -95,6 +168,7 @@ namespace OneTaskBar
         }
         void CloseIsland()
         {
+            CloseCurtain();
             CloseTopBar();
             if(Island!=null){Island.Close();Island=null;}
             if(islandSpace!=null){islandSpace.Dispose();islandSpace=null;}

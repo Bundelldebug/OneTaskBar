@@ -48,6 +48,8 @@ namespace OneTaskBar
                 desktop.GetPosition(out position);desktop.GetBackgroundColor(out background);
             }catch(Exception error){AppLog.Once("media-wallpaper-query",error.GetType().Name);}
             finally{if(instance!=null&&Marshal.IsComObject(instance))Marshal.ReleaseComObject(instance);}
+            string engine=WallpaperEngineSource.Current(screen);
+            if(engine!=null){path=engine;position=4;}
             if(String.IsNullOrWhiteSpace(path)){
                 var buffer=new System.Text.StringBuilder(32768);
                 if(SystemParametersInfo(0x73,buffer.Capacity,buffer,0))path=buffer.ToString();

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
@@ -52,11 +52,33 @@ namespace OneTaskBar
                 double scale=Math.Min(1,Math.Min(16/Math.Max(1,label.Width),10.4/Math.Max(1,label.Height))),width=label.Width*scale,height=label.Height*scale;labelBounds=new Rect(16-width/2,5.3-height/2,width,height);labelTransform=new MatrixTransform(scale,0,0,scale,labelBounds.X,labelBounds.Y);labelTransform.Freeze();}
             BatteryNumberBounds=labelBounds;dc.PushTransform(labelTransform);dc.DrawText(label,new Point());dc.Pop();
         }
+        // Plugging in: the ring fills with a bright head, two ripples leave the gauge, and the bolt pops in and settles.
+        void DrawCharge(DrawingContext dc,Geometry fill,double phase,double growth)
+        {
+            var accent=Glass95.DockDark?darkCharge:lightCharge;
+            dc.PushOpacity(Math.Min(1,(1-phase)/.25));dc.DrawGeometry(null,Stroke(accent),fill);dc.Pop();
+            for(int ripple=0;ripple<2;ripple++)
+            {
+                double t=(phase-ripple*.18)/.7;
+                if(t<=0||t>=1)continue;
+                double eased=1-Math.Pow(1-t,2);
+                var wave=new Pen(accent,1.3*(1-t)+.3);wave.Freeze();
+                dc.PushOpacity(.55*(1-t));dc.DrawEllipse(null,wave,RingCenter,7+7*eased,7+7*eased);dc.Pop();
+            }
+            double sweep=Math.Max(0,level)/100.0*150*growth;
+            if(sweep>0&&phase<.8)
+            {
+                double angle=sweep<=75?150+sweep:315+(sweep-75);
+                dc.PushOpacity(Math.Min(1,(.8-phase)/.2));dc.DrawEllipse(accent,null,At(RingCenter,12.7,angle),2.3,2.3);dc.Pop();
+            }
+            double pop=Math.Min(1,phase/.35),bounce=1+.45*Math.Sin(Math.PI*pop)*(1-pop*.4),size=9.5*(phase<.35?bounce*pop:1+.08*Math.Sin(Math.PI*Math.Min(1,(phase-.35)/.4)));
+            dc.PushOpacity(Math.Min(1,phase/.12));Paint.Icon(dc,"bolt",accent,new Point(16,5.3),size);dc.Pop();
+        }
         protected override void OnRender(DrawingContext dc)
         {
             if(ActualWidth<=0||ActualHeight<=0)return;double scale=Math.Min(ActualWidth/32,ActualHeight/34);dc.PushTransform(new ScaleTransform(scale,scale));var pen=Stroke(ink);BatteryNumberBounds=Rect.Empty;
             if(known){dc.PushOpacity(.22);dc.DrawGeometry(null,pen,track);dc.Pop();double phase=(double)GetValue(ChargePhaseProperty),growth=chargeRunning?Math.Min(1,phase/.75):1;var fill=chargeRunning?Gauge(Math.Max(0,level)/100.0*growth):batteryFill;dc.DrawGeometry(null,Stroke(BatteryColor),fill);
-                if(chargeRunning){var accent=Glass95.DockDark?darkCharge:lightCharge;dc.PushOpacity(Math.Min(1,(1-phase)/.25));dc.DrawGeometry(null,Stroke(accent),fill);dc.Pop();dc.PushOpacity(.7+.3*Math.Sin(Math.PI*phase));Paint.Icon(dc,"bolt",accent,new Point(16,5.3),9.5);dc.Pop();}else DrawNumber(dc,low?warningInk:ink);}
+                if(chargeRunning)DrawCharge(dc,fill,phase,growth);else DrawNumber(dc,low?warningInk:ink);}
             Paint.Icon(dc,network,ink,RingCenter,14,0,signal,-1);
             for(int i=0;i<4;i++){if(i>=steps)dc.PushOpacity(.24);dc.DrawEllipse(ink,null,VolumeDot(i),1.5,1.5);if(i>=steps)dc.Pop();}dc.Pop();
         }

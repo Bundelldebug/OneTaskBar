@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -62,8 +62,7 @@ namespace OneTaskBar
         internal readonly BudsConnections Buds;
         internal readonly DesktopWidgets Widgets;
         readonly List<DockHost> docks=new List<DockHost>();
-        string dockPlacement="";
-        DockHost trayDock;
+        string dockPlacement="";        DockHost trayDock;
         bool trayBusy;
         readonly List<BatteryAnimation> charges=new List<BatteryAnimation>();
         readonly List<AppBarReservation> reservations=new List<AppBarReservation>();
@@ -126,6 +125,8 @@ namespace OneTaskBar
             keys=new VolumeKeys();
             keys.InterceptStart=()=>Desktop&&!Preferences.Current.NativeStartKey;
             keys.InterceptTaskView=()=>Desktop&&!Preferences.Current.NativeTaskView&&!disposed;
+            keys.InterceptSearch=()=>Desktop&&!Preferences.Current.NativeSearch&&!disposed;
+            keys.OnSearch=()=>Application.Current.Dispatcher.BeginInvoke(new Action(()=> {if(Desktop&&!disposed)ToggleSearch(null);}),DispatcherPriority.Input);
             keys.OnTaskView=()=>Application.Current.Dispatcher.BeginInvoke(new Action(OpenTaskView),DispatcherPriority.Input);
             keys.OnNativeStart=()=>Task.Run(()=>SystemPanels.Start());
             keys.InterceptAltTab=()=>Desktop&&!Preferences.Current.NativeAltTab&&!disposed;keys.AltTabGesture.Cycle=Switcher.Cycle;keys.AltTabGesture.Navigate=Switcher.Navigate;keys.AltTabGesture.Finish=Switcher.Finish;keys.AltTabGesture.AltReleased=Switcher.AltReleased;
@@ -176,7 +177,7 @@ namespace OneTaskBar
             SystemEvents.DisplaySettingsChanged+=DisplayChanged;SystemEvents.UserPreferenceChanged+=ThemeChanged;
             SystemEvents.PowerModeChanged+=PowerChanged;
             timer.Tick+=(s,e)=>Tick();
-            shellEvents=new ShellEvents(Application.Current.Dispatcher,()=> {appsAt=DateTime.MinValue;Tick();},Tick);
+            shellEvents=new ShellEvents(Application.Current.Dispatcher,()=> {appsAt=DateTime.MinValue;Tick();},SettleTicks);
             Preferences.Changed+=OptionsChanged;
             LayoutOrder.Changed+=LayoutChanged;DragReorder.Finished+=DragFinished;
         }
@@ -407,8 +408,8 @@ namespace OneTaskBar
             OpenTrayOverflow(dock);
         }
         int panelMotion;string pendingPanel;
-        internal async void ToggleNotifications(DockHost dock){await TogglePanel(true,dock,false);}
-        async Task TogglePanel(bool notifications,DockHost dock,bool forceCustom)
+        internal async void ToggleNotifications(DockHost dock,bool? top=null){await TogglePanel(true,dock,false,top);}
+        async Task TogglePanel(bool notifications,DockHost dock,bool forceCustom,bool? top=null)
         {
             CloseTrayOverflow();CloseDesktopOverview();
             Previews.Close();
@@ -422,7 +423,8 @@ namespace OneTaskBar
                 if(disposed||request!=panelMotion)return;
                 var screen=dock!=null?dock.Screen:Forms.Screen.FromPoint(Forms.Cursor.Position);double scale=dock!=null?dock.Scale:MonitorScale(screen,target),w=Math.Min(notifications?394:380,screen.Bounds.Width/scale-24),h=Math.Min(notifications?584:650,screen.Bounds.Height/scale-100);
                 if(notifications){Banners.Clear();Center.Refresh();}else Quick.Refresh(Power,Brightness,Audio.Value,Audio.Muted,Audio.Available,Brightness>=0);
-                bool fromTop=TopBarFor(screen);
+                // A panel opened from the top bar drops from the top; one opened from the dock stays at the dock.
+                bool fromTop=top.HasValue?top.Value&&TopBarFor(screen):dock==null&&TopBarFor(screen);
                 var position=fromTop?TopBarPopup(screen,scale,w,h,notifications):DockGeometry.Popup(screen.Bounds,scale,w,h,dock!=null?dock.Edge:DockGeometry.Edge);target.PopFromTop=fromTop;target.ShowAt(screen.Bounds,position.X,position.Y,w,h);target.Pop();target.Activate();if(notifications)Center.RefreshNotifications();
             }catch(Exception error){AppLog.Write("panel-switch",error.Message);}finally{if(request==panelMotion)pendingPanel=null;}
         }
@@ -477,7 +479,7 @@ namespace OneTaskBar
             finally {externalLaunching=false;}
         }
         internal async void OpenHomeSettings() {if(Quick!=null&&!await Quick.DismissAsync())return;if(!disposed)ShowWelcome();}
-        internal async void ToggleQuick(DockHost dock,bool forceCustom=false){await TogglePanel(false,dock,forceCustom);}
+        internal async void ToggleQuick(DockHost dock,bool forceCustom=false,bool? top=null){await TogglePanel(false,dock,forceCustom,top);}
         bool nativePanelBusy;
         internal async void ShowWindowsPanel(bool notifications,DockHost dock,int request=0)
         {
@@ -535,7 +537,7 @@ namespace OneTaskBar
         }
         // With the top status bar on, the notification center opens under the clock on the left and quick settings under
         // the status icons on the right, dropping down from the bar.
-        bool TopBarFor(Forms.Screen screen){return TopBarActive&&islandSpace!=null&&!islandSpace.Bottom&&islandSpace.Monitor==screen.DeviceName;}
+        bool TopBarFor(Forms.Screen screen){return topLeft!=null&&topLeft.IsVisible&&Desktop&&islandSpace!=null&&!islandSpace.Bottom&&islandSpace.Monitor==screen.DeviceName;}
         static Rect TopBarPopup(Forms.Screen screen,double scale,double width,double height,bool notifications)
         {
             double wide=screen.Bounds.Width/scale,tall=screen.Bounds.Height/scale,y=IslandSafeArea.Height+4;
@@ -565,10 +567,27 @@ namespace OneTaskBar
                 }catch(Exception error){AppLog.Write("watchdog",error.Message);if(!disposed)Application.Current.Shutdown(1);}
             }));
         }
-        internal async void ToggleSearch(DockHost dock,string query=null)
+        // A window that was just brought forward often goes fullscreen a moment later, with no event of its own.
+        // A few extra passes shortly after the focus change let the dock and the top band follow it promptly.
+        void SettleTicks()
+        {
+            Tick();
+            foreach(int delay in new[]{300,800,1600,3000})
+            {
+                var timer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(delay)};
+                timer.Tick+=(s,e)=>{timer.Stop();if(!disposed)Tick();};
+                timer.Start();
+            }
+        }        internal async void ToggleSearch(DockHost dock,string query=null)
         {
             CloseTrayOverflow();CloseDesktopOverview();
             Previews.Close();
+            // With the Dynamic Island on, the search opens out of it.
+            if(String.IsNullOrEmpty(query)&&!Preferences.Current.NativeSearch&&IslandEnabled&&Island!=null&&!(Finder!=null&&Finder.IsVisible))
+            {
+                foreach(var panel in new GlassWindow[]{Quick,Center,Detail,Drawer,StartMenu})if(panel!=null&&panel.IsVisible)panel.HideImmediately();
+                if(Island.ToggleSearch())return;
+            }
             if(Preferences.Current.NativeSearch){
                 RevealAutoHideDock(dock);
                 var closing=new List<Task<bool>>();foreach(var panel in new GlassWindow[]{Quick,Center,Detail,Drawer,Finder,StartMenu})if(panel!=null)closing.Add(panel.DismissAsync());

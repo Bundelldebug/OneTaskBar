@@ -1,11 +1,11 @@
-using System;
+﻿using System;
 
 namespace OneTaskBar
 {
     internal static class MediaFlightTiming
     {
-        internal const double MinimizeMilliseconds=380;
-        internal const double RestoreMilliseconds=420;
+        internal const double MinimizeMilliseconds=480;
+        internal const double RestoreMilliseconds=520;
 
         internal static double Smooth(double value)
         {
@@ -13,7 +13,7 @@ namespace OneTaskBar
             return t*t*t*(10+t*(-15+6*t));
         }
 
-        const double Stiffness=11;
+        const double Stiffness=8.5;
         // The critically damped step, rescaled so it lands exactly on 1 at the end of the flight.
         static double Spring(double x)
         {

@@ -167,7 +167,10 @@ namespace OneTaskBar
         internal void Frame(Rect initial,Rect capsule,double progress)
         {
             var pose=MediaWindowPose.At(initial,capsule,progress);
-            Shape(pose.Radius/pose.Width,pose.Radius/pose.Height);
+            // Rebuilding the rounded mesh is the costliest part of a frame. A change smaller than a thousandth of the
+            // plane is invisible, so the mesh is only touched when the corner shape really moved.
+            double rx=pose.Radius/pose.Width,ry=pose.Radius/pose.Height;
+            if(Double.IsNaN(shapedX)||Math.Abs(rx-shapedX)>.0008||Math.Abs(ry-shapedY)>.0008||progress<=0||progress>=1){Shape(rx,ry);shapedX=rx;shapedY=ry;}
             scale.ScaleX=pose.Width;
             scale.ScaleY=pose.Height;
             translation.OffsetX=pose.Center.X-host.X-host.Width/2;
@@ -175,8 +178,12 @@ namespace OneTaskBar
             tilt.Angle=pose.Tilt;
             turn.Angle=pose.Turn;
             viewport.Opacity=pose.Opacity;
-            if(HasOcclusion)defocused.Opacity=pose.Defocus;
-            else if(backdrop!=null)backdrop.SetOpacity(pose.Defocus);
+            // The blur layer is a full-display surface: its opacity moves in small steps and only when a step is crossed.
+            double blur=Math.Round(pose.Defocus*40)/40;
+            if(blur==lastBlur)return;
+            lastBlur=blur;
+            if(HasOcclusion)defocused.Opacity=blur;
+            else if(backdrop!=null)backdrop.SetOpacity(blur);
         }
 
         void Shape(double rx,double ry)
@@ -204,6 +211,7 @@ namespace OneTaskBar
             mesh.TextureCoordinates=coordinates;
         }
 
+        double shapedX=Double.NaN,shapedY,lastBlur=-1;
         internal FrameworkElement Scene {get{return viewport;}}
     }
 
