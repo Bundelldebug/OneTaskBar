@@ -54,11 +54,29 @@ namespace OneTaskBar
         {
             Refresh();if(!Enabled)return;
             var current=new HashSet<string>(items.Select(Key),StringComparer.Ordinal);var fresh=items.Where(n=>!known.Contains(Key(n))&&Fresh(n,DateTimeOffset.Now)).OrderByDescending(n=>n.Created).Take(3).Reverse().ToList();
+            // The small bottom popups do not wait for the native toast to be seen: some of these apps post history-only toasts.
+            var direct=baseline?items.Where(n=>!known.Contains(Key(n))&&IsGalaxyConnect(n)&&(DateTimeOffset.Now-n.Created).TotalSeconds>=-5&&(DateTimeOffset.Now-n.Created).TotalSeconds<=25).OrderBy(n=>n.Created).Take(3).ToList():new List<NotificationEntry>();
             if(shell.Island!=null)shell.Island.RetainNotification(current);
             foreach(var banner in visible.ToArray())if(!banner.Retain(current))Close(banner,false);Layout();
             known.Clear();known.UnionWith(current);if(!baseline){baseline=true;if(gate!=null)gate.Refresh();return;}
             foreach(string key in pending.Keys.Where(k=>!current.Contains(k)||!Fresh(pending[k],DateTimeOffset.Now)).ToArray())pending.Remove(key);
             foreach(var item in fresh)pending[Key(item)]=item;while(pending.Count>12)pending.Remove(pending.OrderBy(p=>p.Value.Created).First().Key);Drain();
+            foreach(var item in direct)ShowCompact(item);
+        }
+        async void ShowCompact(NotificationEntry item)
+        {
+            int token=revision;
+            try
+            {
+                await Task.Delay(1500);
+                if(disposed||token!=revision||!Enabled||!pending.Remove(Key(item)))return;
+                var quiet=await shell.Toggles.Disturb.RefreshAsync();
+                if(disposed||token!=revision||!Enabled)return;
+                int state;
+                bool allowed=shell.DisplayAwake&&quiet.Available&&!quiet.Enabled&&!(shell.Center!=null&&shell.Center.IsVisible)&&SHQueryUserNotificationState(out state)==0&&state==5;
+                if(allowed&&AppAllows(item.AppId))Show(item);
+            }
+            catch(Exception error){AppLog.Once("notification-compact",error.Message);}
         }
         // The listener history does not preserve SuppressPopup reliably. A popup
         // must also have appeared in the native toast view before it can be replaced.
@@ -107,7 +125,7 @@ namespace OneTaskBar
             string id=item.AppId??"",app=item.App??"";
             if(id.IndexOf("SamsungContinuityService",StringComparison.OrdinalIgnoreCase)>=0||app=="갤럭시 커넥트"||String.Equals(app,"Galaxy Connect",StringComparison.OrdinalIgnoreCase))return true;
             // Samsung Internet's helper reports through the same small bottom popup.
-            return app.IndexOf("Browser Helper",StringComparison.OrdinalIgnoreCase)>=0||id.IndexOf("SamsungBrowserHelper",StringComparison.OrdinalIgnoreCase)>=0||id.IndexOf("SamsungInternet",StringComparison.OrdinalIgnoreCase)>=0||id.IndexOf("Samsung.Browser",StringComparison.OrdinalIgnoreCase)>=0||app.IndexOf("Samsung Internet",StringComparison.OrdinalIgnoreCase)>=0||app.IndexOf("삼성 인터넷",StringComparison.Ordinal)>=0||app.IndexOf("삼성 브라우저",StringComparison.Ordinal)>=0;
+            return id.IndexOf("SamsungAccountPluginforSa",StringComparison.OrdinalIgnoreCase)>=0||app.IndexOf("Browser Helper",StringComparison.OrdinalIgnoreCase)>=0||id.IndexOf("SamsungBrowserHelper",StringComparison.OrdinalIgnoreCase)>=0||id.IndexOf("SamsungInternet",StringComparison.OrdinalIgnoreCase)>=0||id.IndexOf("Samsung.Browser",StringComparison.OrdinalIgnoreCase)>=0||app.IndexOf("Samsung Internet",StringComparison.OrdinalIgnoreCase)>=0||app.IndexOf("삼성 인터넷",StringComparison.Ordinal)>=0||app.IndexOf("삼성 브라우저",StringComparison.Ordinal)>=0;
         }
         void Layout()
         {
@@ -188,7 +206,7 @@ namespace OneTaskBar
             if(compact)
             {
                 sender.Visibility=Visibility.Collapsed;
-                hit.HorizontalContentAlignment=HorizontalAlignment.Center;title.TextAlignment=body.TextAlignment=TextAlignment.Center;
+                hit.HorizontalContentAlignment=HorizontalAlignment.Center;hit.VerticalContentAlignment=VerticalAlignment.Center;content.VerticalAlignment=VerticalAlignment.Center;text.VerticalAlignment=VerticalAlignment.Center;title.TextAlignment=body.TextAlignment=TextAlignment.Center;
                 title.FontSize=13;title.TextWrapping=TextWrapping.NoWrap;title.MaxHeight=20;title.Margin=new Thickness(0,1,8,1);
                 body.FontSize=11.5;body.TextWrapping=TextWrapping.NoWrap;body.MaxHeight=18;
                 icon.Width=icon.Height=28;icon.VerticalAlignment=VerticalAlignment.Center;icon.Margin=new Thickness(0,0,9,0);

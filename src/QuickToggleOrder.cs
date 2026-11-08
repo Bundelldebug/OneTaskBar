@@ -7,7 +7,9 @@ namespace OneTaskBar
 {
     internal sealed class QuickToggleOrder
     {
-        internal static readonly string[] Defaults=QuickActionCatalog.Specs.Select(s=>s[0]).ToArray();
+        // The arrangement the app ships with; any key it does not name keeps its catalog position at the end.
+        static readonly string[] Preferred={"mute","theme","dnd","efficiency","wifi","bluetooth","manager","slider-scroll","numbers","awake","startup","animations","quick-share","ai-select","second-screen","devices","windows","capture","buds","blur","charge-motion","hover","running-dots","seconds","notification-popups","buds-popup","dock-theme","solid-dock","duo","window-drop","cover","charge-sound","emergency-exit","native-start","native-search","native-switcher","native-center","native-quick","native-button","notification-sync","storage-share","camera-share"};
+        internal static readonly string[] Defaults=Preferred.Where(k=>QuickActionCatalog.Specs.Any(s=>s[0]==k)).Concat(QuickActionCatalog.Specs.Select(s=>s[0])).Distinct(StringComparer.Ordinal).ToArray();
         readonly string file;
         internal string[] Keys {get;private set;}
         readonly HashSet<string> outside=new HashSet<string>(StringComparer.Ordinal);

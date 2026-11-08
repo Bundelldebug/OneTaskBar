@@ -180,11 +180,11 @@ namespace OneTaskBar
             else if(kind=="devices") {dc.DrawRoundedRectangle(null,pen,new Rect(7,3,10,18),2,2);line(10,18,14,18);dc.DrawGeometry(null,pen,Geometry.Parse("M3,8 L1,12 3,16 M21,8 L23,12 21,16"));}
             else if(kind=="calendar") {dc.DrawRoundedRectangle(null,pen,new Rect(3,5,18,17),3,3);line(3,10,21,10);line(8,2,8,7);line(16,2,16,7);dc.DrawEllipse(brush,null,new Point(8,15),1.2,1.2);dc.DrawEllipse(brush,null,new Point(15,15),1.2,1.2);}
             else if(kind=="focus") {dc.DrawEllipse(null,pen,new Point(12,12),10,10);dc.DrawGeometry(brush,null,Geometry.Parse("M12,3 L12,12 20,7 A9,9 0 0 0 12,3 Z"));}
-            else if(kind=="smart-select") {dc.DrawGeometry(null,pen,Geometry.Parse("M12,2 C12,8 14,10 20,12 C14,14 12,16 12,22 C12,16 10,14 4,12 C10,10 12,8 12,2 Z"));dc.DrawGeometry(null,pen,Geometry.Parse("M19,3 L19,7 M17,5 L21,5"));}
-            else if(kind=="second-screen") {dc.DrawRoundedRectangle(null,pen,new Rect(2,4,15,11),2,2);line(6,19,13,19);line(9.5,15,9.5,19);dc.DrawRoundedRectangle(null,pen,new Rect(15,9,7,13),1.8,1.8);}
-            else if(kind=="storage-share") {dc.DrawGeometry(null,pen,Geometry.Parse("M2,6 L2,4 Q2,2 4,2 L9,2 11,5 18,5 Q20,5 20,7 L20,16 Q20,18 18,18 L4,18 Q2,18 2,16 Z"));dc.DrawGeometry(null,pen,Geometry.Parse("M14,14 L22,14 M19,11 L22,14 19,17 M10,22 L10,22"));}
-            else if(kind=="quick-share") {dc.DrawEllipse(null,pen,new Point(18,5),3,3);dc.DrawEllipse(null,pen,new Point(18,19),3,3);dc.DrawEllipse(null,pen,new Point(6,12),3,3);line(8.7,10.6,15.3,6.4);line(8.7,13.4,15.3,17.6);}
-            else if(kind=="camera-share") {dc.DrawGeometry(null,pen,Geometry.Parse("M2,8 Q2,6 4,6 L7,6 9,3 15,3 17,6 20,6 Q22,6 22,8 L22,18 Q22,20 20,20 L4,20 Q2,20 2,18 Z"));dc.DrawEllipse(null,pen,new Point(12,13),4,4);}
+            else if(kind=="smart-select") {dc.DrawRoundedRectangle(null,pen,new Rect(3,3,18,18),4,4);dc.DrawGeometry(null,pen,Geometry.Parse("M12,6.5 C12,10 13,11 16.5,12 C13,13 12,14 12,17.5 C12,14 11,13 7.5,12 C11,11 12,10 12,6.5 Z"));}
+            else if(kind=="second-screen") {dc.DrawRoundedRectangle(null,pen,new Rect(2,5,20,13),2.2,2.2);dc.DrawRoundedRectangle(null,pen,new Rect(9,8,13,13),2,2);line(5,21,9,21);}
+            else if(kind=="storage-share") {dc.DrawGeometry(null,pen,Geometry.Parse("M2.5,7 L2.5,5.5 Q2.5,4 4,4 L9,4 11.5,6.5 20,6.5 Q21.5,6.5 21.5,8 L21.5,18 Q21.5,19.5 20,19.5 L4,19.5 Q2.5,19.5 2.5,18 Z"));dc.DrawGeometry(null,pen,Geometry.Parse("M8,14 L16,14 M13,11 L16,14 13,17"));}
+            else if(kind=="quick-share") {dc.DrawGeometry(null,pen,Geometry.Parse("M4.5,10 A8,8 0 0 1 18.5,6.5 M16,5 L18.7,6.6 17.3,9.4"));dc.DrawGeometry(null,pen,Geometry.Parse("M19.5,14 A8,8 0 0 1 5.5,17.5 M8,19 L5.3,17.4 6.7,14.6"));dc.DrawEllipse(null,pen,new Point(12,12),2.6,2.6);}
+            else if(kind=="camera-share") {dc.DrawGeometry(null,pen,Geometry.Parse("M2.5,8.5 Q2.5,6.5 4.5,6.5 L7.5,6.5 9,4 15,4 16.5,6.5 19.5,6.5 Q21.5,6.5 21.5,8.5 L21.5,18 Q21.5,20 19.5,20 L4.5,20 Q2.5,20 2.5,18 Z"));dc.DrawEllipse(null,pen,new Point(12,13),4.2,4.2);dc.DrawEllipse(null,pen,new Point(12,13),1.3,1.3);}
             else { dc.DrawEllipse(null,pen,new Point(12,12),8,8); dc.DrawEllipse(brush,null,new Point(12,12),2,2); }
             dc.Pop(); dc.Pop();
         }
