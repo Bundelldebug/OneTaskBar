@@ -45,6 +45,45 @@ namespace OneTaskBar
             }
         }
 
+        // The flight plane must be see-through everywhere except the window picture, and it must not be a layered window.
+        internal static async Task PlaneTransparency()
+        {
+            using(var back=new System.Windows.Forms.Form {FormBorderStyle=System.Windows.Forms.FormBorderStyle.None,StartPosition=System.Windows.Forms.FormStartPosition.Manual,
+                Bounds=new System.Drawing.Rectangle(1040,40,900,700),BackColor=System.Drawing.Color.FromArgb(255,0,255),ShowInTaskbar=false,TopMost=true})
+            {
+                back.Show();
+                var picture=ArtworkPalette.Sample(Color.FromRgb(0,0,255));
+                var initial=new Rect(1300,250,300,200);
+                var plane=new MediaWindowPlane(picture,initial,new Rect(1120,120,44,44));
+                try
+                {
+                    plane.Frame(initial,new Rect(1120,120,44,44),0);
+                    plane.Present();
+                    var handle=new WindowInteropHelper(plane).Handle;
+                    Require((Native.GetWindowLong(handle,-20)&0x80000)==0,"flight plane is not a layered window");
+                    await Task.Delay(400);
+                    var inside=ScreenPixel(1450,350);
+                    var outside=ScreenPixel(1110,110);
+                    Require(inside.B>150&&inside.R<100,"flight plane shows the window picture");
+                    Require(outside.R>200&&outside.B>200&&outside.G<80,"flight plane is transparent outside the picture: "+outside.R+","+outside.G+","+outside.B);
+                }
+                finally
+                {
+                    plane.Close();
+                    back.Close();
+                }
+            }
+        }
+        static System.Drawing.Color ScreenPixel(int x,int y)
+        {
+            using(var bitmap=new System.Drawing.Bitmap(1,1))
+            using(var graphics=System.Drawing.Graphics.FromImage(bitmap))
+            {
+                graphics.CopyFromScreen(x,y,0,0,new System.Drawing.Size(1,1));
+                return bitmap.GetPixel(0,0);
+            }
+        }
+
         internal static void Check()
         {
             var window=new Rect(100,90,1280,720);

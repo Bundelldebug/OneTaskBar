@@ -31,7 +31,9 @@ namespace OneTaskBar
             Title="One TaskBar · 미디어 전환";
             WindowStyle=WindowStyle.None;
             ResizeMode=ResizeMode.NoResize;
-            AllowsTransparency=true;
+            // Per-pixel transparency through DWM instead of a layered window: a layered window copies every pixel of this
+            // screen-sized surface back to system memory on each frame, which capped the flight near 45 fps.
+            AllowsTransparency=false;
             Background=Brushes.Transparent;
             ShowActivated=false;
             ShowInTaskbar=false;
@@ -83,6 +85,7 @@ namespace OneTaskBar
                 Native.SetWindowLong(window,-20,(Native.GetWindowLong(window,-20)|0x080000A0)&~0x40000);
                 int disabled=1;
                 DwmSetWindowAttribute(window,3,ref disabled,4);
+                Native.ClearPreviewBackground(this);
                 Native.SetWindowPos(window,new IntPtr(-1),(int)host.X,(int)host.Y,(int)host.Width,(int)host.Height,0x10);
             };
             Closed+=(s,e)=> {

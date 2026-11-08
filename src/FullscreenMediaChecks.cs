@@ -139,6 +139,7 @@ namespace OneTaskBar
                         Require(cloaked==0,"independent watchdog restores source after an interrupted transition");
                     }
                     await MediaFlightChecks.CaptureRace(view);
+                    await MediaFlightChecks.PlaneTransparency();
                     using(var motion=new MediaWindowMotion(null)){
                         var source=new System.Windows.Interop.WindowInteropHelper(view).Handle;var foreground=Native.GetForegroundWindow();
                         view.Width=800;view.Height=600;view.Update(media);view.UpdateLayout();
