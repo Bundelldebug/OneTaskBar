@@ -50,7 +50,7 @@ namespace OneTaskBar
                 if(!DynamicIslandLayout.Clear(monitor.Bounds,work,dpi,windows)){CloseIsland();return;}
                 if(IslandEnabled)
                 {
-                    if(Island==null)Island=new DynamicIsland(Media,SeekMedia,()=>ShowDetail("sound"),OpenMediaApplication,()=>PrepareWindowSwitcher(),id=>MediaApplication.Resolve(id,Running.Concat(Apps)),IslandFind,app=>LaunchApp(app,System.Windows.Input.Keyboard.Modifiers),text=>LauncherSearch.OpenWeb(LauncherSearch.WebAddress(text)));
+                    if(Island==null)Island=new DynamicIsland(Media,SeekMedia,()=>ShowDetail("sound"),OpenMediaApplication,()=>PrepareWindowSwitcher(),id=>MediaApplication.Resolve(id,Running.Concat(Apps)),IslandFind,app=>LaunchApp(app,System.Windows.Input.Keyboard.Modifiers),text=>LauncherSearch.OpenWeb(LauncherSearch.WebAddress(text)),setting=>setting.Open(OpenHomeSettings));
                     Lap("island-prep");Island.Present(Services.Media,Services.OutputName,monitor,dpi,work,islandSpace.Bottom);Lap("island-present");
                 }
                 else if(Island!=null){Island.Close();Island=null;}

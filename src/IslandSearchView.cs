@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -20,15 +21,16 @@ namespace OneTaskBar
         readonly Action<AppEntry> launch;
         readonly Action<string> web;
         readonly Action close;
+        readonly Action<SearchSetting> settings;
         readonly List<Button> buttons=new List<Button>();
         readonly List<Action> actions=new List<Action>();
         int selected;
         internal Action Changed;
         internal int RowCount {get{return actions.Count;}}
         internal double DesiredHeight {get{return actions.Count==0?HeaderHeight:HeaderHeight+actions.Count*RowHeight+8;}}
-        internal IslandSearchView(Func<string,List<AppEntry>> find,Action<AppEntry> launch,Action<string> web,Action close)
+        internal IslandSearchView(Func<string,List<AppEntry>> find,Action<AppEntry> launch,Action<string> web,Action close,Action<SearchSetting> settings=null)
         {
-            this.find=find;this.launch=launch;this.web=web;this.close=close;
+            this.find=find;this.launch=launch;this.web=web;this.close=close;this.settings=settings;
             RowDefinitions.Add(new RowDefinition {Height=new GridLength(HeaderHeight)});
             RowDefinitions.Add(new RowDefinition());
             var header=new Grid {Margin=new Thickness(18,0,18,0)};
@@ -69,7 +71,10 @@ namespace OneTaskBar
             rows.Children.Clear();buttons.Clear();actions.Clear();selected=0;
             string text=Query.Text.Trim();
             var apps=find(text)??new List<AppEntry>();
-            foreach(var entry in apps)
+            var matched=text.Length>0&&settings!=null?LauncherSearch.Settings.Where(s=>LauncherSearch.Matches(s.Name+" "+s.Keywords,text)).ToList():new List<SearchSetting>();
+            // Rows: apps first, up to two settings kept in reach, and the web row always last.
+            int appRows=Math.Max(0,(int)MaxRows-(text.Length>0?1:0)-Math.Min(matched.Count,2));
+            foreach(var entry in apps.Take(appRows))
             {
                 var app=entry;
                 var line=new StackPanel {Orientation=Orientation.Horizontal};
@@ -77,6 +82,19 @@ namespace OneTaskBar
                 var name=Paint.TextBlock(app.Name,14,Paint.ControlWhite);name.TextTrimming=TextTrimming.CharacterEllipsis;name.MaxWidth=250;
                 line.Children.Add(icon);line.Children.Add(name);
                 Add(Kinded(line,"앱"),()=>launch(app),app.Name);
+            }
+            // Windows and One TaskBar settings are found the same way the launcher finds them.
+            if(matched.Count>0)
+            {
+                foreach(var found in matched.Take(Math.Max(0,(int)MaxRows-1-actions.Count)))
+                {
+                    var setting=found;
+                    var line=new StackPanel {Orientation=Orientation.Horizontal};
+                    line.Children.Add(new Glyph(setting.Icon,18){Color=Paint.ControlWhite,Margin=new Thickness(2,0,11,0),VerticalAlignment=VerticalAlignment.Center});
+                    var label=Paint.TextBlock(setting.Name,14,Paint.ControlWhite);label.TextTrimming=TextTrimming.CharacterEllipsis;label.MaxWidth=250;
+                    line.Children.Add(label);
+                    Add(Kinded(line,"설정"),()=>settings(setting),setting.Name);
+                }
             }
             if(text.Length>0)
             {

@@ -27,6 +27,11 @@ namespace OneTaskBar
                     var source=new Window {Title="검사 창 "+(i+1),Width=500,Height=320,Left=100+i*40,Top=130+i*30,Background=new SolidColorBrush(new[]{Colors.SteelBlue,Colors.DarkSeaGreen,Colors.IndianRed}[i]),Content=Paint.TextBlock("창 미리보기 "+(i+1),30,Brushes.White)};source.Show();sources.Add(source);
                     page.Windows.Add(new SwitchItem {Window=new WindowInteropHelper(source).Handle,Title=source.Title,App=new AppEntry {Name=source.Title,Target="fixture:"+i}});
                 }
+                var shapes=new[]{1.78,1.6,.6,2.4,1.33,1.0,1.78};var packed=DesktopPacking.Pack(shapes,1500,760);
+                Require(packed.Length==shapes.Length&&packed.All(r=>r.Left>=-.5&&r.Right<=1500.5&&r.Top>=-.5&&r.Bottom<=760.5),"packed window cards stay inside the workspace");
+                bool crossing=false;for(int a=0;a<packed.Length;a++)for(int b=a+1;b<packed.Length;b++)if(packed[a].IntersectsWith(packed[b])&&Rect.Intersect(packed[a],packed[b]).Width>.5&&Rect.Intersect(packed[a],packed[b]).Height>.5)crossing=true;
+                Require(!crossing,"packed window cards never overlap");
+                Require(Enumerable.Range(0,shapes.Length).All(i=>Math.Abs((packed[i].Width-DesktopPacking.SideChrome)/(packed[i].Height-DesktopPacking.VerticalChrome)-shapes[i])<.02),"each packed card keeps its window's shape");
                 int commands=0;view=new DesktopOverview((id,window,operation)=>commands++,window=>{});view.Present(snapshot,System.Windows.Forms.Screen.PrimaryScreen.Bounds);await Task.Delay(320);
                 Require(view.PreviewCount==3&&view.RegisteredThumbnails==3&&!view.EmptyVisible&&!view.TransitionActive,"three live previews finish their entry animation");
                 var previews=app.Windows.OfType<SwitchThumbnail>().ToArray();Require(previews.All(p=>p.ClearBackground&&p.Background==Brushes.Transparent),"thumbnail hosts have no opaque rectangle behind their fading image");int moves=previews.Sum(p=>p.PositionChanges);

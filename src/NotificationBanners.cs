@@ -93,16 +93,39 @@ namespace OneTaskBar
         {
             if(disposed)return;
             shell.NotificationSound.Notify(item);
-            if(shell.Buds.ShowNative(item)||shell.IslandNotification(item,OpenEntry))return;
+            bool connect=IsGalaxyConnect(item);
+            if(!connect&&(shell.Buds.ShowNative(item)||shell.IslandNotification(item,OpenEntry)))return;
             var existing=visible.FirstOrDefault(b=>String.Equals(NotificationStack.AppKey(b.Entry),NotificationStack.AppKey(item),StringComparison.OrdinalIgnoreCase));
             if(existing!=null){existing.Update(item);Layout();return;}
             while(visible.Count>=3)Close(visible[0],false);
-            var banner=new NotificationBanner(item,Open,Close);visible.Add(banner);Shown++;Layout();banner.Appear();expiry.Start();
+            var banner=new NotificationBanner(item,Open,Close,connect);visible.Add(banner);Shown++;Layout();banner.Appear();expiry.Start();
+        }
+        // Galaxy Connect's phone notifications are small and rise from the bottom centre instead of the top-right stack.
+        internal static bool IsGalaxyConnect(NotificationEntry item)
+        {
+            if(item==null)return false;
+            return (item.AppId??"").IndexOf("SamsungContinuityService",StringComparison.OrdinalIgnoreCase)>=0||String.Equals(item.App,"갤럭시 커넥트",StringComparison.Ordinal)||String.Equals(item.App,"Galaxy Connect",StringComparison.OrdinalIgnoreCase);
         }
         void Layout()
         {
             if(visible.Count==0)return;var screen=Forms.Screen.PrimaryScreen??Forms.Screen.FromPoint(Forms.Cursor.Position);double scale=visible[0].IsVisible?Math.Max(96,Native.GetDpiForWindow(new WindowInteropHelper(visible[0]).Handle))/96.0:ShellController.MonitorScale(screen,visible[0]),width=Math.Min(370,screen.WorkingArea.Width/scale-24),y=Math.Max(12,(screen.WorkingArea.Top-screen.Bounds.Top)/scale+12);
-            foreach(var banner in visible){double h=banner.DesiredHeight;if(y+h>screen.WorkingArea.Height/scale-24){Close(banner,false);break;}banner.PlaceBanner(screen.Bounds,(screen.WorkingArea.Right-screen.Bounds.Left)/scale-width-12,y,width,h);y+=h+9;}
+            foreach(var banner in visible.Where(b=>!b.Compact).ToArray()){double h=banner.DesiredHeight;if(y+h>screen.WorkingArea.Height/scale-24){Close(banner,false);break;}banner.PlaceBanner(screen.Bounds,(screen.WorkingArea.Right-screen.Bounds.Left)/scale-width-12,y,width,h);y+=h+9;}
+            LayoutCompact(screen,scale);
+        }
+        void LayoutCompact(Forms.Screen screen,double scale)
+        {
+            double width=Math.Min(330,screen.Bounds.Width/scale-24),bottom=(screen.WorkingArea.Bottom-screen.Bounds.Top)/scale-14;
+            // The dock floats over the work area, so the popup rises from just above it.
+            var dock=shell.DockFor(screen);
+            Native.RectI apps;
+            if(dock!=null&&dock.Apps.IsVisible&&Native.GetWindowRect(new WindowInteropHelper(dock.Apps).Handle,out apps)&&apps.Top>screen.Bounds.Top+screen.Bounds.Height/2)bottom=Math.Min(bottom,(apps.Top-screen.Bounds.Top)/scale-10);
+            foreach(var banner in visible.Where(b=>b.Compact).Reverse().ToArray())
+            {
+                double h=banner.DesiredHeight;
+                if(bottom-h<12){Close(banner,false);continue;}
+                banner.PlaceBanner(screen.Bounds,(screen.Bounds.Width/scale-width)/2,bottom-h,width,h);
+                bottom-=h+8;
+            }
         }
         async void Open(NotificationBanner banner)
         {
@@ -149,14 +172,23 @@ namespace OneTaskBar
         internal bool HasIcon {get{return icon.Visibility==Visibility.Visible;}}
         internal bool HasArtwork {get{return artwork.Visibility==Visibility.Visible;}}
         internal NotificationEntry Entry;internal DateTime Expires;internal bool Opening,ClosedFlag;
-        internal double DesiredHeight {get{return (String.IsNullOrWhiteSpace(Entry.Body)?98:126)+(Entry.Artwork!=null?127:0);}}
-        internal NotificationBanner(NotificationEntry entry,Action<NotificationBanner> open,Action<NotificationBanner,bool> close)
+        internal double DesiredHeight {get{return Compact?(String.IsNullOrWhiteSpace(Entry.Body)?54:68):(String.IsNullOrWhiteSpace(Entry.Body)?98:126)+(Entry.Artwork!=null?127:0);}}
+        internal readonly bool Compact;
+        internal NotificationBanner(NotificationEntry entry,Action<NotificationBanner> open,Action<NotificationBanner,bool> close,bool compact=false)
         {
-            Title="One TaskBar · 알림 팝업";ShowActivated=false;Focusable=false;Radius=27;StableSurface=true;Dark=true;Surface.CornerRadius=new CornerRadius(Radius);Surface.Background=QuickPanel.Glass;Surface.BorderBrush=Paint.Brush("#36FFFFFF");Surface.BorderThickness=new Thickness(.7);
+            Compact=compact;
+            Title="One TaskBar · 알림 팝업";ShowActivated=false;Focusable=false;Radius=compact?22:27;StableSurface=true;Dark=true;Surface.CornerRadius=new CornerRadius(Radius);Surface.Background=QuickPanel.Glass;Surface.BorderBrush=Paint.Brush("#36FFFFFF");Surface.BorderThickness=new Thickness(.7);
             var content=new Grid();content.ColumnDefinitions.Add(iconColumn);content.ColumnDefinitions.Add(new ColumnDefinition());content.Children.Add(icon);
             var text=new StackPanel();sender.TextTrimming=TextTrimming.CharacterEllipsis;text.Children.Add(sender);title.FontWeight=FontWeights.SemiBold;title.TextWrapping=TextWrapping.Wrap;title.TextTrimming=TextTrimming.CharacterEllipsis;title.MaxHeight=39;title.Margin=new Thickness(0,5,12,3);text.Children.Add(title);body.TextWrapping=TextWrapping.Wrap;body.TextTrimming=TextTrimming.CharacterEllipsis;body.MaxHeight=34;body.Margin=new Thickness(0,0,4,0);text.Children.Add(body);Grid.SetColumn(text,1);content.Children.Add(text);
-            text.Children.Add(artwork);var row=new Grid();var hit=Paint.Button(content,()=>open(this),"알림 열기");hit.Background=Brushes.Transparent;hit.Padding=new Thickness(17,14,33,13);hit.HorizontalContentAlignment=HorizontalAlignment.Stretch;row.Children.Add(hit);var dismiss=Paint.Button(new Glyph("close",13),()=>close(this,true),"팝업 닫기 · 알림 기록 유지");dismiss.Background=Brushes.Transparent;dismiss.Width=dismiss.Height=28;dismiss.Padding=new Thickness(6);dismiss.HorizontalAlignment=HorizontalAlignment.Right;dismiss.VerticalAlignment=VerticalAlignment.Top;dismiss.Margin=new Thickness(0,7,7,0);row.Children.Add(dismiss);Surface.Child=row;TransitionContent=row;
+            text.Children.Add(artwork);var row=new Grid();var hit=Paint.Button(content,()=>open(this),"알림 열기");hit.Background=Brushes.Transparent;hit.Padding=compact?new Thickness(14,9,30,9):new Thickness(17,14,33,13);hit.HorizontalContentAlignment=HorizontalAlignment.Stretch;row.Children.Add(hit);var dismiss=Paint.Button(new Glyph("close",13),()=>close(this,true),"팝업 닫기 · 알림 기록 유지");dismiss.Background=Brushes.Transparent;dismiss.Width=dismiss.Height=28;dismiss.Padding=new Thickness(6);dismiss.HorizontalAlignment=HorizontalAlignment.Right;dismiss.VerticalAlignment=VerticalAlignment.Top;dismiss.Margin=new Thickness(0,7,7,0);row.Children.Add(dismiss);Surface.Child=row;TransitionContent=row;
             SourceInitialized+=(s,e)=> {var h=new WindowInteropHelper(this).Handle;Native.SetWindowLong(h,-20,Native.GetWindowLong(h,-20)|0x08000000);};
+            if(compact)
+            {
+                sender.Visibility=Visibility.Collapsed;
+                title.FontSize=13;title.TextWrapping=TextWrapping.NoWrap;title.MaxHeight=20;title.Margin=new Thickness(0,1,8,1);
+                body.FontSize=11.5;body.TextWrapping=TextWrapping.NoWrap;body.MaxHeight=18;
+                icon.Width=icon.Height=28;icon.VerticalAlignment=VerticalAlignment.Center;icon.Margin=new Thickness(0,0,9,0);
+            }
             motion.Tick+=(s,e)=>Frame();Closed+=(s,e)=>{ClosedFlag=true;motion.Stop();motionWatch.Stop();if(completion!=null)completion.TrySetResult(false);};Update(entry);
         }
         internal void PlaceBanner(System.Drawing.Rectangle screen,double x,double y,double width,double height)
@@ -174,12 +206,12 @@ namespace OneTaskBar
         {
             double t=Math.Min(1,motionWatch.Elapsed.TotalMilliseconds/(to==1?280:160)),ease=SpringEase.Out(t);progress=from+(to-from)*ease;Position();if(t>=1){motion.Stop();motionWatch.Stop();completion.TrySetResult(true);}
         }
-        void Position(){Opacity=progress;Native.BlurOpacity(this,progress);Native.Place(this,monitor,bounds.X+(1-progress)*8,bounds.Y,bounds.Width,bounds.Height);}
+        void Position(){Opacity=progress;Native.BlurOpacity(this,progress);if(Compact)Native.Place(this,monitor,bounds.X,bounds.Y+(1-progress)*16,bounds.Width,bounds.Height);else Native.Place(this,monitor,bounds.X+(1-progress)*8,bounds.Y,bounds.Width,bounds.Height);}
         internal void Update(NotificationEntry entry)
         {
             entries.RemoveAll(n=>NotificationBanners.Key(n)==NotificationBanners.Key(entry));entries.Add(entry);entries.Sort((a,b)=>b.Created.CompareTo(a.Created));if(entries.Count>32)entries.RemoveRange(32,entries.Count-32);Present();Expires=DateTime.UtcNow.AddSeconds(7);
         }
         internal bool Retain(HashSet<string> current){if(entries.RemoveAll(n=>!current.Contains(NotificationBanners.Key(n)))>0&&entries.Count>0)Present();return entries.Count>0;}
-        void Present(){var entry=entries[0];Entry=entry;sender.Text=entry.App+(entries.Count>1?"  ·  알림 "+entries.Count+"개":"");title.Text=entry.Title;body.Text=entry.Body;body.Visibility=String.IsNullOrWhiteSpace(entry.Body)?Visibility.Collapsed:Visibility.Visible;var source=NotificationStackView.CardIcon(entry);icon.Child=source!=null?AppIcons.Visual(source,32):null;icon.Visibility=source!=null?Visibility.Visible:Visibility.Collapsed;iconColumn.Width=new GridLength(source!=null?45:0);artwork.Source=entry.Artwork;artwork.Visibility=entry.Artwork!=null?Visibility.Visible:Visibility.Collapsed;}
+        void Present(){var entry=entries[0];Entry=entry;sender.Text=entry.App+(entries.Count>1?"  ·  알림 "+entries.Count+"개":"");title.Text=entry.Title;body.Text=entry.Body;body.Visibility=String.IsNullOrWhiteSpace(entry.Body)?Visibility.Collapsed:Visibility.Visible;var source=NotificationStackView.CardIcon(entry);icon.Child=source!=null?AppIcons.Visual(source,Compact?26:32):null;icon.Visibility=source!=null?Visibility.Visible:Visibility.Collapsed;iconColumn.Width=new GridLength(source!=null?(Compact?37:45):0);artwork.Source=entry.Artwork;artwork.Visibility=entry.Artwork!=null&&!Compact?Visibility.Visible:Visibility.Collapsed;}
     }
 }

@@ -8,14 +8,18 @@ namespace OneTaskBar
     {
         internal TrayOverflowWindow TrayPopup;
         int trayRequest;
-        internal async void OpenTrayOverflow(DockHost dock)
+        // Set while the panel was opened from a top bar: it hangs below that button instead of rising from the dock.
+        TrayPlacement trayTop;
+        internal TrayPlacement TrayAnchorNow(){return trayTop??(trayDock!=null?trayDock.TrayAnchor():null);}
+        internal async void OpenTrayOverflow(DockHost dock,TrayPlacement placement=null)
         {
             if(disposed||!Desktop||trayBusy)return;
             if(TrayPopup!=null&&TrayPopup.IsVisible){TrayPopup.Dismiss();return;}
             trayDock=dock??docks.FirstOrDefault();
             if(trayDock==null)return;
+            trayTop=placement;
             int request=++trayRequest;trayBusy=true;
-            var anchor=trayDock.TrayAnchor();
+            var anchor=placement??trayDock.TrayAnchor();
             var metadata=Apps.Concat(Running).ToArray();
             CloseDesktopOverview();Switcher.Cancel();Previews.Close();
             foreach(var panel in new GlassWindow[]{StartMenu,Quick,Center,Detail,Drawer,Finder})if(panel!=null)panel.HideImmediately();

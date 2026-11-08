@@ -111,7 +111,7 @@ namespace OneTaskBar
                 }
                 if(QuickActionCatalog.Commands.Contains(key))
                 {
-                    pair.Value.RefreshState(key=="buds"&&(shell.Buds.HasConnectedBuds||BudsInfo.IsBuds(shell.Services.OutputName)),QuickActionCatalog.Available(key,shell));
+                    pair.Value.RefreshState(key=="buds"?shell.Buds.HasConnectedBuds||BudsInfo.IsBuds(shell.Services.OutputName):QuickActionCatalog.SamsungOn(key),QuickActionCatalog.Available(key,shell));
                     continue;
                 }
                 bool on=key=="wifi"?wifi:key=="bluetooth"?bluetooth:key=="theme"?theme.Dark:key=="mute"?muted:key=="efficiency"?efficiency.Selected==QuickActions.EfficientMode:key=="dnd"?disturb.Enabled:key=="awake"?shell.Toggles.Awake:key=="animations"?Preferences.Current.Animations:key=="startup"?shell.Toggles.Startup:Preferences.Current.QuickSliderScroll;
@@ -122,6 +122,12 @@ namespace OneTaskBar
                     if(key!="wifi"&&key!="bluetooth"&&key!="theme"&&key!="mute")tiles[key].Text(tiles[key].Title,available?(on?"켜짐":"꺼짐"):"사용할 수 없음");
                 }
                 pair.Value.RefreshState(on,available);
+            }
+            foreach(var feature in SamsungLink.Features)
+            {
+                var samsungTile=tiles[feature[0]];
+                samsungTile.Text(feature[2],QuickActionCatalog.SamsungCaption(feature[0],shell));
+                samsungTile.State(QuickActionCatalog.SamsungOn(feature[0]),QuickActionCatalog.Available(feature[0],shell));
             }
             tiles["devices"].Text("주변 기기 연결","");
             tiles["devices"].State(false,shell.SamsungDevices()!=null);

@@ -68,7 +68,7 @@ namespace OneTaskBar
         internal Brush MediaSurface {get{return expanded.Background;}}
         internal IslandNotificationView NotificationView {get{return notification;}}
         internal bool NotificationVisible {get{return IsVisible&&state.NotificationVisible(DateTime.UtcNow);}}
-        internal DynamicIsland(Action<string> command,Func<double,Task<bool>> seek,Action output,Action<string> openApp,Action opening=null,Func<string,AppEntry> sourceApp=null,Func<string,List<AppEntry>> findApps=null,Action<AppEntry> launchApp=null,Action<string> searchWeb=null)
+        internal DynamicIsland(Action<string> command,Func<double,Task<bool>> seek,Action output,Action<string> openApp,Action opening=null,Func<string,AppEntry> sourceApp=null,Func<string,List<AppEntry>> findApps=null,Action<AppEntry> launchApp=null,Action<string> searchWeb=null,Action<SearchSetting> openSetting=null)
         {
             this.opening=opening;
             Title="One TaskBar · Dynamic Island";
@@ -126,7 +126,7 @@ namespace OneTaskBar
             player.FitPopup(164);
             mediaSurface.Child=player;
             Grid.SetRow(mediaSurface,1);expanded.Children.Add(mediaSurface);root.Children.Add(expanded);
-            search=new IslandSearchView(findApps??(q=>new List<AppEntry>()),app=>{CloseSearch();if(launchApp!=null)launchApp(app);},text=>{CloseSearch();if(searchWeb!=null)searchWeb(text);},CloseSearch);
+            search=new IslandSearchView(findApps??(q=>new List<AppEntry>()),app=>{CloseSearch();if(launchApp!=null)launchApp(app);},text=>{CloseSearch();if(searchWeb!=null)searchWeb(text);},CloseSearch,openSetting==null?(Action<SearchSetting>)null:setting=>{CloseSearch();openSetting(setting);});
             search.Changed=()=>{if(state.Searching&&state.SearchRows!=search.RowCount){state.SearchRows=search.RowCount;RefreshPresentation();}};
             root.Children.Add(search);
             compact.Visibility=feedback.Visibility=expanded.Visibility=level.Visibility=notification.Visibility=search.Visibility=Visibility.Hidden;

@@ -262,6 +262,11 @@ namespace OneTaskBar
             AddTile("windows","windows-settings","Windows 설정",shell.OpenWindowsSettings);
             AddTile("capture","screenshot","화면 캡처",shell.OpenScreenCapture);
             AddTile("manager","task-manager","작업 관리자",shell.OpenTaskManager);
+            foreach(var feature in SamsungLink.Features)
+            {
+                string featureKey=feature[0];
+                AddTile(featureKey,QuickActionCatalog.Specs.First(s=>s[0]==featureKey)[1],feature[2],()=>shell.OpenSamsungFeature(featureKey));
+            }
             foreach(var spec in new[]
             {
                 new[]

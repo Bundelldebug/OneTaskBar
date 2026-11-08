@@ -153,7 +153,21 @@ namespace OneTaskBar
             row.HorizontalAlignment=HorizontalAlignment.Right;row.VerticalAlignment=VerticalAlignment.Top;
             var button=Paint.Button(cluster,()=>shell.ToggleQuick(Dock(),false,true),"빠른 설정");
             button.Background=Hit;cluster.Background=Hit;button.Padding=new Thickness(8,0,8,0);button.VerticalAlignment=VerticalAlignment.Stretch;
+            // Hidden tray icons: a down-pointing chevron before the status cluster; the panel opens downward from it.
+            trayGlyph.RenderTransformOrigin=new Point(.5,.5);trayGlyph.RenderTransform=new RotateTransform(90);
+            trayButton=Paint.Button(trayGlyph,OpenTray,"숨겨진 아이콘");
+            trayButton.Background=Hit;trayButton.Padding=new Thickness(6,0,6,0);trayButton.VerticalAlignment=VerticalAlignment.Stretch;
+            row.Children.Add(trayButton);
             row.Children.Add(button);
+        }
+        readonly Glyph trayGlyph=new Glyph("chevron",14){VerticalAlignment=VerticalAlignment.Center};
+        Button trayButton;
+        void OpenTray()
+        {
+            if(screen==null||trayButton==null)return;
+            // Physical pixels, under the button; the panel hangs below the bar and keeps clear of the screen edge.
+            var below=trayButton.PointToScreen(new Point(trayButton.ActualWidth/2,trayButton.ActualHeight));
+            shell.OpenTrayOverflow(Dock(),new TrayPlacement(below,screen.Bounds,scale,1,0));
         }
         DockHost Dock(){return shell.DockFor(screen);}
         // Called by the shell on its regular pulse. Cheap when nothing changed.
@@ -273,6 +287,8 @@ namespace OneTaskBar
             if(volume.Kind!=soundKind){volume.Kind=soundKind;volume.InvalidateVisual();}
             if(wifi.Color!=ink||volume.Color!=ink){wifi.Color=volume.Color=ink;wifi.InvalidateVisual();volume.InvalidateVisual();}
             wifi.Effect=volume.Effect=effect;
+            if(trayGlyph.Color!=ink){trayGlyph.Color=ink;trayGlyph.InvalidateVisual();}
+            trayGlyph.Effect=effect;
             var power=shell.Power;
             bool known=power!=null&&power.Known;
             // The top bar keeps the regular Wi-Fi, volume and battery icons, also over the black band.

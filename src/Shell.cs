@@ -463,6 +463,17 @@ namespace OneTaskBar
         bool externalLaunching;
         internal AppEntry SamsungDevices() {return Apps.FirstOrDefault(a=>(a.AppID??"").IndexOf("SamsungMyDevices",StringComparison.OrdinalIgnoreCase)>=0)??Apps.FirstOrDefault(a=>a.Name=="주변 기기 연결");}
         internal AppEntry GalaxyBuds() {return Apps.FirstOrDefault(a=>(a.AppID??"").IndexOf("SAMSUNGELECTRONICSCO.LTD.GalaxyBuds_",StringComparison.OrdinalIgnoreCase)>=0)??Apps.FirstOrDefault(a=>a.Name=="Galaxy Buds"||a.Name=="갤럭시 버즈");}
+        internal AppEntry SamsungFeature(string key)
+        {
+            string marker=SamsungLink.Marker(key);
+            return Apps.FirstOrDefault(a=>(a.AppID??"").IndexOf(marker,StringComparison.OrdinalIgnoreCase)>=0);
+        }
+        internal void OpenSamsungFeature(string key)
+        {
+            var app=SamsungFeature(key);
+            if(app==null){if(Quick!=null)Quick.Feedback("삼성 앱이 설치되어 있지 않습니다.");return;}
+            OpenQuickApplication(app);
+        }
         internal AppEntry QuickDevicesApplication(){return Preferences.Current.QuickGalaxyBuds?GalaxyBuds():SamsungDevices();}
         internal void OpenSamsungSettings()
         {
@@ -688,7 +699,7 @@ namespace OneTaskBar
             bool interactive=FullscreenMediaLive||(StartMenu!=null&&StartMenu.IsVisible)||(Quick!=null&&Quick.IsVisible)||(Center!=null&&Center.IsVisible)||(Detail!=null&&Detail.IsVisible)||(Drawer!=null&&Drawer.IsVisible)||(Finder!=null&&Finder.IsVisible)||(Welcome!=null&&Welcome.IsVisible)||IslandExpanded||docks.Any(d=>d.MediaBar!=null&&d.MediaBar.Expanded);
             if(now>=osdScanAt){osdScanAt=now.AddSeconds(RuntimeCadence.OsdScan(battery));if(osdGate!=null)osdGate.Refresh();}
             LiveBackdrop.SweepOrphans();Lap("sweep");
-            if(Desktop)ExplorerBridge.KeepTrayPosition(trayDock!=null?trayDock.TrayAnchor():null);Lap("keeptray");
+            if(Desktop)ExplorerBridge.KeepTrayPosition(TrayAnchorNow());Lap("keeptray");
             var foreground=Native.GetForegroundWindow(); uint foregroundPid; Native.GetWindowThreadProcessId(foreground,out foregroundPid);
             if(foregroundPid!=ownPid) LastApplication=foreground;
             if(foregroundPid!=ownPid)RememberForeground(foreground);Lap("remember");if(Desktop&&foreground!=lastForeground)Switcher.Update(Running);Lap("switcher");

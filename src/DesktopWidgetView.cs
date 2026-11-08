@@ -381,7 +381,7 @@ namespace OneTaskBar
                 case "startup":on=shell.Toggles.Startup;break;
                 case "slider-scroll":on=Preferences.Current.QuickSliderScroll;break;
                 case "buds":on=shell.Buds.HasConnectedBuds||BudsInfo.IsBuds(shell.Services.OutputName);caption=on?shell.Buds.BudsCaption??"연결됨":"연결 안 됨";available=QuickActionCatalog.Available(key,shell);break;
-                default:available=QuickActionCatalog.Available(key,shell);break;
+                default:available=QuickActionCatalog.Available(key,shell);if(SamsungLink.Feature(key)){on=QuickActionCatalog.SamsungOn(key);caption=QuickActionCatalog.SamsungCaption(key,shell);}break;
             }
             if(caption.Length==0&&!QuickActionCatalog.Commands.Contains(key))caption=on?"켜짐":"꺼짐";
             Toggle.Text(DesktopWidgetCatalog.Title(key),caption);

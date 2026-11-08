@@ -15,7 +15,31 @@ namespace OneTaskBar
 {
     internal sealed class DesktopOverview : GlassWindow
     {
-        sealed class Preview {internal Border Anchor,Card;internal SwitchThumbnail Window;}
+        sealed class Preview {internal Border Anchor,Card;internal SwitchThumbnail Window;internal double Aspect=1.6;}
+        [DllImport("user32.dll")]static extern bool GetClientRect(IntPtr window,out Native.RectI bounds);
+        // DWM previews show the client area, so that is the shape each card has to follow.
+        static double AspectOf(IntPtr window)
+        {
+            Native.RectI client;
+            if(!Native.IsIconic(window)&&GetClientRect(window,out client))
+            {
+                double w=client.Right-client.Left,h=client.Bottom-client.Top;
+                if(w>40&&h>40)return Math.Max(.45,Math.Min(2.6,w/h));
+            }
+            return 1.6;
+        }
+        // Climbed up from the click target: buttons and window cards keep their own click; anything else closes.
+        bool OnControl(DependencyObject source)
+        {
+            while(source!=null&&source!=this)
+            {
+                if(source is System.Windows.Controls.Primitives.ButtonBase)return true;
+                var element=source as FrameworkElement;
+                if(element!=null&&previews.Any(p=>p.Card==element))return true;
+                source=source is Visual||source is System.Windows.Media.Media3D.Visual3D?VisualTreeHelper.GetParent(source):LogicalTreeHelper.GetParent(source);
+            }
+            return false;
+        }
         readonly Grid body=new Grid {Margin=new Thickness(28,18,28,24)};
         readonly StackPanel desktops=new StackPanel {Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Center};
         readonly Grid workspace=new Grid();
@@ -46,7 +70,7 @@ namespace OneTaskBar
         {
             action=execute;closeWindow=close;Title="One TaskBar · 데스크톱 전환";
             Radius=0;Surface.CornerRadius=new CornerRadius(0);SetMaterial(QuickPanel.Glass,PanelMaterial.Solid(Glass95.Dark));
-            body.RowDefinitions.Add(new RowDefinition {Height=new GridLength(104)});
+            body.RowDefinitions.Add(new RowDefinition {Height=new GridLength(132)});
             body.RowDefinitions.Add(new RowDefinition());
             body.RowDefinitions.Add(new RowDefinition {Height=new GridLength(48)});
             var header=new Grid {RenderTransform=headerOffset};header.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(64)});header.ColumnDefinitions.Add(new ColumnDefinition());header.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(64)});
@@ -68,7 +92,7 @@ namespace OneTaskBar
                 else if(e.Key==Key.Left||e.Key==Key.Right){e.Handled=true;SelectPage(selected+(e.Key==Key.Left?-1:1));}
                 else if(e.Key==Key.Enter){e.Handled=true;Execute(0);}
             };
-            PreviewMouseLeftButtonUp+=(s,e)=>{if(e.OriginalSource==cards||e.OriginalSource==workspace){e.Handled=true;Dismiss();}};
+            PreviewMouseLeftButtonUp+=(s,e)=>{var origin=e.OriginalSource as DependencyObject;if(origin!=null&&!OnControl(origin)){e.Handled=true;Dismiss();}};
             Closed+=(s,e)=>{closed=true;StopTransition();ReleasePreviews();};
             IsVisibleChanged+=(s,e)=>{if(!IsVisible){StopTransition();ReleasePreviews();}};
         }
@@ -100,9 +124,16 @@ namespace OneTaskBar
             desktops.Children.Clear();
             for(int i=0;i<snapshot.Pages.Count;i++){
                 int index=i;var page=snapshot.Pages[i];
-                var image=new Grid {Width=122,Height=54,Background=Paint.Brush("#2586979C")};
-                int j=0;foreach(var item in page.Windows.Take(3)){
-                    var mini=new Border {Width=50,Height=33,CornerRadius=new CornerRadius(3),Background=Paint.Brush("#C5ECF0EF"),Child=AppIcons.Visual(item.App,15),HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Top,Margin=new Thickness(8+j*24,6+j*4,0,0)};image.Children.Add(mini);j++;
+                var picture=DesktopPreviewStore.Find(page.Id);
+                double thumbWidth=picture!=null?Math.Round(86*picture.PixelWidth/(double)picture.PixelHeight):152;
+                var image=new Border {Width=thumbWidth,Height=86,CornerRadius=new CornerRadius(10),ClipToBounds=true,Background=Paint.Brush("#2586979C")};
+                if(picture!=null)image.Background=new ImageBrush(picture){Stretch=Stretch.UniformToFill};
+                else
+                {
+                    // A desktop that has not been in front since the app started has no picture yet; show its apps instead.
+                    var icons=new StackPanel {Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};
+                    foreach(var item in page.Windows.Take(3))icons.Children.Add(new Border {Margin=new Thickness(4,0,4,0),Child=AppIcons.Visual(item.App,26)});
+                    image.Child=icons;
                 }
                 var content=new StackPanel();content.Children.Add(image);
                 var label=Paint.TextBlock(page.Name,10,Paint.Text);label.TextAlignment=TextAlignment.Center;label.Margin=new Thickness(0,4,0,0);content.Children.Add(label);
@@ -136,7 +167,7 @@ namespace OneTaskBar
                 var card=new Border {CornerRadius=new CornerRadius(18),Background=QuickPanel.Card,Padding=new Thickness(9),Child=layout};cards.Children.Add(card);
                 card.MouseLeftButtonUp+=(s,e)=>{e.Handled=true;Execute(0,entry.Window);};
                 var native=new SwitchThumbnail(item,owner,()=>{},()=>Execute(0,entry.Window),key=>ChangeWindowPage(key==0x25?-1:1));
-                previews.Add(new Preview {Anchor=anchor,Card=card,Window=native});
+                previews.Add(new Preview {Anchor=anchor,Card=card,Window=native,Aspect=AspectOf(item.Window)});
             }
             ArrangePreviews();BuildMilliseconds=build.Elapsed.TotalMilliseconds;
             if(Motion.Enabled)StartTransition(false,false,0);
@@ -154,11 +185,10 @@ namespace OneTaskBar
             int count=previews.Count;if(count==0)return;
             LayoutPasses++;
             double width=workspace.ActualWidth,height=workspace.ActualHeight-42;
-            int columns=Math.Min(4,Math.Min(count,Math.Max(1,(int)(width/260))));int rows=(count+columns-1)/columns;
-            double gap=22,cardWidth=Math.Min(460,(width-(columns-1)*gap)/columns),cardHeight=Math.Min(cardWidth*.64+42,(height-(rows-1)*gap)/rows);
+            var plan=DesktopPacking.Pack(previews.Select(p=>p.Aspect).ToArray(),width,height);
             for(int i=0;i<count;i++){
-                var preview=previews[i];double x=(width-(cardWidth*columns+gap*(columns-1)))/2+(i%columns)*(cardWidth+gap),y=30+(height-(cardHeight*rows+gap*(rows-1)))/2+(i/columns)*(cardHeight+gap);
-                preview.Card.Width=cardWidth;preview.Card.Height=cardHeight;Canvas.SetLeft(preview.Card,x);Canvas.SetTop(preview.Card,y);
+                var preview=previews[i];var box=plan[i];
+                preview.Card.Width=box.Width;preview.Card.Height=box.Height;Canvas.SetLeft(preview.Card,box.X);Canvas.SetTop(preview.Card,30+box.Y);
             }
             UpdateLayout();foreach(var preview in previews)preview.Window.Place(preview.Anchor);
         }

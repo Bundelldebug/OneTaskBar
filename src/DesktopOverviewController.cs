@@ -30,6 +30,7 @@ namespace OneTaskBar
             var monitor=System.Windows.Forms.Screen.FromPoint(System.Windows.Forms.Cursor.Position);
             var apps=Running.ToArray();
             if(Overview!=null&&(Overview.Retiring||Overview.IsClosed)){Overview.Close();Overview=null;}
+            if(Overview==null||!Overview.IsVisible)DesktopPreviewStore.Capture(VirtualDesktops.CurrentId(),monitor.Bounds);
             var clock=Stopwatch.StartNew();DesktopSnapshot value=null;
             var panel=Overview;
             if(panel==null){panel=new DesktopOverview((id,window,operation)=>{if(overviewCache!=null)ApplyDesktopCommand(overviewCache,id,window,operation);},ElevatedWindows.Close);Overview=panel;panel.Closed+=(s,e)=>{if(Overview==panel)Overview=null;};}
@@ -37,6 +38,7 @@ namespace OneTaskBar
             if(cached)value=overviewCache;
             else{panel.ShowLoading(monitor.Bounds);value=await Task.Run(()=>VirtualDesktops.Read(apps,foreground));}
             if(disposed||request!=overviewRequest||Overview!=panel||panel.Retiring)return;
+            DesktopPreviewStore.Prune(value.Pages.Select(p=>p.Id));
             overviewCache=value;overviewCachedAt=DateTime.UtcNow;
             panel.Present(value,monitor.Bounds);
             AppLog.Json("desktop-overview-timing.json",new {readyMilliseconds=clock.Elapsed.TotalMilliseconds,buildMilliseconds=panel.BuildMilliseconds,layoutPasses=panel.LayoutPasses,cached=cached,desktops=value.Pages.Count,windows=value.Pages.Sum(p=>p.Windows.Count)});
