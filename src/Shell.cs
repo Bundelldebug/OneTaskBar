@@ -635,7 +635,8 @@ namespace OneTaskBar
         void ApplyBrightness(int value)
         {
             if(disposed||value<0||value>100||DateTime.UtcNow<commitBrightnessUntil)return;int before=Brightness;Brightness=value;
-            if(osdGate!=null)osdGate.Refresh();if(before>=0&&before!=value&&DisplayAwake&&(Quick==null||!Quick.IsVisible))ShowHud("brightness",value,false);
+            // Windows adaptive brightness fires this continuously; only the brightness keys (ReplaceNativeOsd) show the HUD.
+            if(osdGate!=null)osdGate.Refresh();
         }
         void ServiceChanged(){Interlocked.Exchange(ref servicesDirty,1);Wake();}
         void Wake()
@@ -717,7 +718,6 @@ namespace OneTaskBar
                     brightnessBusy=false; if(disposed || t.Status!=TaskStatus.RanToCompletion) return;
                     if(DateTime.UtcNow<commitBrightnessUntil || brightnessWriting) return;
                     int next=t.Result;
-                    if(Brightness>=0 && next>=0 && next!=Brightness && (Quick==null || !Quick.IsVisible)) ShowHud("brightness",next,false);
                     Brightness=next;
                 })));
             }
