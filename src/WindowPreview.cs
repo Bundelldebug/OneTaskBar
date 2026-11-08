@@ -70,6 +70,15 @@ namespace OneTaskBar
             hide.Stop();show.Stop();if(DragReorder.Active||value.Windows.Count==0){Close();return;}entry=value;anchor=button;dock=host;if(popup!=null&&popup.IsVisible&&popup.AppKey==value.Key)return;show.Start();
         }
         internal void Leave(){show.Stop();hide.Start();}
+        // A click on an app with several windows opens its preview at once (the pointer is still on the button).
+        internal bool ShowNow(AppEntry value)
+        {
+            if(anchor==null||dock==null||entry==null||entry.Key!=value.Key||!anchor.IsVisible||DragReorder.Active)return false;
+            hide.Stop();show.Stop();entry=value;
+            if(popup!=null&&popup.IsVisible&&popup.AppKey==value.Key)return true;
+            Open();
+            return popup!=null;
+        }
         void Open()
         {
             if(anchor==null||!anchor.IsMouseOver||!anchor.IsVisible||DragReorder.Active)return;ClosePopup();popup=new WindowPreview(entry,new WindowInteropHelper(dock.Apps).Handle);popup.MouseEnter+=(s,e)=>hide.Stop();popup.MouseLeave+=(s,e)=>Leave();var physical=DockGeometry.ScreenRect(anchor);var screen=Forms.Screen.FromPoint(new System.Drawing.Point((int)physical.X,(int)physical.Y));var handle=new WindowInteropHelper(popup).EnsureHandle();Native.SetWindowPos(handle,IntPtr.Zero,screen.Bounds.Left+12,screen.Bounds.Top+12,0,0,0x1|0x4|0x10);double scale=Math.Max(96,Native.GetDpiForWindow(handle))/96.0;popup.Fit((screen.WorkingArea.Width-24)/scale);var area=screen.WorkingArea;var position=DockGeometry.Beside(physical,new Size(popup.Width*scale,popup.Height*scale),new Rect(area.Left,area.Top,area.Width,area.Height),dock.Edge,12*scale);Native.SetWindowPos(handle,new IntPtr(-1),(int)Math.Round(position.X),(int)Math.Round(position.Y),(int)Math.Round(position.Width),(int)Math.Round(position.Height),0x10);popup.Show();Native.SetWindowPos(handle,new IntPtr(-1),(int)Math.Round(position.X),(int)Math.Round(position.Y),(int)Math.Round(position.Width),(int)Math.Round(position.Height),0x10);

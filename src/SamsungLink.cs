@@ -56,7 +56,7 @@ namespace OneTaskBar
                     }
                 }
                 second=monitor?(tablet??"연결됨"):null;
-                camera=cameraName!=null&&LastState(Package("16297BCCB59BC","CameraShare.log"),@"connection state = (\d)")>=1?cameraName:null;
+                camera=cameraName!=null&&CameraConnected(Package("16297BCCB59BC","CameraShare.log"))?cameraName:null;
                 storage=Storage();
             }
             catch(Exception error)
@@ -94,6 +94,19 @@ namespace OneTaskBar
                 }
             }
             catch(IOException){return "";}
+        }
+
+        // The newest of: a connection state, a session opening/closing, or the app shutting down. Turning the feature off
+        // closes the session and exits the app, while the phone-named camera device stays installed.
+        static bool CameraConnected(string path)
+        {
+            var events=Regex.Matches(Tail(path,600000),@"connection state = (\d)|New state = (Opened|Closing|Closed)|(Gracefully Shutting Down)|Toggle state: (\d)");
+            if(events.Count==0)return false;
+            var last=events[events.Count-1];
+            if(last.Groups[1].Success)return last.Groups[1].Value!="0";
+            if(last.Groups[2].Success)return last.Groups[2].Value=="Opened";
+            if(last.Groups[4].Success)return last.Groups[4].Value!="0";
+            return false;
         }
 
         static int LastState(string path,string pattern)

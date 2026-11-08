@@ -365,8 +365,9 @@ namespace OneTaskBar
             if(AppClick.Elevate(System.Windows.Input.Keyboard.Modifiers)){LaunchApp(entry,System.Windows.Input.Keyboard.Modifiers);return;}RecentApps.Record(entry);
             var windows=entry.Windows.Where(Native.IsWindow).ToList();
             var foreground=beforeClick!=IntPtr.Zero&&Native.IsWindow(beforeClick)?beforeClick:Native.GetForegroundWindow();var root=Native.GetAncestor(foreground,3);var active=windows.FirstOrDefault(h=>h==foreground||h==root);
+            // With several windows a click keeps showing the previews, as in Windows; it never minimizes or lists titles.
+            if(windows.Count>1) {if(!Previews.ShowNow(entry))WindowPicker.ShowFor(entry,anchor,this); return;}
             if(active!=IntPtr.Zero&&!Native.IsIconic(active)){Native.ShowWindow(active,6);return;}
-            if(windows.Count>1) {WindowPicker.ShowFor(entry,anchor,this); return;}
             if(windows.Count==1) {
                 Native.Activate(windows[0]); return;
             }

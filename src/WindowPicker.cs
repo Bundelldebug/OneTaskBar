@@ -12,7 +12,8 @@ namespace OneTaskBar
         internal static ContextMenu Menu(AppEntry entry,ShellController shell,bool windowsOnly=false,bool allowAdmin=false)
         {
             var menu=new ContextMenu {MinWidth=220,MaxWidth=380};
-            foreach(var h in entry.Windows.Where(Native.IsWindow)) {
+            // Like the Windows taskbar, the right-click menu has no window list: the preview shows the windows.
+            if(windowsOnly)foreach(var h in entry.Windows.Where(Native.IsWindow)) {
                 var title=new StringBuilder(512);Native.GetWindowText(h,title,title.Capacity);var handle=h;
                 var titleText=new TextBlock {Text=title.ToString(),TextTrimming=TextTrimming.CharacterEllipsis,MaxWidth=290};
                 var item=new MenuItem {Header=titleText,ToolTip=title.ToString(),Icon=AppIcons.Visual(entry,18)}; item.Click+=(s,e)=>Native.Activate(handle);menu.Items.Add(item);
