@@ -57,7 +57,7 @@ namespace OneTaskBar
                 }
                 second=monitor?(tablet??"연결됨"):null;
                 camera=cameraName!=null&&LastState(Package("16297BCCB59BC","CameraShare.log"),@"connection state = (\d)")>=1?cameraName:null;
-                storage=StorageConnected()?StorageName():null;
+                storage=Storage();
             }
             catch(Exception error)
             {
@@ -102,21 +102,19 @@ namespace OneTaskBar
             return matches.Count==0?-1:Int32.Parse(matches[matches.Count-1].Groups[1].Value);
         }
 
-        static bool StorageConnected()
+        // Storage Share writes its tray tooltip to its log whenever the link changes ("저장공간 공유 - <phone>에 연결됨").
+        // The newest such line says what it is connected to now; a tooltip without a phone means nothing is connected.
+        static string Storage()
         {
-            string tail=Tail(Package("4438638898209","StorageShare.log"),600000);
-            int connected=-1,gone=-1;
-            foreach(Match m in Regex.Matches(tail,@"(?i)SmbClient\w*\.cs.*?(connected successfully|connection established|mapped|mounted)"))connected=m.Index;
-            foreach(Match m in Regex.Matches(tail,@"(?i)SmbClient\w*\.cs.*?(disconnected|connection removed|unmapped|unmounted|all connections are removed)"))gone=m.Index;
-            return connected>=0&&connected>gone;
-        }
-
-        static string StorageName()
-        {
-            // The phone Storage Share is connected to is the one whose device folder the log named last.
-            string tail=Tail(Package("4438638898209","StorageShare.log"),600000);
-            var named=Regex.Matches(tail,@"Devices\\([^\r\n\\]+)");
-            return named.Count==0?"연결됨":named[named.Count-1].Groups[1].Value.Trim();
+            string path=Package("4438638898209","StorageShare.log");
+            foreach(int bytes in new[]{600000,6000000})
+            {
+                var lines=Regex.Matches(Tail(path,bytes),@"Updating system tray tooltip to: ([^\r\n]+)");
+                if(lines.Count==0)continue;
+                var phone=Regex.Match(lines[lines.Count-1].Groups[1].Value,@"-\s*(.+?)에 연결됨");
+                return phone.Success?phone.Groups[1].Value.Trim():null;
+            }
+            return null;
         }
 
         internal static string Clean(string text)
