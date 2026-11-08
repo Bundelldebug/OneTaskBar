@@ -124,8 +124,8 @@ namespace OneTaskBar
             if(item==null)return false;
             string id=item.AppId??"",app=item.App??"";
             if(id.IndexOf("SamsungContinuityService",StringComparison.OrdinalIgnoreCase)>=0||app=="갤럭시 커넥트"||String.Equals(app,"Galaxy Connect",StringComparison.OrdinalIgnoreCase))return true;
-            // Samsung Internet's helper reports through the same small bottom popup.
-            return id.IndexOf("SamsungAccountPluginforSa",StringComparison.OrdinalIgnoreCase)>=0||app.IndexOf("Browser Helper",StringComparison.OrdinalIgnoreCase)>=0||id.IndexOf("SamsungBrowserHelper",StringComparison.OrdinalIgnoreCase)>=0||id.IndexOf("SamsungInternet",StringComparison.OrdinalIgnoreCase)>=0||id.IndexOf("Samsung.Browser",StringComparison.OrdinalIgnoreCase)>=0||app.IndexOf("Samsung Internet",StringComparison.OrdinalIgnoreCase)>=0||app.IndexOf("삼성 인터넷",StringComparison.Ordinal)>=0||app.IndexOf("삼성 브라우저",StringComparison.Ordinal)>=0;
+            // Only Samsung Internet's helper reports through the same small bottom popup. The browser's own notifications use the normal path.
+            return id.IndexOf("SamsungAccountPluginforSa",StringComparison.OrdinalIgnoreCase)>=0||app.IndexOf("Browser Helper",StringComparison.OrdinalIgnoreCase)>=0||id.IndexOf("SamsungBrowserHelper",StringComparison.OrdinalIgnoreCase)>=0;
         }
         void Layout()
         {
