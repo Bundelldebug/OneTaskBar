@@ -213,7 +213,12 @@ namespace OneTaskBar
         internal void SetDeviceIcon(ImageSource image){if(device==null){if(image==null)return;device=new DeviceSymbol();}if(device.Set(image))InvalidateVisual();}
         public Glyph(string kind,double size) { Kind=kind; Width=Height=size; IsHitTestVisible=false; }
         internal void Update(string kind,Brush color){if(Kind==kind&&Color==color)return;Kind=kind;Color=color;InvalidateVisual();}
-        protected override void OnRender(DrawingContext dc) {var center=new Point(ActualWidth/2,ActualHeight/2);double size=Math.Min(ActualHeight,ActualWidth)-2;if(HasDeviceIcon)device.Draw(dc,Color,center,size,false);else Paint.Icon(dc,Kind,Color,center,size,Generation,Signal,Traffic);}
+        // An app's own cut-out artwork, drawn in its real colors instead of the ink.
+        ImageSource appIcon;
+        internal void SetAppIcon(ImageSource image){if(Object.ReferenceEquals(appIcon,image))return;appIcon=image;InvalidateVisual();}
+        protected override void OnRender(DrawingContext dc) {var center=new Point(ActualWidth/2,ActualHeight/2);double size=Math.Min(ActualHeight,ActualWidth)-2;
+            if(appIcon!=null&&appIcon.Width>0&&appIcon.Height>0){double fit=Math.Min(size/appIcon.Width,size/appIcon.Height),w=appIcon.Width*fit,h=appIcon.Height*fit;dc.DrawImage(appIcon,new Rect(center.X-w/2,center.Y-h/2,w,h));return;}
+            if(HasDeviceIcon)device.Draw(dc,Color,center,size,false);else Paint.Icon(dc,Kind,Color,center,size,Generation,Signal,Traffic);}
     }
     internal sealed partial class PillSlider : FrameworkElement
     {

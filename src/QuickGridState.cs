@@ -16,6 +16,26 @@ namespace OneTaskBar
             notice.Text=text;
             notice.Visibility=Visibility.Visible;
         }
+        // Samsung features show the installed app's own icon, like Galaxy Buds shows its own symbol.
+        readonly Dictionary<string,ImageSource> samsungIcons=new Dictionary<string,ImageSource>();
+        readonly HashSet<string> samsungAsked=new HashSet<string>();
+        async void LoadSamsungIcon(string key,AppEntry app)
+        {
+            samsungAsked.Add(key);
+            try
+            {
+                var image=app.Icon??await BackgroundWork.Run(()=>AppIcons.Get(app));
+                if(closed||image==null)return;
+                samsungIcons[key]=image;
+                tiles[key].Icon.SetAppIcon(image);
+                QuickToggleButton grouped;
+                if(Toggles.TryGetValue(key,out grouped)){var glyph=grouped.Content as Glyph;if(glyph!=null)glyph.SetAppIcon(image);}
+            }
+            catch(Exception error)
+            {
+                AppLog.Once("quick-samsung-icon",error.GetType().Name);
+            }
+        }
         string budsModel;
         async void LoadBuds(string name)
         {
@@ -126,6 +146,10 @@ namespace OneTaskBar
             foreach(var feature in SamsungLink.Features)
             {
                 var samsungTile=tiles[feature[0]];
+                var featureApp=shell.SamsungFeature(feature[0]);
+                if(featureApp!=null&&!samsungAsked.Contains(feature[0]))LoadSamsungIcon(feature[0],featureApp);
+                ImageSource featureIcon;
+                if(samsungIcons.TryGetValue(feature[0],out featureIcon)){samsungTile.Icon.SetAppIcon(featureIcon);QuickToggleButton featureToggle;if(Toggles.TryGetValue(feature[0],out featureToggle)){var featureGlyph=featureToggle.Content as Glyph;if(featureGlyph!=null)featureGlyph.SetAppIcon(featureIcon);}}
                 samsungTile.Text(feature[2],QuickActionCatalog.SamsungCaption(feature[0],shell));
                 samsungTile.State(QuickActionCatalog.SamsungOn(feature[0]),QuickActionCatalog.Available(feature[0],shell));
             }

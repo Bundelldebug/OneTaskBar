@@ -14,9 +14,8 @@ namespace OneTaskBar
         internal static string SamsungCaption(string key,ShellController shell)
         {
             if(!SamsungLink.Reports(key))return "";
-            string phone=SamsungLink.Phone();
-            return phone??"연결 안 됨";
+            return SamsungLink.Device(key)??"연결 안 됨";
         }
-        internal static bool SamsungOn(string key){return SamsungLink.Reports(key)&&SamsungLink.Phone()!=null;}
+        internal static bool SamsungOn(string key){return SamsungLink.Reports(key)&&SamsungLink.Device(key)!=null;}
     }
 }

@@ -114,7 +114,7 @@ namespace OneTaskBar
                     foreach(var network in snapshot.Networks){var item=network;body.Children.Add(WifiNetworkView.Create(item,()=>SelectNetwork(item)));}
                     status.Text=snapshot.Notice??(snapshot.Networks.Count==0?"사용 가능한 네트워크가 없습니다. Wi-Fi 상태를 확인해 주세요.":"저장된 네트워크는 바로 연결합니다. 새 네트워크는 비밀번호를 입력해 연결할 수 있습니다.");
                 }else{
-                    var peers=BluetoothDeviceView.Rows(snapshot.Devices);foreach(bool registered in new[]{true,false}){var rows=peers.Where(p=>p.Paired==registered).ToList();if(rows.Count==0)continue;Text(registered?"등록된 기기":"새 기기");foreach(var peer in rows){var item=peer;Button button=null;button=BluetoothDeviceView.Create(item,()=>SelectBluetooth(item,button));if(item.Paired)button.PreviewMouseRightButtonUp+=(s,e)=>{e.Handled=true;SelectBluetooth(item,button);};body.Children.Add(button);}}
+                    var peers=BluetoothDeviceView.Rows(snapshot.Devices);foreach(bool registered in new[]{true,false}){var rows=peers.Where(p=>p.Paired==registered).ToList();if(rows.Count==0)continue;Text(registered?"등록된 기기":"새 기기");foreach(var peer in rows){var item=peer;Button button=null;button=BluetoothDeviceView.Create(item,()=>SelectBluetooth(item,button));if(item.Paired)button.PreviewMouseRightButtonUp+=(s,e)=>{e.Handled=true;SelectBluetooth(item,button,true);};body.Children.Add(button);}}
                     status.Text=snapshot.Notice??(snapshot.Devices.Count==0?"주변 기기를 찾지 못했습니다. 기기의 페어링 모드를 켜고 다시 검색해 주세요.":"새 기기를 눌러 페어링합니다. 등록된 기기는 메뉴에서 연결 관리 또는 제거를 선택할 수 있습니다.");
                 }
             }catch(OperationCanceledException){}catch(Exception error){if(!closed&&revision==scanVersion)status.Text="재검색하지 못했습니다: "+error.Message;}
@@ -127,9 +127,25 @@ namespace OneTaskBar
             }
             Action((page=="wifi"?"Wi-Fi":"블루투스")+((page=="wifi"?shell.Services.WifiOn:shell.Services.BluetoothOn)==true?" 끄기":" 켜기"),()=>ToggleRadio(page));
         }
-        async void SelectBluetooth(BluetoothPeer peer,Button button)
+        async void SelectBluetooth(BluetoothPeer peer,Button button,bool menuRequested=false)
         {
             if(peer.Device==null||closed)return;
+            // A click on a registered device connects it, or disconnects it when it is connected; the menu stays on right click.
+            if(peer.Paired&&!menuRequested)
+            {
+                deviceActions++;button.IsEnabled=false;
+                try
+                {
+                    bool connect=!peer.Connected;
+                    status.Text=connect?"연결 중…":"연결 끊는 중…";
+                    status.Text=await BluetoothLink.Set(peer.Device,connect);
+                    await Task.Delay(1800);
+                    if(!closed&&IsVisible)Reload();
+                }
+                catch(Exception error){if(!closed)status.Text=error.Message;}
+                finally{deviceActions=Math.Max(0,deviceActions-1);button.IsEnabled=true;}
+                return;
+            }
             if(peer.Paired){var menu=new ContextMenu {PlacementTarget=button};menu.Opened+=(s,e)=>deviceActions++;menu.Closed+=(s,e)=>deviceActions=Math.Max(0,deviceActions-1);var manage=new MenuItem {Header="Windows에서 연결 관리"};manage.Click+=async(s,e)=>{if(await DismissAsync())Native.Open("ms-settings:bluetooth");};menu.Items.Add(manage);var remove=new MenuItem {Header="등록된 기기 제거…"};remove.Click+=async(s,e)=>{deviceActions++;try{if(MessageBox.Show(this,peer.Name+" 기기의 등록을 해제할까요? 다시 사용하려면 페어링해야 합니다.","기기 제거",MessageBoxButton.YesNo,MessageBoxImage.Question)!=MessageBoxResult.Yes)return;button.IsEnabled=false;status.Text=await BluetoothOperations.Pair(peer.Device);if(!closed&&IsVisible)Reload();}catch(Exception error){if(!closed)status.Text=error.Message;}finally{deviceActions=Math.Max(0,deviceActions-1);button.IsEnabled=true;}};menu.Items.Add(remove);menu.IsOpen=true;return;}
             deviceActions++;button.IsEnabled=false;try{status.Text="페어링 중…";status.Text=await BluetoothOperations.Pair(peer.Device);if(!closed&&IsVisible)Reload();}catch(Exception error){if(!closed)status.Text=error.Message;}finally{deviceActions--;button.IsEnabled=true;}
         }

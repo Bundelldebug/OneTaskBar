@@ -104,7 +104,10 @@ namespace OneTaskBar
         internal static bool IsGalaxyConnect(NotificationEntry item)
         {
             if(item==null)return false;
-            return (item.AppId??"").IndexOf("SamsungContinuityService",StringComparison.OrdinalIgnoreCase)>=0||String.Equals(item.App,"갤럭시 커넥트",StringComparison.Ordinal)||String.Equals(item.App,"Galaxy Connect",StringComparison.OrdinalIgnoreCase);
+            string id=item.AppId??"",app=item.App??"";
+            if(id.IndexOf("SamsungContinuityService",StringComparison.OrdinalIgnoreCase)>=0||app=="갤럭시 커넥트"||String.Equals(app,"Galaxy Connect",StringComparison.OrdinalIgnoreCase))return true;
+            // Samsung Internet's helper reports through the same small bottom popup.
+            return id.IndexOf("SamsungInternet",StringComparison.OrdinalIgnoreCase)>=0||id.IndexOf("Samsung.Browser",StringComparison.OrdinalIgnoreCase)>=0||app.IndexOf("Samsung Internet",StringComparison.OrdinalIgnoreCase)>=0||app.IndexOf("삼성 인터넷",StringComparison.Ordinal)>=0||app.IndexOf("삼성 브라우저",StringComparison.Ordinal)>=0;
         }
         void Layout()
         {
@@ -185,6 +188,7 @@ namespace OneTaskBar
             if(compact)
             {
                 sender.Visibility=Visibility.Collapsed;
+                hit.HorizontalContentAlignment=HorizontalAlignment.Center;title.TextAlignment=body.TextAlignment=TextAlignment.Center;
                 title.FontSize=13;title.TextWrapping=TextWrapping.NoWrap;title.MaxHeight=20;title.Margin=new Thickness(0,1,8,1);
                 body.FontSize=11.5;body.TextWrapping=TextWrapping.NoWrap;body.MaxHeight=18;
                 icon.Width=icon.Height=28;icon.VerticalAlignment=VerticalAlignment.Center;icon.Margin=new Thickness(0,0,9,0);
