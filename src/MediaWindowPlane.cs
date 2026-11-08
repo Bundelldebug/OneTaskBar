@@ -64,7 +64,7 @@ namespace OneTaskBar
                 mesh.TriangleIndices.Add((i+1)%52+1);
             }
             var image=new ImageBrush(snapshot) {Stretch=Stretch.Fill};
-            image.Freeze();
+            RenderOptions.SetBitmapScalingMode(image,BitmapScalingMode.Fant);image.Freeze();
             // Round the small mesh instead of repainting a large texture while
             // its corners morph. The artwork stays one frozen GPU resource.
             var material=new DiffuseMaterial(image);

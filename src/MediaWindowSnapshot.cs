@@ -28,7 +28,8 @@ namespace OneTaskBar
             if(Native.GetForegroundWindow()!=window||Native.IsIconic(window)||bounds.Width<1||bounds.Height<1||bounds.Width*bounds.Height>24000000)return null;
             var area=Rectangle.Intersect(new Rectangle((int)bounds.X,(int)bounds.Y,(int)bounds.Width,(int)bounds.Height),System.Windows.Forms.SystemInformation.VirtualScreen);
             if(area.Width<=0||area.Height<=0)return null;
-            double scale=Math.Min(1,1536/Math.Max(bounds.Width,bounds.Height));
+            // Native pixels up to a 3200px long edge: a smaller texture is what made the flying window look soft.
+            double scale=Math.Min(1,3200/Math.Max(bounds.Width,bounds.Height));
             int width=Math.Max(1,(int)Math.Round(bounds.Width*scale));
             int height=Math.Max(1,(int)Math.Round(bounds.Height*scale));
             using(var bitmap=new Bitmap(width,height,System.Drawing.Imaging.PixelFormat.Format24bppRgb))
