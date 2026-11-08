@@ -58,6 +58,9 @@ namespace OneTaskBar
                     Require(Math.Abs(moved.X-30)+Math.Abs(moved.Y-30)<260,"the free position is the nearest one");
                     var snapped=DesktopWidgetStore.FindFree(new Rect(610,410,190,88),new List<Rect>(),area);
                     Require(snapped.X==600&&snapped.Y==408,"an open drop snaps to the nearest grid position");
+                    var edges=new List<double>{300,502};
+                    Require(DesktopWidgets.Closest(305,edges,14,24)==300&&DesktopWidgets.Closest(497,edges,14,24)==502,"a dragged widget locks to a neighbour's edge when close");
+                    Require(DesktopWidgets.Closest(400,edges,14,24)==408&&DesktopWidgets.Closest(-30,edges,14,24)==0,"a dragged widget otherwise lands on the grid and stays on screen");
                     var full=new Rect(0,0,1200,900);
                     Require(DesktopWidgetStore.FindFree(new Rect(30,30,190,88),new List<Rect>{full},area)==new Rect(30,30,190,88),"a full screen keeps the position instead of failing");
             {

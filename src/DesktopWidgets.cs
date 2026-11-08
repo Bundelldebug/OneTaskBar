@@ -340,6 +340,7 @@ namespace OneTaskBar
                 }
             }
             chip("위젯 추가",()=>OpenGallery(),false);
+            chip("정리",Arrange,false);
             chip("제거",()=>Remove(item),false);
             chip("완료",Deselect,false);
             toolbarBody=new Border {Background=scheme.Surface,CornerRadius=new CornerRadius(22),BorderBrush=scheme.Track,BorderThickness=new Thickness(1),Child=row};
@@ -525,6 +526,75 @@ namespace OneTaskBar
             // The size is rounded on its own, so equal widgets are equal pixels wherever they sit.
             return new Rect(area.Left+Math.Round(fitted.X*scale),area.Top+Math.Round(fitted.Y*scale),Math.Round(fitted.Width*scale),Math.Round(fitted.Height*scale));
         }
+        // While a widget is dragged it already sits where it will land: on the placement grid, and flush with a neighbour's
+        // edge (with the usual gap between them) when it comes close, so widgets line up without fine aiming.
+        internal void SnapPosition(DesktopWidgetSlot item,Size available,string monitor)
+        {
+            const double Reach=14;
+            double step=DesktopWidgetStore.GridStep,gap=InfoTile.Gap;
+            var others=Store.Items.Where(o=>o!=item&&o.Monitor==monitor&&OnScreen(o)).Select(o=>DesktopWidgetStore.Fit(o,available)).ToList();
+            var xs=new List<double>{step,available.Width-step-item.Width};
+            var ys=new List<double>{step,available.Height-step-item.Height};
+            foreach(var o in others)
+            {
+                xs.Add(o.Left);xs.Add(o.Right-item.Width);xs.Add(o.Right+gap);xs.Add(o.Left-gap-item.Width);
+                ys.Add(o.Top);ys.Add(o.Bottom-item.Height);ys.Add(o.Bottom+gap);ys.Add(o.Top-gap-item.Height);
+            }
+            item.X=Closest(item.X,xs,Reach,step);
+            item.Y=Closest(item.Y,ys,Reach,step);
+        }
+        internal static double Closest(double value,List<double> edges,double reach,double step)
+        {
+            double best=Math.Round(value/step)*step,distance=reach;
+            foreach(double edge in edges)
+            {
+                double gap=Math.Abs(edge-value);
+                if(gap>=distance)continue;
+                distance=gap;
+                best=edge;
+            }
+            return Math.Max(0,best);
+        }
+        // Packs every widget of each screen into tidy columns along the right edge, keeping their top-to-bottom order.
+        internal void Arrange()
+        {
+            if(disposed)return;
+            foreach(var group in Store.Items.Where(OnScreen).GroupBy(i=>MonitorIdentity.Of(ScreenFor(i))).ToList())
+            {
+                var screen=ScreenFor(group.First());
+                double scale=Native.DropMonitorScale(screen.Bounds);
+                var available=new Size(Work(screen).Width/scale,Work(screen).Height/scale);
+                double margin=DesktopWidgetStore.GridStep,gap=InfoTile.Gap,right=available.Width-margin,y=margin,column=0;
+                foreach(var item in group.OrderBy(i=>i.Y).ThenBy(i=>i.X).ToList())
+                {
+                    var fit=DesktopWidgetStore.Fit(item,available);
+                    if(y>margin&&y+fit.Height>available.Height-margin)
+                    {
+                        right-=column+gap;
+                        y=margin;
+                        column=0;
+                    }
+                    item.X=Math.Max(0,right-fit.Width);
+                    item.Y=y;
+                    column=Math.Max(column,fit.Width);
+                    y+=fit.Height+gap;
+                }
+                foreach(var item in group)
+                {
+                    DesktopWidgetHost host;
+                    if(!hosts.TryGetValue(item.Id,out host))continue;
+                    host.Place(Physical(item,screen,scale),scale);
+                    PaintWidget(item,host);
+                }
+            }
+            Store.Save();
+            Pulse();
+            if(selectedId!=null)
+            {
+                var selected=Store.Items.FirstOrDefault(i=>i.Id==selectedId);
+                if(selected!=null)ShowToolbar(selected);
+            }
+        }
         internal void Drag(DesktopWidgetSlot item,System.Drawing.Point start,System.Drawing.Point end,bool resize,bool commit)
         {
             if(disposed||changing)return;
@@ -555,6 +625,7 @@ namespace OneTaskBar
                 item.Monitor=MonitorIdentity.Of(screen);
                 item.X=(dragPixels.X+end.X-start.X-Work(screen).Left)/scale;
                 item.Y=(dragPixels.Y+end.Y-start.Y-Work(screen).Top)/scale;
+                SnapPosition(item,new Size(Work(screen).Width/scale,Work(screen).Height/scale),MonitorIdentity.Of(screen));
             }
             DesktopWidgetStore.Normalize(item);
             var fit=DesktopWidgetStore.Fit(item,new Size(Work(screen).Width/scale,Work(screen).Height/scale));
@@ -568,7 +639,7 @@ namespace OneTaskBar
                 dragging=null;
                 RepaintMoved(item);
                 if(resize)Snap(item);
-                else Clear(item,true);
+                else Clear(item,false);
                 Store.Save();
                 if(selectedId==item.Id)ShowToolbar(item);
             }

@@ -15,6 +15,10 @@ namespace OneTaskBar
             var add=Paint.Action("위젯 추가 및 배치 편집",()=>shell.Widgets.OpenGallery());
             add.Margin=new Thickness(0,0,8,0);
             actions.Children.Add(add);
+            var tidy=Paint.Action("위젯 정리",()=>shell.Widgets.Arrange());
+            tidy.ToolTip="놓인 위젯을 겹침 없이 오른쪽 가장자리에 세로 열로 가지런히 모읍니다. 크기와 종류는 그대로입니다";
+            tidy.Margin=new Thickness(0,0,8,0);
+            actions.Children.Add(tidy);
             var layout=Paint.Action("기본 배치로 바꾸기",()=>shell.Widgets.SeedDefault(true));
             layout.ToolTip="지금 놓인 위젯을 모두 지우고 오른쪽 가장자리에 정돈된 기본 위젯을 놓습니다";
             actions.Children.Add(layout);
