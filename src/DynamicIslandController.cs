@@ -32,7 +32,7 @@ namespace OneTaskBar
             var monitor=dock.Screen;
             double dpi=dock.Scale;
             bool full=!DisplayAwake||Overview!=null&&Overview.IsVisible||FullscreenVisibility.IsFullScreen(monitor.Bounds,windows);
-            if(!full&&Preferences.Current.FullscreenBand&&FullscreenVisibility.BandFriendly(FullscreenVisibility.BandCover(monitor.Bounds,windows)))full=true;
+            if(!full&&IslandEnabled&&Preferences.Current.FullscreenBand&&FullscreenVisibility.BandFriendly(FullscreenVisibility.BandCover(monitor.Bounds,windows)))full=true;
             if(full)
             {
                 if(Island!=null)Island.Suspend();
@@ -104,7 +104,7 @@ namespace OneTaskBar
         // A browser or video player in fullscreen still gets the black band, with the status bar on hover.
         bool FullscreenBand(Forms.Screen monitor,double dpi,IEnumerable<FullscreenCandidate> windows,DockHost dock)
         {
-            if(!Preferences.Current.FullscreenBand||!Desktop||disposed||!(IslandEnabled||TopBarEnabled)||!DisplayAwake)return false;
+            if(!Preferences.Current.FullscreenBand||!Desktop||disposed||!IslandEnabled||!DisplayAwake)return false;
             if(Overview!=null&&Overview.IsVisible)return false;
             var cover=FullscreenVisibility.BandCover(monitor.Bounds,windows);
             if(!FullscreenVisibility.BandFriendly(cover))return false;
@@ -119,7 +119,8 @@ namespace OneTaskBar
         }
         bool ShadeWanted(Forms.Screen monitor,IEnumerable<FullscreenCandidate> windows)
         {
-            return (IslandEnabled||TopBarEnabled)&&!Preferences.Current.MaximizedBehindDock&&MaximizedAbove(monitor,windows);
+            // The Android-style top bar stays visible; only the island turns its band black.
+            return IslandEnabled&&!Preferences.Current.MaximizedBehindDock&&MaximizedAbove(monitor,windows);
         }
         void UpdateCurtain(Forms.Screen monitor,double dpi,bool wanted,bool bottom)
         {
