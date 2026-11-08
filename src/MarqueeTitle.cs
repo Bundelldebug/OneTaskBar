@@ -83,7 +83,8 @@ namespace OneTaskBar
         void Rendering(object sender,EventArgs args)
         {
             var frame=args as RenderingEventArgs;
-            if(frame!=null){if(frame.RenderingTime==lastRendering)return;lastRendering=frame.RenderingTime;}
+            // Sixty updates a second everywhere: a 120 Hz display skips every other frame, a 60 Hz one uses all of them.
+            if(frame!=null){if(frame.RenderingTime==lastRendering||lastRendering!=TimeSpan.MinValue&&(frame.RenderingTime-lastRendering).TotalMilliseconds<14)return;lastRendering=frame.RenderingTime;}
             Frame();
         }
         protected override Size MeasureOverride(Size constraint){return new Size(Math.Min(NaturalWidth,Double.IsInfinity(constraint.Width)?NaturalWidth:constraint.Width),Math.Min(Math.Max(22,Formatted.Height),constraint.Height));}
