@@ -106,7 +106,7 @@ namespace OneTaskBar
 
     internal sealed class CalendarTile : InfoTile
     {
-        readonly TextBlock month=Label("",14);
+        readonly TextBlock month=Label("",16);
         readonly TextBlock[] days=new TextBlock[42];
         readonly Border[] cells=new Border[42];
         readonly Brush Today=TileScheme.Creating.Track;
@@ -123,7 +123,7 @@ namespace OneTaskBar
             var names=new UniformGrid {Columns=7};
             foreach(string name in new[]{"일","월","화","수","목","금","토"})
             {
-                var label=Label(name,9.5,Faint);
+                var label=Label(name,11,Faint);
                 label.HorizontalAlignment=HorizontalAlignment.Center;
                 names.Children.Add(label);
             }
@@ -131,7 +131,7 @@ namespace OneTaskBar
             grid=new UniformGrid {Columns=7,Rows=6,Height=Span(2)-62,Margin=new Thickness(0,2,0,0)};
             for(int i=0;i<days.Length;i++)
             {
-                days[i]=Label("",10);
+                days[i]=Label("",12.5);
                 days[i].HorizontalAlignment=HorizontalAlignment.Center;
                 cells[i]=new Border {CornerRadius=new CornerRadius(5),Child=days[i]};
                 grid.Children.Add(cells[i]);
@@ -232,8 +232,8 @@ namespace OneTaskBar
 
     internal sealed class WeatherTile : InfoTile
     {
-        readonly TextBlock temperature=Label("--°",24),summary=Label("",11),place=Label("",10,Faint);
-        readonly Path symbol=new Path {Width=40,Height=40,Stretch=Stretch.Uniform,Fill=TileScheme.Creating.Ink,HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Top,Margin=new Thickness(0,14,14,0)};
+        readonly TextBlock temperature=Label("--°",32),summary=Label("",13),place=Label("",12,Faint);
+        readonly Path symbol=new Path {Width=48,Height=48,Stretch=Stretch.Uniform,Fill=TileScheme.Creating.Ink,HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Top,Margin=new Thickness(0,14,14,0)};
         WeatherReport shown;
         string shownPlace,shownProblem;
         bool loaded;

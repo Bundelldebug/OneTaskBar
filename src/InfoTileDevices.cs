@@ -176,9 +176,10 @@ namespace OneTaskBar
         }
         void Add(string icon,string budsModel)
         {
-            var gauge=new Gauge(icon);
+            var gauge=new Gauge(icon){Width=60};
             gauges.Add(gauge);
-            grid.Children.Add(gauge);
+            // The ring grows to fill its cell instead of staying a small mark in a large tile.
+            grid.Children.Add(new Viewbox {Child=gauge,Stretch=Stretch.Uniform,StretchDirection=StretchDirection.UpOnly,MaxHeight=112,Margin=new Thickness(6)});
             if(budsModel!=null)TileDevices.LoadBudsIcon(budsModel,gauge.SetSymbol);
         }
         sealed class Gauge : Grid
@@ -353,8 +354,10 @@ namespace OneTaskBar
         {
             double bar=rows==2?38:30;
             var bars=new StackPanel {VerticalAlignment=VerticalAlignment.Center};
-            storage=new LevelBar("computer",null,bar) {Margin=new Thickness(0,0,0,8)};
-            memory=new LevelBar("apps",null,bar);
+            // Name each bar unless the tile is the narrow one-row pill.
+            bool named=!(columns==2&&rows==1);
+            storage=new LevelBar("computer",named?"저장공간":null,bar) {Margin=new Thickness(0,0,0,8)};
+            memory=new LevelBar("apps",named?"메모리":null,bar);
             bars.Children.Add(storage);
             bars.Children.Add(memory);
             var open=Paint.Button(new Glyph("settings",rows==2?30:24){Color=TileScheme.Creating.Ink},()=>Native.Open("ms-settings:storagesense"),"저장공간 설정 열기");
