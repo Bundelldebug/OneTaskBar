@@ -22,7 +22,7 @@ namespace OneTaskBar
         internal static AnimationTimeline Press(double from,double to,int milliseconds)
         {
             if(!Fluid.Enabled)return Tween(from,to,milliseconds);
-            var motion=Elastic(from,to,milliseconds+160,SpringEase.Bouncy);
+            var motion=Elastic(from,to,milliseconds+120,SpringEase.Snappy);
             return motion;
         }
         internal static DoubleAnimationUsingKeyFrames PanelTween(double from,double to,int milliseconds)

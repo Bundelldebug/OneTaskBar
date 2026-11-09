@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -19,9 +19,9 @@ namespace OneTaskBar
         // Radius for a surface: the liquid radius when the material is on, otherwise what the caller already chose.
         internal static double Radius(double current,bool live,bool dock)
         {
-            return Enabled&&live?(dock?DockBlur:PanelBlur):current;
+            return Enabled&&live?(Fluid.Enabled?(dock?8:10):dock?DockBlur:PanelBlur):current;
         }
-        internal static double Boost(bool live){return Enabled&&live?Saturation:1;}
+        internal static double Boost(bool live){return Enabled&&live?(Fluid.Enabled?1.12:Saturation):1;}
         // level 0 is the thinnest; each step adds tint for a brighter backdrop (see LiquidReadability).
         internal static Brush Tint(bool dark){return Tint(dark,0);}
         internal static Brush Tint(bool dark,int level)

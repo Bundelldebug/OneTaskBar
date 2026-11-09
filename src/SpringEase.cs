@@ -17,7 +17,7 @@ namespace OneTaskBar
         // A visible, lively settle (about 4%): launches and pops.
         internal static readonly SpringEase Bouncy=Frozen(.72);
         // The Fluid UI's pop: a clear stretch past the target (about 12%) that settles like liquid.
-        internal static readonly SpringEase Liquid=Frozen(.55);
+        internal static readonly SpringEase Liquid=Frozen(.78);
         readonly double damping;
         static SpringEase Frozen(double damping){var ease=new SpringEase(damping);ease.Freeze();return ease;}
         public SpringEase():this(1){}

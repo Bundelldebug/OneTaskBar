@@ -115,7 +115,7 @@ namespace OneTaskBar
         {
             if(Math.Abs(target.X-bounds.X)<.1&&Math.Abs(target.Y-bounds.Y)<.1&&Math.Abs(target.Width-bounds.Width)<.1&&Math.Abs(target.Height-bounds.Height)<.1)return;
             if(flight!=null)flight.Dispose();
-            slide.Damping=Fluid.Enabled?.62:1;slide.Omega=Fluid.Enabled?30:36;
+            slide.Damping=Fluid.Enabled?.82:1;slide.Omega=Fluid.Enabled?30:36;
             Retarget(bounds);
             StopMotion();
             FrameCount=0;

@@ -304,7 +304,7 @@ namespace OneTaskBar
             if(springs==null)springs=new[]{coverX,coverY,coverW,coverH,cardX,cardY,cardW,cardH,coverRound,cardRound,clockTopSpring,clockSizeSpring,dateTopSpring,washSpring,shadeSpring,tilesSpring};
             foreach(var spring in springs)spring.Omega=32;
             // In the Fluid UI the shapes overshoot a little and settle like liquid; fades and tiles stay smooth.
-            double shape=Fluid.Enabled?.62:1;
+            double shape=Fluid.Enabled?.82:1;
             foreach(var spring in new[]{coverX,coverY,coverW,coverH,cardX,cardY,cardW,cardH,coverRound,cardRound})spring.Damping=shape;
             return springs;
         }

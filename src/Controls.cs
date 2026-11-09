@@ -303,7 +303,10 @@ namespace OneTaskBar
         public double Radius=28; public bool Dark=true; public bool HasBlur;internal int LiquidLevel;internal bool PopFromTop;internal bool SoftCorners=true,OpaqueSurface,DockSurface,DockPalette;
         internal bool StableSurface=true,UnifiedFade,SmoothLauncher;internal FrameworkElement TransitionContent;
         GlassLens lens;
-        FluidLight fluidLight;
+        FluidLight fluidLight;FluidBud bud;
+        // Panels in the Fluid UI come out of the bar as a drop; the dock, the island and the Now Bar move their own way.
+        internal bool BudActive {get{return bud!=null&&bud.Active;}}
+        bool BudEligible {get{return Fluid.Enabled&&Motion.Enabled&&!OpaqueSurface&&!DockSurface&&!UnifiedFade&&(BackdropClip==null||bud!=null&&bud.Active)&&Radius>2&&!(this is NowBar)&&!(this is DynamicIsland);}}
         // A window with its own opaque picture (fullscreen media) may still take the Fluid light over it.
         internal bool FluidLightOnOpaque;
         internal bool HasFluidLight {get{return fluidLight!=null;}}
@@ -417,6 +420,7 @@ namespace OneTaskBar
         }
         public new void Show()
         {
+            if(bud!=null)bud.Cancel();
             bool resume=StableSurface&&!UnifiedFade&&IsVisible&&hiding;++motion;hiding=false;CompleteDismissal(false);if(UnifiedFade)ResetFade();Surface.IsHitTestVisible=true;Surface.BeginAnimation(UIElement.OpacityProperty,null);Surface.Opacity=1;Surface.RenderTransform=Transform.Identity;
             if(StableSurface&&TransitionContent!=null){if(resume&&Motion.Enabled){if(SmoothLauncher)LauncherMotion.Run(TransitionContent,true,PopFromTop,true);else Motion.Launcher(TransitionContent,true,PopFromTop);}else{if(SmoothLauncher)LauncherMotion.Cancel(TransitionContent);TransitionContent.BeginAnimation(OpacityProperty,null);TransitionContent.Opacity=1;TransitionContent.RenderTransform=Transform.Identity;}}
             base.Show();
@@ -426,6 +430,7 @@ namespace OneTaskBar
         {
             if(TransitionContent==null)TransitionContent=Surface.Child as FrameworkElement;
             if(!Motion.Enabled){if(SmoothLauncher)LauncherMotion.Cancel(TransitionContent);return;}
+            if(BudEligible){++motion;Surface.RenderTransform=Transform.Identity;Surface.Opacity=1;if(bud==null)bud=new FluidBud(this);bud.Open(Motion.Anchor(Surface,PopFromTop),PopFromTop);return;}
             if(StableSurface&&TransitionContent!=null){++motion;Surface.RenderTransform=Transform.Identity;Surface.Opacity=1;if(SmoothLauncher)LauncherMotion.Run(TransitionContent,true,PopFromTop,true);else Motion.Launcher(TransitionContent,true,PopFromTop);return;}
             if(Fluid.Enabled){++motion;Surface.Opacity=1;Motion.Drop(Surface,Motion.Anchor(Surface,PopFromTop),0);return;}
             ++motion;Surface.RenderTransformOrigin=new Point(.5,.5);var scale=new ScaleTransform(.94,.94);double offset=Math.Min(14,Math.Max(0,Surface.ActualHeight)*.025);var translate=new TranslateTransform(0,offset);var group=new TransformGroup();group.Children.Add(scale);group.Children.Add(translate);Surface.RenderTransform=group;
@@ -439,6 +444,7 @@ namespace OneTaskBar
             if(TransitionContent==null)TransitionContent=Surface.Child as FrameworkElement;
             if(closed||!IsVisible){CompleteDismissal(!closed);return;}if(hiding)return;
             if(!Motion.Enabled){base.Hide();CompleteDismissal(true);return;}
+            if(BudEligible){hiding=true;Surface.IsHitTestVisible=false;int budToken=++motion;if(bud==null)bud=new FluidBud(this);bud.Close(Motion.Anchor(Surface,PopFromTop),PopFromTop,()=>{if(!closed&&budToken==motion){base.Hide();hiding=false;Surface.IsHitTestVisible=true;CompleteDismissal(true);}});return;}
             if(UnifiedFade){hiding=true;Surface.IsHitTestVisible=false;int fadeToken=++motion;double from=(double)GetValue(SurfaceFadeProperty);SetValue(SurfaceFadeProperty,0.0);var fade=Motion.Tween(from,0,145);fade.Completed+=(s,e)=>{if(!closed&&fadeToken==motion){base.Hide();hiding=false;Surface.IsHitTestVisible=true;ResetFade();CompleteDismissal(true);}};BeginAnimation(SurfaceFadeProperty,fade);return;}
             if(StableSurface&&TransitionContent!=null){hiding=true;Surface.IsHitTestVisible=false;int contentToken=++motion;var fade=SmoothLauncher?LauncherMotion.Run(TransitionContent,false):Motion.Launcher(TransitionContent,false);fade.Completed+=(s,e)=> {if(!closed&&contentToken==motion){base.Hide();hiding=false;Surface.IsHitTestVisible=true;TransitionContent.BeginAnimation(OpacityProperty,null);TransitionContent.Opacity=1;TransitionContent.RenderTransform=Transform.Identity;CompleteDismissal(true);}};TransitionContent.BeginAnimation(OpacityProperty,fade);return;}
             hiding=true;Surface.IsHitTestVisible=false;int token=++motion;Surface.RenderTransformOrigin=Fluid.Enabled?Motion.Anchor(Surface,PopFromTop):new Point(.85,1);var scale=new ScaleTransform(1,1);var shift=new TranslateTransform();var group=new TransformGroup();group.Children.Add(scale);group.Children.Add(shift);Surface.RenderTransform=group;

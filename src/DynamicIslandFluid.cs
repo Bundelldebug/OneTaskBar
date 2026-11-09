@@ -68,7 +68,7 @@ namespace OneTaskBar
             if(!on){pour.Visibility=bloom.Visibility=Visibility.Collapsed;}
             SetMaterial(on?FluidBase:Black,on?FluidBase:Black);
             // About one overshoot of a tenth: the shape stretches past its size and settles back.
-            slide.Damping=on?.6:1;
+            slide.Damping=on?.8:1;
             slide.Omega=on?30:38;
             if(!on)SetFluidMotion(false);
             if(IsVisible&&!current.IsEmpty)PlaceShape();

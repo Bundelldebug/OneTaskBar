@@ -199,6 +199,7 @@ namespace OneTaskBar
             popupX=bounds.Left;popupY=bounds.Top;lastClip=clip;
             if(w!=width||h!=height){var size=new Vector2(w,h);root.Size=size;blur.Size=size;}width=w;height=h;corner=c;
             double scale=backdropScale;float cw=clip.HasValue?(float)(clip.Value.Width*scale):w,ch=clip.HasValue?(float)(clip.Value.Height*scale):h;
+            if(!clip.HasValue&&inputClip.HasValue){if(Native.ClipWindow(background,new Native.RectI {Right=w,Bottom=h}))inputClip=null;}
             if(clip.HasValue){var boundsClip=Native.InputBounds(clip.Value,scale);if(glass is NowBar&&ReleaseFeatures.GlassUI)boundsClip=new Native.RectI {Right=w,Bottom=h};if(!inputClip.HasValue||!inputClip.Value.Equals(boundsClip)){if(Native.ClipWindow(background,boundsClip))inputClip=boundsClip;}}
             shape.Offset=clip.HasValue?new Vector2((float)(clip.Value.X*scale),(float)(clip.Value.Y*scale)):Vector2.Zero;shape.Size=new Vector2(cw,ch);shape.CornerRadius=new Vector2(Math.Min(c,cw/2f),Math.Min(c,ch/2f));
             Sync();

@@ -101,14 +101,26 @@ namespace OneTaskBar
                     motion=Motion.WithAnimationsForFixture();
                     var panel=new GlassWindow {Width=320,Height=220,Left=1200,Top=200,ShowActivated=false};
                     panel.Surface.Child=new TextBlock {Text="Fluid panel",Foreground=Brushes.Black,Margin=new Thickness(24),FontSize=18};
+                    panel.Surface.Background=Brushes.SteelBlue;
                     panel.Show();
-                    await Task.Delay(120);
-                    Program.Save(panel.Content as FrameworkElement,320,220,Path.Combine(AppLog.Data,"fluid-panel-sweep.png"));
-                    await Task.Delay(900);
+                    panel.Pop();
+                    Require(panel.BudActive,"a fluid panel opens as a drop from the bar");
+                    int waited=0;
+                    foreach(int at in new[]{40,110,200,320,470})
+                    {
+                        await Task.Delay(at-waited);waited=at;
+                        Program.Save(panel.Content as FrameworkElement,320,220,Path.Combine(AppLog.Data,"fluid-bud-"+at+".png"));
+                    }
+                    await Task.Delay(500);
+                    Require(!panel.BudActive&&!panel.BackdropClip.HasValue&&((FrameworkElement)panel.Content).Clip==null,"the drop ends as the plain panel");
                     Program.Save(panel.Content as FrameworkElement,320,220,Path.Combine(AppLog.Data,"fluid-panel-rest.png"));
-                    panel.Hide();panel.Show();
-                    await Task.Delay(140);
-                    Program.Save(panel.Content as FrameworkElement,320,220,Path.Combine(AppLog.Data,"fluid-panel-sweep.png"));
+                    panel.Hide();
+                    await Task.Delay(120);
+                    Program.Save(panel.Content as FrameworkElement,320,220,Path.Combine(AppLog.Data,"fluid-bud-closing.png"));
+                    await Task.Delay(400);
+                    Require(!panel.IsVisible,"the panel is hidden once it has shrunk into the bar");
+                    panel.Show();panel.Pop();await Task.Delay(900);
+                    Require(!panel.BudActive&&!panel.BackdropClip.HasValue&&panel.Surface.Child.Opacity>=.999,"reopening restores the panel after a close");
                     Require(panel.HasFluidLight,"the fluid UI adds its light to glass panels");
                     panel.Close();
                     foreach(int version in new[]{95,Fluid.Version})Program.Save(new UIVersionPreview {Version=version},130,132,Path.Combine(AppLog.Data,"ui-version-preview-"+version+".png"));
