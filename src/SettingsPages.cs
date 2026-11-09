@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -75,13 +75,13 @@ namespace OneTaskBar
                 case "데스크톱":return "desktops";
                 case "바탕화면 위젯":return "apps";
                 case "패널 선택":
-                case "Dynamic Island와 상단바":return "notification";
+                case "다이나믹 아일랜드와 상단바":return "notification";
                 case "시작과 검색":return "search";
                 case "미디어 플레이어":return "play";
                 case "복구":return "shield";
                 case "PC 호환성":return "computer";
                 case "화면":
-                case "Fluid UI":return "brightness";
+                case "플루이드 UI":return "brightness";
                 case "움직임":return "motion";
                 case "충전 소리":return "volume";
                 default:return "settings";

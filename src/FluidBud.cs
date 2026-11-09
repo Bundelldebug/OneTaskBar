@@ -14,13 +14,11 @@ namespace OneTaskBar
     //   4. a soft white wavefront runs through the panel from the bar's side, and the picture comes in behind it.
     // The panel's real outline moves: the backdrop, the window and the picture all follow it, nothing is scaled or
     // squashed, and the bar stays still. The window is stretched to the bar's edge for the length of the motion so the
-    // drop really starts in the bar. Closing runs the outline back into the bar on a quick spring.
+    // drop really starts in the bar. Closing plays the same steps backwards, faster, back into the bar.
     internal sealed class FluidBud
     {
-        const double Orb=30,Total=.62;
+        const double Orb=30,Total=.62,CloseTime=.34;
         readonly GlassWindow window;
-        readonly SpringValue spring=new SpringValue(.002);
-        readonly SpringClock clock=new SpringClock();
         readonly Stopwatch watch=new Stopwatch();
         readonly RectangleGeometry body=new RectangleGeometry();
         readonly GeometryGroup outline=new GeometryGroup {FillRule=FillRule.Nonzero};
@@ -58,6 +56,9 @@ namespace OneTaskBar
         {
             Cancel();
             fromTop=top;
+            // On the first open the window has just been shown and may not be laid out yet; without a size there is no
+            // shape to animate, which is why a first click used to show no motion at all.
+            if(window.Surface.ActualWidth<2||window.Surface.ActualHeight<2)window.UpdateLayout();
             GrowToBar();
             anchor=at.X;
             closing=close;
@@ -76,21 +77,11 @@ namespace OneTaskBar
             }
             reveal.StartPoint=new Point(0,fromTop?-offset:panel-offset);
             reveal.EndPoint=new Point(0,fromTop?panel-offset:-offset);
-            if(close)
-            {
-                spring.Omega=34;
-                spring.Damping=1;
-                spring.Value=1;
-                spring.Velocity=0;
-                spring.Target=0;
-                clock.Restart();
-            }
-            else
-            {
-                AttachFlare();
-                watch.Restart();
-            }
-            Step(close?1:0);
+            // Closing plays the arrival backwards, faster: the picture recedes toward the bar behind the light, the panel
+            // folds into a pill, the pill into a drop, and the drop goes back into the bar on its neck.
+            AttachFlare();
+            watch.Restart();
+            Step(close?Total:0);
             if(!hooked){hooked=true;CompositionTarget.Rendering+=Frame;}
         }
 
@@ -129,6 +120,7 @@ namespace OneTaskBar
             int pixels=(int)Math.Round(extra*scale);
             original=rect;
             var surface=window.Surface;
+            if(surface.ActualWidth<2||surface.ActualHeight<2)return;
             fixedWidth=surface.ActualWidth;fixedHeight=surface.ActualHeight;
             surface.Width=fixedWidth;surface.Height=fixedHeight;
             surface.VerticalAlignment=fromTop?VerticalAlignment.Bottom:VerticalAlignment.Top;
@@ -154,20 +146,15 @@ namespace OneTaskBar
         {
             var rendering=e as RenderingEventArgs;
             if(rendering==null)return;
-            bool over;
-            if(closing)
+            double t=watch.Elapsed.TotalSeconds;
+            bool over=t>=(closing?CloseTime:Total);
+            if(!over)
             {
-                spring.Step(clock.Next(rendering.RenderingTime));
-                over=spring.Value<=.02;
-                if(!over)Step(spring.Value);
+                // Closing runs the arrival's timeline backwards from where the picture is complete, so it answers at once.
+                double s=t/CloseTime;
+                Step(closing?.54*(1-s):t);
+                return;
             }
-            else
-            {
-                double t=watch.Elapsed.TotalSeconds;
-                over=t>=Total;
-                if(!over)Step(t);
-            }
-            if(!over)return;
             var done=finished;
             bool wasClosing=closing;
             finished=null;
@@ -190,14 +177,9 @@ namespace OneTaskBar
             return SpringEase.Position(Math.Max(0,Math.Min(1,(t-start)/(end-start))),damping);
         }
 
-        // One moment of the motion. Opening takes the time in seconds; closing takes the spring's position (1 = open).
+        // One moment of the arrival's timeline, in seconds; closing walks the same timeline back to 0.
         void Step(double at)
         {
-            if(closing)
-            {
-                Apply(at*1.18,at,1,0,0,-1,Math.Max(0,Math.Min(1,(at-.1)*2.2)));
-                return;
-            }
             double drop=Smooth(0,.12,at);
             double across=Spring(.1,.38,at,.86),down=Spring(.2,.6,at,.84);
             double pinch=1-Smooth(.12,.3,at);
@@ -275,10 +257,10 @@ namespace OneTaskBar
         {
             var inside=window.Surface.Child;
             if(inside==null)return;
-            if(closing||wave<0)
+            if(wave<0)
             {
                 if(masked!=null){masked.OpacityMask=null;masked=null;}
-                inside.Opacity=closing?content:0;
+                inside.Opacity=0;
                 return;
             }
             inside.Opacity=1;

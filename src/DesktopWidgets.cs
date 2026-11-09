@@ -644,10 +644,12 @@ namespace OneTaskBar
                 if(selectedId==item.Id)ShowToolbar(item);
             }
         }
+        int fluidKey=Fluid.StyleKey;
         internal void Pulse()
         {
             if(disposed||!Preferences.Current.DesktopWidgets)return;
-            if(tintedInk!=WidgetMaterial.Tinted)ApplyMaterial();
+            // A new Fluid glow color repaints the widgets' glass and rims, like it rebuilds the panels.
+            if(tintedInk!=WidgetMaterial.Tinted||fluidKey!=Fluid.StyleKey){fluidKey=Fluid.StyleKey;ApplyMaterial();}
             if(interfaceVersion!=Preferences.Current.UIVersion)
             {
                 Clear();

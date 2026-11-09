@@ -93,6 +93,20 @@ namespace OneTaskBar
             return spill;
         }
 
+        static Brush rim;static int rimKey;
+        // A thin edge that catches the glow: pale at the top-left, the glow color toward the lower right.
+        internal static Brush Rim()
+        {
+            int key=StyleKey;
+            if(rim!=null&&rimKey==key)return rim;
+            var brush=new LinearGradientBrush {StartPoint=new System.Windows.Point(0,0),EndPoint=new System.Windows.Point(1,1)};
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(120,255,255,255),0));
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(46,255,255,255),.5));
+            brush.GradientStops.Add(new GradientStop(GlowOn?Pale(150):Color.FromArgb(70,255,255,255),1));
+            brush.Freeze();
+            rim=brush;rimKey=key;
+            return brush;
+        }
         static readonly Brush[] tints=new Brush[2];
         static int tintKey;
         // Thin glass whose top is clear and whose lower part holds the glow with a cool lilac band above it.

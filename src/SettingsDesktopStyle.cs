@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -11,7 +11,7 @@ namespace OneTaskBar
     internal sealed partial class WelcomeWindow
     {
         static readonly string[] desktopStyleNames={"Windows","Mac","GoogleBook"};
-        static readonly string[] desktopStyleNotes={"기본 하단 작업표시줄","Dynamic Island + 하단바 · 나우바 끔 · 듀오 아이콘","상단 안드로이드 바"};
+        static readonly string[] desktopStyleNotes={"기본 하단 작업표시줄","다이나믹 아일랜드 + 하단바 · 나우바 끔 · 듀오 아이콘","상단 안드로이드 바"};
         internal int DesktopStyleCount {get{return desktopStyleNames.Length;}}
         // The style is a preset of two existing options, so it always reflects what those options say.
         internal static int CurrentDesktopStyle(){return Preferences.Current.TopStatusBar?2:Preferences.Current.DynamicIsland?1:0;}
@@ -47,7 +47,7 @@ namespace OneTaskBar
         {
             var box=new StackPanel {Margin=new Thickness(15,14,15,14)};
             var title=Paint.TextBlock("데스크톱 스타일",15,AppSettingsPalette.Text);title.FontWeight=FontWeights.SemiBold;box.Children.Add(title);
-            var detail=Paint.TextBlock("Windows는 기본 하단 작업표시줄, Mac은 Dynamic Island를 켠 하단바, GoogleBook은 위쪽 안드로이드 바입니다",13,AppSettingsPalette.Muted);detail.TextWrapping=TextWrapping.Wrap;detail.Margin=new Thickness(0,4,0,10);box.Children.Add(detail);
+            var detail=Paint.TextBlock("Windows는 기본 하단 작업표시줄, Mac은 다이나믹 아일랜드를 켠 하단바, GoogleBook은 위쪽 안드로이드 바입니다",13,AppSettingsPalette.Muted);detail.TextWrapping=TextWrapping.Wrap;detail.Margin=new Thickness(0,4,0,10);box.Children.Add(detail);
             var grid=new Grid();
             var frames=new Border[3];
             Action refresh=()=>

@@ -547,6 +547,12 @@ namespace OneTaskBar
                     StartMenu.Configure(fit.Width,fit.Height);
                     StartMenu.Reload();
                     StartMenu.Prepare();
+                    // The app drawer and search are built the same way, so their first open has nothing left to build either.
+                    var layout=LauncherLayout.Fit(dock.Screen.Bounds,Native.WorkArea(dock.Screen),dock.Scale,dock.Edge);
+                    if(Drawer==null)Drawer=new DrawerWindow(this);
+                    if(!Drawer.IsVisible){Drawer.Configure(layout.Width,layout.Height);Drawer.Reload();StartWindow.Prepare(Drawer);}
+                    if(Finder==null)Finder=new SearchWindow(this);
+                    if(!Finder.IsVisible){Finder.Configure(layout.Width,layout.Height);Finder.Reset();StartWindow.Prepare(Finder);}
                 }
                 catch(Exception error){AppLog.Once("start-warm",error.GetType().Name);}
             }),System.Windows.Threading.DispatcherPriority.ApplicationIdle);

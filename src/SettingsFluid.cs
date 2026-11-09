@@ -15,7 +15,7 @@ namespace OneTaskBar
         {
             var rows=new StackPanel();
             SubHeading(rows,"뒤쪽 글로우");
-            var note=Paint.TextBlock("유리 뒤에서 번지는 빛의 색입니다. 패널, 카드 테두리, Dynamic Island, 전체화면 미디어에 함께 적용됩니다. '배경에 맞춤'은 바탕화면의 주요 색을 따라갑니다.",13,AppSettingsPalette.Muted);
+            var note=Paint.TextBlock("유리 뒤에서 번지는 빛의 색입니다. 패널, 카드 테두리, 다이나믹 아일랜드, 전체화면 미디어에 함께 적용됩니다. '배경에 맞춤'은 바탕화면의 주요 색을 따라갑니다.",13,AppSettingsPalette.Muted);
             note.TextWrapping=TextWrapping.Wrap;note.LineHeight=19;note.Margin=new Thickness(17,6,17,6);rows.Children.Add(note);
             var chips=new WrapPanel {Margin=new Thickness(15,4,15,8)};
             var refreshers=new List<Action>();
@@ -43,7 +43,7 @@ namespace OneTaskBar
             glowRefresh();
             rows.Children.Add(chips);
             SubHeading(rows,"알림");
-            Row(rows,"알림 글로우를 앱 아이콘 색으로","알림 팝업과 Dynamic Island 알림이 앱 아이콘의 주요 색으로 빛납니다. 끄면 위에서 고른 색을 씁니다. 글로우가 없음이면 적용되지 않습니다",Preferences.Current.FluidIconGlow,v=>Preferences.Set(p=>p.FluidIconGlow=v));
+            Row(rows,"알림 글로우를 앱 아이콘 색으로","알림 팝업과 다이나믹 아일랜드 알림이 앱 아이콘의 주요 색으로 빛납니다. 끄면 위에서 고른 색을 씁니다. 글로우가 없음이면 적용되지 않습니다",Preferences.Current.FluidIconGlow,v=>Preferences.Set(p=>p.FluidIconGlow=v));
             return rows;
         }
         Action glowRefresh;

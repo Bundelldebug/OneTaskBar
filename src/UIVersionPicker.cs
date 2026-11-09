@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
@@ -36,8 +36,8 @@ namespace OneTaskBar
                 values.Add(new UIVersionChoice
                 {
                     Value=Fluid.Version,
-                    Label="Fluid 베타",
-                    Description="베타 · 9.5 다음 인터페이스입니다. 모든 패널의 유리 아래에 따뜻한 빛이 고이고 테두리가 빛을 받으며, Dynamic Island가 스프링처럼 늘어났다 돌아옵니다. 리퀴드 글래스가 항상 켜집니다."
+                    Label="플루이드 베타",
+                    Description="베타 · 9.5 다음 인터페이스입니다. 모든 패널의 유리 아래에 따뜻한 빛이 고이고 테두리가 빛을 받으며, 다이나믹 아일랜드가 스프링처럼 늘어났다 돌아옵니다. 리퀴드 글래스가 항상 켜집니다."
                 });
             }
             return values.ToArray();

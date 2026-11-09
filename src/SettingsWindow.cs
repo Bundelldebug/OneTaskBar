@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -79,7 +79,7 @@ namespace OneTaskBar
                 YouTubeArtwork.Enabled,v=>Preferences.Set(p=>{p.YouTubeHighResArtwork=v;p.YouTubeArtworkTrack=null;}));
             if(ReleaseFeatures.GlassUI)
             {
-                Row(island,"Dynamic Island","미디어·새 알림과 충전·음량·밝기를 표시합니다. 위쪽 작업표시줄에서는 화면 아래에 표시합니다",
+                Row(island,"다이나믹 아일랜드","미디어·새 알림과 충전·음량·밝기를 표시합니다. 위쪽 작업표시줄에서는 화면 아래에 표시합니다",
                     Preferences.Current.DynamicIsland,v=>Preferences.Set(p=>p.DynamicIsland=v));
                 Row(nowBar,"미디어 앱 전환 애니메이션","재생 앱을 최소화하거나 복원할 때 미디어 캡슐로 연결합니다",
                     Preferences.Current.MediaWindowAnimation,v=>Preferences.Set(p=>p.MediaWindowAnimation=v));
@@ -87,12 +87,12 @@ namespace OneTaskBar
                     Preferences.Current.LightEffects,v=>Preferences.Set(p=>p.LightEffects=v));
                 Row(hardware,"60Hz 모드","120Hz 화면에서도 애니메이션을 60프레임으로 제한해 발열과 전력 사용을 줄입니다. 앱을 다시 시작하면 적용됩니다",
                     Preferences.Current.Limit60Hz,v=>Preferences.Set(p=>p.Limit60Hz=v));
-                Row(island,"상단 상태 표시줄","안드로이드처럼 화면 위쪽에 시계·알림(왼쪽), 재생 중인 미디어, 알림 앱 아이콘, 빠른 설정(오른쪽)을 배치합니다. Dynamic Island와 같은 두께의 위쪽 공간을 씁니다",
+                Row(island,"상단 상태 표시줄","안드로이드처럼 화면 위쪽에 시계·알림(왼쪽), 재생 중인 미디어, 알림 앱 아이콘, 빠른 설정(오른쪽)을 배치합니다. 다이나믹 아일랜드와 같은 두께의 위쪽 공간을 씁니다",
                     Preferences.Current.TopStatusBar,v=>Preferences.Set(p=>p.TopStatusBar=v));
                 Row(island,"전체화면 검은 띠","브라우저·동영상 플레이어가 전체화면일 때 위쪽 안전 영역을 검게 채우고, 포인터를 올리면 상태 표시줄을 보여 줍니다. 게임에는 적용하지 않습니다",
                     Preferences.Current.FullscreenBand,v=>Preferences.Set(p=>p.FullscreenBand=v));
-                ChoiceRow(nowBar,"미디어 앱 전환 애니메이션 목적지","Dynamic Island가 켜져 있을 때 창이 들어가고 나오는 자리를 고릅니다. 꺼져 있으면 나우바로 갑니다",
-                    Preferences.Current.MediaFlightToIsland,v=>Preferences.Set(p=>p.MediaFlightToIsland=v),"나우바","Dynamic Island");
+                ChoiceRow(nowBar,"미디어 앱 전환 애니메이션 목적지","다이나믹 아일랜드가 켜져 있을 때 창이 들어가고 나오는 자리를 고릅니다. 꺼져 있으면 나우바로 갑니다",
+                    Preferences.Current.MediaFlightToIsland,v=>Preferences.Set(p=>p.MediaFlightToIsland=v),"나우바","다이나믹 아일랜드");
                 Row(nowBar,"측면 미디어 세로 캡슐","왼쪽·오른쪽 작업표시줄에서 커버와 재생 표시를 세로로 배치합니다",
                     Preferences.Current.NowBarSideCapsule,v=>Preferences.Set(p=>p.NowBarSideCapsule=v));
                 SubHeading(nowBar,"전체화면 미디어");
@@ -134,10 +134,10 @@ namespace OneTaskBar
             soundActions.Children.Add(Paint.Action("소리 파일 선택",()=> {var picker=new Microsoft.Win32.OpenFileDialog {Title="충전 연결음 선택",Filter="소리 파일|*.wav;*.mp3;*.wma;*.m4a;*.aac",CheckFileExists=true,Multiselect=false};if(picker.ShowDialog(this)!=true)return;Preferences.Set(p=> {p.ChargeSoundFile=picker.FileName;p.ChargeSoundEnabled=true;});soundName.Text=Path.GetFileName(picker.FileName);soundToggle.Refresh(true);status.Text="충전 연결음을 저장했습니다";}));
             soundActions.Children.Add(Paint.Action("미리 듣기",()=>shell.ConnectionSound.Play(Preferences.Current.ChargeSoundFile,message=>status.Text=message)));
             soundActions.Children.Add(Paint.Action("파일 지우기",()=> {Preferences.Set(p=> {p.ChargeSoundFile=null;p.ChargeSoundEnabled=false;});soundName.Text="선택한 파일 없음";soundToggle.Refresh(false);}));sounds.Children.Add(soundActions);Group(groups,"충전 소리",sounds);
-            if(island.Children.Count>0)Group(groups,"Dynamic Island와 상단바",island);
-            if(Preferences.Current.UIVersion>=Fluid.Version)Group(groups,"Fluid UI",FluidSection());
+            if(island.Children.Count>0)Group(groups,"다이나믹 아일랜드와 상단바",island);
+            if(Preferences.Current.UIVersion>=Fluid.Version)Group(groups,"플루이드 UI",FluidSection());
             // Ordered by what people reach for: the bar itself, how it looks and moves, panels, launcher, media, then upkeep.
-            var order=new[]{"데스크톱","Fluid UI","Dynamic Island와 상단바","화면","움직임","패널 선택","시작과 검색","바탕화면 위젯","미디어 플레이어","충전 소리","PC 호환성","복구","소프트웨어 정보"};
+            var order=new[]{"데스크톱","플루이드 UI","다이나믹 아일랜드와 상단바","화면","움직임","패널 선택","시작과 검색","바탕화면 위젯","미디어 플레이어","충전 소리","PC 호환성","복구","소프트웨어 정보"};
             sections.Sort((a,b)=>Array.IndexOf(order,a.Name)-Array.IndexOf(order,b.Name));
             SettingsPages(root,groups);Surface.Child=root;AppSettingsPalette.Apply(root);
             Closing+=(s,e)=> {if(!releasing&&!shell.IsDisposing&&!Application.Current.Dispatcher.HasShutdownStarted){e.Cancel=true;Hide();}};

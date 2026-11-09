@@ -288,8 +288,8 @@ namespace OneTaskBar
         internal void Editing(bool value)
         {
             editor.Visibility=value?Visibility.Visible:Visibility.Collapsed;
-            card.BorderThickness=new Thickness(value?2:tile!=null?0:1);
-            card.BorderBrush=value?Paint.Brush("#FF4F8BF0"):Paint.Brush("#46FFFFFF");
+            card.BorderThickness=new Thickness(value?2:tile!=null&&!fluidRim?0:1);
+            card.BorderBrush=value?Paint.Brush("#FF4F8BF0"):Rim;
         }
         internal void Material(Brush blurred,int opacity,bool glass=false)
         {
@@ -299,9 +299,20 @@ namespace OneTaskBar
                 card.Optical=glass;
                 card.InvalidateVisual();
             }
-            if(scheme!=null)card.Background=glass?scheme.Surface:WidgetMaterial.Surface(scheme,opacity);
+            // Under the Fluid UI a glass widget is the same thin glass as the panels, with the glow pooling in its lower
+            // corner and a rim that catches it.
+            bool fluid=glass&&Fluid.Enabled;
+            if(scheme!=null)card.Background=fluid?Fluid.Tint(Glass95.Dark):glass?scheme.Surface:WidgetMaterial.Surface(scheme,opacity);
             else card.Opacity=glass?.8:Math.Max(.1,opacity/100.0);
+            fluidRim=fluid;
+            if(editor.Visibility!=Visibility.Visible)
+            {
+                card.BorderBrush=Rim;
+                if(fluid)card.BorderThickness=new Thickness(1);
+            }
         }
+        bool fluidRim;
+        Brush Rim {get{return fluidRim?Fluid.Rim():Paint.Brush("#46FFFFFF");}}
         void Shape()
         {
             bool circular=Toggle!=null&&ActualWidth<=110&&ActualHeight<=110;

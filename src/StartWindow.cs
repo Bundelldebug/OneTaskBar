@@ -91,13 +91,14 @@ namespace OneTaskBar
         void QueueSearch(){if(queued||Search.Text.Length==0)return;queued=true;Dispatcher.BeginInvoke(new Action(()=> {queued=false;if(!composing&&IsVisible&&!String.IsNullOrWhiteSpace(Search.Text))shell.ToggleSearch(null,Search.Text);}),System.Windows.Threading.DispatcherPriority.Background);}
         internal bool Loaded {get;private set;}
         // Builds the window and lays out its tiles ahead of time, so the first open does not wait for them.
-        internal void Prepare()
+        internal void Prepare(){Prepare(this);}
+        internal static void Prepare(Window window)
         {
-            new System.Windows.Interop.WindowInteropHelper(this).EnsureHandle();
-            var root=Content as UIElement;
-            if(root==null)return;
-            root.Measure(new Size(Width,Height));
-            root.Arrange(new Rect(0,0,Width,Height));
+            new System.Windows.Interop.WindowInteropHelper(window).EnsureHandle();
+            var root=window.Content as UIElement;
+            if(root==null||Double.IsNaN(window.Width)||Double.IsNaN(window.Height))return;
+            root.Measure(new Size(window.Width,window.Height));
+            root.Arrange(new Rect(0,0,window.Width,window.Height));
         }
         internal void Reload()
         {
