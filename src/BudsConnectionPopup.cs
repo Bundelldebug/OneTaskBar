@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
@@ -16,7 +16,7 @@ namespace OneTaskBar
         readonly Image hero=new Image {Stretch=Stretch.Uniform,Margin=new Thickness(22,0,22,12)};
         readonly Button heroHit;
         readonly Image product=new Image {Width=62,Height=62,Stretch=Stretch.Uniform,Margin=new Thickness(0,0,12,0)};readonly ColumnDefinition pictureColumn=new ColumnDefinition();readonly System.Windows.Controls.Primitives.UniformGrid buttons=new System.Windows.Controls.Primitives.UniformGrid();readonly Action<NotificationAction> invoke;
-        readonly DispatcherTimer clock=new DispatcherTimer(DispatcherPriority.Normal){Interval=TimeSpan.FromMilliseconds(16)};readonly Stopwatch watch=new Stopwatch();
+        readonly FrameClock clock=new FrameClock();readonly Stopwatch watch=new Stopwatch();
         double progress,from,to;TaskCompletionSource<bool> finished;System.Drawing.Rectangle monitor;Rect bounds;
         internal BudsInfo Info;internal DateTime Expires;internal bool ClosedFlag;internal bool Animating {get{return clock.IsEnabled;}}
         internal BudsConnectionPopup(Action open,Action dismiss,Action<NotificationAction> onAction)

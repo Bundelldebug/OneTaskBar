@@ -17,6 +17,8 @@ namespace OneTaskBar
         internal static readonly string[] GlowNames={"주황","분홍","보라","파랑","초록","없음","직접 선택","배경에 맞춤"};
         static readonly Color[] glowColors={Color.FromRgb(0xFF,0x8A,0x3D),Color.FromRgb(0xFF,0x5C,0x9E),Color.FromRgb(0x9A,0x6B,0xFF),Color.FromRgb(0x3D,0x9B,0xFF),Color.FromRgb(0x3D,0xD6,0x8C)};
 
+        static string customText;
+        static Color customColor;
         internal static int GlowChoice
         {
             get{int value=Preferences.Current.FluidGlow;return value<0||value>GlowAuto?0:value;}
@@ -30,8 +32,15 @@ namespace OneTaskBar
                 if(choice==GlowAuto)return FluidAutoGlow.Color;
                 if(choice==GlowCustom)
                 {
-                    Color custom;
-                    return DockAppearance.TryColor(Preferences.Current.FluidGlowColor,out custom)?Color.FromRgb(custom.R,custom.G,custom.B):glowColors[0];
+                    // The text is parsed once per change, not on every brush that asks for the glow.
+                    string text=Preferences.Current.FluidGlowColor;
+                    if(!Object.ReferenceEquals(text,customText))
+                    {
+                        Color custom;
+                        customColor=DockAppearance.TryColor(text,out custom)?Color.FromRgb(custom.R,custom.G,custom.B):glowColors[0];
+                        customText=text;
+                    }
+                    return customColor;
                 }
                 return choice<glowColors.Length?glowColors[choice]:glowColors[0];
             }

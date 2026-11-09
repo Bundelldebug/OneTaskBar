@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -187,9 +187,12 @@ namespace OneTaskBar
         readonly Image artwork=new Image {Height=118,Stretch=Stretch.Uniform,Margin=new Thickness(0,9,0,0),Visibility=Visibility.Collapsed};
         readonly ColumnDefinition iconColumn=new ColumnDefinition();
         readonly List<NotificationEntry> entries=new List<NotificationEntry>();
-        readonly DispatcherTimer motion=new DispatcherTimer(DispatcherPriority.Normal){Interval=TimeSpan.FromMilliseconds(16)};readonly System.Diagnostics.Stopwatch motionWatch=new System.Diagnostics.Stopwatch();
+        bool moving;readonly System.Diagnostics.Stopwatch motionWatch=new System.Diagnostics.Stopwatch();
         System.Drawing.Rectangle monitor;Rect bounds;double progress=1,from,to;TaskCompletionSource<bool> completion;
-        internal bool Animating {get{return motion.IsEnabled;}}
+        internal bool Animating {get{return moving;}}
+        // Frames follow the display refresh, like the Dynamic Island, instead of a 16 ms timer that drifts against it.
+        void StartMotion(){if(moving)return;moving=true;System.Windows.Media.CompositionTarget.Rendering+=Frame;}
+        void StopMotion(){if(!moving)return;moving=false;System.Windows.Media.CompositionTarget.Rendering-=Frame;}
         internal int StackCount {get{return entries.Count;}}
         internal bool HasIcon {get{return icon.Visibility==Visibility.Visible;}}
         internal bool HasArtwork {get{return artwork.Visibility==Visibility.Visible;}}
@@ -212,7 +215,7 @@ namespace OneTaskBar
                 body.FontSize=11.5;body.TextWrapping=TextWrapping.NoWrap;body.MaxHeight=18;
                 icon.Width=icon.Height=28;icon.VerticalAlignment=VerticalAlignment.Center;icon.Margin=new Thickness(0,0,9,0);
             }
-            motion.Tick+=(s,e)=>Frame();Closed+=(s,e)=>{ClosedFlag=true;motion.Stop();motionWatch.Stop();if(completion!=null)completion.TrySetResult(false);};Update(entry);
+            Closed+=(s,e)=>{ClosedFlag=true;StopMotion();motionWatch.Stop();if(completion!=null)completion.TrySetResult(false);};Update(entry);
         }
         internal void PlaceBanner(System.Drawing.Rectangle screen,double x,double y,double width,double height)
         {
@@ -222,14 +225,17 @@ namespace OneTaskBar
         internal Task<bool> Disappear(){return Animate(false);}
         Task<bool> Animate(bool opening)
         {
-            if(completion!=null)completion.TrySetResult(false);completion=new TaskCompletionSource<bool>();var pending=completion.Task;motion.Stop();from=opening?0:progress;to=opening?1:0;
-            if(!Motion.Enabled||!IsVisible){progress=to;Position();completion.TrySetResult(true);return pending;}progress=from;Position();motionWatch.Restart();motion.Start();return pending;
+            if(completion!=null)completion.TrySetResult(false);completion=new TaskCompletionSource<bool>();var pending=completion.Task;StopMotion();from=opening?0:progress;to=opening?1:0;
+            if(!Motion.Enabled||!IsVisible){progress=to;Position();completion.TrySetResult(true);return pending;}progress=from;Position();motionWatch.Restart();StartMotion();return pending;
         }
-        void Frame()
+        void Frame(object sender,EventArgs args)
         {
-            double t=Math.Min(1,motionWatch.Elapsed.TotalMilliseconds/(to==1?280:160)),ease=SpringEase.Out(t);progress=from+(to-from)*ease;Position();if(t>=1){motion.Stop();motionWatch.Stop();completion.TrySetResult(true);}
+            // The Fluid UI arrives on the island's spring, settling a little past its place; closing is quick and does not bounce.
+            bool fluid=Fluid.Enabled&&to==1;
+            double t=Math.Min(1,motionWatch.Elapsed.TotalMilliseconds/(fluid?360:to==1?280:160)),ease=fluid?SpringEase.Position(t,.8):SpringEase.Out(t);
+            progress=from+(to-from)*ease;Position();if(t>=1){StopMotion();motionWatch.Stop();progress=to;Position();completion.TrySetResult(true);}
         }
-        void Position(){Opacity=progress;Native.BlurOpacity(this,progress);if(Compact)Native.Place(this,monitor,bounds.X,bounds.Y+(1-progress)*16,bounds.Width,bounds.Height);else Native.Place(this,monitor,bounds.X+(1-progress)*8,bounds.Y,bounds.Width,bounds.Height);}
+        void Position(){double shown=Math.Max(0,Math.Min(1,progress));Opacity=shown;Native.BlurOpacity(this,shown);if(Compact)Native.Place(this,monitor,bounds.X,bounds.Y+(1-progress)*16,bounds.Width,bounds.Height);else Native.Place(this,monitor,bounds.X+(1-progress)*8,bounds.Y,bounds.Width,bounds.Height);}
         internal void Update(NotificationEntry entry)
         {
             entries.RemoveAll(n=>NotificationBanners.Key(n)==NotificationBanners.Key(entry));entries.Add(entry);entries.Sort((a,b)=>b.Created.CompareTo(a.Created));if(entries.Count>32)entries.RemoveRange(32,entries.Count-32);Present();Expires=DateTime.UtcNow.AddSeconds(7);

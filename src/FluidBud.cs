@@ -1,31 +1,33 @@
-using System;
-using System.Diagnostics;
+﻿using System;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
 
 namespace OneTaskBar
 {
-    // The Fluid UI's arrival: a drop is pulled up out of the bar, tears off, then swells until it is the panel.
-    // The panel's real shape is what moves. Its backdrop, its window and its picture all follow one outline, so nothing
-    // is scaled or squashed. The window is stretched down to the bar's edge for the length of the motion, so the drop
-    // really starts in the bar; the neck thins and snaps, a small residue falls back, and the loose drop swells on a spring.
-    // Closing runs the shape back into the bar. The bar itself is drawn down a little while the drop is pulled.
+    // The Fluid UI's arrival, after the reference: a drop hangs from the bar's edge on a thin neck, widens into a pill
+    // and fills out into the panel while the neck pinches off. One spring, the same kind the Dynamic Island morphs
+    // with, drives the whole shape, so it keeps its speed if it is interrupted. The panel's real outline moves: the
+    // backdrop, the window and the picture all follow it, and nothing is scaled or squashed. The bar itself stays still.
+    // The window is stretched to the bar's edge for the length of the motion so the drop really starts in the bar.
     internal sealed class FluidBud
     {
-        const double Tear=.2,Swell=.2,Orb=36,Lift=14,CloseTime=.2;
+        const double Orb=30;
         readonly GlassWindow window;
-        readonly Stopwatch watch=new Stopwatch();
-        readonly RectangleGeometry clip=new RectangleGeometry();
+        readonly SpringValue spring=new SpringValue(.002);
+        readonly SpringClock clock=new SpringClock();
+        readonly RectangleGeometry body=new RectangleGeometry();
+        readonly GeometryGroup outline=new GeometryGroup {FillRule=FillRule.Nonzero};
         bool running,closing,hooked;
-        double anchor;
-        bool fromTop;
+        double anchor,extra;
+        bool fromTop,grown;
         Action finished;
-        // The bar moves with the drop: drawn down a little as the drop is pulled up, settling back when it lets go.
-        internal static event Action<double> BarTug;
-        double extra;bool grown;Native.RectI original;
-        static void Tug(double pull){var handler=BarTug;if(handler!=null)handler(pull);}
-        internal FluidBud(GlassWindow owner){window=owner;}
+        Native.RectI original;
+        internal FluidBud(GlassWindow owner)
+        {
+            window=owner;
+            outline.Children.Add(body);
+        }
         internal bool Active {get{return running;}}
 
         internal void Open(Point at,bool top)
@@ -46,8 +48,14 @@ namespace OneTaskBar
             closing=close;
             finished=done;
             running=true;
-            watch.Restart();
-            Apply(0);
+            // Opening is a lively spring that settles with a small overshoot; closing is quick and does not bounce.
+            spring.Omega=close?40:27;
+            spring.Damping=close?1:.84;
+            spring.Value=close?1:0;
+            spring.Velocity=0;
+            spring.Target=close?0:1;
+            clock.Restart();
+            Apply(spring.Value);
             if(!hooked){hooked=true;CompositionTarget.Rendering+=Frame;}
         }
 
@@ -69,7 +77,6 @@ namespace OneTaskBar
             window.Surface.Margin=new Thickness(0,fromTop?extra:0,0,fromTop?0:extra);
             Native.SetWindowPos(handle,IntPtr.Zero,rect.Left,fromTop?rect.Top-pixels:rect.Top,rect.Right-rect.Left,rect.Bottom-rect.Top+pixels,0x14);
             grown=true;
-            window.UpdateLayout();
         }
         void ShrinkBack()
         {
@@ -82,20 +89,22 @@ namespace OneTaskBar
 
         void Frame(object sender,EventArgs e)
         {
-            double total=closing?CloseTime:Tear+Swell;
-            double time=watch.Elapsed.TotalSeconds;
-            if(time>=total)
+            var rendering=e as RenderingEventArgs;
+            if(rendering==null)return;
+            spring.Step(clock.Next(rendering.RenderingTime));
+            if(closing?spring.Value<=.02:spring.AtRest)
             {
                 var done=finished;
-                bool wasClosing=closing;
                 finished=null;
-                Stop(false);
+                bool wasClosing=closing;
+                Stop();
+                // A closed window is restored after it is hidden; an open one lands on its exact shape.
+                if(!wasClosing)Restore();
                 if(done!=null)done();
-                // After the window is hidden the normal shape comes back; a new motion started by done keeps its own.
-                if(!running)Restore();
+                if(wasClosing&&!running)Restore();
                 return;
             }
-            Apply(time);
+            Apply(spring.Value);
         }
 
         static double Smooth(double a,double b,double x)
@@ -103,118 +112,60 @@ namespace OneTaskBar
             double t=Math.Max(0,Math.Min(1,(x-a)/(b-a)));
             return t*t*(3-2*t);
         }
+        static double Mix(double a,double b,double t){return a+(b-a)*t;}
 
-        // The shape at a moment. It is built as if the bar were below the panel, in window coordinates with the bar at the
-        // bottom edge; a window that opens downward is flipped afterwards.
-        void Apply(double time)
+        // The shape at spring position v (0 = a drop at the bar, 1 = the panel). It is built as if the bar were below the
+        // panel, with the bar at the bottom edge of the window; a window that opens downward is flipped afterwards.
+        void Apply(double v)
         {
             double width=window.Surface.ActualWidth,height=window.Surface.ActualHeight;
             if(width<2||height<2)return;
-            double panelHeight=height;
-            double total=panelHeight+extra;
-            double orb=Math.Min(Orb,Math.Min(width,panelHeight));
+            double total=height+extra;
+            double orb=Math.Min(Orb,Math.Min(width,height));
             double cx=Math.Max(orb/2,Math.Min(width-orb/2,anchor*width));
-            Rect full=new Rect(0,0,width,panelHeight);
-            Rect loose=new Rect(cx-orb/2,panelHeight-Lift-orb,orb,orb);
-            if(closing)
+            // The width leads, the height follows: a round drop, then a wide pill, then the panel.
+            double across=Math.Max(0,Math.Min(1.06,v*1.18)),down=Math.Max(0,Math.Min(1.06,v));
+            double dropTop=total-orb*.88;
+            double left=Mix(cx-orb/2,0,across),right=Mix(cx+orb/2,width,across);
+            double top=Mix(dropTop,0,down),bottom=Mix(dropTop+orb,height,down);
+            var shape=new Rect(left,top,Math.Max(2,right-left),Math.Max(2,bottom-top));
+            shape.Intersect(new Rect(0,0,width,total));
+            if(shape.IsEmpty)return;
+            double radius=Math.Min(window.Radius,Math.Min(shape.Width,shape.Height)/2);
+            body.Rect=shape;
+            body.RadiusX=body.RadiusY=radius;
+            Rect region=shape;
+            // The neck holds the drop to the bar and pinches off as the drop swells.
+            double pinch=closing?0:1-Smooth(.08,.55,v);
+            while(outline.Children.Count>1)outline.Children.RemoveAt(1);
+            if(pinch>.04&&shape.Bottom<total-1)
             {
-                double v=Math.Max(0,Math.Min(1,time/CloseTime));
-                if(v<.55)
+                double topHalf=Math.Min(shape.Width*.2,7)*pinch,baseHalf=Math.Min(shape.Width*.3,13)*pinch;
+                double y0=shape.Bottom-radius*.5,mid=(y0+total)/2;
+                var neck=new StreamGeometry();
+                using(var dc=neck.Open())
                 {
-                    Rect shape=Lerp(loose,full,1-Smooth(0,.55,v));
-                    shape.Intersect(full);
-                    Tug(0);
-                    Place(shape,Math.Max(0,1-v*3.2),shape,total);
+                    dc.BeginFigure(new Point(cx-topHalf,y0),true,true);
+                    dc.LineTo(new Point(cx+topHalf,y0),true,false);
+                    dc.BezierTo(new Point(cx+topHalf*.5,mid),new Point(cx+baseHalf*.4,mid),new Point(cx+baseHalf,total),true,false);
+                    dc.LineTo(new Point(cx-baseHalf,total),true,false);
+                    dc.BezierTo(new Point(cx-baseHalf*.4,mid),new Point(cx-topHalf*.5,mid),new Point(cx-topHalf,y0),true,false);
                 }
-                else
-                {
-                    // The drop falls back into the bar and is gone.
-                    double w=(v-.55)/.45,drop=Smooth(0,1,w);
-                    double size=Math.Max(1.5,orb*(1-drop*.8)),centerY=loose.Y+orb/2+(total-loose.Y-orb/2)*drop;
-                    Rect shape=new Rect(cx-size/2,centerY-size/2,size,size);
-                    Tug(2.4*Math.Sin(Math.PI*Math.Min(1,w*1.2)));
-                    Place(shape,0,shape,total);
-                }
-                return;
+                neck.Freeze();
+                outline.Children.Add(neck);
+                region=Rect.Union(region,new Rect(cx-baseHalf,y0,baseHalf*2,total-y0));
             }
-            if(time<Tear)
-            {
-                Tearing(time/Tear,cx,width,total,orb,loose);
-                return;
-            }
-            double s=Math.Max(0,Math.Min(1,(time-Tear)/Swell));
-            double p=SpringEase.Position(s,.8);
-            Rect panel=Lerp(loose,full,p);
-            panel.Intersect(full);
-            if(panel.IsEmpty)panel=loose;
-            Tug(0);
-            Place(panel,Math.Max(0,Math.Min(1,(p-.18)/.5)),panel,total);
-        }
-
-        // The drop is pulled out of the bar's edge on a neck that thins and snaps; a little residue draws back in.
-        void Tearing(double u,double cx,double width,double total,double orb,Rect loose)
-        {
-            double travel=total-loose.Y-orb/2;
-            double rise=SpringEase.Position(u,.55);
-            double radius=Math.Max(1.5,orb/2*SpringEase.Position(Math.Min(1,u*1.15),.8));
-            // The drop is pulled well above where it settles before the neck lets go, so the tear reads clearly.
-            double centerY=total-travel*rise-orb*.7*Math.Sin(Math.PI*Math.Min(1,u/.85))*(1-u*.4);
-            double neck=radius*.55*(1-Smooth(.3,.78,u));
-            double basis=radius*1.15*(1-Smooth(.5,.92,u));
-            double residue=orb*.26*Smooth(0,.25,u)*(1-Smooth(.55,1,u));
-            // Each part is merged into one outline; a plain group would cancel them where their windings oppose.
-            Geometry group=new EllipseGeometry(new Point(cx,centerY),radius,radius*(1+.28*(1-Smooth(0,.8,u))));
-            double bottomY=total;
-            if(neck>.6&&basis>.6&&centerY<bottomY-radius)
-            {
-                var path=new StreamGeometry();
-                using(var dc=path.Open())
-                {
-                    double top=centerY,mid=(centerY+bottomY)/2;
-                    dc.BeginFigure(new Point(cx-radius*.9,top),true,true);
-                    dc.BezierTo(new Point(cx-neck,mid),new Point(cx-neck,mid),new Point(cx-basis,bottomY),true,true);
-                    dc.LineTo(new Point(cx+basis,bottomY),true,true);
-                    dc.BezierTo(new Point(cx+neck,mid),new Point(cx+neck,mid),new Point(cx+radius*.9,top),true,true);
-                }
-                group=Geometry.Combine(group,path,GeometryCombineMode.Union,null);
-            }
-            if(residue>.8)group=Geometry.Combine(group,new EllipseGeometry(new Point(cx,bottomY),residue,residue),GeometryCombineMode.Union,null);
-            double halfWidth=Math.Max(radius,Math.Max(basis,residue));
-            double topEdge=Math.Max(0,centerY-radius*1.3);
-            Rect region=new Rect(cx-halfWidth,topEdge,Math.Max(2,halfWidth*2),Math.Max(2,bottomY-topEdge));
-            Rect circle=new Rect(cx-radius,centerY-radius,radius*2,radius*2);
-            // The bar is drawn down as the drop is pulled, then springs back when the neck lets go.
-            Tug(u<.62?3.4*Math.Sin(Math.PI/2*Math.Min(1,u/.62)):-1.8*Math.Sin(Math.PI*Math.Min(1,(u-.62)/.38))+3.4*(1-Smooth(.62,.8,u)));
+            // The picture shows once the pill is wide enough to hold it.
+            double content=closing?Math.Max(0,Math.Min(1,(v-.1)*2.2)):Smooth(.3,.8,v);
             if(fromTop)
             {
-                var flipped=group.Clone();flipped.Transform=new MatrixTransform(1,0,0,-1,0,total);group=flipped;
-                region=Flip(region,total);
-                circle=Flip(circle,total);
+                outline.Transform=new MatrixTransform(1,0,0,-1,0,total);
+                region=new Rect(region.X,total-region.Bottom,region.Width,region.Height);
+                shape=new Rect(shape.X,total-shape.Bottom,shape.Width,shape.Height);
             }
+            else outline.Transform=Transform.Identity;
             region.Intersect(new Rect(0,0,width,total));
-            Shape(group,circle,region,0);
-        }
-
-        static Rect Flip(Rect rect,double total){return new Rect(rect.X,total-rect.Bottom,rect.Width,rect.Height);}
-        static Rect Lerp(Rect a,Rect b,double t)
-        {
-            return new Rect(a.X+(b.X-a.X)*t,a.Y+(b.Y-a.Y)*t,Math.Max(1,a.Width+(b.Width-a.Width)*t),Math.Max(1,a.Height+(b.Height-a.Height)*t));
-        }
-
-        // A rounded rectangle outline: the backdrop, the window and the picture all follow it.
-        void Place(Rect shape,double content,Rect region,double total)
-        {
-            if(fromTop){shape=Flip(shape,total);region=Flip(region,total);}
-            double radius=Math.Min(window.Radius,Math.Min(shape.Width,shape.Height)/2);
-            clip.Rect=shape;
-            clip.RadiusX=clip.RadiusY=radius;
-            Shape(clip,shape,region,content);
-        }
-
-        // Applies an outline: the geometry clips the picture, the rectangle sizes the backdrop and the region the window.
-        void Shape(Geometry outline,Rect backdrop,Rect region,double content)
-        {
-            window.BackdropClip=backdrop;
+            window.BackdropClip=shape;
             window.RegionClip=region;
             var host=window.Content as UIElement;
             if(host!=null)host.Clip=outline;
@@ -223,14 +174,10 @@ namespace OneTaskBar
             Native.Round(window,window.Radius);
         }
 
-        void Stop(bool restore)
+        void Stop()
         {
             if(hooked){hooked=false;CompositionTarget.Rendering-=Frame;}
             running=false;
-            watch.Stop();
-            Tug(0);
-            if(!restore)return;
-            Restore();
         }
 
         void Restore()
@@ -249,7 +196,7 @@ namespace OneTaskBar
         internal void Cancel()
         {
             bool was=running||hooked||window.RegionClip.HasValue||grown;
-            Stop(false);
+            Stop();
             finished=null;
             if(was)Restore();
         }

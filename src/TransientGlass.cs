@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
@@ -12,7 +12,7 @@ namespace OneTaskBar
     internal class TransientGlass : GlassWindow
     {
         [System.Runtime.InteropServices.DllImport("user32.dll")]static extern bool EnableWindow(IntPtr window,bool enabled);
-        readonly DispatcherTimer clock=new DispatcherTimer(DispatcherPriority.Normal){Interval=TimeSpan.FromMilliseconds(16)};
+        readonly FrameClock clock=new FrameClock();
         readonly Stopwatch watch=new Stopwatch();double from,to;int duration;bool closeAfter,closed;
         internal bool Fading {get{return clock.IsEnabled;}}
         internal TransientGlass(){Opacity=0;ShowActivated=false;Focusable=false;IsHitTestVisible=false;Surface.BorderThickness=new Thickness(1);SourceInitialized+=(s,e)=>{var h=new WindowInteropHelper(this).Handle;Native.SetWindowLong(h,-20,Native.GetWindowLong(h,-20)|0x080000A0);};clock.Tick+=(s,e)=>Frame();Closed+=(s,e)=>{closed=true;clock.Stop();};}
