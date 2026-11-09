@@ -131,6 +131,7 @@ namespace OneTaskBar
             keys.OnNativeStart=()=>Task.Run(()=>SystemPanels.Start());
             keys.InterceptAltTab=()=>Desktop&&!Preferences.Current.NativeAltTab&&!disposed;keys.AltTabGesture.Cycle=Switcher.Cycle;keys.AltTabGesture.Navigate=Switcher.Navigate;keys.AltTabGesture.Finish=Switcher.Finish;keys.AltTabGesture.AltReleased=Switcher.AltReleased;
             keys.OnStart=()=>Application.Current.Dispatcher.BeginInvoke(new Action(()=> {if(Desktop&&!disposed)ToggleStart(null);}));
+            if(!Program.Inspectable)AdminBridge.Start(keys);
             keys.OnKey=(key)=> {
                 if(!Audio.Available) return false;
                 Application.Current.Dispatcher.BeginInvoke(new Action(()=> {

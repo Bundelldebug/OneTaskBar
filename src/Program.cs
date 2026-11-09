@@ -41,6 +41,7 @@ namespace OneTaskBar
             if(args.Length==2&&args[0]=="--review-edge"&&new[]{"0","1","2","3"}.Contains(args[1])){Signal("Panel-edge"+args[1]);return 0;}
             if(args.Length==2&&args[0]=="--review-background"&&new[]{"0","1","2","3"}.Contains(args[1])){Signal("Panel-background"+args[1]);return 0;}
             if(args.Length==2&&args[0]=="--run-startup-after")return AdminMode.RunAfter(args[1]);
+            if(args.Length==1&&args[0]=="--admin-helper")return AdminHelperHost.Run();
             if(args.Length==2&&args[0]=="--elevated-startup")return LogonStartup.ElevatedHelper(args[1]=="on");
             if(args.Length==3&&args[0]=="--register-notifications")return NotificationIdentity.RegisterHelper(args[1],args[2]);
             if(args.Length>0&&args[0]=="--notification-restart")return NotificationIdentity.RestartHelper(args);

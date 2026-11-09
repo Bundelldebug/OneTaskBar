@@ -6,23 +6,25 @@ using System.Windows;
 
 namespace OneTaskBar
 {
-    // Running with the administrator token lets the keyboard hook see Win and Alt+Tab while an elevated game has focus.
-    // The sign-in task carries the setting; turning it on or off asks Windows for consent once, then restarts the app.
+    // Administrator windows (an elevated game) can only be switched to, restored and watched for Alt+Tab by an administrator process.
+    // A separate helper does that, so the app itself stays a normal process and can keep its notification connection.
+    // Turning the helper on or off asks Windows for consent once, then restarts the app.
     internal static class AdminMode
     {
-        internal static bool Enabled {get{return LogonStartup.IsAdministrator||LogonStartup.Elevated;}}
+        internal static bool Enabled {get{return LogonStartup.AdminHelperRegistered||LogonStartup.IsAdministrator||LogonStartup.Elevated;}}
         // Returns a message for the settings window; null means the change did not happen.
         internal static string Set(bool on)
         {
             try
             {
-                if(Enabled==on&&LogonStartup.IsAdministrator==on)return null;
+                if(LogonStartup.AdminHelperRegistered==on&&!LogonStartup.IsAdministrator&&!LogonStartup.Elevated)return null;
+                if(!on)AdminBridge.Quit();
                 var info=new ProcessStartInfo(NotificationIdentity.PhysicalFile(Path.Combine(AppLog.Root,"OneTaskBar.exe")),"--elevated-startup "+(on?"on":"off")){UseShellExecute=true,Verb="runas",WindowStyle=ProcessWindowStyle.Hidden};
                 int code;
                 using(var helper=Process.Start(info)){helper.WaitForExit();code=helper.ExitCode;}
                 if(code!=0)return "관리자 권한 설정을 저장하지 못했습니다";
                 Restart();
-                return on?"관리자 권한 실행을 켰습니다. 앱을 다시 시작합니다":"관리자 권한 실행을 껐습니다. 앱을 다시 시작합니다";
+                return on?"관리자 권한 창 지원을 켰습니다. 앱을 다시 시작합니다":"관리자 권한 창 지원을 껐습니다. 앱을 다시 시작합니다";
             }
             catch(Win32Exception error)
             {

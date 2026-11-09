@@ -72,6 +72,11 @@ namespace OneTaskBar
             Require(!kindStore.ApplyAutoFolders(kinds,true),"Unchanged automatic folders were written again");
             kindStore.ApplyAutoFolders(kinds,false);
             Require(kindStore.FolderCount==0&&kindStore.Resolve(kinds).Count==kinds.Count,"Turning automatic folders off lost apps or kept folders");
+            string helperTask=LogonStartup.AdminHelperDefinition(@"C:\Apps\OneTaskBar.exe","S-1-5-21-1");
+            Require(helperTask.Contains("<RunLevel>HighestAvailable</RunLevel>")&&helperTask.Contains("--admin-helper")&&helperTask.Contains("OneTaskBar.AdminHelper.v1|S-1-5-21-1"),"Administrator helper task is not elevated, marked and limited to the helper");
+            Require(!LogonStartup.Definition(@"C:\Apps\OneTaskBar.exe","S-1-5-21-1").Contains("--admin-helper"),"The startup task must never start the helper mode");
+            Require(ProcessElevation.IsElevated((uint)System.Diagnostics.Process.GetCurrentProcess().Id)==LogonStartup.IsAdministrator,"Elevation check disagrees with the current token");
+            checks.Add("Administrator helper task is elevated, marked as the helper's, and the elevation test matches this process");
             checks.Add("Automatic app folders gather three or more alike, leave the rest, and dissolve cleanly");
 
             var chrome=new AppEntry {Name="Chrome",AppID=@"C:\Apps\chrome.exe",Executable=@"C:\Apps\chrome.exe"};

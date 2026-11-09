@@ -106,13 +106,68 @@ namespace OneTaskBar
             }
         }
         internal static bool IsAdministrator{get{using(var identity=WindowsIdentity.GetCurrent())return new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);}}
+        internal const string AdminHelperTask="OneTaskBar.AdminHelper",AdminHelperArguments="--admin-helper";
+        // The helper's own sign-in task: administrator token, started without a prompt, never the app itself.
+        internal static string AdminHelperDefinition(string executable,string userSid)
+        {
+            var text=new StringBuilder();using(var writer=XmlWriter.Create(text,new XmlWriterSettings {OmitXmlDeclaration=true})){
+                writer.WriteStartElement("Task",TaskNamespace);writer.WriteAttributeString("version","1.2");
+                writer.WriteStartElement("RegistrationInfo");writer.WriteElementString("Description","One TaskBar helper for administrator windows (Alt+Tab and restoring them).");writer.WriteElementString("Source","OneTaskBar.AdminHelper.v1|"+userSid);writer.WriteEndElement();
+                writer.WriteStartElement("Triggers");writer.WriteStartElement("LogonTrigger");writer.WriteElementString("Enabled","true");writer.WriteElementString("UserId",userSid);writer.WriteElementString("Delay","PT0S");writer.WriteEndElement();writer.WriteEndElement();
+                writer.WriteStartElement("Principals");writer.WriteStartElement("Principal");writer.WriteAttributeString("id","CurrentUser");writer.WriteElementString("UserId",userSid);writer.WriteElementString("LogonType","InteractiveToken");writer.WriteElementString("RunLevel","HighestAvailable");writer.WriteEndElement();writer.WriteEndElement();
+                writer.WriteStartElement("Settings");writer.WriteElementString("MultipleInstancesPolicy","IgnoreNew");writer.WriteElementString("DisallowStartIfOnBatteries","false");writer.WriteElementString("StopIfGoingOnBatteries","false");writer.WriteElementString("AllowHardTerminate","true");writer.WriteElementString("StartWhenAvailable","true");writer.WriteElementString("Enabled","true");writer.WriteElementString("ExecutionTimeLimit","PT0S");writer.WriteElementString("Priority","4");writer.WriteEndElement();
+                writer.WriteStartElement("Actions");writer.WriteAttributeString("Context","CurrentUser");writer.WriteStartElement("Exec");writer.WriteElementString("Command",executable);writer.WriteElementString("Arguments",AdminHelperArguments);writer.WriteElementString("WorkingDirectory",Path.GetDirectoryName(executable));writer.WriteEndElement();writer.WriteEndElement();writer.WriteEndElement();
+            }return text.ToString();
+        }
+        // True when this user's helper task exists for the app at its current location.
+        internal static bool AdminHelperRegistered
+        {
+            get
+            {
+                try
+                {
+                    using(var scheduler=new Scheduler())
+                    {
+                        var task=scheduler.Find(AdminHelperTask);
+                        if(task==null)return false;
+                        string xml=(string)Invoke(task,"Xml",BindingFlags.GetProperty);
+                        return (bool)Invoke(task,"Enabled",BindingFlags.GetProperty)&&xml.IndexOf("OneTaskBar.AdminHelper.v1|"+Sid,StringComparison.Ordinal)>=0&&
+                            xml.IndexOf(System.Security.SecurityElement.Escape(Exe),StringComparison.OrdinalIgnoreCase)>=0&&xml.IndexOf("<RunLevel>HighestAvailable</RunLevel>",StringComparison.OrdinalIgnoreCase)>=0;
+                    }
+                }
+                catch(Exception error){AppLog.Once("admin-helper-read",error.GetType().Name);return false;}
+            }
+        }
         // Runs in the elevated helper process: registers the sign-in task with or without the administrator token.
         internal static int ElevatedHelper(bool on)
         {
             try
             {
                 if(!IsAdministrator)return 2;
-                lock(gate)using(var scheduler=new Scheduler())RegisterOwnedTask(scheduler,TaskName,Exe,Sid,true,on);
+                lock(gate)using(var scheduler=new Scheduler())
+                {
+                    // An earlier version ran the whole app as administrator; that is undone so notifications can connect again.
+                    var main=scheduler.Find(TaskName);
+                    if(main!=null)
+                    {
+                        string xml=(string)Invoke(main,"Xml",BindingFlags.GetProperty);
+                        if(Owned(xml,Exe,Sid)&&xml.IndexOf("<RunLevel>HighestAvailable</RunLevel>",StringComparison.OrdinalIgnoreCase)>=0)
+                            RegisterOwnedTask(scheduler,TaskName,Exe,Sid,(bool)Invoke(main,"Enabled",BindingFlags.GetProperty),false);
+                    }
+                    var helper=scheduler.Find(AdminHelperTask);
+                    if(on)
+                    {
+                        scheduler.Keep(Invoke(scheduler.Root,"RegisterTask",BindingFlags.InvokeMethod,AdminHelperTask,AdminHelperDefinition(Exe,Sid),helper==null?2:6,null,null,3,null));
+                        var registered=scheduler.Find(AdminHelperTask);
+                        if(registered==null)throw new InvalidOperationException("관리자 도우미 작업을 확인하지 못했습니다.");
+                        Invoke(registered,"Run",BindingFlags.InvokeMethod,(object)null);
+                    }
+                    else if(helper!=null)
+                    {
+                        string xml=(string)Invoke(helper,"Xml",BindingFlags.GetProperty);
+                        if(xml.IndexOf("OneTaskBar.AdminHelper.v1|"+Sid,StringComparison.Ordinal)>=0)Invoke(scheduler.Root,"DeleteTask",BindingFlags.InvokeMethod,AdminHelperTask,0);
+                    }
+                }
                 return 0;
             }
             catch(Exception error){AppLog.Once("startup-elevated-write",error.ToString());return 1;}

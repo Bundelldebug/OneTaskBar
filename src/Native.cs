@@ -337,6 +337,14 @@ namespace OneTaskBar
         int bufferedWin,nativeWins;
         [DllImport("user32.dll")]static extern short GetAsyncKeyState(int key);
         public VolumeKeys() { callback=Handle; handle=SetWindowsHookEx(13,callback,GetModuleHandle(null),0); }
+        // Keys the administrator helper saw while an administrator window had focus (this hook never receives them).
+        // Bit 0 of the result: the key is swallowed. Bit 1: the switcher is open.
+        internal int ObserveRemote(int key,uint flags,byte modifiers)
+        {
+            bool enabled=Enabled&&InterceptAltTab!=null&&InterceptAltTab();
+            bool swallow=AltTabGesture.Observe(key,(modifiers&16)!=0,enabled,(modifiers&1)!=0,(modifiers&2)!=0,(modifiers&4)!=0,(modifiers&8)!=0,(flags&0x10)!=0);
+            return (swallow?1:0)|(AltTabGesture.Active?2:0);
+        }
         IntPtr Handle(int code,IntPtr message,IntPtr info)
         {
             int key=code>=0 ? Marshal.ReadInt32(info) : 0;

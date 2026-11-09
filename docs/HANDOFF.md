@@ -150,3 +150,10 @@ Keep durable rules in [AGENTS.md](../AGENTS.md) and navigation in [DEBUGGING.md]
 - Item 4 (Fluid polish): only the desktop switcher and earlier Glass95 work; no broad restyle was done.
 - `Test-UI` Quick, Settings, Launcher, Notifications, Media, Dock, Glass, Startup, Resources passed. Installed with `Apply-ToPC.ps1`. Idle measure of the installed build: CPU 0.045 %, working set 378 MiB (private 234 MiB), report in `.qa-data/runtime-7d2b66c5…json`. Nothing published.
 - One stray click earlier opened a release-notes file pane in the Claude app (harmless).
+
+### Administrator windows (Claude Code, later 2026-11-09)
+
+- Owner's request: an administrator-run game ignored the app's Alt+Tab and a minimized one could not be restored from the dock; notification connection must keep working too.
+- Cause: Windows blocks a normal process from messaging, watching keys of or restoring an administrator window, and refuses notification access to an administrator app (so the old "run as administrator" mode lost notifications).
+- Fix: the app stays normal. A separate administrator helper (`--admin-helper`, own sign-in task `OneTaskBar.AdminHelper`, registered once through the settings toggle "관리자 권한 창 지원") restores/raises administrator windows on request and, while an administrator window has focus, forwards Alt+Tab keys to the app over per-user named pipes (`AdminHelper.cs`, `VolumeKeys.ObserveRemote`, `WindowActivation.TryActivate`, `LogonStartup.AdminHelperDefinition`). Turning it on also returns an old elevated startup task to normal.
+- Checked: build, `Test-UI` Settings/Dock/Media/Launcher/Startup (one Media motion probe flaked once, passed on rerun). NOT checked on the device: it needs the owner's Windows consent to register the helper task, so no real admin game test was run. Keys other than Alt+Tab (Win key, Win+S) are still not seen in administrator windows.

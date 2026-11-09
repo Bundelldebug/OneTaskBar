@@ -70,8 +70,11 @@ namespace OneTaskBar
                     try {restoring(window);}
                     catch(Exception error) {AppLog.Once("window-restore-preview",error.GetType().Name);}
                 }
+                // An administrator window ignores this app's messages, so the administrator helper restores and raises it.
+                if(AdminBridge.WantsHelper(window)&&AdminBridge.Activate(window))return true;
                 ShowWindowAsync(window,9);
             }
+            else if(AdminBridge.WantsHelper(window)&&AdminBridge.Activate(window))return true;
             BringWindowToTop(window);Native.SetForegroundWindow(window);
             if(!ForegroundIs(window))ActivateHostedContent(window);
             if(ForegroundIs(window)){Native.SetWindowPos(window,IntPtr.Zero,0,0,0,0,0x13);BringWindowToTop(window);Responsive(window);if(ForegroundIs(window)){RestoreContentFocus(window);return true;}}
