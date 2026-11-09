@@ -71,6 +71,7 @@ namespace OneTaskBar
             OverflowButton=Paint.Button(new Glyph("more",23){Color=Glass95.DockForeground},()=>Overflow.Toggle(),"숨겨진 앱");OverflowButton.Width=46;OverflowButton.Height=42;OverflowButton.Padding=new Thickness(0);OverflowButton.Background=Brushes.Transparent;OverflowButton.Visibility=Visibility.Collapsed;Panel.SetZIndex(OverflowButton,3);appCanvas.Children.Add(OverflowButton);Overflow=new DockOverflow(shell,this,OverflowButton,QueueHide);
             resizeTimer.Tick+=(sender,args)=>ResizeFrame();
             visibilityTimer.Tick+=(sender,args)=>VisibilityFrame();
+            live.Add(this);
 
             foreach(var w in new GlassWindow[] {Start,Apps,Status}) {
                 w.MouseEnter+=(s,e)=>{interactionUntil=DateTime.UtcNow.AddMilliseconds(1000);hideDelay.Stop();if(autoHide&&!visible&&!fullScreen)Reveal();};w.MouseLeave+=(s,e)=>QueueHide();w.PreviewMouseDown+=(s,e)=>interactionUntil=DateTime.UtcNow.AddMilliseconds(1200);
@@ -381,7 +382,23 @@ namespace OneTaskBar
             return new TrayPlacement(trayAccess.PointToScreen(new Point(trayAccess.ActualWidth/2,0)),Screen.Bounds,Scale,Edge,22*Zoom);
         }
         internal object Inspect() {return new {scale=Scale,visible=visible,autoHide=autoHide,revealEdge=EdgeVisible,apps=Native.RegionInfo(Apps),start=Native.RegionInfo(Start),status=Native.RegionInfo(Status),blur=Apps.HasBlur&&Status.HasBlur,nowBar=MediaBar!=null?Native.RegionInfo(MediaBar):null};}
-        internal void Close() { if(closed) return; closed=true;DragApps.Dispose();DragReorder.Finished-=EndDragPreview;resizeTimer.Stop();visibilityTimer.Stop();hideDelay.Stop();Overflow.Dispose();if(revealEdge!=null){revealEdge.Dispose();revealEdge=null;}if(MediaBar!=null)MediaBar.Close();cells.Clear(); Start.Close(); Apps.Close(); Status.Close(); }
+        static readonly System.Collections.Generic.List<DockHost> live=new System.Collections.Generic.List<DockHost>();
+        // The screen edge of the visible bar on a monitor, in device pixels: its top when the panel opens above it, its
+        // bottom when the panel opens below it. A Fluid drop starts right there, so it comes out of the bar, not over it.
+        internal static int? BarEdge(System.Drawing.Rectangle screen,bool panelBelowBar)
+        {
+            foreach(var dock in live)
+            {
+                if(dock.closed||dock.Screen.Bounds!=screen||DockGeometry.Vertical(dock.Edge))continue;
+                var surface=dock.Apps.Surface;
+                if(!dock.Apps.IsVisible||surface.ActualHeight<1||PresentationSource.FromVisual(surface)==null)continue;
+                var top=surface.PointToScreen(new Point(0,0));
+                var bottom=surface.PointToScreen(new Point(0,surface.ActualHeight));
+                return (int)Math.Round(panelBelowBar?bottom.Y:top.Y);
+            }
+            return null;
+        }
+        internal void Close() { if(closed) return; closed=true;live.Remove(this);DragApps.Dispose();DragReorder.Finished-=EndDragPreview;resizeTimer.Stop();visibilityTimer.Stop();hideDelay.Stop();Overflow.Dispose();if(revealEdge!=null){revealEdge.Dispose();revealEdge=null;}if(MediaBar!=null)MediaBar.Close();cells.Clear(); Start.Close(); Apps.Close(); Status.Close(); }
     }
     internal sealed class HudWindow : GlassWindow
     {

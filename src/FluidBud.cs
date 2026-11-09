@@ -17,7 +17,7 @@ namespace OneTaskBar
     // drop really starts in the bar. Closing runs the outline back into the bar on a quick spring.
     internal sealed class FluidBud
     {
-        const double Orb=30,Total=.72;
+        const double Orb=30,Total=.62;
         readonly GlassWindow window;
         readonly SpringValue spring=new SpringValue(.002);
         readonly SpringClock clock=new SpringClock();
@@ -119,8 +119,11 @@ namespace OneTaskBar
             Native.RectI rect;
             if(handle==IntPtr.Zero||!Native.GetWindowRect(handle,out rect))return;
             double scale=Math.Max(96,Native.GetDpiForWindow(handle))/96.0;
-            var screen=System.Windows.Forms.Screen.FromHandle(handle).Bounds;
-            double gap=(fromTop?rect.Top-screen.Top:screen.Bottom-rect.Bottom)/scale-14;
+            // The window reaches exactly to the bar's outer edge, so the drop leaves the bar instead of forming over it.
+            var monitor=System.Windows.Forms.Screen.FromHandle(handle);
+            int? bar=DockHost.BarEdge(monitor.Bounds,fromTop);
+            int edge=bar??(fromTop?monitor.WorkingArea.Top:monitor.WorkingArea.Bottom);
+            double gap=(fromTop?rect.Top-edge:edge-rect.Bottom)/scale;
             if(gap<6)return;
             extra=Math.Min(140,gap);
             int pixels=(int)Math.Round(extra*scale);
@@ -200,7 +203,7 @@ namespace OneTaskBar
             double pinch=1-Smooth(.12,.3,at);
             // White at first, clear glass once the drop has a shape of its own.
             double white=Smooth(0,.04,at)*(1-Smooth(.1,.34,at));
-            double wave=at<.34?-1:Math.Min(1,(at-.34)/.34);
+            double wave=at<.32?-1:Math.Min(1,(at-.32)/.22);
             Apply(across,down,drop,pinch,white,wave,wave<0?0:1);
         }
 
@@ -217,7 +220,8 @@ namespace OneTaskBar
             down=Math.Max(0,Math.Min(1.06,down));
             // Before it widens the drop forms at the bar and is pulled up on its neck, so it reads as a drop first.
             double size=orb*(.35+.65*formed),pull=orb*.4*formed*(1-Smooth(0,.45,Math.Max(across,down)));
-            double dropTop=total-size*.88-pull;
+            // The drop sits on the bar's edge and moves away from it, toward where the panel opens.
+            double dropTop=total-size-pull;
             double left=Mix(cx-size/2,0,across),right=Mix(cx+size/2,width,across);
             double top=Mix(dropTop,0,down),bottom=Mix(dropTop+size,height,down);
             var shape=new Rect(left,top,Math.Max(2,right-left),Math.Max(2,bottom-top));
