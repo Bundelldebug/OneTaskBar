@@ -80,6 +80,18 @@ namespace OneTaskBar
                     if(!registered)return;
                     server=new AdminKeyServer(keys);
                     EnsureRunning();
+                    // The helper leaves when the app does (so an update can replace the files) and is started again with the app.
+                    var application=Application.Current;
+                    if(application!=null)application.Dispatcher.BeginInvoke(new Action(()=>
+                    {
+                        var current=Application.Current;
+                        if(current!=null)current.Exit+=(s,e)=>Quit();
+                    }));
+                    while(started)
+                    {
+                        Thread.Sleep(10000);
+                        EnsureRunning();
+                    }
                 }
                 catch(Exception error){AppLog.Once("admin-helper-start",error.GetType().Name);}
             });
@@ -214,6 +226,9 @@ namespace OneTaskBar
         [DllImport("user32.dll")] static extern IntPtr CallNextHookEx(IntPtr hook,int code,IntPtr message,IntPtr info);
         [DllImport("kernel32.dll",CharSet=CharSet.Unicode)] static extern IntPtr GetModuleHandle(string module);
         [DllImport("user32.dll")] static extern short GetAsyncKeyState(int key);
+        [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
+        [DllImport("user32.dll")] static extern bool PostThreadMessage(uint thread,uint message,IntPtr wp,IntPtr lp);
+        static uint uiThread;
         static Hook callback;
         static IntPtr hook;
         static NamedPipeClientStream keyPipe;
@@ -229,6 +244,7 @@ namespace OneTaskBar
             using(var mutex=new Mutex(true,"Local\\OneTaskBar.AdminHelper."+AdminPipes.Sid,out created))
             {
                 if(!created)return 0;
+                uiThread=GetCurrentThreadId();
                 var commands=new Thread(Commands){IsBackground=true,Name="One TaskBar admin commands"};
                 commands.Start();
                 callback=OnKey;
@@ -237,8 +253,14 @@ namespace OneTaskBar
                 timer.Tick+=(s,e)=>
                 {
                     Connect();
-                    // The normal app has been gone for a minute: nothing left to help.
-                    if((DateTime.UtcNow-lastSeen).TotalSeconds>60)System.Windows.Forms.Application.Exit();
+                    // A pipe whose other end has gone can still look connected, so the app's own process is what counts.
+                    int own=Process.GetCurrentProcess().Id;
+                    foreach(var other in Process.GetProcessesByName("OneTaskBar"))
+                    {
+                        using(other)if(other.Id!=own)lastSeen=DateTime.UtcNow;
+                    }
+                    // The normal app has been gone for a while: nothing left to help, and the installed files must be free for an update.
+                    if((DateTime.UtcNow-lastSeen).TotalSeconds>20)System.Windows.Forms.Application.Exit();
                 };
                 timer.Start();
                 System.Windows.Forms.Application.Run();
@@ -276,7 +298,7 @@ namespace OneTaskBar
                         pipe.Flush();
                         if(quit)
                         {
-                            System.Windows.Forms.Application.Exit();
+                            PostThreadMessage(uiThread,0x12,IntPtr.Zero,IntPtr.Zero);
                             return;
                         }
                     }
@@ -292,7 +314,7 @@ namespace OneTaskBar
         }
         static bool Connect()
         {
-            if(keyPipe!=null&&keyPipe.IsConnected){lastSeen=DateTime.UtcNow;return true;}
+            if(keyPipe!=null&&keyPipe.IsConnected)return true;
             if(DateTime.UtcNow<retryAt)return false;
             Drop();
             var pipe=new NamedPipeClientStream(".",AdminPipes.Keys,PipeDirection.InOut);
