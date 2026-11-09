@@ -34,6 +34,9 @@ namespace OneTaskBar
         DateTime proactiveRestoreUntil;
         Rect snapshotBounds,preparedBounds,preparedCapsule,from,to;
         TimeSpan? started,lastFrame,holdUntil;
+        IntPtr flightWindow;
+        BitmapSource flightImage;
+        Task<bool> painted;
         bool capturing,minimizeHover,disposed,placing,restore,finishing;
         volatile int captureGeneration;
 
@@ -275,6 +278,9 @@ namespace OneTaskBar
             var initial=restore?end:start;
             var capsule=restore?start:end;
             var image=fixture??(snapshotWindow==source?snapshot:null);
+            flightWindow=source;
+            flightImage=image;
+            painted=null;
             try
             {
                 if(image!=null)
@@ -362,15 +368,19 @@ namespace OneTaskBar
             }
             // Let WPF present the exact endpoint before removing the texture.
             // Construction time never consumes any of the animation timeline.
-            // A restored window can still be blank (a browser paints white first), so the plane keeps showing the window's
-            // picture a moment longer before it steps aside.
+            // A restored window can still be blank (a browser paints white first, for up to about 0.4 s), so the plane keeps
+            // showing the window's picture until the real page is back, or at most half a second.
             if(p>=1)
             {
                 if(!restore||plane==null){finishing=true;}
                 else
                 {
-                    if(!holdUntil.HasValue)holdUntil=rendering.RenderingTime+TimeSpan.FromMilliseconds(160);
-                    if(rendering.RenderingTime>=holdUntil.Value)finishing=true;
+                    if(!holdUntil.HasValue)
+                    {
+                        holdUntil=rendering.RenderingTime+TimeSpan.FromMilliseconds(500);
+                        painted=MediaRestorePaint.Painted(flightWindow,flightImage,480);
+                    }
+                    if(rendering.RenderingTime>=holdUntil.Value||painted!=null&&painted.IsCompleted)finishing=true;
                 }
             }
         }
@@ -418,6 +428,8 @@ namespace OneTaskBar
                 MediaFlightTrace.Save(LastTiming);
             }
             trace=null;
+            flightImage=null;
+            painted=null;
         }
 
         void DropPrepared()

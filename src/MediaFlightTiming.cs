@@ -4,9 +4,10 @@ namespace OneTaskBar
 {
     internal static class MediaFlightTiming
     {
-        // The Fluid UI's flight runs a little longer, evenly enough that the shrinking window is seen the whole way.
-        internal static double MinimizeMilliseconds {get{return Fluid.Enabled?620:480;}}
-        internal static double RestoreMilliseconds {get{return Fluid.Enabled?640:520;}}
+        // The Fluid UI's flight eases at both ends, so it needs no more time than the classic one to stay visible; the
+        // owner found the earlier 620/640 ms too slow.
+        internal static double MinimizeMilliseconds {get{return Fluid.Enabled?420:480;}}
+        internal static double RestoreMilliseconds {get{return Fluid.Enabled?440:520;}}
 
         internal static double Smooth(double value)
         {
