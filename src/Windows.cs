@@ -71,6 +71,7 @@ namespace OneTaskBar
             OverflowButton=Paint.Button(new Glyph("more",23){Color=Glass95.DockForeground},()=>Overflow.Toggle(),"숨겨진 앱");OverflowButton.Width=46;OverflowButton.Height=42;OverflowButton.Padding=new Thickness(0);OverflowButton.Background=Brushes.Transparent;OverflowButton.Visibility=Visibility.Collapsed;Panel.SetZIndex(OverflowButton,3);appCanvas.Children.Add(OverflowButton);Overflow=new DockOverflow(shell,this,OverflowButton,QueueHide);
             resizeTimer.Tick+=(sender,args)=>ResizeFrame();
             visibilityTimer.Tick+=(sender,args)=>VisibilityFrame();
+            FluidBud.BarTug+=Tug;
 
             foreach(var w in new GlassWindow[] {Start,Apps,Status}) {
                 w.MouseEnter+=(s,e)=>{interactionUntil=DateTime.UtcNow.AddMilliseconds(1000);hideDelay.Stop();if(autoHide&&!visible&&!fullScreen)Reveal();};w.MouseLeave+=(s,e)=>QueueHide();w.PreviewMouseDown+=(s,e)=>interactionUntil=DateTime.UtcNow.AddMilliseconds(1200);
@@ -381,7 +382,27 @@ namespace OneTaskBar
             return new TrayPlacement(trayAccess.PointToScreen(new Point(trayAccess.ActualWidth/2,0)),Screen.Bounds,Scale,Edge,22*Zoom);
         }
         internal object Inspect() {return new {scale=Scale,visible=visible,autoHide=autoHide,revealEdge=EdgeVisible,apps=Native.RegionInfo(Apps),start=Native.RegionInfo(Start),status=Native.RegionInfo(Status),blur=Apps.HasBlur&&Status.HasBlur,nowBar=MediaBar!=null?Native.RegionInfo(MediaBar):null};}
-        internal void Close() { if(closed) return; closed=true;DragApps.Dispose();DragReorder.Finished-=EndDragPreview;resizeTimer.Stop();visibilityTimer.Stop();hideDelay.Stop();Overflow.Dispose();if(revealEdge!=null){revealEdge.Dispose();revealEdge=null;}if(MediaBar!=null)MediaBar.Close();cells.Clear(); Start.Close(); Apps.Close(); Status.Close(); }
+        bool tugged;
+        // While a Fluid drop is pulled out of the bar, the bar is drawn down a little and springs back.
+        void Tug(double pull)
+        {
+            if(closed)return;
+            foreach(var w in new GlassWindow[] {Start,Apps,Status})
+            {
+                if(pull==0)
+                {
+                    if(tugged)w.Surface.RenderTransform=Transform.Identity;
+                    continue;
+                }
+                if(!(w.Surface.RenderTransform is ScaleTransform)&&!w.Surface.RenderTransform.Value.IsIdentity)continue;
+                if(DockGeometry.Vertical(Edge))continue;
+                w.Surface.RenderTransformOrigin=new Point(.5,Edge==1?0:1);
+                w.Surface.RenderTransform=new ScaleTransform(1,1-pull/Math.Max(20,w.Surface.ActualHeight));
+                tugged=true;
+            }
+            if(pull==0)tugged=false;
+        }
+        internal void Close() { if(closed) return; closed=true;FluidBud.BarTug-=Tug;DragApps.Dispose();DragReorder.Finished-=EndDragPreview;resizeTimer.Stop();visibilityTimer.Stop();hideDelay.Stop();Overflow.Dispose();if(revealEdge!=null){revealEdge.Dispose();revealEdge=null;}if(MediaBar!=null)MediaBar.Close();cells.Clear(); Start.Close(); Apps.Close(); Status.Close(); }
     }
     internal sealed class HudWindow : GlassWindow
     {

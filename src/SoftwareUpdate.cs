@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -14,7 +14,9 @@ namespace OneTaskBar
     internal sealed class ReleaseInfo
     {
         internal string Tag,Notes,SetupUrl,Digest,Suffix="";
-        internal string VersionText {get{return Version.Major+"."+Version.Minor+"."+Math.Max(0,Version.Build)+Suffix;}}
+        internal string VersionText {get{return Version.Major+"."+Version.Minor+"."+Math.Max(0,Version.Build)+(Suffix.Length==1?Suffix:"");}}
+        // The number with the build code ("10.0.0 A1A1") for places that show the exact build.
+        internal string DetailText {get{return Version.Major+"."+Version.Minor+"."+Math.Max(0,Version.Build)+(Suffix.Length==0?"":(Suffix.Length==1?Suffix:" "+Suffix));}}
         internal long Size;
         internal Version Version;
     }
@@ -41,7 +43,18 @@ namespace OneTaskBar
             {
                 var version=Current;
                 string number=version.Major+"."+version.Minor+"."+version.Build;
-                return number+CurrentSuffix;
+                string suffix=CurrentSuffix;
+                return number+(suffix.Length==1?suffix:"");
+            }
+        }
+
+        // The exact build: "10.0.0 A1A1", or the same as CurrentText for a build without a code.
+        internal static string DetailText
+        {
+            get
+            {
+                string suffix=CurrentSuffix;
+                return suffix.Length<=1?CurrentText:Current.Major+"."+Current.Minor+"."+Current.Build+" "+suffix;
             }
         }
 
@@ -62,11 +75,35 @@ namespace OneTaskBar
             }
         }
 
-        // The single lowercase letter after the numbers of a tag or product version ("v9.5.13b" -> "b"), or "".
+        // What follows the numbers of a tag or product version: one lowercase letter ("v9.5.13b" -> "b") or a build code of
+        // two letter+digit pairs ("10.0.0 A1A1" -> "A1A1"), or "". The code counts up in its last digit to 9; the tenth
+        // build moves the letter before it on and restarts that digit at 1 (A1A9 -> A1B1).
         internal static string Suffix(string text)
         {
+            var code=Regex.Match(text??"",@"^[vV]?\d+\.\d+\.\d+[ _-]?([A-Za-z]\d[A-Za-z]\d)(?![A-Za-z0-9])");
+            if(code.Success)return code.Groups[1].Value.ToUpperInvariant();
             var match=Regex.Match(text??"",@"^[vV]?\d+\.\d+\.\d+([a-z])(?![A-Za-z0-9])");
             return match.Success?match.Groups[1].Value:"";
+        }
+
+        // Orders suffixes: none, then single letters, then build codes; codes compare letter by letter and digit by digit.
+        internal static string SuffixKey(string suffix)
+        {
+            suffix=suffix??"";
+            return suffix.Length==0?"0":suffix.Length==1?"1"+suffix:"2"+suffix.ToUpperInvariant();
+        }
+
+        // The next build code after this one: the last digit up to 9, then the letter before it advances and the digit restarts at 1.
+        internal static string NextCode(string code)
+        {
+            if(!Regex.IsMatch(code??"",@"^[A-Z]\d[A-Z]\d$"))return code;
+            char tail=code[3],letter=code[2];
+            if(tail<'9')return code.Substring(0,3)+(char)(tail+1);
+            if(letter<'Z')return code.Substring(0,2)+(char)(letter+1)+"1";
+            // The second letter is used up: the first digit and letter move on.
+            char digit=code[1],first=code[0];
+            if(digit<'9')return code[0].ToString()+(char)(digit+1)+"A1";
+            return ((char)(first+1)).ToString()+"1A1";
         }
 
         // Newest stable release, or null when the repository has none.
@@ -83,7 +120,7 @@ namespace OneTaskBar
             string tag=Convert.ToString(root["tag_name"]);
             Version version;
             // A re-release of the same version carries a letter after it (v9.5.12b); the number is what is compared.
-            if(!Version.TryParse(Regex.Replace(Regex.Replace(tag,"^[vV]",""),"(?<=[0-9])[A-Za-z]$",""),out version))return null;
+            if(!Version.TryParse(Regex.Replace(Regex.Replace(tag,"^[vV]",""),"(?<=[0-9])([ _-]?[A-Za-z][0-9][A-Za-z][0-9]|[A-Za-z])$",""),out version))return null;
             var info=new ReleaseInfo {Tag=tag,Version=version,Suffix=Suffix(tag),Notes=root.ContainsKey("body")?Convert.ToString(root["body"]):""};
             var assets=root.ContainsKey("assets")?root["assets"] as object[]:null;
             if(assets!=null)
@@ -106,8 +143,8 @@ namespace OneTaskBar
             var current=Current;
             var latest=release.Version;
             int order=new Version(latest.Major,latest.Minor,Math.Max(0,latest.Build)).CompareTo(new Version(current.Major,current.Minor,Math.Max(0,current.Build)));
-            // Same number: a later letter (none < a < b) is the newer build.
-            if(order==0)order=String.CompareOrdinal(release.Suffix??"",CurrentSuffix);
+            // Same number: a later letter or build code (none < a < b < A1A1 < A1A2 < A1B1) is the newer build.
+            if(order==0)order=String.CompareOrdinal(SuffixKey(release.Suffix),SuffixKey(CurrentSuffix));
             return order>0;
         }
 
