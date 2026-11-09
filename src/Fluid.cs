@@ -10,7 +10,12 @@ namespace OneTaskBar
         internal const int Version=100;
         // 10.0.0a is a beta of the interface; the label shows beside the version number.
         internal const bool Beta=true;
-        internal static bool Enabled {get{return ReleaseFeatures.GlassUI&&Preferences.Current.UIVersion>=Version;}}
+        // The Fluid UI is part of the 10.x beta builds only. A 9.5.x general build is made from the same source and leaves
+        // it out entirely, also for someone whose saved choice is the Fluid UI: they get the 9.5 glass instead.
+        internal static readonly bool Available=typeof(Fluid).Assembly.GetName().Version.Major>=10;
+        // The beta label only belongs to builds that carry the Fluid UI.
+        internal static bool ShowBeta {get{return Available&&Beta;}}
+        internal static bool Enabled {get{return Available&&ReleaseFeatures.GlassUI&&Preferences.Current.UIVersion>=Version;}}
 
         // The glow behind the glass: a preset, a color of the owner's choice, or none.
         internal const int GlowNone=5,GlowCustom=6,GlowAuto=7;

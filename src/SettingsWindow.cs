@@ -135,7 +135,7 @@ namespace OneTaskBar
             soundActions.Children.Add(Paint.Action("미리 듣기",()=>shell.ConnectionSound.Play(Preferences.Current.ChargeSoundFile,message=>status.Text=message)));
             soundActions.Children.Add(Paint.Action("파일 지우기",()=> {Preferences.Set(p=> {p.ChargeSoundFile=null;p.ChargeSoundEnabled=false;});soundName.Text="선택한 파일 없음";soundToggle.Refresh(false);}));sounds.Children.Add(soundActions);Group(groups,"충전 소리",sounds);
             if(island.Children.Count>0)Group(groups,"다이나믹 아일랜드와 상단바",island);
-            if(Preferences.Current.UIVersion>=Fluid.Version)Group(groups,"플루이드 UI",FluidSection());
+            if(Fluid.Available&&Preferences.Current.UIVersion>=Fluid.Version)Group(groups,"플루이드 UI",FluidSection());
             // Ordered by what people reach for: the bar itself, how it looks and moves, panels, launcher, media, then upkeep.
             var order=new[]{"데스크톱","플루이드 UI","다이나믹 아일랜드와 상단바","화면","움직임","패널 선택","시작과 검색","바탕화면 위젯","미디어 플레이어","충전 소리","PC 호환성","복구","소프트웨어 정보"};
             sections.Sort((a,b)=>Array.IndexOf(order,a.Name)-Array.IndexOf(order,b.Name));

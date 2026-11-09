@@ -33,7 +33,8 @@ namespace OneTaskBar
                     Label=ReleaseFeatures.Prerelease?"9.5 베타":"9.5",
                     Description="9.0의 배치를 유지하면서 실시간 배경 블러와 유리 가장자리 굴절·반사를 적용합니다."
                 });
-                values.Add(new UIVersionChoice
+                // The Fluid UI ships only in the 10.x beta; the 9.5.x general release does not offer it.
+                if(Fluid.Available)values.Add(new UIVersionChoice
                 {
                     Value=Fluid.Version,
                     Label="플루이드 베타",

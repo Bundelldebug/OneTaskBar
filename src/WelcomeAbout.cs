@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -14,8 +14,8 @@ namespace OneTaskBar
         StackPanel AboutSection()
         {
             var about=new StackPanel();
-            AboutLine(about,"현재 버전","One TaskBar "+SoftwareUpdate.CurrentText+(Fluid.Beta?" Beta":"")+(Program.Inspectable?" (개발 빌드)":""));
-            AboutLine(about,"상세 버전",SoftwareUpdate.DetailText+(Fluid.Beta?" Beta":""));
+            AboutLine(about,"현재 버전","One TaskBar "+SoftwareUpdate.CurrentText+(Fluid.ShowBeta?" Beta":"")+(Program.Inspectable?" (개발 빌드)":""));
+            AboutLine(about,"상세 버전",SoftwareUpdate.DetailText+(Fluid.ShowBeta?" Beta":""));
             AboutLine(about,"개발","OneTaskBar contributors · MIT 라이선스");
             AboutLine(about,"저장소","github.com/"+SoftwareUpdate.Repository);
             AboutLine(about,"설치 위치",AppLog.Root);

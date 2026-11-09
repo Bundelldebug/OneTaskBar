@@ -54,6 +54,19 @@ namespace OneTaskBar
             for(int i=0;i<200;i++){critical.Step(1/120.0);max=Math.Max(max,critical.Value);}
             Require(max<=1.0001,"the default spring still never overshoots");
             int old=Preferences.Current.UIVersion;
+            if(!Fluid.Available)
+            {
+                // A 9.5.x general build: the Fluid UI is not offered and a saved Fluid choice falls back to the 9.5 glass.
+                try
+                {
+                    Preferences.Set(p=>p.UIVersion=Fluid.Version);
+                    Require(!Fluid.Enabled&&!Fluid.ShowBeta,"a 9.5 general build never turns on the fluid UI or its beta label");
+                    Require(Array.Find(UIVersions.Available,c=>c.Value==Fluid.Version)==null,"a 9.5 general build does not offer the fluid UI");
+                    Require(Glass95.Enabled,"a saved fluid choice keeps the 9.5 glass");
+                }
+                finally{Preferences.Set(p=>p.UIVersion=old);}
+                return;
+            }
             try
             {
                 Preferences.Set(p=>p.UIVersion=95);
@@ -113,6 +126,12 @@ namespace OneTaskBar
                 {
                     Program.Inspectable=true;
                     Validate();
+                    if(!Fluid.Available)
+                    {
+                        AppLog.Json("fluid-island-probe.json",new {passed=true,fluidAvailable=false});
+                        result=0;
+                        return;
+                    }
                     Preferences.Set(p=>p.UIVersion=Fluid.Version);
                     motion=Motion.WithAnimationsForFixture();
                     var panel=new GlassWindow {Width=320,Height=220,Left=1200,Top=200,ShowActivated=false};

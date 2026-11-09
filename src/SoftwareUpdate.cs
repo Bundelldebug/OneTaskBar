@@ -120,7 +120,7 @@ namespace OneTaskBar
             string tag=Convert.ToString(root["tag_name"]);
             Version version;
             // A re-release of the same version carries a letter after it (v9.5.12b); the number is what is compared.
-            if(!Version.TryParse(Regex.Replace(Regex.Replace(tag,"^[vV]",""),"(?<=[0-9])([ _-]?[A-Za-z][0-9][A-Za-z][0-9]|[A-Za-z])$",""),out version))return null;
+            if(!Version.TryParse(Regex.Replace(Regex.Replace(Regex.Replace(tag,"^[vV]",""),"-beta.*$",""),"(?<=[0-9])([ _-]?[A-Za-z][0-9][A-Za-z][0-9]|[A-Za-z])$",""),out version))return null;
             var info=new ReleaseInfo {Tag=tag,Version=version,Suffix=Suffix(tag),Notes=root.ContainsKey("body")?Convert.ToString(root["body"]):""};
             var assets=root.ContainsKey("assets")?root["assets"] as object[]:null;
             if(assets!=null)
