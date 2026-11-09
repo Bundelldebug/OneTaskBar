@@ -165,3 +165,15 @@ Keep durable rules in [AGENTS.md](../AGENTS.md) and navigation in [DEBUGGING.md]
 - Administrator helper lessons: it holds `OneTaskBar.exe` open, so it must leave with the app (main sends Quit on exit; it also exits 20 s after the last other OneTaskBar process is gone). An older build of it stayed alive and blocked `Apply-ToPC.ps1`; it needed an elevated taskkill. `Application.Exit()` from another thread does not end a message loop without a form: use PostThreadMessage(WM_QUIT).
 - Measured with `tools/Measure-Runtime.ps1` on the installed builds: A1Z1 CPU 0.084 %, working set 369 MiB; A1A3 CPU 0.065 %, 348 MiB.
 - Verified on device: helper restores and raises an elevated Notepad on request. Not verified: Alt+Tab/Win key inside a real administrator game (cannot inject keys into an elevated window); an elevated Notepad opened for the test may still be open.
+
+
+### Releases A1Z2 / A1A4 (Claude Code, 2026-11-09 late night)
+
+- Published at the owner's request: [9.5.13 A1Z2](https://github.com/Bundelldebug/OneTaskBar/releases/tag/v9.5.13-A1Z2) (stable, commit `6f0df5e`) and [10.0.0 A1A4 Beta](https://github.com/Bundelldebug/OneTaskBar/releases/tag/v10.0.0-A1A4-beta) (commit `ea9cd4d`). Both unsigned. Installed on this PC: A1A4.
+- Admin-support toggle now runs off the UI thread (`AdminMode.SetAsync`), waits up to 3 min for the Windows consent, and no longer restarts the app unless an old elevated app must become normal. Helper start/stop is immediate (`AdminBridge.Refresh`).
+- "배경에 맞춤": hue-weighted colour pick from the wallpaper (`FluidAutoGlow.Extract`), silver for neutral wallpapers, refresh on wallpaper change, more robust wallpaper lookup (`DesktopWallpaper.CurrentFile`). The other-PC failure was NOT reproduced; the cause there is unconfirmed.
+- Desktop style preview scales to its card (Viewbox).
+- Test-UI Settings, Quick, Launcher, Media, Dock, Notifications, Glass, Startup, Resources passed on the 10.0.0 build; Settings/Startup/Quick/Dock passed on the 9.5.13 build (`window-activation-probe` timed out once, passed on rerun).
+- `Build.ps1` self-test reads the real data dir unless `ONE_TASKBAR_DATA` is set: with UI 100 saved and a 9.5.x build, `NowBarLayout.Check` fails. Build the stable with `ONE_TASKBAR_DATA` pointing to an empty folder.
+- Idle measure, installed: A1Z2 CPU 0.048 %, WS 444 MiB (private 294); A1A4 CPU 0.067 %, WS 451 MiB (private 298). Working set is about 100 MiB above the A1A3 figure (348 MiB); cause not investigated (could be machine state).
+- Not verified: the toggle's UAC flow on this PC, admin game keys, auto-folder drawer view (screenshot opened the launcher instead).
