@@ -382,6 +382,26 @@ namespace OneTaskBar
             return new TrayPlacement(trayAccess.PointToScreen(new Point(trayAccess.ActualWidth/2,0)),Screen.Bounds,Scale,Edge,22*Zoom);
         }
         internal object Inspect() {return new {scale=Scale,visible=visible,autoHide=autoHide,revealEdge=EdgeVisible,apps=Native.RegionInfo(Apps),start=Native.RegionInfo(Start),status=Native.RegionInfo(Status),blur=Apps.HasBlur&&Status.HasBlur,nowBar=MediaBar!=null?Native.RegionInfo(MediaBar):null};}
+        // Where on screen, in device pixels, the dock shows the app that owns a window (or the given app); null when the
+        // dock is hidden or does not show it.
+        internal static Rect? IconRect(IntPtr window,AppEntry app=null)
+        {
+            var root=window==IntPtr.Zero?IntPtr.Zero:Native.GetAncestor(window,3);
+            foreach(var dock in live)
+            {
+                if(dock.closed||!dock.Apps.IsVisible)continue;
+                foreach(var cell in dock.cells.Values)
+                {
+                    if(cell.Leaving)continue;
+                    bool match=app!=null?String.Equals(cell.Entry.Key,app.Key,StringComparison.OrdinalIgnoreCase):cell.Entry.Windows.Contains(window)||cell.Entry.Windows.Contains(root);
+                    if(!match||PresentationSource.FromVisual(cell.Icon)==null)continue;
+                    var a=cell.Icon.PointToScreen(new Point(0,0));
+                    var b=cell.Icon.PointToScreen(new Point(cell.Icon.ActualWidth,cell.Icon.ActualHeight));
+                    return new Rect(a,b);
+                }
+            }
+            return null;
+        }
         static readonly System.Collections.Generic.List<DockHost> live=new System.Collections.Generic.List<DockHost>();
         // The screen edge of the visible bar on a monitor, in device pixels: its top when the panel opens above it, its
         // bottom when the panel opens below it. A Fluid drop starts right there, so it comes out of the bar, not over it.

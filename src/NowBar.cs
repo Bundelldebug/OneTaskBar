@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
@@ -32,7 +32,9 @@ namespace OneTaskBar
         Rect current,from,target,hostBox;NowBarLayout layout;double dockStart,dockTop,monitorScale=1;
         readonly Canvas hostCanvas=new Canvas();readonly RectangleGeometry capsuleClip=new RectangleGeometry();
         internal int FrameCount {get;private set;}internal double MaximumFrameGap {get;private set;}internal double MaximumPlaceMilliseconds {get;private set;}double lastFrame;
-        internal ArtworkPalette Palette {get;private set;}MediaState media;ImageSource artwork;DateTime lastActive;bool expanded,wanted,closed;IntPtr previousWindow;
+        internal ArtworkPalette Palette {get;private set;}MediaState media;ImageSource artwork;
+        // The cover in the small capsule opens the playing app; the rest of the capsule opens the player.
+        bool artPressed;DateTime lastActive;bool expanded,wanted,closed;IntPtr previousWindow;
         internal string PlayKind {get{return expandedContent.PlayKind;}}internal bool Expanded {get{return expanded;}}internal Rect Shape {get{return current;}}internal double TitleOffset {get{return title.Offset;}}internal bool MarqueeOverflow {get{return title.NaturalWidth>title.ActualWidth+.5;}}
         internal Button CompactButton {get{return compact;}}internal Button PlayButton {get{return expandedContent.PlayButton;}}internal Button NextButton {get{return expandedContent.NextButton;}}internal Button PreviousButton {get{return expandedContent.PreviousButton;}}internal PillSlider SeekBar {get{return expandedContent.SeekBar;}}
         internal bool OutputBudsIcon {get{return expandedContent.OutputBudsIcon;}}
@@ -52,7 +54,7 @@ namespace OneTaskBar
             var small=new Grid {Height=44,Margin=new Thickness(10,0,10,0)};compactRow=small;small.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(36)});small.ColumnDefinitions.Add(new ColumnDefinition());small.Children.Add(compactArt);Grid.SetColumn(title,1);small.Children.Add(title);
             if(dockZoom!=1)small.LayoutTransform=new ScaleTransform(dockZoom,dockZoom);
             Grid.SetColumnSpan(sideActivity,2);small.Children.Add(sideActivity);
-            compact=Paint.Button(small,()=>SetExpanded(true),"미디어 플레이어 · 재생 컨트롤 열기");compact.Background=Brushes.Transparent;compact.Padding=new Thickness(0);compact.Height=CompactHeight;compact.HorizontalContentAlignment=HorizontalAlignment.Stretch;compact.VerticalAlignment=VerticalAlignment.Bottom;root.Children.Add(compact);
+            compact=Paint.Button(small,()=>SetExpanded(true),"미디어 플레이어 · 재생 컨트롤 열기");compactArt.Cursor=System.Windows.Input.Cursors.Hand;compactArt.ToolTip="앱 열기";compactArt.PreviewMouseLeftButtonDown+=(s,e)=>{if(media==null||String.IsNullOrEmpty(media.AppId))return;e.Handled=true;artPressed=true;};compactArt.MouseLeftButtonUp+=(s,e)=>{if(!artPressed)return;artPressed=false;e.Handled=true;if(media!=null)shell.OpenMediaApplication(media.AppId);};compactArt.MouseLeave+=(s,e)=>artPressed=false;compact.Background=Brushes.Transparent;compact.Padding=new Thickness(0);compact.Height=CompactHeight;compact.HorizontalContentAlignment=HorizontalAlignment.Stretch;compact.VerticalAlignment=VerticalAlignment.Bottom;root.Children.Add(compact);
             expandedContent=new MediaPlayerView(command,seekCommand,()=>{SetExpanded(false);shell.ShowDetail("sound");},()=>SetExpanded(false),openApp:shell.OpenMediaApplication,sourceApp:id=>MediaApplication.Resolve(id,System.Linq.Enumerable.Concat(shell.Running,shell.Apps))) {VerticalAlignment=VerticalAlignment.Bottom,Visibility=Visibility.Collapsed,Opacity=0};
             if(ReleaseFeatures.GlassUI){var menu=new ContextMenu();var fullscreen=new MenuItem {Header="전체화면 미디어"};fullscreen.Click+=(s,e)=>shell.OpenFullscreenMedia();menu.Items.Add(fullscreen);compact.ContextMenu=menu;expandedContent.ContextMenu=menu;}root.Children.Add(expandedContent);Surface.Child=root;var decorator=(AdornerDecorator)Content;decorator.Child=null;hostCanvas.Children.Add(Surface);decorator.Child=hostCanvas;Surface.Clip=capsuleClip;compact.HorizontalAlignment=HorizontalAlignment.Left;expandedContent.HorizontalAlignment=HorizontalAlignment.Left;
             SourceInitialized+=(s,e)=>{var h=new WindowInteropHelper(this).Handle;Native.SetWindowLong(h,-20,(Native.GetWindowLong(h,-20)|0x80|0x08000000)&~0x40000);var source=HwndSource.FromHwnd(h);source.AddHook((IntPtr hwnd,int msg,IntPtr wp,IntPtr lp,ref bool handled)=>{if(msg==0x21&&!expanded){handled=true;return new IntPtr(3);}return IntPtr.Zero;});};

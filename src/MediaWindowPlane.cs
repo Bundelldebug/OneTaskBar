@@ -89,6 +89,7 @@ namespace OneTaskBar
                 Native.SetWindowPos(window,new IntPtr(-1),(int)host.X,(int)host.Y,(int)host.Width,(int)host.Height,0x10);
             };
             Closed+=(s,e)=> {
+                CompositionTarget.Rendering-=Reveal;
                 if(backdrop!=null)backdrop.Dispose();
                 backdrop=null;
                 viewport.Children.Clear();
@@ -128,11 +129,30 @@ namespace OneTaskBar
                     AppLog.Once("media-flight-backdrop",error.GetType().Name);
                 }
             }
+            // A window that is not layered can be composed once before WPF has drawn into it, which showed as a white
+            // flash across the plane. It stays cloaked until its first frame is drawn, and the flight waits for that.
+            var handle=new WindowInteropHelper(this).EnsureHandle();
+            int cloak=1;
+            DwmSetWindowAttribute(handle,13,ref cloak,4);
+            Ready=false;
             Show();
             // Order the temporary plane below the recipient instead of raising
             // the recipient and its separate blur HWND through the new plane.
-            Native.SetWindowPos(new WindowInteropHelper(this).Handle,recipient==IntPtr.Zero?new IntPtr(-1):recipient,
+            Native.SetWindowPos(handle,recipient==IntPtr.Zero?new IntPtr(-1):recipient,
                 (int)host.X,(int)host.Y,(int)host.Width,(int)host.Height,0x10|0x200);
+            framesUntilReady=2;
+            CompositionTarget.Rendering+=Reveal;
+        }
+        int framesUntilReady;
+        // True once the plane has drawn and been uncloaked; the flight's clock starts then.
+        internal bool Ready {get;private set;}
+        void Reveal(object sender,EventArgs e)
+        {
+            if(--framesUntilReady>0)return;
+            CompositionTarget.Rendering-=Reveal;
+            var handle=new WindowInteropHelper(this).Handle;
+            if(handle!=IntPtr.Zero){int cloak=0;DwmSetWindowAttribute(handle,13,ref cloak,4);}
+            Ready=true;
         }
 
         internal bool CoverRestoringWindow(IntPtr source)

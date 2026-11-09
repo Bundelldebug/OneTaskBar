@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -335,6 +335,9 @@ namespace OneTaskBar
                 Stop();
                 return;
             }
+            // The clock starts once the plane is on screen; frames spent building it would otherwise be skipped, and
+            // only the tail of the flight was seen.
+            if(plane!=null&&!plane.Ready)return;
             if(!started.HasValue)started=rendering.RenderingTime;
             if(lastFrame.HasValue)MaximumFrameGap=Math.Max(MaximumFrameGap,(rendering.RenderingTime-lastFrame.Value).TotalMilliseconds);
             lastFrame=rendering.RenderingTime;
@@ -439,6 +442,7 @@ namespace OneTaskBar
     internal sealed partial class ShellController
     {
         MediaWindowMotion mediaMotion;
+        AppWindowMotion appMotion;
         // The capsule a window flies to: the Dynamic Island when it is on and chosen, otherwise the media pill.
         internal bool MediaMotionToIsland(IntPtr window)
         {
@@ -461,6 +465,7 @@ namespace OneTaskBar
         {
             if(!ReleaseFeatures.GlassUI||Demo||Program.TestProcess)return;
             if(mediaMotion==null)mediaMotion=new MediaWindowMotion(this);
+            if(appMotion==null)appMotion=new AppWindowMotion(this);
             mediaMotion.Observe(foreground);
         }
     }

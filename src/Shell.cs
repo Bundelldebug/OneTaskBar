@@ -373,6 +373,7 @@ namespace OneTaskBar
             if(windows.Count==1) {
                 Native.Activate(windows[0]); return;
             }
+            if(appMotion!=null)appMotion.Launching(entry);
             var launch=entry.Copy();launch.Windows.Clear();launch.Launch();appsAt=DateTime.MinValue;
         }
         internal void LaunchApp(AppEntry entry,System.Windows.Input.ModifierKeys modifiers)
@@ -940,7 +941,7 @@ namespace OneTaskBar
         {
             if(disposed) return; disposed=true;
             Widgets.Dispose();
-            browserFullscreen.Dispose();CloseFullscreenMedia();if(mediaMotion!=null)mediaMotion.Dispose();
+            browserFullscreen.Dispose();CloseFullscreenMedia();if(mediaMotion!=null)mediaMotion.Dispose();if(appMotion!=null)appMotion.Dispose();
             CloseIsland();
             Desktop=false;
             TaskbarMask.Active=false;

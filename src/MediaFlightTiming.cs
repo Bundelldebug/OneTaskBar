@@ -4,8 +4,9 @@ namespace OneTaskBar
 {
     internal static class MediaFlightTiming
     {
-        internal const double MinimizeMilliseconds=480;
-        internal const double RestoreMilliseconds=520;
+        // The Fluid UI's flight runs a little longer, evenly enough that the shrinking window is seen the whole way.
+        internal static double MinimizeMilliseconds {get{return Fluid.Enabled?620:480;}}
+        internal static double RestoreMilliseconds {get{return Fluid.Enabled?640:520;}}
 
         internal static double Smooth(double value)
         {
@@ -29,14 +30,18 @@ namespace OneTaskBar
         {
             double x=Math.Max(0,Math.Min(1,elapsed));
             if(x==0||x==1)return restoring?1-x:x;
-            // The Fluid UI lets the window settle like the island does: a restore swells a touch past its size and returns.
             if(Fluid.Enabled)
             {
-                double fluid=SpringEase.Position(x,.8);
-                return restoring?Math.Max(-.08,1-fluid):Math.Min(1,fluid);
+                // The Fluid UI eases in and out, so the large window is seen leaving or arriving instead of most of the
+                // move happening in the first frames. A restore swells a touch past its size near the end and settles,
+                // like the island does.
+                double value=Smooth(x);
+                if(!restoring)return value;
+                double swell=.05*Math.Sin(Math.PI*Math.Max(0,Math.Min(1,(x-.62)/.38)));
+                return Math.Max(-.08,1-value-swell);
             }
-            double value=Spring(x);
-            return restoring?1-value:value;
+            double spring=Spring(x);
+            return restoring?1-spring:spring;
         }
     }
 }
