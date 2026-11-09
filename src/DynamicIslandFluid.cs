@@ -72,15 +72,30 @@ namespace OneTaskBar
             if(on&&glowKey!=Fluid.StyleKey){glowKey=Fluid.StyleKey;noticeGlowSet=false;warmGlow.Fill=FluidPaint.Glow(Fluid.Glow(0xA0));fluidRim.BorderBrush=FluidPaint.Rim();}
             if(on==fluid)return;
             fluid=on;
-            var visible=on?Visibility.Visible:Visibility.Collapsed;
-            fluidLight.Visibility=fluidRim.Visibility=fluidOrb.Visibility=visible;
             if(!on){pour.Visibility=bloom.Visibility=Visibility.Collapsed;}
-            SetMaterial(on?FluidBase:Black,on?FluidBase:Black);
+            dressSet=false;
+            SetFluidDress(dressOpen);
             // About one overshoot of a tenth: the shape stretches past its size and settles back.
             slide.Damping=on?.8:1;
             slide.Omega=on?30:38;
             if(!on)SetFluidMotion(false);
             if(IsVisible&&!current.IsEmpty)PlaceShape();
+        }
+
+        bool dressOpen,dressed,dressSet;
+        // Folded, the island is plain black: its first job is to hide the camera hole, and black does that best. The
+        // Fluid glass, light and rim only dress it while it is open (media, a notification, feedback or search).
+        void SetFluidDress(bool open)
+        {
+            dressOpen=open;
+            bool want=fluid&&open;
+            if(dressSet&&want==dressed)return;
+            dressSet=true;
+            dressed=want;
+            var visible=want?Visibility.Visible:Visibility.Collapsed;
+            fluidLight.Visibility=fluidRim.Visibility=visible;
+            fluidOrb.Visibility=Visibility.Collapsed;
+            SetMaterial(want?FluidBase:Black,want?FluidBase:Black);
         }
 
         // The light drifts and the orb breathes only while something is playing and animations are on.

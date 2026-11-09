@@ -308,7 +308,10 @@ namespace OneTaskBar
             ShowContent(search,searching);
             ShowContent(compact,compactVisible);
             activity.SetPlaying(compactVisible&&media.Playing&&Motion.Enabled);
-            SetFluidMotion(active&&media.Playing);
+            bool open=detail||notice||show||searching;
+            SetFluidDress(open);
+            // The drifting light is only seen on the open island, so it rests while the island is folded.
+            SetFluidMotion(open&&active&&media.Playing);
             ShowContent(feedback,charge);
             ShowContent(level,show&&!charge);
             ShowContent(notification,notice);

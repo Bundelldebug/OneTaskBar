@@ -148,8 +148,9 @@ namespace OneTaskBar
                     var media=new MediaState {Available=true,Active=true,Playing=true,Title="Ordinary · 오디너리",Artist="Damage",CanPlay=true,CanPrevious=true,CanNext=true,CanSeek=true,Duration=200,Position=45,Artwork=Cover()};
                     view.Present(media,"헤드폰",screen,dpi);
                     await Task.Delay(500);
-                    Require(view.FluidActive&&view.Surface.Background!=Brushes.Black&&view.Surface.Background.IsFrozen,"the fluid island uses its own frozen material");
-                    Require(view.FluidMoving,"light and orb move while music plays");
+                    // Folded, the island stays black to hide the camera hole, and its light rests.
+                    Require(view.FluidActive&&view.Surface.Background==Brushes.Black,"the folded fluid island is black");
+                    Require(!view.FluidMoving,"the light rests while the island is folded");
                     Require(!view.HasBlur,"the fluid island still creates no live backdrop");
                     Program.Save(view.Surface,(int)DynamicIslandLayout.MediaWidth,(int)DynamicIslandLayout.CompactHeight,Path.Combine(AppLog.Data,"fluid-island-media.png"));
                     var tall=new double[1];double peak=0;
@@ -158,6 +159,7 @@ namespace OneTaskBar
                     await Task.Delay(400);
                     double target=view.Shape.Height;
                     Require(!view.Animating&&target>100,"the fluid card settles");
+                    Require(view.Surface.Background!=Brushes.Black&&view.Surface.Background.IsFrozen&&view.FluidMoving,"the open island wears the fluid glass and its light moves while music plays");
                     Require(peak>target+1,"the card stretches past its size and settles back: peak "+peak+" target "+target);
                     Require(peak<=DynamicIslandLayout.MaximumHeight+.01,"the stretch never leaves the host window");
                     Program.Save(view.Surface,360,204,Path.Combine(AppLog.Data,"fluid-island-expanded.png"));
