@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -537,7 +537,12 @@ namespace OneTaskBar
             foreach(var host in docks)if(host.MediaBar!=null)host.MediaBar.SetExpanded(false);
             var screen=dock!=null?dock.Screen:Forms.Screen.FromPoint(Forms.Cursor.Position);double scale=dock!=null?dock.Scale:MonitorScale(screen,StartMenu);
             var fit=StartMenuLayout.Fit(screen.Bounds,Native.WorkArea(screen),scale,620,dock!=null?dock.Edge:DockGeometry.Edge);
-            StartMenu.Configure(fit.Width,fit.Height);StartMenu.Reload();StartMenu.ShowForMonitor(screen,scale,dock!=null?dock.Edge:DockGeometry.Edge);StartMenu.Pop();StartMenu.Activate();StartMenu.Search.Focus();RevealAutoHideDock(dock);
+            StartMenu.Configure(fit.Width,fit.Height);
+            // A menu that was built before opens at once and refreshes its tiles right after the first frame; only the first open waits.
+            bool refreshLater=StartMenu.Loaded;
+            if(!refreshLater)StartMenu.Reload();
+            StartMenu.ShowForMonitor(screen,scale,dock!=null?dock.Edge:DockGeometry.Edge);StartMenu.Pop();StartMenu.Activate();StartMenu.Search.Focus();RevealAutoHideDock(dock);
+            if(refreshLater){var menu=StartMenu;menu.Dispatcher.BeginInvoke(new Action(()=>{if(menu.IsVisible&&String.IsNullOrEmpty(menu.Search.Text))menu.Reload();}),System.Windows.Threading.DispatcherPriority.ContextIdle);}
         }
         // With auto-hide on, the Windows key and the search box bring the whole dock up with their panel, on the
         // monitor the panel opens on. It goes away again by itself once the panel is closed and the pointer is elsewhere.

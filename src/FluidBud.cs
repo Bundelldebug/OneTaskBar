@@ -23,6 +23,7 @@ namespace OneTaskBar
         bool fromTop,grown;
         Action finished;
         Native.RectI original;
+        double fixedWidth,fixedHeight;
         internal FluidBud(GlassWindow owner)
         {
             window=owner;
@@ -56,6 +57,9 @@ namespace OneTaskBar
             spring.Velocity=0;
             spring.Target=close?0:1;
             clock.Restart();
+            dwell.Reset();
+            emerge=1;
+            if(!close){emerge=0;dwell.Start();}
             Apply(spring.Value);
             if(!hooked){hooked=true;CompositionTarget.Rendering+=Frame;}
         }
@@ -75,7 +79,13 @@ namespace OneTaskBar
             extra=Math.Min(140,gap);
             int pixels=(int)Math.Round(extra*scale);
             original=rect;
-            window.Surface.Margin=new Thickness(0,fromTop?extra:0,0,fromTop?0:extra);
+            // The panel keeps a fixed size while the window grows around it, so its contents are not measured again.
+            var surface=window.Surface;
+            fixedWidth=surface.ActualWidth;fixedHeight=surface.ActualHeight;
+            surface.Width=fixedWidth;surface.Height=fixedHeight;
+            surface.VerticalAlignment=fromTop?VerticalAlignment.Bottom:VerticalAlignment.Top;
+            surface.HorizontalAlignment=HorizontalAlignment.Left;
+            surface.Margin=new Thickness(0);
             Native.SetWindowPos(handle,IntPtr.Zero,rect.Left,fromTop?rect.Top-pixels:rect.Top,rect.Right-rect.Left,rect.Bottom-rect.Top+pixels,0x14);
             grown=true;
         }
@@ -83,15 +93,33 @@ namespace OneTaskBar
         {
             if(!grown)return;
             grown=false;extra=0;
-            window.Surface.Margin=new Thickness(0);
+            var restore=window.Surface;
+            restore.ClearValue(FrameworkElement.WidthProperty);restore.ClearValue(FrameworkElement.HeightProperty);
+            restore.VerticalAlignment=VerticalAlignment.Stretch;restore.HorizontalAlignment=HorizontalAlignment.Stretch;
             var handle=new WindowInteropHelper(window).Handle;
             if(handle!=IntPtr.Zero)Native.SetWindowPos(handle,IntPtr.Zero,original.Left,original.Top,original.Right-original.Left,original.Bottom-original.Top,0x14);
         }
 
+        const double Dwell=.13;
+        double emerge=1;
+        readonly System.Diagnostics.Stopwatch dwell=new System.Diagnostics.Stopwatch();
         void Frame(object sender,EventArgs e)
         {
             var rendering=e as RenderingEventArgs;
             if(rendering==null)return;
+            if(dwell.IsRunning)
+            {
+                double u=dwell.Elapsed.TotalSeconds/Dwell;
+                if(u<1)
+                {
+                    emerge=u*u*(3-2*u);
+                    Apply(0);
+                    return;
+                }
+                dwell.Stop();
+                emerge=1;
+                clock.Restart();
+            }
             spring.Step(clock.Next(rendering.RenderingTime));
             if(closing?spring.Value<=.02:spring.AtRest)
             {
@@ -119,16 +147,18 @@ namespace OneTaskBar
         // panel, with the bar at the bottom edge of the window; a window that opens downward is flipped afterwards.
         void Apply(double v)
         {
-            double width=window.Surface.ActualWidth,height=window.Surface.ActualHeight;
+            double width=grown?fixedWidth:window.Surface.ActualWidth,height=grown?fixedHeight:window.Surface.ActualHeight;
             if(width<2||height<2)return;
             double total=height+extra;
             double orb=Math.Min(Orb,Math.Min(width,height));
             double cx=Math.Max(orb/2,Math.Min(width-orb/2,anchor*width));
             // The width leads, the height follows: a round drop, then a wide pill, then the panel.
             double across=Math.Max(0,Math.Min(1.06,v*1.18)),down=Math.Max(0,Math.Min(1.06,v));
-            double dropTop=total-orb*.88;
-            double left=Mix(cx-orb/2,0,across),right=Mix(cx+orb/2,width,across);
-            double top=Mix(dropTop,0,down),bottom=Mix(dropTop+orb,height,down);
+            // Before it widens the drop forms at the bar and is pulled up on its neck, so it reads as a drop first.
+            double formed=closing?1:emerge,size=orb*(.4+.6*formed),pull=orb*.4*formed*(1-Smooth(0,.45,v));
+            double dropTop=total-size*.88-pull;
+            double left=Mix(cx-size/2,0,across),right=Mix(cx+size/2,width,across);
+            double top=Mix(dropTop,0,down),bottom=Mix(dropTop+size,height,down);
             var shape=new Rect(left,top,Math.Max(2,right-left),Math.Max(2,bottom-top));
             shape.Intersect(new Rect(0,0,width,total));
             if(shape.IsEmpty)return;

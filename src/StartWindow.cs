@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -89,8 +89,10 @@ namespace OneTaskBar
         static Button Tool(string glyph,string label,Action action){var button=Paint.Button(new Glyph(glyph,20),action,label);button.Background=Brushes.Transparent;button.Padding=new Thickness(9);button.Width=button.Height=40;return button;}
         static Grid Heading(string text){var row=new Grid {Height=34,Margin=new Thickness(8,0,8,0)};var title=Paint.TextBlock(text,16,Paint.Text);title.FontWeight=FontWeights.SemiBold;row.Children.Add(title);return row;}
         void QueueSearch(){if(queued||Search.Text.Length==0)return;queued=true;Dispatcher.BeginInvoke(new Action(()=> {queued=false;if(!composing&&IsVisible&&!String.IsNullOrWhiteSpace(Search.Text))shell.ToggleSearch(null,Search.Text);}),System.Windows.Threading.DispatcherPriority.Background);}
+        internal bool Loaded {get;private set;}
         internal void Reload()
         {
+            Loaded=true;
             Search.Text="";openFolder=null;pinPage=0;moreRecent=false;RefreshPins();
             if(!StartRecentFeed.Enabled()){cachedRecent=null;recentUntil=DateTime.MinValue;}RenderRecent(cachedRecent??new List<StartRecent>());LoadRecent();if(Phone.Visibility==Visibility.Visible)LoadPhone();
         }
