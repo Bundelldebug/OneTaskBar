@@ -29,6 +29,12 @@ namespace OneTaskBar
         {
             double x=Math.Max(0,Math.Min(1,elapsed));
             if(x==0||x==1)return restoring?1-x:x;
+            // The Fluid UI lets the window settle like the island does: a restore swells a touch past its size and returns.
+            if(Fluid.Enabled)
+            {
+                double fluid=SpringEase.Position(x,.8);
+                return restoring?Math.Max(-.08,1-fluid):Math.Min(1,fluid);
+            }
             double value=Spring(x);
             return restoring?1-value:value;
         }
