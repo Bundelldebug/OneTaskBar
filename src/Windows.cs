@@ -47,9 +47,9 @@ namespace OneTaskBar
         sealed class DockDrop {internal string Target;internal bool After,Pinned;}
         DockDrop pendingDockDrop;
         readonly Dictionary<string,DockCell> cells=new Dictionary<string,DockCell>(StringComparer.OrdinalIgnoreCase);
-        readonly FrameClock resizeTimer=new FrameClock();
+        readonly System.Windows.Threading.DispatcherTimer resizeTimer=new System.Windows.Threading.DispatcherTimer(System.Windows.Threading.DispatcherPriority.Render){Interval=TimeSpan.FromMilliseconds(16)};
         readonly Stopwatch resizeWatch=new Stopwatch();
-        readonly FrameClock visibilityTimer=new FrameClock();
+        readonly System.Windows.Threading.DispatcherTimer visibilityTimer=new System.Windows.Threading.DispatcherTimer(System.Windows.Threading.DispatcherPriority.Render){Interval=TimeSpan.FromMilliseconds(16)};
         readonly Stopwatch visibilityWatch=new Stopwatch();double reveal=1,revealFrom,revealTarget=1;int revealDuration;
         double currentX,currentWidth,currentY,currentStartX,fromX,fromWidth,fromY,fromStartX,resizeDelay;DockLayout targetLayout;bool placed;
         bool visible=true,ready,mediaSpace;
