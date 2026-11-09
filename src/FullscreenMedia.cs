@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
@@ -91,6 +92,14 @@ namespace OneTaskBar
             var close=Icon("close",Hide,"전체화면 닫기 · Esc");close.Tag="close";canvas.Children.Add(close);
             lockButton=Icon("lock",lockPC,"PC 잠금");lockButton.Tag="lock";canvas.Children.Add(lockButton);
             SizeChanged+=(s,e)=>Layout(false);
+            // Space plays or pauses and the arrow keys skip, as in a video player; typing into a field is left alone.
+            PreviewKeyDown+=(s,e)=>
+            {
+                if(e.OriginalSource is TextBox||Keyboard.Modifiers!=ModifierKeys.None)return;
+                string command=e.Key==Key.Space?"play":e.Key==Key.Right?"next":e.Key==Key.Left?"previous":null;
+                if(command==null||(tiles!=null&&tiles.Editing))return;
+                dispatch(command);e.Handled=true;
+            };
             Preferences.MediaAppearanceChanged+=ClockChanged;
             SourceInitialized += (s, e) =>
             {
@@ -123,6 +132,8 @@ namespace OneTaskBar
         {
             ShowAt(screen.Bounds,0,0,screen.Bounds.Width/scale,screen.Bounds.Height/scale);
             Layout(false);Activate();
+            // Opened from another process the foreground lock can refuse Activate, which leaves Esc and the keys dead.
+            if(!IsActive)Native.Activate(new System.Windows.Interop.WindowInteropHelper(this).Handle);
             fill.BorderBrush=Fluid.Enabled?(Brush)Glass95.Rim:Paint.Brush("#35FFFFFF");
             cardLight.Background=Fluid.Enabled?Glass95.Card:null;
             if(Fluid.Enabled&&Motion.Enabled&&springsReady)DropIn();
