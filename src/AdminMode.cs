@@ -13,18 +13,36 @@ namespace OneTaskBar
     {
         internal static bool Enabled {get{return LogonStartup.AdminHelperRegistered||LogonStartup.IsAdministrator||LogonStartup.Elevated;}}
         // Returns a message for the settings window; null means the change did not happen.
+        // Runs off the interface thread: the Windows consent window can stay open as long as it likes without freezing the app.
+        internal static System.Threading.Tasks.Task<string> SetAsync(bool on)
+        {
+            return System.Threading.Tasks.Task.Run(()=>Set(on));
+        }
         internal static string Set(bool on)
         {
             try
             {
-                if(LogonStartup.AdminHelperRegistered==on&&!LogonStartup.IsAdministrator&&!LogonStartup.Elevated)return null;
+                bool legacy=LogonStartup.IsAdministrator;
+                if(LogonStartup.AdminHelperRegistered==on&&!legacy&&!LogonStartup.Elevated)return null;
                 if(!on)AdminBridge.Quit();
                 var info=new ProcessStartInfo(NotificationIdentity.PhysicalFile(Path.Combine(AppLog.Root,"OneTaskBar.exe")),"--elevated-startup "+(on?"on":"off")){UseShellExecute=true,Verb="runas",WindowStyle=ProcessWindowStyle.Hidden};
                 int code;
-                using(var helper=Process.Start(info)){helper.WaitForExit();code=helper.ExitCode;}
+                using(var helper=Process.Start(info))
+                {
+                    // Waiting for the consent window is bounded, so a closed or hidden prompt cannot leave the setting stuck.
+                    if(!helper.WaitForExit(180000))return "Windows 확인이 끝나지 않아 변경하지 않았습니다";
+                    code=helper.ExitCode;
+                }
                 if(code!=0)return "관리자 권한 설정을 저장하지 못했습니다";
-                Restart();
-                return on?"관리자 권한 창 지원을 켰습니다. 앱을 다시 시작합니다":"관리자 권한 창 지원을 껐습니다. 앱을 다시 시작합니다";
+                // The helper is started or stopped right now; the app itself keeps running. Only an app that was itself running as
+                // administrator (an older setting) has to start again, to become a normal process.
+                AdminBridge.Refresh();
+                if(legacy)
+                {
+                    Restart();
+                    return on?"관리자 권한 창 지원을 켰습니다. 앱을 다시 시작합니다":"관리자 권한 창 지원을 껐습니다. 앱을 다시 시작합니다";
+                }
+                return on?"관리자 권한 창 지원을 켰습니다":"관리자 권한 창 지원을 껐습니다";
             }
             catch(Win32Exception error)
             {

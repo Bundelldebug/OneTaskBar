@@ -129,7 +129,8 @@ namespace OneTaskBar
                 Piece(canvas,w/2-14,4,28,4,2,"#99FFFFFF");
                 Piece(canvas,w-34,4,26,4,2,"#E6FFFFFF");
             }
-            return new Border {CornerRadius=new CornerRadius(11),ClipToBounds=true,Child=canvas};
+            // Scaled to the card, so four of them fit side by side without cutting the picture off.
+            return new Border {CornerRadius=new CornerRadius(11),ClipToBounds=true,Child=new Viewbox {Stretch=Stretch.Uniform,Child=canvas}};
         }
     }
 }

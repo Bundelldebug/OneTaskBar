@@ -68,41 +68,66 @@ namespace OneTaskBar
         static DateTime offlineUntil=DateTime.MinValue,launchedAt=DateTime.MinValue;
         static bool started;
         static AdminKeyServer server;
+        static VolumeKeys keyHook;
+        static readonly object gate=new object();
         internal static void Start(VolumeKeys keys)
         {
+            keyHook=keys;
             if(started||LogonStartup.IsAdministrator)return;
             started=true;
-            Task.Run(()=>
+            Task.Run(()=>Refresh());
+            var watcher=new Thread(()=>
             {
-                try
+                // A helper that went away (an update, a crash) is started again; nothing happens while the feature is off.
+                while(started)
                 {
-                    registered=LogonStartup.AdminHelperRegistered;
-                    if(!registered)return;
-                    server=new AdminKeyServer(keys);
-                    EnsureRunning();
-                    // The helper leaves when the app does (so an update can replace the files) and is started again with the app.
-                    var application=Application.Current;
-                    if(application!=null)application.Dispatcher.BeginInvoke(new Action(()=>
+                    Thread.Sleep(10000);
+                    if(registered)EnsureRunning();
+                }
+            }){IsBackground=true,Name="One TaskBar admin helper watch"};
+            watcher.Start();
+            var application=Application.Current;
+            if(application!=null)application.Dispatcher.BeginInvoke(new Action(()=>
+            {
+                var current=Application.Current;
+                // The helper leaves when the app does, so an update can replace the files; it is started again with the app.
+                if(current!=null)current.Exit+=(s,e)=>{if(registered)Quit();};
+            }));
+        }
+        // Reads whether the helper task exists and brings the app in line: starts or stops serving the helper's keys.
+        internal static void Refresh()
+        {
+            try
+            {
+                bool now=LogonStartup.AdminHelperRegistered;
+                lock(gate)
+                {
+                    registered=now;
+                    if(now)
                     {
-                        var current=Application.Current;
-                        if(current!=null)current.Exit+=(s,e)=>Quit();
-                    }));
-                    while(started)
+                        if(server==null&&keyHook!=null)server=new AdminKeyServer(keyHook);
+                    }
+                    else
                     {
-                        Thread.Sleep(10000);
-                        EnsureRunning();
+                        var current=server;
+                        server=null;
+                        if(current!=null)current.Dispose();
                     }
                 }
-                catch(Exception error){AppLog.Once("admin-helper-start",error.GetType().Name);}
-            });
+                if(now)EnsureRunning();
+            }
+            catch(Exception error){AppLog.Once("admin-helper-refresh",error.GetType().Name);}
         }
         internal static void Stop()
         {
-            var current=server;
-            server=null;
-            if(current!=null)current.Dispose();
-        }
-        static bool Running {get{return File.Exists(@"\\.\pipe\"+AdminPipes.Command);}}
+            started=false;
+            lock(gate)
+            {
+                var current=server;
+                server=null;
+                if(current!=null)current.Dispose();
+            }
+        }        static bool Running {get{return File.Exists(@"\\.\pipe\"+AdminPipes.Command);}}
         static void EnsureRunning()
         {
             if(Running||(DateTime.UtcNow-launchedAt).TotalSeconds<20)return;
@@ -136,7 +161,7 @@ namespace OneTaskBar
         {
             if(!registered||LogonStartup.IsAdministrator||DateTime.UtcNow<offlineUntil||!ProcessElevation.WindowIsElevated(window))return false;
             AllowSetForegroundWindow(-1);
-            string answer=Ask("A "+window.ToInt64(),100);
+            string answer=Ask("A "+window.ToInt64(),60);
             if(answer==null)
             {
                 offlineUntil=DateTime.UtcNow.AddSeconds(3);

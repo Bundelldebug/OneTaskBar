@@ -33,18 +33,28 @@ namespace OneTaskBar
                 instance=Activator.CreateInstance(Type.GetTypeFromCLSID(new Guid("C2CF3110-460E-4FC1-B9D0-8A1C0C9CC4BD")));
                 var desktop=(IWallpaper)instance;uint count;desktop.GetMonitorDevicePathCount(out count);long best=-1;
                 for(uint n=0;n<count;n++){
-                    string id;Native.RectI bounds;desktop.GetMonitorDevicePathAt(n,out id);desktop.GetMonitorRECT(id,out bounds);
-                    long area=(long)Math.Max(0,Math.Min(screen.Right,bounds.Right)-Math.Max(screen.Left,bounds.Left))*Math.Max(0,Math.Min(screen.Bottom,bounds.Bottom)-Math.Max(screen.Top,bounds.Top));
-                    if(area<=best)continue;
-                    string file;desktop.GetWallpaper(id,out file);
-                    if(!String.IsNullOrWhiteSpace(file)){best=area;path=file;}
+                    // One monitor that cannot be asked (disconnected, no picture of its own) must not hide the others.
+                    try{
+                        string id;Native.RectI bounds;desktop.GetMonitorDevicePathAt(n,out id);desktop.GetMonitorRECT(id,out bounds);
+                        long area=(long)Math.Max(0,Math.Min(screen.Right,bounds.Right)-Math.Max(screen.Left,bounds.Left))*Math.Max(0,Math.Min(screen.Bottom,bounds.Bottom)-Math.Max(screen.Top,bounds.Top));
+                        if(area<=best)continue;
+                        string file;desktop.GetWallpaper(id,out file);
+                        if(!String.IsNullOrWhiteSpace(file)){best=area;path=file;}
+                    }catch(Exception error){AppLog.Once("wallpaper-monitor-query",error.GetType().Name);}
                 }
-                desktop.GetBackgroundColor(out color);
+                // A single picture for every monitor is answered without a monitor name.
+                if(String.IsNullOrWhiteSpace(path)){string any;desktop.GetWallpaper(null,out any);if(!String.IsNullOrWhiteSpace(any))path=any;}
             }catch(Exception error){AppLog.Once("wallpaper-file-query",error.GetType().Name);}
+            try{if(instance!=null)((IWallpaper)instance).GetBackgroundColor(out color);}catch(Exception){}
             finally{if(instance!=null&&Marshal.IsComObject(instance))Marshal.ReleaseComObject(instance);}
-            if(String.IsNullOrWhiteSpace(path)){
+            if(String.IsNullOrWhiteSpace(path)||!File.Exists(path)){
                 var buffer=new System.Text.StringBuilder(32768);
-                if(SystemParametersInfo(0x73,buffer.Capacity,buffer,0))path=buffer.ToString();
+                if(SystemParametersInfo(0x73,buffer.Capacity,buffer,0)&&File.Exists(buffer.ToString()))path=buffer.ToString();
+            }
+            // Windows keeps the picture it is showing here, whatever the source (theme, slideshow, Spotlight).
+            if(String.IsNullOrWhiteSpace(path)||!File.Exists(path)){
+                string cached=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),@"Microsoft\Windows\Themes\TranscodedWallpaper");
+                if(File.Exists(cached))path=cached;
             }
             background=Color.FromRgb((byte)color,(byte)(color>>8),(byte)(color>>16));
             return path;

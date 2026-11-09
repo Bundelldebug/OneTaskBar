@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -18,6 +18,19 @@ namespace OneTaskBar
         static string key="";
         static int checkedAt;
         static bool checkedOnce;
+
+        static FluidAutoGlow()
+        {
+            // A new picture (also a slideshow or Spotlight change) is looked at again right away, not after the polling pause.
+            try
+            {
+                Microsoft.Win32.SystemEvents.UserPreferenceChanged+=(s,e)=>
+                {
+                    if(e.Category==Microsoft.Win32.UserPreferenceCategory.Desktop){checkedOnce=false;}
+                };
+            }
+            catch(Exception error){AppLog.Once("fluid-auto-glow-event",error.GetType().Name);}
+        }
 
         // Looked up at most every few seconds; the picture is only decoded again when the wallpaper file changed.
         internal static Color Color
@@ -42,7 +55,7 @@ namespace OneTaskBar
                         string plain="color|"+background.R+","+background.G+","+background.B;
                         if(plain==key)return current;
                         key=plain;
-                        current=Lift(background,false);
+                        current=FromBackground(background);
                         return current;
                     }
                     string stamp=path+"|"+File.GetLastWriteTimeUtc(path).Ticks;
@@ -59,6 +72,17 @@ namespace OneTaskBar
             }
         }
 
+        // A colorless wallpaper glows a soft cool white instead of the default orange, which would clash with it.
+        static readonly Color Silver=Color.FromRgb(0xE4,0xEA,0xF4);
+
+        static Color FromBackground(Color color)
+        {
+            double max=Math.Max(color.R,Math.Max(color.G,color.B))/255.0,min=Math.Min(color.R,Math.Min(color.G,color.B))/255.0;
+            return max-min<.08?Silver:Lift(color,false);
+        }
+
+        // The wallpaper's main color: pixels are weighted by how vivid and bright they are and grouped by hue, so a large dark
+        // or grey area does not outvote the colored part, and the strongest hue (with its neighbours) is averaged.
         static Color Extract(string path)
         {
             if(new FileInfo(path).Length>67108864)return Fallback;
@@ -67,14 +91,58 @@ namespace OneTaskBar
             {
                 image.BeginInit();
                 image.CacheOption=BitmapCacheOption.OnLoad;
-                image.DecodePixelWidth=64;
+                image.DecodePixelWidth=96;
                 image.StreamSource=stream;
                 image.EndInit();
                 image.Freeze();
             }
-            return Lift(ArtworkPalette.Read(image).Dominant,Object.ReferenceEquals(ArtworkPalette.Read(image),ArtworkPalette.Neutral));
+            var converted=new FormatConvertedBitmap(image,PixelFormats.Bgra32,null,0);
+            int width=converted.PixelWidth,height=converted.PixelHeight,stride=width*4;
+            var pixels=new byte[stride*height];
+            converted.CopyPixels(pixels,stride,0);
+            const int Buckets=36;
+            var weight=new double[Buckets];
+            var red=new double[Buckets];
+            var green=new double[Buckets];
+            var blue=new double[Buckets];
+            int counted=0;
+            for(int i=0;i+3<pixels.Length;i+=4)
+            {
+                if(pixels[i+3]<128)continue;
+                counted++;
+                double b=pixels[i]/255.0,g=pixels[i+1]/255.0,r=pixels[i+2]/255.0;
+                double max=Math.Max(r,Math.Max(g,b)),min=Math.Min(r,Math.Min(g,b)),delta=max-min;
+                if(max<.12||delta<.06)continue;
+                double saturation=delta/max;
+                if(saturation<.1)continue;
+                double hue;
+                if(max==r)hue=((g-b)/delta+6)%6;
+                else if(max==g)hue=(b-r)/delta+2;
+                else hue=(r-g)/delta+4;
+                int bucket=Math.Min(Buckets-1,(int)(hue*60/10));
+                double w=saturation*Math.Sqrt(max);
+                weight[bucket]+=w;red[bucket]+=r*w;green[bucket]+=g*w;blue[bucket]+=b*w;
+            }
+            if(counted==0)return Fallback;
+            int best=0;double bestWeight=-1,total=0;
+            for(int n=0;n<Buckets;n++)
+            {
+                total+=weight[n];
+                double sum=weight[n]+weight[(n+1)%Buckets]+weight[(n+Buckets-1)%Buckets];
+                if(sum>bestWeight){bestWeight=sum;best=n;}
+            }
+            // Hardly any colored pixel: a grey, black or white picture.
+            if(bestWeight<counted*.015)return Silver;
+            double wr=0,wg=0,wb=0,ww=0;
+            for(int d=-1;d<=1;d++)
+            {
+                int n=(best+d+Buckets)%Buckets;
+                wr+=red[n];wg+=green[n];wb+=blue[n];ww+=weight[n];
+            }
+            if(ww<=0)return Silver;
+            var main=Color.FromRgb((byte)Math.Round(wr/ww*255),(byte)Math.Round(wg/ww*255),(byte)Math.Round(wb/ww*255));
+            return FromBackground(main);
         }
-
         // Keeps the hue, and makes it vivid and bright enough to glow; a colorless picture gets the default orange.
         internal static Color Lift(Color color,bool neutral)
         {
