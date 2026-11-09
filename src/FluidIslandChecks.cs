@@ -82,6 +82,18 @@ namespace OneTaskBar
                     Validate();
                     Preferences.Set(p=>p.UIVersion=Fluid.Version);
                     motion=Motion.WithAnimationsForFixture();
+                    var panel=new GlassWindow {Width=320,Height=220,Left=1200,Top=200,ShowActivated=false};
+                    panel.Surface.Child=new TextBlock {Text="Fluid panel",Foreground=Brushes.Black,Margin=new Thickness(24),FontSize=18};
+                    panel.Show();
+                    await Task.Delay(120);
+                    Program.Save(panel.Content as FrameworkElement,320,220,Path.Combine(AppLog.Data,"fluid-panel-sweep.png"));
+                    await Task.Delay(900);
+                    Program.Save(panel.Content as FrameworkElement,320,220,Path.Combine(AppLog.Data,"fluid-panel-rest.png"));
+                    panel.Hide();panel.Show();
+                    await Task.Delay(140);
+                    Program.Save(panel.Content as FrameworkElement,320,220,Path.Combine(AppLog.Data,"fluid-panel-sweep.png"));
+                    Require(panel.HasFluidLight,"the fluid UI adds its light to glass panels");
+                    panel.Close();
                     foreach(int version in new[]{95,Fluid.Version})Program.Save(new UIVersionPreview {Version=version},130,132,Path.Combine(AppLog.Data,"ui-version-preview-"+version+".png"));
                     view=new DynamicIsland(command=>{},value=>Task.FromResult(true),()=>{},id=>{});
                     var screen=Forms.Screen.PrimaryScreen;
@@ -107,7 +119,13 @@ namespace OneTaskBar
                     Require(!view.Animating&&view.Shape.Height==DynamicIslandLayout.CompactHeight&&view.Shape.Width==DynamicIslandLayout.MediaWidth,"collapse settles exactly on the compact capsule");
                     var notice=new NotificationEntry {Id=1,App="테스트 앱",AppId="fixture",Title="Emily Olson",Body="Yup. It was Dan. Bakery I wanted to…",Icon=media.Artwork};
                     Require(view.ShowNotification(notice,entry=>{}),"notifications still use the island");
-                    await Task.Delay(700);
+                    // The arrival, frame by frame: light bursts around the orb, pours across, words come into focus.
+                    int passed=0;
+                    foreach(int at in new[]{70,170,290,430,640,1000})
+                    {
+                        await Task.Delay(at-passed);passed=at;
+                        Program.Save(view.Surface,360,156,Path.Combine(AppLog.Data,"fluid-island-arrival-"+at+".png"));
+                    }
                     Program.Save(view.Surface,360,156,Path.Combine(AppLog.Data,"fluid-island-notification.png"));
                     view.DismissNotification();
                     await Task.Delay(500);

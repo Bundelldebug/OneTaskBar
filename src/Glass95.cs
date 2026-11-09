@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -26,10 +26,11 @@ namespace OneTaskBar
         internal static bool Dark {get{return fixtureDark??AppTheme.Dark;}}
         internal static bool DockDark {get{return fixtureDark??AppTheme.DockDark;}}
         static Palette Current {get{return Dark?dark:light;}}
-        internal static bool CardBrush(Brush brush){return brush!=null&&(brush==light.Card||brush==dark.Card);}
+        static readonly Brush fluidCard=FluidFilm();
+        internal static bool CardBrush(Brush brush){return brush!=null&&(brush==light.Card||brush==dark.Card||brush==fluidCard);}
         internal static bool Transparent {get{return Preferences.Current.Blur&&!SystemParameters.HighContrast;}}
         internal static Brush Surface {get{return PanelMaterial.PanelSurface(Dark,true);}}
-        internal static Brush Card {get{return Transparent?Current.Card:PanelMaterial.Card(Dark);}}
+        internal static Brush Card {get{return Transparent?(Fluid.Enabled?fluidCard:Current.Card):PanelMaterial.Card(Dark);}}
         internal static Brush Solid {get{return PanelMaterial.Solid(Dark);}}
         internal static Brush Text {get{return SystemParameters.HighContrast?SystemColors.WindowTextBrush:Current.Text;}}
         internal static Brush Muted {get{return SystemParameters.HighContrast?SystemColors.WindowTextBrush:Current.Muted;}}
@@ -38,6 +39,16 @@ namespace OneTaskBar
         static readonly Brush[] fluidRims={Edge(false,true,true),Edge(true,true,true)};
         internal static Brush Rim {get{return Transparent?(Fluid.Enabled?fluidRims[Dark?1:0]:Current.Rim):Brushes.Transparent;}}
         internal static readonly Brush Accent=Paint.Brush("#FF3478FD"),Selected=Paint.ControlWhite;
+        // Cards in the Fluid UI catch the key light at the upper left and take a little warm light at the bottom.
+        static Brush FluidFilm()
+        {
+            var film=new LinearGradientBrush {StartPoint=new Point(.05,0),EndPoint=new Point(.55,1)};
+            film.GradientStops.Add(new GradientStop(Color.FromArgb(40,255,255,255),0));
+            film.GradientStops.Add(new GradientStop(Color.FromArgb(10,255,255,255),.26));
+            film.GradientStops.Add(new GradientStop(Color.FromArgb(0,255,255,255),.6));
+            film.GradientStops.Add(new GradientStop(Color.FromArgb(34,255,150,86),1));
+            film.Freeze();return film;
+        }
         static Brush Film(bool dark)
         {
             var film=new LinearGradientBrush {StartPoint=new Point(.08,0),EndPoint=new Point(.4,1)};
@@ -52,7 +63,8 @@ namespace OneTaskBar
         internal static LinearGradientBrush Edge(bool isDark,bool freeze=false,bool? fluid=null)
         {
             var edge=new LinearGradientBrush {StartPoint=new Point(.12,0),EndPoint=new Point(.84,1)};
-            edge.GradientStops.Add(new GradientStop(Color.FromArgb(isDark?(byte)78:(byte)105,255,255,255),0));
+            bool lit=fluid??Fluid.Enabled;
+            edge.GradientStops.Add(new GradientStop(Color.FromArgb(isDark?(byte)(lit?140:78):(byte)(lit?175:105),255,255,255),0));
             // The Fluid UI's rim is lilac in the middle and picks up a warm light at the far corner.
             bool warm=fluid??Fluid.Enabled;
             edge.GradientStops.Add(new GradientStop(warm?Color.FromArgb(isDark?(byte)30:(byte)50,214,200,255):Color.FromArgb(isDark?(byte)24:(byte)45,221,232,249),.45));
@@ -75,6 +87,7 @@ namespace OneTaskBar
         static Brush Recolor(Brush brush)
         {
             if(brush==null)return null;
+            if(Object.ReferenceEquals(brush,fluidCard))return Card;
             foreach(var old in new[]{light,dark}){
                 if(Same(brush,old.Text))return Text;if(Same(brush,old.Muted))return Muted;if(Same(brush,old.Surface))return Surface;if(Same(brush,old.Card))return Card;if(Same(brush,old.Solid))return Solid;if(Same(brush,old.Toggle))return Toggle;if(Same(brush,old.Rim))return Rim;
             }return brush;

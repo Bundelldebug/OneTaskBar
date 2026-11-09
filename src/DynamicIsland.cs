@@ -355,11 +355,13 @@ namespace OneTaskBar
             }
             catch(Exception error){AppLog.Once("island-device-symbol",error.GetType().Name);}
         }
-        static void ShowContent(FrameworkElement content,bool visible)
+        void ShowContent(FrameworkElement content,bool visible)
         {
             if(visible==(content.Visibility==Visibility.Visible))return;
             content.Visibility=visible?Visibility.Visible:Visibility.Hidden;
-            if(visible)Motion.Fade(content,0,1,180);
+            if(!visible)return;
+            if(fluid&&Motion.Enabled)Reveal(content);
+            else Motion.Fade(content,0,1,180);
         }
         internal void SetExpanded(bool value)
         {

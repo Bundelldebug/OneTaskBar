@@ -301,6 +301,8 @@ namespace OneTaskBar
         public double Radius=28; public bool Dark=true; public bool HasBlur;internal int LiquidLevel;internal bool PopFromTop;internal bool SoftCorners=true,OpaqueSurface,DockSurface,DockPalette;
         internal bool StableSurface=true,UnifiedFade,SmoothLauncher;internal FrameworkElement TransitionContent;
         GlassLens lens;
+        FluidLight fluidLight;
+        internal bool HasFluidLight {get{return fluidLight!=null;}}
         static readonly DependencyProperty SurfaceFadeProperty=DependencyProperty.Register("SurfaceFade",typeof(double),typeof(GlassWindow),new PropertyMetadata(1.0,(d,e)=>{var window=(GlassWindow)d;if(window.Surface!=null)window.Surface.Opacity=(double)e.NewValue;Native.BlurOpacity(window,(double)e.NewValue);}));
         void ResetFade(){BeginAnimation(SurfaceFadeProperty,null);SetValue(SurfaceFadeProperty,1.0);Surface.Opacity=1;Native.BlurOpacity(this,1);}
         internal Rect? BackdropClip;
@@ -336,10 +338,13 @@ namespace OneTaskBar
             SizeChanged+=(s,e)=> { if(new WindowInteropHelper(this).Handle!=IntPtr.Zero) Native.Round(this,Radius); };
             Preferences.Changed+=ApplyMaterial;
             Preferences.AppearanceChanged+=ApplyAppearance;
-            MouseMove+=(s,e)=>MoveGlassHighlight(e.GetPosition(Surface));MouseLeave+=(s,e)=>MoveGlassHighlight(new Point(Surface.ActualWidth/2,Surface.ActualHeight/2));
-            Loaded+=(s,e)=>{if(lens==null){var layer=AdornerLayer.GetAdornerLayer(Surface);if(layer!=null){lens=new GlassLens(this);layer.Add(lens);}}ApplyMaterial();if(Program.CaptureReview){ShowInTaskbar=true;var h=new WindowInteropHelper(this).Handle;Native.SetWindowLong(h,-20,(Native.GetWindowLong(h,-20)|0x40000)&~(0x80|0x08000000));}};
-            IsVisibleChanged+=(s,e)=> {if(!IsVisible)HiddenSince=DateTime.UtcNow;};
-            Closed+=(s,e)=> {closed=true;++motion;LauncherMotion.Cancel(TransitionContent);CompleteDismissal(false);Preferences.Changed-=ApplyMaterial;Preferences.AppearanceChanged-=ApplyAppearance;};
+            MouseMove+=(s,e)=>{var at=e.GetPosition(Surface);MoveGlassHighlight(at);if(fluidLight!=null)fluidLight.Move(at);};MouseLeave+=(s,e)=>{MoveGlassHighlight(new Point(Surface.ActualWidth/2,Surface.ActualHeight/2));if(fluidLight!=null)fluidLight.Leave();};
+            Loaded+=(s,e)=>{if(lens==null){var layer=AdornerLayer.GetAdornerLayer(Surface);if(layer!=null){lens=new GlassLens(this);layer.Add(lens);}}
+                // The Fluid UI adds its light to every glass window: panels, the dock, the Now Bar, HUDs and banners. The opaque island has its own.
+                if(fluidLight==null&&Fluid.Enabled&&!OpaqueSurface&&!Performance.Light&&(!DockSurface||!DockAppearance.Custom&&!DockAppearance.IconsOnly)){var layer=AdornerLayer.GetAdornerLayer(Surface);if(layer!=null){fluidLight=new FluidLight(this);layer.Add(fluidLight);fluidLight.Sweep();}}
+                ApplyMaterial();if(Program.CaptureReview){ShowInTaskbar=true;var h=new WindowInteropHelper(this).Handle;Native.SetWindowLong(h,-20,(Native.GetWindowLong(h,-20)|0x40000)&~(0x80|0x08000000));}};
+            IsVisibleChanged+=(s,e)=> {if(!IsVisible)HiddenSince=DateTime.UtcNow;else if(fluidLight!=null)fluidLight.Sweep();};
+            Closed+=(s,e)=> {closed=true;++motion;if(fluidLight!=null)fluidLight.Dispose();LauncherMotion.Cancel(TransitionContent);CompleteDismissal(false);Preferences.Changed-=ApplyMaterial;Preferences.AppearanceChanged-=ApplyAppearance;};
             PreviewKeyDown+=(s,e)=> { if(e.Key==Key.Escape&&!DragReorder.Active) {if(EscapeConsumed()){e.Handled=true;return;}var overview=this as DesktopOverview;var overflow=this as TrayOverflowWindow;if(overview!=null)overview.Dismiss();else if(overflow!=null)overflow.Dismiss();else Hide(); e.Handled=true; } };
         }
         void ApplyAppearance(){if(DockSurface||this is StartWindow)ApplyMaterial();}
