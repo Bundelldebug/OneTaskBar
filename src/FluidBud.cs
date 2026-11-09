@@ -52,8 +52,18 @@ namespace OneTaskBar
             Begin(at,top,true,done);
         }
 
+        // Where the last motion was on the arrival's timeline, and when it was there. A motion that is turned around while it
+        // runs (the panel pressed again, Escape, a quick reopen) continues from that point instead of jumping to the end.
+        double lastAt;
+        long lastStamp;
+        double from,closeSpan;
+        bool Interrupted {get{return lastStamp!=0&&Stopwatch.GetTimestamp()-lastStamp<Stopwatch.Frequency/8&&lastAt>0&&lastAt<Total;}}
+
         void Begin(Point at,bool top,bool close,Action done)
         {
+            bool resume=Interrupted;
+            from=close?(resume?Math.Min(lastAt,.54):.54):(resume?lastAt:0);
+            closeSpan=Math.Max(.06,CloseTime*from/.54);
             Cancel();
             fromTop=top;
             // On the first open the window has just been shown and may not be laid out yet; without a size there is no
@@ -81,7 +91,7 @@ namespace OneTaskBar
             // folds into a pill, the pill into a drop, and the drop goes back into the bar on its neck.
             AttachFlare();
             watch.Restart();
-            Step(close?Total:0);
+            Step(from);
             if(!hooked){hooked=true;CompositionTarget.Rendering+=Frame;}
         }
 
@@ -147,14 +157,15 @@ namespace OneTaskBar
             var rendering=e as RenderingEventArgs;
             if(rendering==null)return;
             double t=watch.Elapsed.TotalSeconds;
-            bool over=t>=(closing?CloseTime:Total);
+            bool over=closing?t>=closeSpan:from+t>=Total;
             if(!over)
             {
-                // Closing runs the arrival's timeline backwards from where the picture is complete, so it answers at once.
-                double s=t/CloseTime;
-                Step(closing?.54*(1-s):t);
+                // Closing runs the arrival's timeline backwards from where it stands, so it answers at once; opening runs it
+                // forward from where it stands.
+                Step(closing?from*(1-t/closeSpan):from+t);
                 return;
             }
+            lastStamp=0;
             var done=finished;
             bool wasClosing=closing;
             finished=null;
@@ -180,6 +191,8 @@ namespace OneTaskBar
         // One moment of the arrival's timeline, in seconds; closing walks the same timeline back to 0.
         void Step(double at)
         {
+            lastAt=at;
+            lastStamp=Stopwatch.GetTimestamp();
             double drop=Smooth(0,.12,at);
             double across=Spring(.1,.38,at,.86),down=Spring(.2,.6,at,.84);
             double pinch=1-Smooth(.12,.3,at);

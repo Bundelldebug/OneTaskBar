@@ -102,15 +102,19 @@ namespace OneTaskBar
                 try{Preferences.Set(p=>p.FluidIconGlow=false);Require(Fluid.IconGlow(red)==null,"the icon glow can be turned off");}
                 finally{Preferences.Set(p=>p.FluidIconGlow=iconOld);}
                 Require(Fluid.Beta&&SoftwareUpdate.CurrentText=="10.0.0","the shown version leaves out the build code: "+SoftwareUpdate.CurrentText);
-                Require(SoftwareUpdate.DetailText=="10.0.0 A1A1","the detailed version carries the build code: "+SoftwareUpdate.DetailText);
+                string code=SoftwareUpdate.CurrentSuffix;
+                Require(System.Text.RegularExpressions.Regex.IsMatch(code,"^[A-Z][0-9][A-Z][0-9]$")&&SoftwareUpdate.DetailText=="10.0.0 "+code,"the detailed version carries the build code: "+SoftwareUpdate.DetailText);
                 Require(SoftwareUpdate.Suffix("v10.0.0A1A1")=="A1A1"&&SoftwareUpdate.Suffix("10.0.0 a1b2")=="A1B2"&&SoftwareUpdate.Suffix("v9.5.12b")=="b"&&SoftwareUpdate.Suffix("v9.5.12")=="","build codes and letters are read from tags");
                 Require(SoftwareUpdate.NextCode("A1A1")=="A1A2"&&SoftwareUpdate.NextCode("A1A9")=="A1B1"&&SoftwareUpdate.NextCode("A1Z9")=="A2A1","build codes count up with the letter rollover");
                 Require(String.CompareOrdinal(SoftwareUpdate.SuffixKey("A1B1"),SoftwareUpdate.SuffixKey("A1A9"))>0&&String.CompareOrdinal(SoftwareUpdate.SuffixKey("A1A1"),SoftwareUpdate.SuffixKey("b"))>0&&String.CompareOrdinal(SoftwareUpdate.SuffixKey("b"),SoftwareUpdate.SuffixKey(""))>0,"build codes order after letters and numbers");
                 var lifted=FluidAutoGlow.Lift(Color.FromRgb(40,60,120),false);
                 Require(lifted.B>=235&&lifted.B>lifted.R+80&&FluidAutoGlow.Lift(Color.FromRgb(120,120,120),false)==Color.FromRgb(0xFF,0x8A,0x3D),"the automatic glow lifts a wallpaper color and keeps orange for grey");
                 Require(Fluid.GlowNames.Length==Fluid.GlowAuto+1,"the automatic glow has a name in the list");
-                var parsed=SoftwareUpdate.Parse("{\"tag_name\":\"v10.0.0A1A2\"}");
-                Require(parsed!=null&&parsed.Suffix=="A1A2"&&parsed.VersionText=="10.0.0"&&SoftwareUpdate.IsNewer(parsed),"a later build code is an update");
+                string next=SoftwareUpdate.NextCode(code);
+                var parsed=SoftwareUpdate.Parse("{\"tag_name\":\"v10.0.0-"+next+"-beta\"}");
+                Require(parsed!=null&&parsed.Suffix==next&&parsed.VersionText=="10.0.0"&&SoftwareUpdate.IsNewer(parsed),"a later build code is an update");
+                var same=SoftwareUpdate.Parse("{\"tag_name\":\"v10.0.0-"+code+"-beta\"}");
+                Require(same!=null&&!SoftwareUpdate.IsNewer(same),"the same build code is not an update");
                 var choice=Array.Find(UIVersions.Available,c=>c.Value==Fluid.Version);
                 Require(choice!=null&&choice.Label.IndexOf("베타")>=0,"the picker offers the fluid UI with a beta tag");
             }

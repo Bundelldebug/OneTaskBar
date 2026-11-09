@@ -219,7 +219,8 @@ namespace OneTaskBar
             if(msg==0x312)
             {
                 int id=wp.ToInt32();
-                if(id==1)ToggleQuick(docks.FirstOrDefault());
+                // A shortcut is not the dock: with the Android-style top bar the panel drops from the top, as from the bar itself.
+                if(id==1)ToggleQuick(docks.FirstOrDefault(),false,true);
                 else if(id==2)ShowWelcome();
                 handled=true;
             }

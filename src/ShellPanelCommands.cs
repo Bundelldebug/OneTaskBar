@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -26,8 +26,8 @@ namespace OneTaskBar
             if(Program.CaptureReview&&key.StartsWith("edge",StringComparison.Ordinal)){Preferences.Current.DockEdge=key[4]-'0';Relayout();return;}
             if(Program.CaptureReview&&key.StartsWith("background",StringComparison.Ordinal)){Preferences.Current.DockBackgroundKind=key[10]-'0';Preferences.Current.DockSolidBackground=key[10]=='1';Relayout();return;}
             var dock=docks.FirstOrDefault();
-            if(key=="notifications")ToggleNotifications(dock);
-            else if(key=="quick")ToggleQuick(dock);
+            if(key=="notifications")ToggleNotifications(dock,true);
+            else if(key=="quick")ToggleQuick(dock,false,true);
             else if(key=="start")ToggleStart(dock);
             else if(key=="search")ToggleSearch(dock);
             else if(key=="desktops")OpenTaskView();
