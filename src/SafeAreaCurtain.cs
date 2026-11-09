@@ -19,6 +19,9 @@ namespace OneTaskBar
         DateTime leftAt=DateTime.MinValue;
         bool closed,retiring;
         internal bool Revealed {get;private set;}
+        bool pinned;
+        // Keeps the status bar showing over the band for good.
+        internal void Pin(){pinned=true;Revealed=true;}
         internal Action<bool> RevealChanged;
         // True while something opened from the status bar is still on screen, so the bar stays.
         internal Func<bool> Hold;
@@ -78,6 +81,7 @@ namespace OneTaskBar
 
         void Watch()
         {
+            if(pinned)return;
             var cursor=Forms.Cursor.Position;
             var bounds=screen.Bounds;
             int band=(int)Math.Ceiling(IslandSafeArea.Height*scale)+1;

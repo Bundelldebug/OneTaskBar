@@ -32,7 +32,7 @@ namespace OneTaskBar
             var monitor=dock.Screen;
             double dpi=dock.Scale;
             bool full=!DisplayAwake||Overview!=null&&Overview.IsVisible||FullscreenVisibility.IsFullScreen(monitor.Bounds,windows);
-            if(!full&&IslandEnabled&&Preferences.Current.FullscreenBand&&FullscreenVisibility.BandFriendly(FullscreenVisibility.BandCover(monitor.Bounds,windows)))full=true;
+            if(!full&&(IslandEnabled||TopBarEnabled)&&Preferences.Current.FullscreenBand&&FullscreenVisibility.BandFriendly(FullscreenVisibility.BandCover(monitor.Bounds,windows)))full=true;
             if(full)
             {
                 if(Island!=null)Island.Suspend();
@@ -104,7 +104,7 @@ namespace OneTaskBar
         // A browser or video player in fullscreen still gets the black band, with the status bar on hover.
         bool FullscreenBand(Forms.Screen monitor,double dpi,IEnumerable<FullscreenCandidate> windows,DockHost dock)
         {
-            if(!Preferences.Current.FullscreenBand||!Desktop||disposed||!IslandEnabled||!DisplayAwake)return false;
+            if(!Preferences.Current.FullscreenBand||!Desktop||disposed||!IslandEnabled&&!TopBarEnabled||!DisplayAwake)return false;
             if(Overview!=null&&Overview.IsVisible)return false;
             var cover=FullscreenVisibility.BandCover(monitor.Bounds,windows);
             if(!FullscreenVisibility.BandFriendly(cover))return false;
@@ -132,6 +132,8 @@ namespace OneTaskBar
                 curtain.Hold=()=>Quick!=null&&Quick.IsVisible||Center!=null&&Center.IsVisible||topLeft!=null&&topLeft.CardOpen;
                 curtain.RevealChanged=revealed=>{if(topLeft!=null)topLeft.Conceal(!revealed,true);if(topRight!=null)topRight.Conceal(!revealed,true);};
             }
+            // The Android-style bar keeps its clock and battery on the black band instead of hiding until the pointer comes.
+            if(!IslandEnabled&&TopBarEnabled)curtain.Pin();
             curtain.Present();
             if(topLeft!=null)topLeft.Conceal(!curtain.Revealed,true);
             if(topRight!=null)topRight.Conceal(!curtain.Revealed,true);

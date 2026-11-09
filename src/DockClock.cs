@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
@@ -15,7 +15,7 @@ namespace OneTaskBar
         int mode=-1;bool vertical;
         internal static int Mode {get{return Math.Max(0,Math.Min(2,Preferences.Current.DockClockMode));}}
         internal static double Width {get{return Mode==1?82:Mode==2?76:94;}}
-        internal static double SideHeight {get{return Mode==1?28:Mode==2?20:40;}}
+        internal static double SideHeight {get{return Mode==1?34:Mode==2?20:48;}}
         internal void Update(DateTime value,int edge)
         {
             bool side=DockGeometry.Vertical(edge);int next=Mode;

@@ -49,8 +49,9 @@ namespace OneTaskBar
             finished=done;
             running=true;
             // Opening is a lively spring that settles with a small overshoot; closing is quick and does not bounce.
-            spring.Omega=close?40:27;
+            spring.Omega=close?34:15;
             spring.Damping=close?1:.84;
+            roundedOnce=false;
             spring.Value=close?1:0;
             spring.Velocity=0;
             spring.Target=close?0:1;
@@ -171,8 +172,11 @@ namespace OneTaskBar
             if(host!=null)host.Clip=outline;
             var inside=window.Surface.Child;
             if(inside!=null)inside.Opacity=content;
-            Native.Round(window,window.Radius);
+            // Setting the window region is the costly part of a frame; it is only redone when the region moved a whole pixel.
+            var cut=new Rect(Math.Round(region.X),Math.Round(region.Y),Math.Round(region.Width),Math.Round(region.Height));
+            if(cut!=lastCut||!roundedOnce){lastCut=cut;roundedOnce=true;Native.Round(window,window.Radius);}
         }
+        Rect lastCut;bool roundedOnce;
 
         void Stop()
         {

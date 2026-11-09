@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -34,7 +34,7 @@ namespace OneTaskBar
                     "explicit on and off settings survive the stable upgrade");
             }
             foreach(double volume in new[]{0.0,1,25,26,50,51,75,76,100}){int expected=volume<=0?0:volume<=25?1:volume<=50?2:volume<=75?3:4;Require(DuoStatusGlyph.Dots(volume,false,true)==expected&&DuoStatusGlyph.Dots(volume,true,true)==0&&DuoStatusGlyph.Dots(volume,false,false)==0,"volume dots reflect endpoints, mute and missing devices");}
-            Require(DuoStatusGlyph.Dots(Double.NaN,false,true)==0&&DuoStatusGlyph.Dots(300,false,true)==4,"invalid volume is bounded");Require(DockGeometry.SideStatusWidth==44&&DockGeometry.SideStatusLength(58)==128&&DockGeometry.SideStatusLength(0)==106,"side status remains narrow with or without power data");var date=new DateTime(2026,10,26,13,52,2);Require(DockGeometry.ClockLabel(date,true,true).Split('\n').Length==3&&DockGeometry.ClockLabel(date,true,false).Contains("2026-10-26"),"compact clock fits three lines while horizontal clock keeps the year");
+            Require(DuoStatusGlyph.Dots(Double.NaN,false,true)==0&&DuoStatusGlyph.Dots(300,false,true)==4,"invalid volume is bounded");Require(DockGeometry.SideStatusWidth==44&&DockGeometry.SideStatusLength(58)==128-(40-DockClock.SideHeight)&&DockGeometry.SideStatusLength(0)==106-(40-DockClock.SideHeight),"side status remains narrow with or without power data");var date=new DateTime(2026,10,26,13,52,2);Require(DockGeometry.ClockLabel(date,true,true).Split('\n').Length==3&&DockGeometry.ClockLabel(date,true,false).Contains("2026-10-26"),"compact clock fits three lines while horizontal clock keeps the year");
             for(int i=0;i<4;i++){var dot=DuoStatusGlyph.VolumeDot(i);Require(Math.Abs((dot-DuoStatusGlyph.RingCenter).Length-12.7)<.001,"volume dots follow the battery arc curvature");}Require(DuoStatusGlyph.VolumeDot(1).Y>DuoStatusGlyph.VolumeDot(0).Y&&DuoStatusGlyph.VolumeDot(2).Y>DuoStatusGlyph.VolumeDot(3).Y,"center dots are lower than the outer dots");
             checks.Add("Optional Duo battery/network/volume icon, compact side status and default-off slider numbers persist and respect state boundaries");
         }
