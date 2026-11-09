@@ -21,8 +21,20 @@ namespace OneTaskBar
             Value=Target;
             Velocity=0;
         }
+        // 1 is critically damped. Below 1 the value overshoots its target once or twice and settles, which gives
+        // the soft, elastic stretch of the fluid style; the step stays the exact solution either way.
+        internal double Damping=1;
         internal void Step(double seconds)
         {
+            if(Damping<1)
+            {
+                double decayRate=Damping*Omega,natural=Omega*Math.Sqrt(1-Damping*Damping);
+                double start=Value-Target,other=(Velocity+decayRate*start)/natural;
+                double cos=Math.Cos(natural*seconds),sin=Math.Sin(natural*seconds),fade=Math.Exp(-decayRate*seconds);
+                Value=Target+fade*(start*cos+other*sin);
+                Velocity=fade*(-decayRate*(start*cos+other*sin)+natural*(-start*sin+other*cos));
+                return;
+            }
             double offset=Value-Target,push=Velocity+Omega*offset,decay=Math.Exp(-Omega*seconds);
             Value=Target+(offset+push*seconds)*decay;
             Velocity=(Velocity-push*Omega*seconds)*decay;

@@ -65,7 +65,7 @@ namespace OneTaskBar
                 else if(SoftwareUpdate.IsNewer(release))
                 {
                     foundRelease=release;
-                    result.Text="새 버전 "+release.Version.Major+"."+release.Version.Minor+"."+release.Version.Build+"을 설치할 수 있습니다.";
+                    result.Text="새 버전 "+release.VersionText+"을 설치할 수 있습니다.";
                     install.Visibility=Visibility.Visible;
                 }
                 else result.Text="최신 버전을 사용 중입니다.";

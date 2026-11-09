@@ -15,7 +15,7 @@ using Forms=System.Windows.Forms;
 
 namespace OneTaskBar
 {
-    internal sealed class DynamicIsland : GlassWindow
+    internal sealed partial class DynamicIsland : GlassWindow
     {
         static readonly Brush Black=Brushes.Black;
         static readonly Brush Charging=Paint.Brush("#FF79E6A1");
@@ -130,7 +130,8 @@ namespace OneTaskBar
             search.Changed=()=>{if(state.Searching&&state.SearchRows!=search.RowCount){state.SearchRows=search.RowCount;RefreshPresentation();}};
             root.Children.Add(search);
             compact.Visibility=feedback.Visibility=expanded.Visibility=level.Visibility=notification.Visibility=search.Visibility=Visibility.Hidden;
-            Surface.Child=root;
+            Surface.Child=BuildFluid(root);
+            SetFluid(Fluid.Enabled);
             var decorator=(AdornerDecorator)Content;
             decorator.Child=null;
             canvas.Children.Add(Surface);decorator.Child=canvas;
@@ -149,7 +150,7 @@ namespace OneTaskBar
             Loaded+=(s,e)=>QueuePlacement();
             LocationChanged+=(s,e)=>{if(!placingHost)QueuePlacement();};
             Deactivated+=(s,e)=>{if(state.Expanded&&!IsMouseOver)SetExpanded(false);if(state.Searching&&!IsMouseOver)CloseSearch();};
-            Closed+=(s,e)=>{closed=true;activity.SetPlaying(false);StopMotion();StopOutside();expiry.Stop();ClearNotification();player.Update(new MediaState(),null);media=null;artwork=null;surfaceArtwork=null;art.Background=expanded.Background=null;};
+            Closed+=(s,e)=>{closed=true;activity.SetPlaying(false);SetFluidMotion(false);StopMotion();StopOutside();expiry.Stop();ClearNotification();player.Update(new MediaState(),null);media=null;artwork=null;surfaceArtwork=null;art.Background=expanded.Background=null;};
         }
         internal override void RefreshGlassMaterial()
         {
@@ -161,6 +162,7 @@ namespace OneTaskBar
         internal void Present(MediaState value,string output,Forms.Screen monitor,double dpi,System.Drawing.Rectangle? work=null,bool atBottom=false)
         {
             if(closed)return;
+            SetFluid(Fluid.Enabled);
             outputName=output;
             media=value!=null&&value.Available&&value.Active?value:null;
             screen=monitor;scale=dpi;
@@ -305,6 +307,7 @@ namespace OneTaskBar
             ShowContent(search,searching);
             ShowContent(compact,compactVisible);
             activity.SetPlaying(compactVisible&&media.Playing&&Motion.Enabled);
+            SetFluidMotion(active&&media.Playing);
             ShowContent(feedback,charge);
             ShowContent(level,show&&!charge);
             ShowContent(notification,notice);
@@ -433,7 +436,7 @@ namespace OneTaskBar
             body.Width=next.Width;body.Height=next.Height;
             fromRadius=currentRadius;
             bool card=state.Expanded||state.Searching||NotificationVisible||next.Height>32;
-            targetRadius=Math.Min(Math.Min(next.Width,next.Height)/2,card?29:100);
+            targetRadius=Math.Min(Math.Min(next.Width,next.Height)/2,card?(fluid?36:29):100);
             if(!Motion.Enabled||current.IsEmpty){StopMotion();current=target;currentRadius=targetRadius;PlaceShape();return;}
             motion.Restart();
             if(!animating){animating=true;lastRendering=TimeSpan.MinValue;CompositionTarget.Rendering+=Frame;}
@@ -451,6 +454,7 @@ namespace OneTaskBar
         void PlaceShape()
         {
             double radius=currentRadius;
+            if(fluid)radius=FluidShape(radius);
             Surface.Width=current.Width;Surface.Height=current.Height;
             Surface.CornerRadius=new CornerRadius(radius);
             clip.Rect=new Rect(0,0,current.Width,current.Height);clip.RadiusX=clip.RadiusY=radius;
@@ -464,7 +468,7 @@ namespace OneTaskBar
         internal void Suspend()
         {
             if(closed||!IsVisible&&!animating&&!expiry.IsEnabled)return;
-            activity.SetPlaying(false);
+            activity.SetPlaying(false);SetFluidMotion(false);
             StopMotion();StopOutside();expiry.Stop();state.Reset();
             ClearNotification();
             var handle=new WindowInteropHelper(this).Handle;

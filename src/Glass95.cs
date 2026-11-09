@@ -17,7 +17,7 @@ namespace OneTaskBar
                 Surface=PanelMaterial.PanelSurface(dark,true);
                 Card=Film(true);
                 Solid=dark?PanelMaterial.DarkSolid:Paint.Brush("#FF242832");Text=dark?PanelMaterial.DarkText:Paint.Brush("#FFF5F7FC");Muted=dark?PanelMaterial.DarkMuted:Paint.Brush("#FFD1D9E7");
-                Rail=Paint.Brush("#626C7A91");Toggle=Paint.Brush("#28FFFFFF");Rim=Edge(true,true);
+                Rail=Paint.Brush("#626C7A91");Toggle=Paint.Brush("#28FFFFFF");Rim=Edge(true,true,false);
             }
         }
         static readonly Palette light=new Palette(false),dark=new Palette(true);
@@ -35,7 +35,8 @@ namespace OneTaskBar
         internal static Brush Muted {get{return SystemParameters.HighContrast?SystemColors.WindowTextBrush:Current.Muted;}}
         internal static Brush Rail {get{return Current.Rail;}}
         internal static Brush Toggle {get{return Current.Toggle;}}
-        internal static Brush Rim {get{return Transparent?Current.Rim:Brushes.Transparent;}}
+        static readonly Brush[] fluidRims={Edge(false,true,true),Edge(true,true,true)};
+        internal static Brush Rim {get{return Transparent?(Fluid.Enabled?fluidRims[Dark?1:0]:Current.Rim):Brushes.Transparent;}}
         internal static readonly Brush Accent=Paint.Brush("#FF3478FD"),Selected=Paint.ControlWhite;
         static Brush Film(bool dark)
         {
@@ -48,12 +49,14 @@ namespace OneTaskBar
         }
         internal static Brush ToggleInk(bool value){return value?Paint.OnLight:Paint.Text;}
         internal static Brush DockForeground {get{return DockAppearance.Custom?DockAppearance.Foreground:DockDark?Paint.ControlWhite:Paint.OnLight;}}
-        internal static LinearGradientBrush Edge(bool isDark,bool freeze=false)
+        internal static LinearGradientBrush Edge(bool isDark,bool freeze=false,bool? fluid=null)
         {
             var edge=new LinearGradientBrush {StartPoint=new Point(.12,0),EndPoint=new Point(.84,1)};
             edge.GradientStops.Add(new GradientStop(Color.FromArgb(isDark?(byte)78:(byte)105,255,255,255),0));
-            edge.GradientStops.Add(new GradientStop(Color.FromArgb(isDark?(byte)24:(byte)45,221,232,249),.45));
-            edge.GradientStops.Add(new GradientStop(Color.FromArgb(isDark?(byte)28:(byte)58,119,140,170),1));if(freeze)edge.Freeze();return edge;
+            // The Fluid UI's rim is lilac in the middle and picks up a warm light at the far corner.
+            bool warm=fluid??Fluid.Enabled;
+            edge.GradientStops.Add(new GradientStop(warm?Color.FromArgb(isDark?(byte)30:(byte)50,214,200,255):Color.FromArgb(isDark?(byte)24:(byte)45,221,232,249),.45));
+            edge.GradientStops.Add(new GradientStop(warm?Color.FromArgb(isDark?(byte)70:(byte)90,255,176,120):Color.FromArgb(isDark?(byte)28:(byte)58,119,140,170),1));if(freeze)edge.Freeze();return edge;
         }
         internal static void DockInk(DependencyObject root,Brush ink=null)
         {

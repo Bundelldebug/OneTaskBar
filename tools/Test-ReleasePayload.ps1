@@ -32,7 +32,7 @@ try{
 if(@(Get-ChildItem -LiteralPath $taskExtract -Recurse -File).Count -ne $taskExpected.Count){throw 'Unexpected extracted files'}
 $taskExecutables=@((Join-Path $DistRoot 'OneTaskBar.exe'),(Join-Path $DistRoot 'OneTaskBar.Guard.exe'),$taskSetup)|ForEach-Object {
     $taskVersion=[Diagnostics.FileVersionInfo]::GetVersionInfo($_)
-    if($taskVersion.ProductVersion -cne $ExpectedProductVersion -or ([Version]$taskVersion.FileVersion).ToString($ExpectedProductVersion.Split('-')[0].Split('.').Count) -cne $ExpectedProductVersion.Split('-')[0]){throw ('Version mismatch: '+[IO.Path]::GetFileName($_))}
+    if($taskVersion.ProductVersion -cne $ExpectedProductVersion -or ([Version]$taskVersion.FileVersion).ToString((($ExpectedProductVersion.Split('-')[0] -replace '(?<=\d)[a-z]$','')).Split('.').Count) -cne ($ExpectedProductVersion.Split('-')[0] -replace '(?<=\d)[a-z]$','')){throw ('Version mismatch: '+[IO.Path]::GetFileName($_))}
     $taskSignature=(Get-AuthenticodeSignature -LiteralPath $_).Status.ToString()
     if($taskSignature -notin @('NotSigned','Valid')){throw ('Unexpected signature status: '+$taskSignature)}
     [pscustomobject]@{file=[IO.Path]::GetFileName($_);version=$taskVersion.FileVersion;productVersion=$taskVersion.ProductVersion;sha256=(Get-FileHash -LiteralPath $_).Hash;signature=$taskSignature}

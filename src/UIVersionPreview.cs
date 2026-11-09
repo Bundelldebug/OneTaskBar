@@ -16,19 +16,20 @@ namespace OneTaskBar
         internal UIVersionPreview(){Width=130;Height=132;IsHitTestVisible=false;}
         protected override void OnRender(DrawingContext dc)
         {
-            bool glass=version>=95,modern=version>=90;
+            bool glass=version>=95,modern=version>=90,fluid=version>=Fluid.Version;
             var background=new Rect(0,0,130,132);
             dc.DrawRoundedRectangle(Paint.Brush(glass?"#FF456A7A":"#FF454B50"),null,background,16,16);
             if(glass)
             {
-                var glow=new LinearGradientBrush(Colors.Teal,Colors.CornflowerBlue,35);glow.Freeze();
+                var glow=fluid?new LinearGradientBrush(Color.FromRgb(0x7C,0x5C,0xB8),Color.FromRgb(0xF0,0x8A,0x5A),60):new LinearGradientBrush(Colors.Teal,Colors.CornflowerBlue,35);glow.Freeze();
                 dc.DrawRoundedRectangle(glow,null,new Rect(4,4,122,124),13,13);
             }
-            Brush card=Paint.Brush(glass?"#589BA6B1":"#747E878C");
-            Pen rim=glass?new Pen(Paint.Brush("#78FFFFFF"),.7):null;
+            Brush card=Paint.Brush(fluid?"#66F4EEF8":glass?"#589BA6B1":"#747E878C");
+            Pen rim=fluid?new Pen(Paint.Brush("#B0FFD9BE"),.9):glass?new Pen(Paint.Brush("#78FFFFFF"),.7):null;
+            double round=fluid?15:12;
             foreach(double x in new[]{9.0,69})
             {
-                dc.DrawRoundedRectangle(card,rim,new Rect(x,11,52,24),12,12);
+                dc.DrawRoundedRectangle(card,rim,new Rect(x,11,52,24),round,round);
                 dc.DrawEllipse(Paint.ControlWhite,null,new Point(x+12,23),8,8);
                 dc.DrawRoundedRectangle(Paint.Brush("#DAFFFFFF"),null,new Rect(x+25,20,18,3),1.5,1.5);
             }
@@ -43,6 +44,15 @@ namespace OneTaskBar
                 else dc.DrawEllipse(Paint.Brush("#90FFFFFF"),null,new Point(110,top+8),5,5);
             }
             dc.DrawRoundedRectangle(card,rim,new Rect(9,114,112,9),4.5,4.5);
+            if(fluid)
+            {
+                // The beta tag sits over the top-right corner of the miniature.
+                var tag=new Rect(80,2,46,13);
+                dc.DrawRoundedRectangle(Paint.Brush("#FFFF8A3D"),null,tag,6.5,6.5);
+                var label=new FormattedText("BETA",System.Globalization.CultureInfo.InvariantCulture,FlowDirection.LeftToRight,
+                    new Typeface(new FontFamily("Segoe UI"),FontStyles.Normal,FontWeights.SemiBold,FontStretches.Normal),8.5,Brushes.White);
+                dc.DrawText(label,new Point(tag.X+(tag.Width-label.Width)/2,tag.Y+(tag.Height-label.Height)/2));
+            }
         }
     }
 }

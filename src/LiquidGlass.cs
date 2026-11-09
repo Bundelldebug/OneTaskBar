@@ -15,7 +15,7 @@ namespace OneTaskBar
         internal const double Saturation=1.65,PanelBlur=22,DockBlur=16;
         static readonly Brush[] tints=new Brush[10];
         static readonly Brush[] rims=new Brush[2];
-        internal static bool Enabled {get{return Preferences.Current.LiquidGlass&&!Performance.Light&&Glass95.Enabled&&Glass95.Transparent;}}
+        internal static bool Enabled {get{return (Preferences.Current.LiquidGlass||Fluid.Enabled)&&!Performance.Light&&Glass95.Enabled&&Glass95.Transparent;}}
         // Radius for a surface: the liquid radius when the material is on, otherwise what the caller already chose.
         internal static double Radius(double current,bool live,bool dock)
         {
@@ -27,6 +27,8 @@ namespace OneTaskBar
         internal static Brush Tint(bool dark,int level)
         {
             level=Math.Max(0,Math.Min(4,level));
+            // The Fluid UI keeps its warm light on the thinnest glass; the brighter readability steps stay as they were.
+            if(Fluid.Enabled&&level==0)return Fluid.Tint(dark);
             int index=(dark?1:0)*5+level;var cached=tints[index];if(cached!=null)return cached;
             // Thin: the top is nearly clear and the bottom takes a little more color, as light pools in glass.
             var brush=new LinearGradientBrush {StartPoint=new Point(0,0),EndPoint=new Point(0,1)};

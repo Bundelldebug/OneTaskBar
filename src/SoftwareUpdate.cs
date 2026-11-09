@@ -13,7 +13,8 @@ namespace OneTaskBar
     // Updates come from the project's own GitHub releases and are only contacted when the user asks.
     internal sealed class ReleaseInfo
     {
-        internal string Tag,Notes,SetupUrl,Digest;
+        internal string Tag,Notes,SetupUrl,Digest,Suffix="";
+        internal string VersionText {get{return Version.Major+"."+Version.Minor+"."+Math.Max(0,Version.Build)+Suffix;}}
         internal long Size;
         internal Version Version;
     }
@@ -33,13 +34,39 @@ namespace OneTaskBar
             }
         }
 
+        // "9.5.13", or "9.5.13b" for a re-release of the same version; the letter comes from the product version.
         internal static string CurrentText
         {
             get
             {
                 var version=Current;
-                return version.Major+"."+version.Minor+"."+version.Build;
+                string number=version.Major+"."+version.Minor+"."+version.Build;
+                return number+CurrentSuffix;
             }
+        }
+
+        internal static string CurrentSuffix
+        {
+            get
+            {
+                try
+                {
+                    var attribute=System.Reflection.Assembly.GetExecutingAssembly().GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute),false);
+                    if(attribute.Length==0)return "";
+                    return Suffix(((System.Reflection.AssemblyInformationalVersionAttribute)attribute[0]).InformationalVersion);
+                }
+                catch(Exception)
+                {
+                    return "";
+                }
+            }
+        }
+
+        // The single lowercase letter after the numbers of a tag or product version ("v9.5.13b" -> "b"), or "".
+        internal static string Suffix(string text)
+        {
+            var match=Regex.Match(text??"",@"^[vV]?\d+\.\d+\.\d+([a-z])(?![A-Za-z0-9])");
+            return match.Success?match.Groups[1].Value:"";
         }
 
         // Newest stable release, or null when the repository has none.
@@ -57,7 +84,7 @@ namespace OneTaskBar
             Version version;
             // A re-release of the same version carries a letter after it (v9.5.12b); the number is what is compared.
             if(!Version.TryParse(Regex.Replace(Regex.Replace(tag,"^[vV]",""),"(?<=[0-9])[A-Za-z]$",""),out version))return null;
-            var info=new ReleaseInfo {Tag=tag,Version=version,Notes=root.ContainsKey("body")?Convert.ToString(root["body"]):""};
+            var info=new ReleaseInfo {Tag=tag,Version=version,Suffix=Suffix(tag),Notes=root.ContainsKey("body")?Convert.ToString(root["body"]):""};
             var assets=root.ContainsKey("assets")?root["assets"] as object[]:null;
             if(assets!=null)
             {
@@ -78,7 +105,10 @@ namespace OneTaskBar
             if(release==null)return false;
             var current=Current;
             var latest=release.Version;
-            return new Version(latest.Major,latest.Minor,Math.Max(0,latest.Build)).CompareTo(new Version(current.Major,current.Minor,Math.Max(0,current.Build)))>0;
+            int order=new Version(latest.Major,latest.Minor,Math.Max(0,latest.Build)).CompareTo(new Version(current.Major,current.Minor,Math.Max(0,current.Build)));
+            // Same number: a later letter (none < a < b) is the newer build.
+            if(order==0)order=String.CompareOrdinal(release.Suffix??"",CurrentSuffix);
+            return order>0;
         }
 
         // Downloads the installer to a private temp folder and checks size and SHA-256 against what GitHub published.
