@@ -21,12 +21,12 @@ namespace OneTaskBar
             dc.DrawRoundedRectangle(Paint.Brush(glass?"#FF456A7A":"#FF454B50"),null,background,16,16);
             if(glass)
             {
-                var glow=fluid?new LinearGradientBrush(Color.FromRgb(0x7C,0x5C,0xB8),Color.FromRgb(0xF0,0x8A,0x5A),60):new LinearGradientBrush(Colors.Teal,Colors.CornflowerBlue,35);glow.Freeze();
+                var glow=fluid?new LinearGradientBrush(Color.FromRgb(0x7C,0x5C,0xB8),Fluid.GlowOn?Fluid.Glow(255):Color.FromRgb(0x58,0x6A,0x9A),60):new LinearGradientBrush(Colors.Teal,Colors.CornflowerBlue,35);glow.Freeze();
                 dc.DrawRoundedRectangle(glow,null,new Rect(4,4,122,124),13,13);
                 if(fluid)
                 {
                     // The light of the Fluid UI: a white key light high on the left and a warm one low on the right.
-                    foreach(var lamp in new[]{new Tuple<double,double,Color>(.15,.04,Color.FromArgb(150,255,255,255)),new Tuple<double,double,Color>(.92,1,Color.FromArgb(190,255,150,80))})
+                    foreach(var lamp in new[]{new Tuple<double,double,Color>(.15,.04,Color.FromArgb(150,255,255,255)),new Tuple<double,double,Color>(.92,1,Fluid.Glow(190))})
                     {
                         var light=new RadialGradientBrush(lamp.Item3,Color.FromArgb(0,lamp.Item3.R,lamp.Item3.G,lamp.Item3.B)) {Center=new Point(lamp.Item1,lamp.Item2),GradientOrigin=new Point(lamp.Item1,lamp.Item2),RadiusX=.75,RadiusY=.6};
                         light.Freeze();
@@ -35,7 +35,7 @@ namespace OneTaskBar
                 }
             }
             Brush card=Paint.Brush(fluid?"#66F4EEF8":glass?"#589BA6B1":"#747E878C");
-            Pen rim=fluid?new Pen(Paint.Brush("#B0FFD9BE"),.9):glass?new Pen(Paint.Brush("#78FFFFFF"),.7):null;
+            Pen rim=fluid?new Pen(new SolidColorBrush(Fluid.GlowOn?Fluid.Pale(176):Color.FromArgb(176,255,255,255)),.9):glass?new Pen(Paint.Brush("#78FFFFFF"),.7):null;
             double round=fluid?15:12;
             foreach(double x in new[]{9.0,69})
             {

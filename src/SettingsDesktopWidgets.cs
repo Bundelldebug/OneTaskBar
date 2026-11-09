@@ -25,7 +25,7 @@ namespace OneTaskBar
             rows.Children.Add(actions);
             SubHeading(rows,"위젯 재질");
             var sliders=new StackPanel {Visibility=WidgetMaterial.Glass?Visibility.Collapsed:Visibility.Visible};
-            Row(rows,"글래스 재질","UI 9.5에서 위젯에 패널과 같은 글래스 재질을 씁니다. 끄면 아래 불투명도와 블러를 직접 정합니다",Preferences.Current.WidgetGlass,v=>
+            if(Preferences.Current.UIVersion>=95)Row(rows,"글래스 재질","UI 9.5에서 위젯에 패널과 같은 글래스 재질을 씁니다. 끄면 아래 불투명도와 블러를 직접 정합니다",Preferences.Current.WidgetGlass,v=>
             {
                 Preferences.SetWidgetMaterial(p=>p.WidgetGlass=v);
                 sliders.Visibility=WidgetMaterial.Glass?Visibility.Collapsed:Visibility.Visible;

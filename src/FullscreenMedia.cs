@@ -15,7 +15,7 @@ namespace OneTaskBar
     internal sealed class FullscreenMedia : GlassWindow
     {
         readonly Canvas canvas=new Canvas();
-        readonly Border cover=new Border(),card=new Border(),fill=new Border();
+        readonly Border cover=new Border(),card=new Border(),fill=new Border(),cardLight=new Border {IsHitTestVisible=false};
         readonly FullscreenCaption caption=new FullscreenCaption();
         readonly Border wallpaper=new Border(),artworkWash=new Border();
         readonly TextBlock clock=Paint.TextBlock("",36,Paint.ControlWhite),date=Paint.TextBlock("",16,Paint.ControlWhite);
@@ -71,7 +71,7 @@ namespace OneTaskBar
         internal FullscreenMedia(Action<string> dispatch,Func<double,Task<bool>> seekCommand,Action output,Action lockPC,Func<string,AppEntry> sourceApp=null,ShellController controller=null)
         {
             shell=controller;
-            Title="One TaskBar · 전체화면 미디어";OpaqueSurface=true;FluidLightOnOpaque=true;Radius=0;
+            Title="One TaskBar · 전체화면 미디어";OpaqueSurface=true;Radius=0;
             Surface.CornerRadius=new CornerRadius(0);Surface.BorderThickness=new Thickness(0);
             SetMaterial(Brushes.Black,Brushes.Black);
             var root=new Grid();root.Children.Add(wallpaper);root.Children.Add(artworkWash);
@@ -85,7 +85,7 @@ namespace OneTaskBar
             player=new MediaPlayerView(dispatch,seekCommand,()=>{HideImmediately();output();},sourceApp:sourceApp);
             // The card's own fill and edge fade out as the cover opens, so the expanded player has no panel.
             fill.BorderBrush=Paint.Brush("#35FFFFFF");fill.BorderThickness=new Thickness(.6);fill.IsHitTestVisible=false;
-            var cardContent=new Grid();cardContent.Children.Add(fill);cardContent.Children.Add(player);
+            var cardContent=new Grid();cardContent.Children.Add(fill);cardContent.Children.Add(cardLight);cardContent.Children.Add(player);
             card.Child=cardContent;card.CornerRadius=new CornerRadius(28);card.Clip=cardClip;canvas.Children.Add(card);
             canvas.Children.Add(caption);Panel.SetZIndex(caption,3);
             var close=Icon("close",Hide,"전체화면 닫기 · Esc");close.Tag="close";canvas.Children.Add(close);
@@ -123,18 +123,19 @@ namespace OneTaskBar
         {
             ShowAt(screen.Bounds,0,0,screen.Bounds.Width/scale,screen.Bounds.Height/scale);
             Layout(false);Activate();
-            fill.BorderBrush=Fluid.Enabled?(Brush)Glass95.Edge(true,true,true):Paint.Brush("#35FFFFFF");
+            fill.BorderBrush=Fluid.Enabled?(Brush)Glass95.Rim:Paint.Brush("#35FFFFFF");
+            cardLight.Background=Fluid.Enabled?Glass95.Card:null;
             if(Fluid.Enabled&&Motion.Enabled&&springsReady)DropIn();
             else Pop();
         }
-        // The Fluid UI's arrival: the cover and the player start as small drops below their place and swell into it on springs.
+        // The Fluid UI reaches only the player and its companions here, not the wallpaper: the cover and the player start as
+        // small drops below their place and swell into it on springs.
         void DropIn()
         {
             ShrinkToward(cardX,cardY,cardW,cardH,.5,.45,70);
             ShrinkToward(coverX,coverY,coverW,coverH,.3,.3,-34);
             coverRound.Value=Math.Max(coverRound.Value,coverW.Value/2);
-            Surface.BeginAnimation(UIElement.OpacityProperty,new DoubleAnimation(0,1,TimeSpan.FromMilliseconds(170)) {FillBehavior=FillBehavior.Stop});
-            Surface.Opacity=1;ApplyMotion();StartMotion();
+            ApplyMotion();StartMotion();
         }
         static void ShrinkToward(SpringValue x,SpringValue y,SpringValue width,SpringValue height,double widthPart,double heightPart,double drop)
         {
@@ -277,7 +278,7 @@ namespace OneTaskBar
         }
         void PlaceCard(Rect box)
         {
-            cardBox=box;
+            cardBox=box;cardLight.CornerRadius=new CornerRadius(cardRadius);
             card.Width=box.Width;card.Height=box.Height;
             Canvas.SetLeft(card,box.X);Canvas.SetTop(card,box.Y);
             card.CornerRadius=fill.CornerRadius=new CornerRadius(cardRadius);
@@ -345,7 +346,7 @@ namespace OneTaskBar
             clock.FontSize=Math.Max(1,clockSizeSpring.Value);
             Canvas.SetTop(date,dateTopSpring.Value);
             artworkWash.Opacity=Unit(washSpring.Value);
-            fill.Opacity=1-Unit(washSpring.Value);
+            fill.Opacity=cardLight.Opacity=1-Unit(washSpring.Value);
             shade.Opacity=Unit(shadeSpring.Value);
             if(tiles!=null)
             {

@@ -336,7 +336,7 @@ namespace OneTaskBar
             bool reserve=!top&&Preferences.Current.ShowNowBar&&controller.Desktop&&(controller.Services.Media.Active||MediaBar!=null&&MediaBar.ReservesSpace);
             double expected=PowerDisplay.DockSlot(state,Preferences.Current.DesktopPowerWatts);
             if(expected!=powerWidth||reserve!=mediaSpace)Rebuild();
-            if(MediaBar!=null&&(top||MediaBar.InterfaceVersion!=Preferences.Current.UIVersion||MediaBar.SideCapsuleStyle!=(ReleaseFeatures.GlassUI&&Preferences.Current.NowBarSideCapsule&&DockGeometry.Vertical(Edge)))){MediaBar.Close();MediaBar=null;}
+            if(MediaBar!=null&&(top||MediaBar.StyleKey!=Fluid.StyleKey||MediaBar.SideCapsuleStyle!=(ReleaseFeatures.GlassUI&&Preferences.Current.NowBarSideCapsule&&DockGeometry.Vertical(Edge)))){MediaBar.Close();MediaBar=null;}
             if(MediaBar==null&&!top&&Preferences.Current.ShowNowBar&&controller.Services.Media.Active&&controller.Desktop)
                 MediaBar=new NowBar(controller,Screen){DismissedOutside=HideAfterMediaDismissed};
             RefreshMedia();if(top&&Status.IsVisible){Status.HideImmediately();Native.BlurOpacity(Status,0);}powerAccess.ToolTip=state.Known?"배터리 · 빠른 설정":"직접 입력한 PC 전력값 · 실시간 측정 아님";

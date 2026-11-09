@@ -18,6 +18,13 @@ namespace OneTaskBar
         {
             return new DoubleAnimation(from,to,TimeSpan.FromMilliseconds(milliseconds)) {EasingFunction=SpringEase.Smooth,FillBehavior=FillBehavior.Stop};
         }
+        // Press and hover scaling: a plain tween, or in the Fluid UI a spring that overshoots a little before it settles.
+        internal static AnimationTimeline Press(double from,double to,int milliseconds)
+        {
+            if(!Fluid.Enabled)return Tween(from,to,milliseconds);
+            var motion=Elastic(from,to,milliseconds+160,SpringEase.Bouncy);
+            return motion;
+        }
         internal static DoubleAnimationUsingKeyFrames PanelTween(double from,double to,int milliseconds)
         {
             var animation=new DoubleAnimationUsingKeyFrames {Duration=TimeSpan.FromMilliseconds(milliseconds),FillBehavior=FillBehavior.Stop};
@@ -31,15 +38,28 @@ namespace OneTaskBar
             motion.KeyFrames.Add(new LinearDoubleKeyFrame(from,KeyTime.FromTimeSpan(TimeSpan.Zero)));
             motion.KeyFrames.Add(new EasingDoubleKeyFrame(target,KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(milliseconds)),Fluid.Enabled?SpringEase.Liquid:SpringEase.Snappy));return motion;
         }
-        // The Fluid UI's arrival: the panel starts as a small, tall drop above its place, falls, lands and swells to full size.
+        // Where a panel buds from: the edge of the bar next to the pointer, which is on the button that opened it.
+        internal static Point Anchor(FrameworkElement element,bool fromTop)
+        {
+            double x=.5;
+            try
+            {
+                var cursor=System.Windows.Forms.Control.MousePosition;
+                var local=element.PointFromScreen(new Point(cursor.X,cursor.Y));
+                if(element.ActualWidth>1)x=Math.Max(.1,Math.Min(.9,local.X/element.ActualWidth));
+            }
+            catch(InvalidOperationException){}
+            return new Point(x,fromTop?0:1);
+        }
+        // The Fluid UI's arrival: a small drop pushes out of the bar and swells into the panel.
         // Width and height ride different springs so the shape squashes and stretches like liquid before it settles.
         // Starts the drop on the transforms and returns the height animation, whose Completed marks the end.
         internal static DoubleAnimationUsingKeyFrames DropCurves(ScaleTransform scale,TranslateTransform shift,double fall,int milliseconds)
         {
-            var height=Elastic(.5,1,milliseconds,SpringEase.Bouncy);
-            scale.BeginAnimation(ScaleTransform.ScaleXProperty,Elastic(.34,1,milliseconds,SpringEase.Liquid));
+            var height=Elastic(.12,1,milliseconds,SpringEase.Bouncy);
+            scale.BeginAnimation(ScaleTransform.ScaleXProperty,Elastic(.2,1,milliseconds,SpringEase.Liquid));
             scale.BeginAnimation(ScaleTransform.ScaleYProperty,height);
-            shift.BeginAnimation(TranslateTransform.YProperty,Elastic(fall,0,milliseconds,SpringEase.Bouncy));
+            if(fall!=0)shift.BeginAnimation(TranslateTransform.YProperty,Elastic(fall,0,milliseconds,SpringEase.Bouncy));
             return height;
         }
         internal static void Drop(FrameworkElement target,Point origin,double fall,int milliseconds=620)
@@ -65,7 +85,8 @@ namespace OneTaskBar
             var old=content.RenderTransform as TransformGroup;var oldScale=old==null?null:old.Children.OfType<ScaleTransform>().FirstOrDefault();var oldShift=old==null?null:old.Children.OfType<TranslateTransform>().FirstOrDefault();
             double fromScale=oldScale!=null?oldScale.ScaleX:opening?(Fluid.Enabled?.92:.965):1,rise=fromTop?-22:12,fromY=oldShift!=null?oldShift.Y:opening?rise:0,fromOpacity=old!=null?content.Opacity:opening?.12:content.Opacity;
             content.BeginAnimation(UIElement.OpacityProperty,null);var scale=new ScaleTransform(opening?1:.985,opening?1:.985);var shift=new TranslateTransform(0,opening?0:rise);var group=new TransformGroup();group.Children.Add(scale);group.Children.Add(shift);content.RenderTransformOrigin=new Point(.5,fromTop?0:1);content.RenderTransform=group;
-            if(opening&&Fluid.Enabled){DropCurves(scale,shift,fromTop?-30:30,620);}else if(opening){scale.BeginAnimation(ScaleTransform.ScaleXProperty,Spring(Math.Min(1,fromScale),.999,1,Fluid.Enabled?520:340));scale.BeginAnimation(ScaleTransform.ScaleYProperty,Spring(Math.Min(1,fromScale),.999,1,Fluid.Enabled?520:340));shift.BeginAnimation(TranslateTransform.YProperty,Spring(fromTop?Math.Min(0,Math.Max(rise,fromY)):Math.Max(0,Math.Min(12,fromY)),.4,0,Fluid.Enabled?520:340));}
+            if(opening&&Fluid.Enabled){content.RenderTransformOrigin=Anchor(content,fromTop);DropCurves(scale,shift,0,620);}else if(opening){scale.BeginAnimation(ScaleTransform.ScaleXProperty,Spring(Math.Min(1,fromScale),.999,1,Fluid.Enabled?520:340));scale.BeginAnimation(ScaleTransform.ScaleYProperty,Spring(Math.Min(1,fromScale),.999,1,Fluid.Enabled?520:340));shift.BeginAnimation(TranslateTransform.YProperty,Spring(fromTop?Math.Min(0,Math.Max(rise,fromY)):Math.Max(0,Math.Min(12,fromY)),.4,0,Fluid.Enabled?520:340));}
+            else if(Fluid.Enabled){content.RenderTransformOrigin=Anchor(content,fromTop);scale.BeginAnimation(ScaleTransform.ScaleXProperty,Tween(fromScale,.2,190));scale.BeginAnimation(ScaleTransform.ScaleYProperty,Tween(fromScale,.2,190));}
             else {scale.BeginAnimation(ScaleTransform.ScaleXProperty,Tween(fromScale,.985,145));scale.BeginAnimation(ScaleTransform.ScaleYProperty,Tween(fromScale,.985,145));shift.BeginAnimation(TranslateTransform.YProperty,Tween(fromY,rise,145));}
             content.Opacity=opening?1:0;var fade=Tween(fromOpacity,opening?1:0,opening?135:145);if(opening)content.BeginAnimation(UIElement.OpacityProperty,fade);return fade;
         }
@@ -81,7 +102,7 @@ namespace OneTaskBar
                 var transform=part.RenderTransform as ScaleTransform;if(transform==null){transform=new ScaleTransform(1,1);part.RenderTransform=transform;part.RenderTransformOrigin=new Point(.5,.5);}
                 double x=transform.ScaleX,y=transform.ScaleY;transform.BeginAnimation(ScaleTransform.ScaleXProperty,null);transform.BeginAnimation(ScaleTransform.ScaleYProperty,null);
                 var target=ButtonScale(button,scale);transform.ScaleX=target.X;transform.ScaleY=target.Y;
-                if(Enabled){transform.BeginAnimation(ScaleTransform.ScaleXProperty,Tween(x,target.X,150));transform.BeginAnimation(ScaleTransform.ScaleYProperty,Tween(y,target.Y,150));}
+                if(Enabled){transform.BeginAnimation(ScaleTransform.ScaleXProperty,Press(x,target.X,150));transform.BeginAnimation(ScaleTransform.ScaleYProperty,Press(y,target.Y,150));}
                 Fade(part,part.Opacity,opacity,130);
             };
             button.MouseEnter+=(s,e)=>apply(Preferences.Current.Hover?1.025:1,.88);button.MouseLeave+=(s,e)=>apply(1,1);
@@ -107,7 +128,7 @@ namespace OneTaskBar
         internal static Action Dock(Button button,FrameworkElement icon)
         {
             var scale=new ScaleTransform(1,1);var shift=new TranslateTransform();var group=new TransformGroup();group.Children.Add(scale);group.Children.Add(shift);icon.RenderTransform=group;icon.RenderTransformOrigin=new Point(.5,.5);bool bouncing=false;
-            Action<double> settle=value=>{if(bouncing)return;double from=scale.ScaleX;scale.BeginAnimation(ScaleTransform.ScaleXProperty,null);scale.BeginAnimation(ScaleTransform.ScaleYProperty,null);scale.ScaleX=scale.ScaleY=value;if(Enabled){scale.BeginAnimation(ScaleTransform.ScaleXProperty,Tween(from,value,140));scale.BeginAnimation(ScaleTransform.ScaleYProperty,Tween(from,value,140));}};
+            Action<double> settle=value=>{if(bouncing)return;double from=scale.ScaleX;scale.BeginAnimation(ScaleTransform.ScaleXProperty,null);scale.BeginAnimation(ScaleTransform.ScaleYProperty,null);scale.ScaleX=scale.ScaleY=value;if(Enabled){scale.BeginAnimation(ScaleTransform.ScaleXProperty,Press(from,value,140));scale.BeginAnimation(ScaleTransform.ScaleYProperty,Press(from,value,140));}};
             button.MouseEnter+=(s,e)=>settle(Preferences.Current.Hover?1.08:1);button.MouseLeave+=(s,e)=>settle(1);
             button.PreviewMouseLeftButtonDown+=(s,e)=>settle(.88);
             button.LostMouseCapture+=(s,e)=>settle(button.IsMouseOver&&Preferences.Current.Hover?1.08:1);

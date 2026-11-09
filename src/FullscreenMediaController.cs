@@ -15,7 +15,7 @@ namespace OneTaskBar
         {
             if(!ReleaseFeatures.GlassUI||disposed)return;
             PrepareWindowSwitcher();
-            if(fullscreenMedia!=null&&fullscreenMedia.InterfaceVersion!=Preferences.Current.UIVersion)CloseFullscreenMedia();
+            if(fullscreenMedia!=null&&fullscreenMedia.StyleKey!=Fluid.StyleKey)CloseFullscreenMedia();
             var screen=LastApplication!=IntPtr.Zero?Forms.Screen.FromHandle(LastApplication):Forms.Screen.PrimaryScreen;var dock=docks.FirstOrDefault(d=>d.Screen.DeviceName==screen.DeviceName);double scale=dock!=null?dock.Scale:1;
             if(fullscreenMedia==null){fullscreenMedia=new FullscreenMedia(Media,SeekMedia,()=>ShowDetail("sound"),()=>{fullscreenMedia.HideImmediately();try{SystemPower.Execute(SystemPowerAction.Lock);}catch(Exception e){AppLog.Write("media-screen-lock",e.Message);}},id=>MediaApplication.Resolve(id,Running.Concat(Apps)),this);SystemEvents.SessionSwitch+=MediaSessionChanged;}
             if(dock==null)scale=Native.PrepareMonitor(fullscreenMedia,screen.Bounds);fullscreenMedia.Present(screen,scale);fullscreenMedia.Update(Services.Media,Services.OutputName);

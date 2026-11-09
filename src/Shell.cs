@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -321,15 +321,15 @@ namespace OneTaskBar
         }
         void UIVersionChanged()
         {
-            if(disposed)return;CloseTrayOverflow();CloseDesktopOverview();Switcher.PreferenceChanged();QueuePanelTheme();int version=Preferences.Current.UIVersion;
-            if(Calendar!=null&&Calendar.InterfaceVersion!=version){Calendar.Close();Calendar=null;}
-            if(Quick!=null&&Quick.InterfaceVersion!=version){Quick.Close();Quick=null;}
-            if(Detail!=null&&Detail.InterfaceVersion!=version){Detail.Close();Detail=null;}
-            if(Center!=null&&Center.InterfaceVersion!=version){Center.Close();Center=null;}
-            if(StartMenu!=null&&StartMenu.InterfaceVersion!=version){StartMenu.Close();StartMenu=null;}
-            if(Drawer!=null&&Drawer.InterfaceVersion!=version){Drawer.Close();Drawer=null;}
-            if(Finder!=null&&Finder.InterfaceVersion!=version){Finder.Close();Finder=null;}
-            if(hud!=null&&hud.InterfaceVersion!=version){hud.Close();hud=null;hudScreen=null;}
+            if(disposed)return;CloseTrayOverflow();CloseDesktopOverview();Switcher.PreferenceChanged();QueuePanelTheme();int version=Fluid.StyleKey;
+            if(Calendar!=null&&Calendar.StyleKey!=version){Calendar.Close();Calendar=null;}
+            if(Quick!=null&&Quick.StyleKey!=version){Quick.Close();Quick=null;}
+            if(Detail!=null&&Detail.StyleKey!=version){Detail.Close();Detail=null;}
+            if(Center!=null&&Center.StyleKey!=version){Center.Close();Center=null;}
+            if(StartMenu!=null&&StartMenu.StyleKey!=version){StartMenu.Close();StartMenu=null;}
+            if(Drawer!=null&&Drawer.StyleKey!=version){Drawer.Close();Drawer=null;}
+            if(Finder!=null&&Finder.StyleKey!=version){Finder.Close();Finder=null;}
+            if(hud!=null&&hud.StyleKey!=version){hud.Close();hud=null;hudScreen=null;}
         }
         void OptionsChanged()
         {
@@ -438,7 +438,7 @@ namespace OneTaskBar
             var screen=Forms.Screen.FromPoint(Forms.Cursor.Position);double scale=MonitorScale(screen,Detail),w=Math.Min(380,screen.Bounds.Width/scale-24),h=Math.Min(540,screen.Bounds.Height/scale-100);
             var position=DockGeometry.Popup(screen.Bounds,scale,w,h,DockGeometry.Edge);Detail.ShowAt(screen.Bounds,position.X,position.Y,w,h);Detail.Pop();Detail.Activate();
         }
-        internal void ShowWelcome() { if(StartMenu!=null)StartMenu.HideImmediately();if(Welcome!=null&&Welcome.InterfaceVersion!=Preferences.Current.UIVersion){Welcome.ReleaseIdle();Welcome=null;}if(Welcome==null) Welcome=new WelcomeWindow(this); Welcome.UpdateMode(); Welcome.Show();Welcome.Pop(); Welcome.Activate(); }
+        internal void ShowWelcome() { if(StartMenu!=null)StartMenu.HideImmediately();if(Welcome!=null&&Welcome.StyleKey!=Fluid.StyleKey){Welcome.ReleaseIdle();Welcome=null;}if(Welcome==null) Welcome=new WelcomeWindow(this); Welcome.UpdateMode(); Welcome.Show();Welcome.Pop(); Welcome.Activate(); }
         internal int TaskViewRequests;
         internal void OpenTaskView()
         {

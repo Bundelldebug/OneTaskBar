@@ -65,6 +65,23 @@ namespace OneTaskBar
                 Require(!Object.ReferenceEquals(LiquidGlass.Tint(true,0),plainTint)&&LiquidGlass.Tint(true,0).IsFrozen,"the fluid UI has its own frozen thin tint");
                 Require(Object.ReferenceEquals(LiquidGlass.Tint(true,2),LiquidGlass.Tint(true,2)),"readability steps keep their cached tints");
                 Require(!Object.ReferenceEquals(Glass95.Rim,plainRim),"the fluid UI has its own warm rim");
+                int glowOld=Preferences.Current.FluidGlow;string colorOld=Preferences.Current.FluidGlowColor;
+                try
+                {
+                    Preferences.Set(p=>p.FluidGlow=0);
+                    int orange=Fluid.StyleKey;var orangeTint=Fluid.Tint(true);
+                    Preferences.Set(p=>p.FluidGlow=3);
+                    Require(Fluid.StyleKey!=orange&&!Object.ReferenceEquals(Fluid.Tint(true),orangeTint),"a new glow color rebuilds the tint and the panels");
+                    Require(Fluid.Glow(80).B>Fluid.Glow(80).R,"the blue glow is blue");
+                    Preferences.Set(p=>p.FluidGlow=Fluid.GlowNone);
+                    Require(!Fluid.GlowOn&&Fluid.Glow(255).A==0&&Fluid.Pale(255).A==0,"no glow leaves every glow color clear");
+                    Preferences.Set(p=>{p.FluidGlow=Fluid.GlowCustom;p.FluidGlowColor="#FF12AB34";});
+                    Require(Fluid.GlowColor==System.Windows.Media.Color.FromRgb(0x12,0xAB,0x34),"a custom glow color is used as chosen");
+                    Preferences.Set(p=>p.FluidGlow=99);
+                    Require(Fluid.GlowChoice==0,"an unknown glow choice falls back to orange");
+                }
+                finally{Preferences.Set(p=>{p.FluidGlow=glowOld;p.FluidGlowColor=colorOld;});}
+                Require(Fluid.Beta&&SoftwareUpdate.CurrentText.StartsWith("10.0.0"),"this build is 10.0.0a beta: "+SoftwareUpdate.CurrentText);
                 var choice=Array.Find(UIVersions.Available,c=>c.Value==Fluid.Version);
                 Require(choice!=null&&choice.Label.IndexOf("베타")>=0,"the picker offers the fluid UI with a beta tag");
             }

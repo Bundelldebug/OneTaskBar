@@ -26,8 +26,9 @@ namespace OneTaskBar
         internal static bool Dark {get{return fixtureDark??AppTheme.Dark;}}
         internal static bool DockDark {get{return fixtureDark??AppTheme.DockDark;}}
         static Palette Current {get{return Dark?dark:light;}}
-        static readonly Brush fluidCard=FluidFilm();
-        internal static bool CardBrush(Brush brush){return brush!=null&&(brush==light.Card||brush==dark.Card||brush==fluidCard);}
+        static Brush fluidCardBrush;static int fluidCardKey;
+        static Brush fluidCard{get{int key=Fluid.StyleKey;if(fluidCardBrush==null||fluidCardKey!=key){fluidCardBrush=FluidFilm();fluidCardKey=key;}return fluidCardBrush;}}
+        internal static bool CardBrush(Brush brush){return brush!=null&&(brush==light.Card||brush==dark.Card||brush==fluidCardBrush);}
         internal static bool Transparent {get{return Preferences.Current.Blur&&!SystemParameters.HighContrast;}}
         internal static Brush Surface {get{return PanelMaterial.PanelSurface(Dark,true);}}
         internal static Brush Card {get{return Transparent?(Fluid.Enabled?fluidCard:Current.Card):PanelMaterial.Card(Dark);}}
@@ -36,8 +37,9 @@ namespace OneTaskBar
         internal static Brush Muted {get{return SystemParameters.HighContrast?SystemColors.WindowTextBrush:Current.Muted;}}
         internal static Brush Rail {get{return Current.Rail;}}
         internal static Brush Toggle {get{return Current.Toggle;}}
-        static readonly Brush[] fluidRims={Edge(false,true,true),Edge(true,true,true)};
-        internal static Brush Rim {get{return Transparent?(Fluid.Enabled?fluidRims[Dark?1:0]:Current.Rim):Brushes.Transparent;}}
+        static Brush[] fluidRims;static int fluidRimKey;
+        static Brush FluidRim(bool isDark){int key=Fluid.StyleKey;if(fluidRims==null||fluidRimKey!=key){fluidRims=new Brush[]{Edge(false,true,true),Edge(true,true,true)};fluidRimKey=key;}return fluidRims[isDark?1:0];}
+        internal static Brush Rim {get{return Transparent?(Fluid.Enabled?FluidRim(Dark):Current.Rim):Brushes.Transparent;}}
         internal static readonly Brush Accent=Paint.Brush("#FF3478FD"),Selected=Paint.ControlWhite;
         // Cards in the Fluid UI catch the key light at the upper left and take a little warm light at the bottom.
         static Brush FluidFilm()
@@ -46,7 +48,7 @@ namespace OneTaskBar
             film.GradientStops.Add(new GradientStop(Color.FromArgb(40,255,255,255),0));
             film.GradientStops.Add(new GradientStop(Color.FromArgb(10,255,255,255),.26));
             film.GradientStops.Add(new GradientStop(Color.FromArgb(0,255,255,255),.6));
-            film.GradientStops.Add(new GradientStop(Color.FromArgb(34,255,150,86),1));
+            film.GradientStops.Add(new GradientStop(Fluid.Glow(34),1));
             film.Freeze();return film;
         }
         static Brush Film(bool dark)
@@ -68,7 +70,7 @@ namespace OneTaskBar
             // The Fluid UI's rim is lilac in the middle and picks up a warm light at the far corner.
             bool warm=fluid??Fluid.Enabled;
             edge.GradientStops.Add(new GradientStop(warm?Color.FromArgb(isDark?(byte)30:(byte)50,214,200,255):Color.FromArgb(isDark?(byte)24:(byte)45,221,232,249),.45));
-            edge.GradientStops.Add(new GradientStop(warm?Color.FromArgb(isDark?(byte)70:(byte)90,255,176,120):Color.FromArgb(isDark?(byte)28:(byte)58,119,140,170),1));if(freeze)edge.Freeze();return edge;
+            edge.GradientStops.Add(new GradientStop(warm?Fluid.Pale(isDark?70:90):Color.FromArgb(isDark?(byte)28:(byte)58,119,140,170),1));if(freeze)edge.Freeze();return edge;
         }
         internal static void DockInk(DependencyObject root,Brush ink=null)
         {
@@ -87,7 +89,7 @@ namespace OneTaskBar
         static Brush Recolor(Brush brush)
         {
             if(brush==null)return null;
-            if(Object.ReferenceEquals(brush,fluidCard))return Card;
+            if(Object.ReferenceEquals(brush,fluidCardBrush))return Card;
             foreach(var old in new[]{light,dark}){
                 if(Same(brush,old.Text))return Text;if(Same(brush,old.Muted))return Muted;if(Same(brush,old.Surface))return Surface;if(Same(brush,old.Card))return Card;if(Same(brush,old.Solid))return Solid;if(Same(brush,old.Toggle))return Toggle;if(Same(brush,old.Rim))return Rim;
             }return brush;

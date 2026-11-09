@@ -80,7 +80,8 @@ namespace OneTaskBar
                 case "미디어 플레이어":return "play";
                 case "복구":return "shield";
                 case "PC 호환성":return "computer";
-                case "화면":return "brightness";
+                case "화면":
+                case "Fluid UI":return "brightness";
                 case "움직임":return "motion";
                 case "충전 소리":return "volume";
                 default:return "settings";

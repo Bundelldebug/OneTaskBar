@@ -295,6 +295,8 @@ namespace OneTaskBar
     {
         int motion;bool closed,hiding;Brush glassTint,solidTint;LinearGradientBrush glassEdge;bool edgeDark;Point glassPointer;TaskCompletionSource<bool> dismissal;
         internal readonly int InterfaceVersion=Preferences.Current.UIVersion;
+        // Version and Fluid glow together: a window built under another style is rebuilt.
+        internal readonly int StyleKey=Fluid.StyleKey;
         internal bool GlassMaterial {get{return glassEdge!=null;}}
         internal Point GlassHighlight {get{return glassEdge==null?new Point():glassEdge.StartPoint;}}
         public readonly Border Surface;
@@ -425,7 +427,7 @@ namespace OneTaskBar
             if(TransitionContent==null)TransitionContent=Surface.Child as FrameworkElement;
             if(!Motion.Enabled){if(SmoothLauncher)LauncherMotion.Cancel(TransitionContent);return;}
             if(StableSurface&&TransitionContent!=null){++motion;Surface.RenderTransform=Transform.Identity;Surface.Opacity=1;if(SmoothLauncher)LauncherMotion.Run(TransitionContent,true,PopFromTop,true);else Motion.Launcher(TransitionContent,true,PopFromTop);return;}
-            if(Fluid.Enabled){++motion;Surface.Opacity=1;Motion.Drop(Surface,new Point(.5,1),Math.Min(26,Math.Max(10,Surface.ActualHeight*.06)));return;}
+            if(Fluid.Enabled){++motion;Surface.Opacity=1;Motion.Drop(Surface,Motion.Anchor(Surface,PopFromTop),0);return;}
             ++motion;Surface.RenderTransformOrigin=new Point(.5,.5);var scale=new ScaleTransform(.94,.94);double offset=Math.Min(14,Math.Max(0,Surface.ActualHeight)*.025);var translate=new TranslateTransform(0,offset);var group=new TransformGroup();group.Children.Add(scale);group.Children.Add(translate);Surface.RenderTransform=group;
             scale.BeginAnimation(ScaleTransform.ScaleXProperty,Motion.PanelTween(.94,1,310));scale.BeginAnimation(ScaleTransform.ScaleYProperty,Motion.PanelTween(.94,1,310));translate.BeginAnimation(TranslateTransform.YProperty,Motion.PanelTween(offset,0,310));
             Surface.BeginAnimation(UIElement.OpacityProperty,new DoubleAnimation(0,1,TimeSpan.FromMilliseconds(150)));
@@ -439,8 +441,8 @@ namespace OneTaskBar
             if(!Motion.Enabled){base.Hide();CompleteDismissal(true);return;}
             if(UnifiedFade){hiding=true;Surface.IsHitTestVisible=false;int fadeToken=++motion;double from=(double)GetValue(SurfaceFadeProperty);SetValue(SurfaceFadeProperty,0.0);var fade=Motion.Tween(from,0,145);fade.Completed+=(s,e)=>{if(!closed&&fadeToken==motion){base.Hide();hiding=false;Surface.IsHitTestVisible=true;ResetFade();CompleteDismissal(true);}};BeginAnimation(SurfaceFadeProperty,fade);return;}
             if(StableSurface&&TransitionContent!=null){hiding=true;Surface.IsHitTestVisible=false;int contentToken=++motion;var fade=SmoothLauncher?LauncherMotion.Run(TransitionContent,false):Motion.Launcher(TransitionContent,false);fade.Completed+=(s,e)=> {if(!closed&&contentToken==motion){base.Hide();hiding=false;Surface.IsHitTestVisible=true;TransitionContent.BeginAnimation(OpacityProperty,null);TransitionContent.Opacity=1;TransitionContent.RenderTransform=Transform.Identity;CompleteDismissal(true);}};TransitionContent.BeginAnimation(OpacityProperty,fade);return;}
-            hiding=true;Surface.IsHitTestVisible=false;int token=++motion;Surface.RenderTransformOrigin=new Point(.85,1);var scale=new ScaleTransform(1,1);var shift=new TranslateTransform();var group=new TransformGroup();group.Children.Add(scale);group.Children.Add(shift);Surface.RenderTransform=group;
-            scale.BeginAnimation(ScaleTransform.ScaleXProperty,new DoubleAnimation(.97,TimeSpan.FromMilliseconds(180)));scale.BeginAnimation(ScaleTransform.ScaleYProperty,new DoubleAnimation(.97,TimeSpan.FromMilliseconds(180)));shift.BeginAnimation(TranslateTransform.YProperty,new DoubleAnimation(9,TimeSpan.FromMilliseconds(180)));
+            hiding=true;Surface.IsHitTestVisible=false;int token=++motion;Surface.RenderTransformOrigin=Fluid.Enabled?Motion.Anchor(Surface,PopFromTop):new Point(.85,1);var scale=new ScaleTransform(1,1);var shift=new TranslateTransform();var group=new TransformGroup();group.Children.Add(scale);group.Children.Add(shift);Surface.RenderTransform=group;
+            double closeScale=Fluid.Enabled?.2:.97;scale.BeginAnimation(ScaleTransform.ScaleXProperty,new DoubleAnimation(closeScale,TimeSpan.FromMilliseconds(180)));scale.BeginAnimation(ScaleTransform.ScaleYProperty,new DoubleAnimation(closeScale,TimeSpan.FromMilliseconds(180)));if(!Fluid.Enabled)shift.BeginAnimation(TranslateTransform.YProperty,new DoubleAnimation(9,TimeSpan.FromMilliseconds(180)));
             var animation=new DoubleAnimation(0,TimeSpan.FromMilliseconds(180)) {EasingFunction=new CubicEase {EasingMode=EasingMode.EaseIn}};
             animation.Completed+=(s,e)=> {if(!closed&&token==motion){base.Hide();hiding=false;Surface.IsHitTestVisible=true;Surface.BeginAnimation(UIElement.OpacityProperty,null);Surface.Opacity=1;Surface.RenderTransform=Transform.Identity;CompleteDismissal(true);}};Surface.BeginAnimation(UIElement.OpacityProperty,animation);
         }

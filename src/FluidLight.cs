@@ -12,9 +12,10 @@ namespace OneTaskBar
     // only runs while that light is still gliding to the pointer.
     internal sealed class FluidLight : Adorner
     {
-        static readonly Brush KeyDark=Radial(.12,-.05,.95,Color.FromArgb(34,255,255,255));
-        static readonly Brush KeyLight=Radial(.12,-.05,.95,Color.FromArgb(70,255,255,255));
-        static readonly Brush Warm=Radial(.92,1.08,1.05,Color.FromArgb(70,255,154,90));
+        static readonly Brush KeyDark=Radial(.12,-.05,.95,Color.FromArgb(18,255,255,255));
+        static readonly Brush KeyLight=Radial(.12,-.05,.95,Color.FromArgb(34,255,255,255));
+        static Brush warmBrush;static int warmKey;
+        static Brush Warm {get{int key=Fluid.StyleKey;if(warmBrush==null||warmKey!=key){warmBrush=Radial(.92,1.08,1.05,Fluid.Glow(30));warmKey=key;}return warmBrush;}}
         readonly GlassWindow window;
         readonly RadialGradientBrush pointer=new RadialGradientBrush();
         readonly GradientStop pointerCore=new GradientStop(Colors.White,0),pointerEdge=new GradientStop(Colors.Transparent,1);
@@ -27,7 +28,7 @@ namespace OneTaskBar
         {
             window=owner;
             IsHitTestVisible=false;
-            pointer.RadiusX=pointer.RadiusY=.5;
+            pointer.RadiusX=pointer.RadiusY=.38;
             pointer.GradientStops.Add(pointerCore);
             pointer.GradientStops.Add(pointerEdge);
             pointer.Opacity=0;
@@ -47,8 +48,9 @@ namespace OneTaskBar
         void Palette(bool isDark)
         {
             dark=isDark;
-            pointerCore.Color=Color.FromArgb(isDark?(byte)40:(byte)84,255,244,232);
-            pointerEdge.Color=Color.FromArgb(0,255,244,232);
+            var tint=Fluid.GlowOn?Fluid.Pale(isDark?22:30):Color.FromArgb(isDark?(byte)20:(byte)28,255,255,255);
+            pointerCore.Color=tint;
+            pointerEdge.Color=Color.FromArgb(0,tint.R,tint.G,tint.B);
         }
 
         void SetPointer(double px,double py)

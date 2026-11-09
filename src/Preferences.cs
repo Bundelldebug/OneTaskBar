@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Web.Script.Serialization;
 using Microsoft.Win32;
@@ -20,6 +20,9 @@ namespace OneTaskBar
         public bool BudsConnectionPopups=true;
         public bool QuickGalaxyBuds=false;
         public int UIVersion=85;
+        // Fluid UI only: the color of the glow behind the glass (0 orange, 1 pink, 2 violet, 3 blue, 4 green, 5 none, 6 custom).
+        public int FluidGlow=0;
+        public string FluidGlowColor="#FFFF8A3D";
         public int UITheme=0;
         public bool SeparateDockTheme=false;
         public bool PanelsUseDockColor=false;

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -83,7 +83,7 @@ namespace OneTaskBar
                     Preferences.Current.DynamicIsland,v=>Preferences.Set(p=>p.DynamicIsland=v));
                 Row(nowBar,"미디어 앱 전환 애니메이션","재생 앱을 최소화하거나 복원할 때 미디어 캡슐로 연결합니다",
                     Preferences.Current.MediaWindowAnimation,v=>Preferences.Set(p=>p.MediaWindowAnimation=v));
-                Row(hardware,"가벼운 효과","포인터를 따라 움직이는 유리 빛, 리퀴드 글래스, 미디어 전환의 배경 흐림을 끄고 파형·제목 갱신을 줄입니다. 사양이 낮은 PC는 자동으로 켜집니다",
+                if(Preferences.Current.UIVersion>=95)Row(hardware,"가벼운 효과","포인터를 따라 움직이는 유리 빛, 리퀴드 글래스, 미디어 전환의 배경 흐림을 끄고 파형·제목 갱신을 줄입니다. 사양이 낮은 PC는 자동으로 켜집니다",
                     Preferences.Current.LightEffects,v=>Preferences.Set(p=>p.LightEffects=v));
                 Row(hardware,"60Hz 모드","120Hz 화면에서도 애니메이션을 60프레임으로 제한해 발열과 전력 사용을 줄입니다. 앱을 다시 시작하면 적용됩니다",
                     Preferences.Current.Limit60Hz,v=>Preferences.Set(p=>p.Limit60Hz=v));
@@ -116,7 +116,7 @@ namespace OneTaskBar
             watts.PreviewTextInput+=(s,e)=>e.Handled=e.Text.Any(c=>c<'0'||c>'9');
             DataObject.AddPastingHandler(watts,(s,e)=> {string value=e.DataObject.GetData(typeof(string)) as string;int number;if(String.IsNullOrEmpty(value)||value.Length>4||!Int32.TryParse(value,out number)||number<0||number>9999)e.CancelCommand();});
             watts.TextChanged+=(s,e)=> {int number;if(Int32.TryParse(watts.Text,out number)&&number>=0&&number<=9999&&Preferences.Current.DesktopPowerWatts!=number)Preferences.Set(p=>p.DesktopPowerWatts=number);};watts.LostKeyboardFocus+=(s,e)=>watts.Text=PowerDisplay.Clamp(Preferences.Current.DesktopPowerWatts).ToString();Grid.SetColumn(watts,1);powerRow.Children.Add(watts);hardware.Children.Add(powerRow);Group(groups,"PC 호환성",hardware);
-            var appearance=new StackPanel();ThemeSetting(appearance);Row(appearance,"동적 블러","배경의 창과 화면 색을 캡슐에 반영합니다",Preferences.Current.Blur,v=>Preferences.Set(p=>p.Blur=v));Row(appearance,"리퀴드 글래스","실시간 블러에 채도를 더하고 틴트를 얇게 해 배경이 더 투명하게 비치는 재질입니다. UI 9.5와 동적 블러가 켜져 있어야 하며 기본은 꺼짐입니다",Preferences.Current.LiquidGlass,v=>Preferences.Set(p=>p.LiquidGlass=v));
+            var appearance=new StackPanel();ThemeSetting(appearance);Row(appearance,"동적 블러","배경의 창과 화면 색을 캡슐에 반영합니다",Preferences.Current.Blur,v=>Preferences.Set(p=>p.Blur=v));if(Preferences.Current.UIVersion>=95)Row(appearance,"리퀴드 글래스","실시간 블러에 채도를 더하고 틴트를 얇게 해 배경이 더 투명하게 비치는 재질입니다. UI 9.5와 동적 블러가 켜져 있어야 하며 기본은 꺼짐입니다",Preferences.Current.LiquidGlass,v=>Preferences.Set(p=>p.LiquidGlass=v));
             AppIconSetting(appearance);
             Row(appearance,"듀오 스타일 상태 아이콘","배터리 원 게이지 · Wi-Fi · 음량 네 점을 하나로 표시합니다",Preferences.Current.DuoStatusIcon,v=>Preferences.Set(p=>p.DuoStatusIcon=v));
             StatusItemsSetting(appearance);
@@ -135,8 +135,9 @@ namespace OneTaskBar
             soundActions.Children.Add(Paint.Action("미리 듣기",()=>shell.ConnectionSound.Play(Preferences.Current.ChargeSoundFile,message=>status.Text=message)));
             soundActions.Children.Add(Paint.Action("파일 지우기",()=> {Preferences.Set(p=> {p.ChargeSoundFile=null;p.ChargeSoundEnabled=false;});soundName.Text="선택한 파일 없음";soundToggle.Refresh(false);}));sounds.Children.Add(soundActions);Group(groups,"충전 소리",sounds);
             if(island.Children.Count>0)Group(groups,"Dynamic Island와 상단바",island);
+            if(Preferences.Current.UIVersion>=Fluid.Version)Group(groups,"Fluid UI",FluidSection());
             // Ordered by what people reach for: the bar itself, how it looks and moves, panels, launcher, media, then upkeep.
-            var order=new[]{"데스크톱","Dynamic Island와 상단바","화면","움직임","패널 선택","시작과 검색","바탕화면 위젯","미디어 플레이어","충전 소리","PC 호환성","복구","소프트웨어 정보"};
+            var order=new[]{"데스크톱","Fluid UI","Dynamic Island와 상단바","화면","움직임","패널 선택","시작과 검색","바탕화면 위젯","미디어 플레이어","충전 소리","PC 호환성","복구","소프트웨어 정보"};
             sections.Sort((a,b)=>Array.IndexOf(order,a.Name)-Array.IndexOf(order,b.Name));
             SettingsPages(root,groups);Surface.Child=root;AppSettingsPalette.Apply(root);
             Closing+=(s,e)=> {if(!releasing&&!shell.IsDisposing&&!Application.Current.Dispatcher.HasShutdownStarted){e.Cancel=true;Hide();}};
