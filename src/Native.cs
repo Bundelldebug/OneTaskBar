@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -91,7 +91,7 @@ namespace OneTaskBar
             // A GDI region has binary pixel coverage and cuts off the layered window's antialiasing.
             // Capsules and panels already have per-pixel WPF alpha and a matching composition clip.
             var glass=window as GlassWindow;
-            if(glass!=null&&glass.BackdropClip.HasValue){var bounds=InputBounds(glass.BackdropClip.Value,scale);
+            if(glass!=null&&glass.BackdropClip.HasValue){var bounds=InputBounds(glass.RegionClip??glass.BackdropClip.Value,scale);
                 if(glass is NowBar&&ReleaseFeatures.GlassUI)bounds=new RectI {Right=rect.Right-rect.Left,Bottom=rect.Bottom-rect.Top};
                 if(!state.InputClip.HasValue||!state.InputClip.Value.Equals(bounds)){if(ClipWindow(handle,bounds))state.InputClip=bounds;}state.Soft=false;return;}
             if(state.InputClip.HasValue){SetWindowRgn(handle,IntPtr.Zero,true);state.InputClip=null;state.Width=0;}

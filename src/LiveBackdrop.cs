@@ -91,7 +91,7 @@ namespace OneTaskBar
         readonly DispatcherTimer popupTimer;
         readonly double radius;
         int width,height,corner,popupX=Int32.MinValue,popupY=Int32.MinValue;
-        Native.RectI placedBounds;bool shown,enabled=true;double opacity=1;Rect? lastClip;
+        Native.RectI placedBounds;bool shown,enabled=true;double opacity=1;Rect? lastClip,lastRegion;
         Native.RectI? inputClip;
         internal bool Realtime {get{return blur!=null&&(blur.Brush is CompositionBackdropBrush||blur.Brush==customBlur);}}
         internal double BlurRadius {get{return customRadius;}}
@@ -195,12 +195,12 @@ namespace OneTaskBar
             backdropScale=Math.Max(96,Native.GetDpiForWindow(handle))/96.0;
             int w=bounds.Right-bounds.Left,h=bounds.Bottom-bounds.Top,c=(int)Math.Round(radius*backdropScale);
             var glass=window as GlassWindow;Rect? clip=glass!=null?glass.BackdropClip:null;
-            if(w==width&&h==height&&c==corner&&clip==lastClip){Sync();return;}
+            if(w==width&&h==height&&c==corner&&clip==lastClip&&(glass==null||glass.RegionClip==lastRegion)){Sync();return;}lastRegion=glass!=null?glass.RegionClip:null;
             popupX=bounds.Left;popupY=bounds.Top;lastClip=clip;
             if(w!=width||h!=height){var size=new Vector2(w,h);root.Size=size;blur.Size=size;}width=w;height=h;corner=c;
             double scale=backdropScale;float cw=clip.HasValue?(float)(clip.Value.Width*scale):w,ch=clip.HasValue?(float)(clip.Value.Height*scale):h;
             if(!clip.HasValue&&inputClip.HasValue){if(Native.ClipWindow(background,new Native.RectI {Right=w,Bottom=h}))inputClip=null;}
-            if(clip.HasValue){var boundsClip=Native.InputBounds(clip.Value,scale);if(glass is NowBar&&ReleaseFeatures.GlassUI)boundsClip=new Native.RectI {Right=w,Bottom=h};if(!inputClip.HasValue||!inputClip.Value.Equals(boundsClip)){if(Native.ClipWindow(background,boundsClip))inputClip=boundsClip;}}
+            if(clip.HasValue){var boundsClip=Native.InputBounds(glass.RegionClip??clip.Value,scale);if(glass is NowBar&&ReleaseFeatures.GlassUI)boundsClip=new Native.RectI {Right=w,Bottom=h};if(!inputClip.HasValue||!inputClip.Value.Equals(boundsClip)){if(Native.ClipWindow(background,boundsClip))inputClip=boundsClip;}}
             shape.Offset=clip.HasValue?new Vector2((float)(clip.Value.X*scale),(float)(clip.Value.Y*scale)):Vector2.Zero;shape.Size=new Vector2(cw,ch);shape.CornerRadius=new Vector2(Math.Min(c,cw/2f),Math.Min(c,ch/2f));
             Sync();
         }

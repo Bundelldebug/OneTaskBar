@@ -313,6 +313,8 @@ namespace OneTaskBar
         static readonly DependencyProperty SurfaceFadeProperty=DependencyProperty.Register("SurfaceFade",typeof(double),typeof(GlassWindow),new PropertyMetadata(1.0,(d,e)=>{var window=(GlassWindow)d;if(window.Surface!=null)window.Surface.Opacity=(double)e.NewValue;Native.BlurOpacity(window,(double)e.NewValue);}));
         void ResetFade(){BeginAnimation(SurfaceFadeProperty,null);SetValue(SurfaceFadeProperty,1.0);Surface.Opacity=1;Native.BlurOpacity(this,1);}
         internal Rect? BackdropClip;
+        // While the panel is still a drop on a neck, the window must cover more than the backdrop does.
+        internal Rect? RegionClip;
         internal Native.RectI? DockBounds;
         internal bool IsDismissing {get{return hiding;}}
         internal DateTime HiddenSince=DateTime.UtcNow;
@@ -348,16 +350,37 @@ namespace OneTaskBar
             MouseMove+=(s,e)=>{var at=e.GetPosition(Surface);MoveGlassHighlight(at);if(fluidLight!=null)fluidLight.Move(at);};MouseLeave+=(s,e)=>{MoveGlassHighlight(new Point(Surface.ActualWidth/2,Surface.ActualHeight/2));if(fluidLight!=null)fluidLight.Leave();};
             Loaded+=(s,e)=>{if(lens==null){var layer=AdornerLayer.GetAdornerLayer(Surface);if(layer!=null){lens=new GlassLens(this);layer.Add(lens);}}
                 // The Fluid UI adds its light to every glass window: panels, the dock, the Now Bar, HUDs and banners. The opaque island has its own.
-                if(fluidLight==null&&Fluid.Enabled&&(!OpaqueSurface||FluidLightOnOpaque)&&!Performance.Light&&(!DockSurface||!DockAppearance.Custom&&!DockAppearance.IconsOnly)){var layer=AdornerLayer.GetAdornerLayer(Surface);if(layer!=null){fluidLight=new FluidLight(this);layer.Add(fluidLight);}}
+                SyncFluidLight();
                 ApplyMaterial();if(Program.CaptureReview){ShowInTaskbar=true;var h=new WindowInteropHelper(this).Handle;Native.SetWindowLong(h,-20,(Native.GetWindowLong(h,-20)|0x40000)&~(0x80|0x08000000));}};
             IsVisibleChanged+=(s,e)=> {if(!IsVisible)HiddenSince=DateTime.UtcNow;;};
             Closed+=(s,e)=> {closed=true;++motion;if(fluidLight!=null)fluidLight.Dispose();LauncherMotion.Cancel(TransitionContent);CompleteDismissal(false);Preferences.Changed-=ApplyMaterial;Preferences.AppearanceChanged-=ApplyAppearance;};
             PreviewKeyDown+=(s,e)=> { if(e.Key==Key.Escape&&!DragReorder.Active) {if(EscapeConsumed()){e.Handled=true;return;}var overview=this as DesktopOverview;var overflow=this as TrayOverflowWindow;if(overview!=null)overview.Dismiss();else if(overflow!=null)overflow.Dismiss();else Hide(); e.Handled=true; } };
         }
         void ApplyAppearance(){if(DockSurface||this is StartWindow)ApplyMaterial();}
+        // The Fluid light exists only while the Fluid UI is chosen: a window built under it drops the light when the
+        // interface goes back to 9.5, and a window built before it picks the light up.
+        void SyncFluidLight()
+        {
+            if(closed||!IsLoaded)return;
+            bool wanted=Fluid.Enabled&&(!OpaqueSurface||FluidLightOnOpaque)&&!Performance.Light&&(!DockSurface||!DockAppearance.Custom&&!DockAppearance.IconsOnly);
+            var layer=AdornerLayer.GetAdornerLayer(Surface);
+            if(!wanted&&fluidLight!=null)
+            {
+                fluidLight.Dispose();
+                if(layer!=null)layer.Remove(fluidLight);
+                fluidLight=null;
+            }
+            else if(wanted&&fluidLight==null&&layer!=null)
+            {
+                fluidLight=new FluidLight(this);
+                layer.Add(fluidLight);
+            }
+            else if(fluidLight!=null)fluidLight.Refresh();
+        }
         void ApplyMaterial()
         {
             if(closed)return;
+            SyncFluidLight();
             if(DockSurface||DockPalette)Dark=Glass95.DockDark;else if(!OpaqueSurface)Dark=Glass95.Dark;
             if(lens!=null){lens.Active=Glass95.Enabled&&!OpaqueSurface&&HasBlur&&Preferences.Current.Blur&&!(DockSurface&&DockAppearance.Custom)&&!(this is HudWindow);lens.InvalidateVisual();}
             if(glassTint==null)return;

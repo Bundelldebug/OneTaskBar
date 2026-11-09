@@ -90,6 +90,13 @@ namespace OneTaskBar
             Hook();
         }
 
+        // The glow color or the palette changed under a window that stays open.
+        internal void Refresh()
+        {
+            Palette(window.Dark);
+            InvalidateVisual();
+        }
+
         internal void Leave()
         {
             if(disposed||!present)return;
