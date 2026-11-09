@@ -93,6 +93,9 @@ namespace OneTaskBar
                 Require(SoftwareUpdate.Suffix("v10.0.0A1A1")=="A1A1"&&SoftwareUpdate.Suffix("10.0.0 a1b2")=="A1B2"&&SoftwareUpdate.Suffix("v9.5.12b")=="b"&&SoftwareUpdate.Suffix("v9.5.12")=="","build codes and letters are read from tags");
                 Require(SoftwareUpdate.NextCode("A1A1")=="A1A2"&&SoftwareUpdate.NextCode("A1A9")=="A1B1"&&SoftwareUpdate.NextCode("A1Z9")=="A2A1","build codes count up with the letter rollover");
                 Require(String.CompareOrdinal(SoftwareUpdate.SuffixKey("A1B1"),SoftwareUpdate.SuffixKey("A1A9"))>0&&String.CompareOrdinal(SoftwareUpdate.SuffixKey("A1A1"),SoftwareUpdate.SuffixKey("b"))>0&&String.CompareOrdinal(SoftwareUpdate.SuffixKey("b"),SoftwareUpdate.SuffixKey(""))>0,"build codes order after letters and numbers");
+                var lifted=FluidAutoGlow.Lift(Color.FromRgb(40,60,120),false);
+                Require(lifted.B>=235&&lifted.B>lifted.R+80&&FluidAutoGlow.Lift(Color.FromRgb(120,120,120),false)==Color.FromRgb(0xFF,0x8A,0x3D),"the automatic glow lifts a wallpaper color and keeps orange for grey");
+                Require(Fluid.GlowNames.Length==Fluid.GlowAuto+1,"the automatic glow has a name in the list");
                 var parsed=SoftwareUpdate.Parse("{\"tag_name\":\"v10.0.0A1A2\"}");
                 Require(parsed!=null&&parsed.Suffix=="A1A2"&&parsed.VersionText=="10.0.0"&&SoftwareUpdate.IsNewer(parsed),"a later build code is an update");
                 var choice=Array.Find(UIVersions.Available,c=>c.Value==Fluid.Version);

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
@@ -15,7 +15,7 @@ namespace OneTaskBar
         {
             var rows=new StackPanel();
             SubHeading(rows,"뒤쪽 글로우");
-            var note=Paint.TextBlock("유리 뒤에서 번지는 빛의 색입니다. 패널, 카드 테두리, Dynamic Island, 전체화면 미디어에 함께 적용됩니다.",13,AppSettingsPalette.Muted);
+            var note=Paint.TextBlock("유리 뒤에서 번지는 빛의 색입니다. 패널, 카드 테두리, Dynamic Island, 전체화면 미디어에 함께 적용됩니다. '배경에 맞춤'은 바탕화면의 주요 색을 따라갑니다.",13,AppSettingsPalette.Muted);
             note.TextWrapping=TextWrapping.Wrap;note.LineHeight=19;note.Margin=new Thickness(17,6,17,6);rows.Children.Add(note);
             var chips=new WrapPanel {Margin=new Thickness(15,4,15,8)};
             var refreshers=new List<Action>();
@@ -50,6 +50,11 @@ namespace OneTaskBar
         static Brush GlowDot(int choice)
         {
             if(choice==Fluid.GlowNone)return Brushes.Transparent;
+            if(choice==Fluid.GlowAuto)
+            {
+                var auto=FluidAutoGlow.Color;
+                return new SolidColorBrush(Color.FromRgb(auto.R,auto.G,auto.B));
+            }
             if(choice==Fluid.GlowCustom)
             {
                 Color custom;

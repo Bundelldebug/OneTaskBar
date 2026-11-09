@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Windows.Media;
 
 namespace OneTaskBar
@@ -13,13 +13,13 @@ namespace OneTaskBar
         internal static bool Enabled {get{return ReleaseFeatures.GlassUI&&Preferences.Current.UIVersion>=Version;}}
 
         // The glow behind the glass: a preset, a color of the owner's choice, or none.
-        internal const int GlowNone=5,GlowCustom=6;
-        internal static readonly string[] GlowNames={"주황","분홍","보라","파랑","초록","없음","직접 선택"};
+        internal const int GlowNone=5,GlowCustom=6,GlowAuto=7;
+        internal static readonly string[] GlowNames={"주황","분홍","보라","파랑","초록","없음","직접 선택","배경에 맞춤"};
         static readonly Color[] glowColors={Color.FromRgb(0xFF,0x8A,0x3D),Color.FromRgb(0xFF,0x5C,0x9E),Color.FromRgb(0x9A,0x6B,0xFF),Color.FromRgb(0x3D,0x9B,0xFF),Color.FromRgb(0x3D,0xD6,0x8C)};
 
         internal static int GlowChoice
         {
-            get{int value=Preferences.Current.FluidGlow;return value<0||value>GlowCustom?0:value;}
+            get{int value=Preferences.Current.FluidGlow;return value<0||value>GlowAuto?0:value;}
         }
         internal static bool GlowOn {get{return GlowChoice!=GlowNone;}}
         internal static Color GlowColor
@@ -27,6 +27,7 @@ namespace OneTaskBar
             get
             {
                 int choice=GlowChoice;
+                if(choice==GlowAuto)return FluidAutoGlow.Color;
                 if(choice==GlowCustom)
                 {
                     Color custom;
