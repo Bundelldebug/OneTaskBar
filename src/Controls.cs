@@ -341,9 +341,9 @@ namespace OneTaskBar
             MouseMove+=(s,e)=>{var at=e.GetPosition(Surface);MoveGlassHighlight(at);if(fluidLight!=null)fluidLight.Move(at);};MouseLeave+=(s,e)=>{MoveGlassHighlight(new Point(Surface.ActualWidth/2,Surface.ActualHeight/2));if(fluidLight!=null)fluidLight.Leave();};
             Loaded+=(s,e)=>{if(lens==null){var layer=AdornerLayer.GetAdornerLayer(Surface);if(layer!=null){lens=new GlassLens(this);layer.Add(lens);}}
                 // The Fluid UI adds its light to every glass window: panels, the dock, the Now Bar, HUDs and banners. The opaque island has its own.
-                if(fluidLight==null&&Fluid.Enabled&&!OpaqueSurface&&!Performance.Light&&(!DockSurface||!DockAppearance.Custom&&!DockAppearance.IconsOnly)){var layer=AdornerLayer.GetAdornerLayer(Surface);if(layer!=null){fluidLight=new FluidLight(this);layer.Add(fluidLight);fluidLight.Sweep();}}
+                if(fluidLight==null&&Fluid.Enabled&&!OpaqueSurface&&!Performance.Light&&(!DockSurface||!DockAppearance.Custom&&!DockAppearance.IconsOnly)){var layer=AdornerLayer.GetAdornerLayer(Surface);if(layer!=null){fluidLight=new FluidLight(this);layer.Add(fluidLight);}}
                 ApplyMaterial();if(Program.CaptureReview){ShowInTaskbar=true;var h=new WindowInteropHelper(this).Handle;Native.SetWindowLong(h,-20,(Native.GetWindowLong(h,-20)|0x40000)&~(0x80|0x08000000));}};
-            IsVisibleChanged+=(s,e)=> {if(!IsVisible)HiddenSince=DateTime.UtcNow;else if(fluidLight!=null)fluidLight.Sweep();};
+            IsVisibleChanged+=(s,e)=> {if(!IsVisible)HiddenSince=DateTime.UtcNow;;};
             Closed+=(s,e)=> {closed=true;++motion;if(fluidLight!=null)fluidLight.Dispose();LauncherMotion.Cancel(TransitionContent);CompleteDismissal(false);Preferences.Changed-=ApplyMaterial;Preferences.AppearanceChanged-=ApplyAppearance;};
             PreviewKeyDown+=(s,e)=> { if(e.Key==Key.Escape&&!DragReorder.Active) {if(EscapeConsumed()){e.Handled=true;return;}var overview=this as DesktopOverview;var overflow=this as TrayOverflowWindow;if(overview!=null)overview.Dismiss();else if(overflow!=null)overflow.Dismiss();else Hide(); e.Handled=true; } };
         }
@@ -414,7 +414,7 @@ namespace OneTaskBar
         public new void Show()
         {
             bool resume=StableSurface&&!UnifiedFade&&IsVisible&&hiding;++motion;hiding=false;CompleteDismissal(false);if(UnifiedFade)ResetFade();Surface.IsHitTestVisible=true;Surface.BeginAnimation(UIElement.OpacityProperty,null);Surface.Opacity=1;Surface.RenderTransform=Transform.Identity;
-            if(StableSurface&&TransitionContent!=null){if(resume&&Motion.Enabled){if(SmoothLauncher)LauncherMotion.Run(TransitionContent,true,PopFromTop);else Motion.Launcher(TransitionContent,true,PopFromTop);}else{if(SmoothLauncher)LauncherMotion.Cancel(TransitionContent);TransitionContent.BeginAnimation(OpacityProperty,null);TransitionContent.Opacity=1;TransitionContent.RenderTransform=Transform.Identity;}}
+            if(StableSurface&&TransitionContent!=null){if(resume&&Motion.Enabled){if(SmoothLauncher)LauncherMotion.Run(TransitionContent,true,PopFromTop,true);else Motion.Launcher(TransitionContent,true,PopFromTop);}else{if(SmoothLauncher)LauncherMotion.Cancel(TransitionContent);TransitionContent.BeginAnimation(OpacityProperty,null);TransitionContent.Opacity=1;TransitionContent.RenderTransform=Transform.Identity;}}
             base.Show();
             ShellWindowPolicy.Apply(this);
         }
@@ -422,7 +422,8 @@ namespace OneTaskBar
         {
             if(TransitionContent==null)TransitionContent=Surface.Child as FrameworkElement;
             if(!Motion.Enabled){if(SmoothLauncher)LauncherMotion.Cancel(TransitionContent);return;}
-            if(StableSurface&&TransitionContent!=null){++motion;Surface.RenderTransform=Transform.Identity;Surface.Opacity=1;if(SmoothLauncher)LauncherMotion.Run(TransitionContent,true,PopFromTop);else Motion.Launcher(TransitionContent,true,PopFromTop);return;}
+            if(StableSurface&&TransitionContent!=null){++motion;Surface.RenderTransform=Transform.Identity;Surface.Opacity=1;if(SmoothLauncher)LauncherMotion.Run(TransitionContent,true,PopFromTop,true);else Motion.Launcher(TransitionContent,true,PopFromTop);return;}
+            if(Fluid.Enabled){++motion;Surface.Opacity=1;Motion.Drop(Surface,new Point(.5,1),Math.Min(26,Math.Max(10,Surface.ActualHeight*.06)));return;}
             ++motion;Surface.RenderTransformOrigin=new Point(.5,.5);var scale=new ScaleTransform(.94,.94);double offset=Math.Min(14,Math.Max(0,Surface.ActualHeight)*.025);var translate=new TranslateTransform(0,offset);var group=new TransformGroup();group.Children.Add(scale);group.Children.Add(translate);Surface.RenderTransform=group;
             scale.BeginAnimation(ScaleTransform.ScaleXProperty,Motion.PanelTween(.94,1,310));scale.BeginAnimation(ScaleTransform.ScaleYProperty,Motion.PanelTween(.94,1,310));translate.BeginAnimation(TranslateTransform.YProperty,Motion.PanelTween(offset,0,310));
             Surface.BeginAnimation(UIElement.OpacityProperty,new DoubleAnimation(0,1,TimeSpan.FromMilliseconds(150)));

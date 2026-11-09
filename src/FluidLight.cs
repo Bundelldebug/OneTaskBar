@@ -7,8 +7,8 @@ using System.Windows.Media.Animation;
 namespace OneTaskBar
 {
     // The Fluid UI's light inside a glass panel: a key light in the upper left, warm light bleeding in from the lower
-    // right, a soft light that follows the pointer like a finger-sized lamp, and one sweep of light each time the panel
-    // opens. It is a single adorner drawn once; the pointer light moves by editing its brush, and the frame callback
+    // right, a soft light that follows the pointer like a finger-sized lamp.
+    // It is a single adorner drawn once; the pointer light moves by editing its brush, and the frame callback
     // only runs while that light is still gliding to the pointer.
     internal sealed class FluidLight : Adorner
     {
@@ -18,8 +18,6 @@ namespace OneTaskBar
         readonly GlassWindow window;
         readonly RadialGradientBrush pointer=new RadialGradientBrush();
         readonly GradientStop pointerCore=new GradientStop(Colors.White,0),pointerEdge=new GradientStop(Colors.Transparent,1);
-        readonly LinearGradientBrush sweep=new LinearGradientBrush {StartPoint=new Point(0,0),EndPoint=new Point(1,.55)};
-        readonly GradientStop sweepBefore=new GradientStop(Colors.Transparent,-.55),sweepHead=new GradientStop(Colors.Transparent,-.3),sweepAfter=new GradientStop(Colors.Transparent,-.05);
         readonly SpringValue x=new SpringValue(.002) {Omega=16,Damping=.82},y=new SpringValue(.002) {Omega=16,Damping=.82};
         readonly SpringClock clock=new SpringClock();
         bool dark,hooked,present,disposed;
@@ -33,9 +31,6 @@ namespace OneTaskBar
             pointer.GradientStops.Add(pointerCore);
             pointer.GradientStops.Add(pointerEdge);
             pointer.Opacity=0;
-            sweep.GradientStops.Add(sweepBefore);
-            sweep.GradientStops.Add(sweepHead);
-            sweep.GradientStops.Add(sweepAfter);
             x.Value=x.Target=.3;
             y.Value=y.Target=.2;
             SetPointer(.3,.2);
@@ -54,9 +49,6 @@ namespace OneTaskBar
             dark=isDark;
             pointerCore.Color=Color.FromArgb(isDark?(byte)40:(byte)84,255,244,232);
             pointerEdge.Color=Color.FromArgb(0,255,244,232);
-            sweepBefore.Color=Color.FromArgb(0,255,255,255);
-            sweepHead.Color=Color.FromArgb(isDark?(byte)60:(byte)110,255,246,236);
-            sweepAfter.Color=Color.FromArgb(0,255,255,255);
         }
 
         void SetPointer(double px,double py)
@@ -76,7 +68,6 @@ namespace OneTaskBar
             dc.DrawRectangle(window.Dark?KeyDark:KeyLight,null,rect);
             dc.DrawRectangle(Warm,null,rect);
             dc.DrawRectangle(pointer,null,rect);
-            dc.DrawRectangle(sweep,null,rect);
             dc.Pop();
         }
 
@@ -102,22 +93,6 @@ namespace OneTaskBar
             if(disposed||!present)return;
             present=false;
             pointer.BeginAnimation(Brush.OpacityProperty,new DoubleAnimation(pointer.Opacity,0,TimeSpan.FromMilliseconds(420)));
-        }
-
-        // One diagonal band of light crosses the panel as it opens.
-        internal void Sweep()
-        {
-            if(disposed||!Motion.Enabled||window.Surface.ActualWidth<2)return;
-            if(window.Dark!=dark)Palette(window.Dark);
-            Slide(sweepBefore,-.55,1.0);
-            Slide(sweepHead,-.3,1.25);
-            Slide(sweepAfter,-.05,1.5);
-        }
-
-        static void Slide(GradientStop stop,double from,double to)
-        {
-            var move=new DoubleAnimation(from,to,TimeSpan.FromMilliseconds(760)) {EasingFunction=new CubicEase {EasingMode=EasingMode.EaseOut},FillBehavior=FillBehavior.Stop};
-            stop.BeginAnimation(GradientStop.OffsetProperty,move);
         }
 
         void Hook()
