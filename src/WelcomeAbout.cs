@@ -19,6 +19,7 @@ namespace OneTaskBar
             AboutLine(about,"개발","OneTaskBar contributors · MIT 라이선스");
             AboutLine(about,"저장소","github.com/"+SoftwareUpdate.Repository);
             AboutLine(about,"설치 위치",AppLog.Root);
+            Row(about,"베타 버전 받기","켜면 '업데이트 확인'이 베타(시험판) 릴리스도 찾습니다. 베타는 아직 다듬어지는 중일 수 있습니다",Preferences.Current.BetaUpdates,v=>Preferences.Set(p=>p.BetaUpdates=v));
             var message=Paint.TextBlock("업데이트는 직접 확인할 때만 GitHub에 접속합니다. 자동으로 확인하거나 정보를 보내지 않습니다.",12,Paint.Muted);
             message.TextWrapping=TextWrapping.Wrap;
             message.Margin=new Thickness(15,10,15,4);
@@ -35,8 +36,20 @@ namespace OneTaskBar
             actions.Children.Add(check);
             actions.Children.Add(install);
             actions.Children.Add(Paint.Action("릴리스 페이지",()=>Native.Open("https://github.com/"+SoftwareUpdate.Repository+"/releases")));
+            actions.Children.Add(Paint.Action("피드백 보내기",()=>Native.Open(FeedbackAddress())));
             about.Children.Add(actions);
             return about;
+        }
+
+        // A new GitHub issue with the build details filled in; nothing is sent until the owner presses Submit on GitHub.
+        internal static string FeedbackAddress()
+        {
+            string body="## 무엇이 문제인가요?\n\n\n## 어떻게 하면 다시 나타나나요?\n\n\n## 기대한 동작\n\n\n---\n"+
+                "- One TaskBar: "+SoftwareUpdate.DetailText+(Fluid.ShowBeta?" Beta":"")+"\n"+
+                "- Windows: "+Environment.OSVersion.Version+"\n"+
+                "- UI 버전: "+Preferences.Current.UIVersion+"\n\n"+
+                "(스크린샷이나 영상에 개인 정보가 보이면 가려 주세요.)";
+            return "https://github.com/"+SoftwareUpdate.Repository+"/issues/new?title="+Uri.EscapeDataString("[피드백] ")+"&body="+Uri.EscapeDataString(body);
         }
 
         static void AboutLine(StackPanel parent,string label,string value)
@@ -61,12 +74,13 @@ namespace OneTaskBar
             result.Text="GitHub 릴리스를 확인하는 중…";
             try
             {
-                var release=await Task.Run(()=>SoftwareUpdate.Latest());
+                bool beta=Preferences.Current.BetaUpdates;
+                var release=await Task.Run(()=>beta?SoftwareUpdate.LatestIncludingBeta():SoftwareUpdate.Latest());
                 if(release==null)result.Text="릴리스 정보를 읽지 못했습니다.";
                 else if(SoftwareUpdate.IsNewer(release))
                 {
                     foundRelease=release;
-                    result.Text="새 버전 "+release.VersionText+"을 설치할 수 있습니다.";
+                    result.Text="새 버전 "+release.DetailText+(release.Beta?" Beta":"")+"을 설치할 수 있습니다.";
                     install.Visibility=Visibility.Visible;
                 }
                 else result.Text="최신 버전을 사용 중입니다.";

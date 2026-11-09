@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
@@ -166,13 +166,10 @@ namespace OneTaskBar
                     using(var pipe=new NamedPipeServerStream(AdminPipes.Keys,PipeDirection.InOut,1,PipeTransmissionMode.Byte,PipeOptions.None,64,64,AdminPipes.Security()))
                     {
                         pipe.WaitForConnection();
-                        var request=new byte[9];
+                        var request=new byte[28];
                         while(!stopped&&Fill(pipe,request))
                         {
-                            int key=BitConverter.ToInt32(request,0);
-                            uint flags=BitConverter.ToUInt32(request,4);
-                            byte modifiers=request[8];
-                            pipe.WriteByte(Handle(key,flags,modifiers));
+                            pipe.WriteByte(Handle(BitConverter.ToInt32(request,0),BitConverter.ToInt32(request,4),BitConverter.ToInt32(request,8),BitConverter.ToUInt32(request,12),BitConverter.ToUInt32(request,16),BitConverter.ToInt64(request,20)));
                         }
                     }
                 }
@@ -194,13 +191,13 @@ namespace OneTaskBar
             }
             return true;
         }
-        byte Handle(int key,uint flags,byte modifiers)
+        byte Handle(int message,int key,int scan,uint flags,uint time,long extra)
         {
             var application=Application.Current;
             if(application==null)return 0;
             try
             {
-                object answer=application.Dispatcher.Invoke(DispatcherPriority.Send,TimeSpan.FromMilliseconds(120),new Func<int>(()=>keys.ObserveRemote(key,flags,modifiers)));
+                object answer=application.Dispatcher.Invoke(DispatcherPriority.Send,TimeSpan.FromMilliseconds(120),new Func<int>(()=>keys.ObserveRemote(message,key,scan,flags,time,extra)));
                 if(answer==null)return 0;
                 return (byte)(int)answer;
             }
@@ -324,15 +321,18 @@ namespace OneTaskBar
             return cachedElevated;
         }
         // Returns the normal app's answer (bit 0 swallow, bit 1 switcher open), or -1 when it could not be asked in time.
-        static int Forward(int key,uint flags,byte modifiers)
+        static int Forward(int message,int key,int scan,uint flags,uint time,long extra)
         {
             try
             {
                 if(!Connect())return -1;
-                var request=new byte[9];
-                Buffer.BlockCopy(BitConverter.GetBytes(key),0,request,0,4);
-                Buffer.BlockCopy(BitConverter.GetBytes(flags),0,request,4,4);
-                request[8]=modifiers;
+                var request=new byte[28];
+                Buffer.BlockCopy(BitConverter.GetBytes(message),0,request,0,4);
+                Buffer.BlockCopy(BitConverter.GetBytes(key),0,request,4,4);
+                Buffer.BlockCopy(BitConverter.GetBytes(scan),0,request,8,4);
+                Buffer.BlockCopy(BitConverter.GetBytes(flags),0,request,12,4);
+                Buffer.BlockCopy(BitConverter.GetBytes(time),0,request,16,4);
+                Buffer.BlockCopy(BitConverter.GetBytes(extra),0,request,20,8);
                 keyPipe.Write(request,0,request.Length);
                 var answer=new byte[1];
                 var read=keyPipe.ReadAsync(answer,0,1);
@@ -359,12 +359,15 @@ namespace OneTaskBar
                         int key=Marshal.ReadInt32(info);
                         uint flags=(uint)Marshal.ReadInt32(info,8);
                         bool alt=(flags&0x20)!=0||(GetAsyncKeyState(0x12)&0x8000)!=0;
-                        // Only Alt+Tab, and the keys that steer the open switcher, are handed over; games keep everything else.
-                        if(((down&&key==9&&alt)||active)&&(flags&0x10)==0&&ForegroundElevated())
+                        // Only the shortcuts One TaskBar owns are handed over (Alt+Tab, the Win key and its chords, volume keys);
+                        // everything else a game receives untouched. While a switcher or chord is in progress every key is sent.
+                        bool win=(GetAsyncKeyState(0x5b)&0x8000)!=0||(GetAsyncKeyState(0x5c)&0x8000)!=0;
+                        bool owned=(down&&key==9&&alt)||key==0x5b||key==0x5c||win||(key>=0xAD&&key<=0xAF)||active;
+                        if(owned&&(flags&0x10)==0&&ForegroundElevated())
                         {
-                            bool ctrl=(GetAsyncKeyState(0x11)&0x8000)!=0,shift=(GetAsyncKeyState(0x10)&0x8000)!=0,win=(GetAsyncKeyState(0x5b)&0x8000)!=0||(GetAsyncKeyState(0x5c)&0x8000)!=0;
-                            byte modifiers=(byte)((alt?1:0)|(ctrl?2:0)|(shift?4:0)|(win?8:0)|(down?16:0));
-                            int answer=Forward(key,flags,modifiers);
+                            int scan=Marshal.ReadInt32(info,4),time=Marshal.ReadInt32(info,12);
+                            long extra=Marshal.ReadInt64(info,16);
+                            int answer=Forward(kind,key,scan,flags,(uint)time,extra);
                             if(answer>=0)
                             {
                                 active=(answer&2)!=0;

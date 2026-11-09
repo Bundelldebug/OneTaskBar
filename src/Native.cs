@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -337,18 +337,26 @@ namespace OneTaskBar
         int bufferedWin,nativeWins;
         [DllImport("user32.dll")]static extern short GetAsyncKeyState(int key);
         public VolumeKeys() { callback=Handle; handle=SetWindowsHookEx(13,callback,GetModuleHandle(null),0); }
-        // Keys the administrator helper saw while an administrator window had focus (this hook never receives them).
-        // Bit 0 of the result: the key is swallowed. Bit 1: the switcher is open.
-        internal int ObserveRemote(int key,uint flags,byte modifiers)
+        bool remote;
+        IntPtr Next(int code,IntPtr message,IntPtr info){return remote?IntPtr.Zero:CallNextHookEx(handle,code,message,info);}
+        // A key the administrator helper saw while an administrator window had focus (this hook never receives those).
+        // Bit 0 of the result: the key is swallowed. Bit 1: a switcher or Win-key chord is in progress, so the helper keeps sending keys.
+        internal int ObserveRemote(int message,int key,int scan,uint flags,uint time,long extra)
         {
-            bool enabled=Enabled&&InterceptAltTab!=null&&InterceptAltTab();
-            bool swallow=AltTabGesture.Observe(key,(modifiers&16)!=0,enabled,(modifiers&1)!=0,(modifiers&2)!=0,(modifiers&4)!=0,(modifiers&8)!=0,(flags&0x10)!=0);
-            return (swallow?1:0)|(AltTabGesture.Active?2:0);
+            IntPtr buffer=Marshal.AllocHGlobal(24);
+            try
+            {
+                Marshal.WriteInt32(buffer,0,key);Marshal.WriteInt32(buffer,4,scan);Marshal.WriteInt32(buffer,8,(int)flags);Marshal.WriteInt32(buffer,12,(int)time);Marshal.WriteInt64(buffer,16,extra);
+                remote=true;
+                bool swallow=Handle(0,new IntPtr(message),buffer)==new IntPtr(1);
+                return (swallow?1:0)|(AltTabGesture.Active||bufferedWin!=0||nativeWins!=0||searchKeyHeld?2:0);
+            }
+            finally{remote=false;Marshal.FreeHGlobal(buffer);}
         }
         IntPtr Handle(int code,IntPtr message,IntPtr info)
         {
             int key=code>=0 ? Marshal.ReadInt32(info) : 0;
-            if(code>=0&&Marshal.ReadInt64(info,16)==(long)SystemPanels.InputMarker)return CallNextHookEx(handle,code,message,info);
+            if(code>=0&&Marshal.ReadInt64(info,16)==(long)SystemPanels.InputMarker)return Next(code,message,info);
             if(code>=0) {
                 bool down=message==new IntPtr(0x100)||message==new IntPtr(0x104),up=message==new IntPtr(0x101)||message==new IntPtr(0x105);
                 if(down||up)try{uint flags=(uint)Marshal.ReadInt32(info,8);bool alt=(flags&0x20)!=0||(GetAsyncKeyState(0x12)&0x8000)!=0,ctrl=(GetAsyncKeyState(0x11)&0x8000)!=0,shift=(GetAsyncKeyState(0x10)&0x8000)!=0,win=(GetAsyncKeyState(0x5b)&0x8000)!=0||(GetAsyncKeyState(0x5c)&0x8000)!=0;if(AltTabGesture.Observe(key,down,Enabled&&InterceptAltTab!=null&&InterceptAltTab(),alt,ctrl,shift,win,(flags&0x10)!=0))return new IntPtr(1);}catch(Exception error){AppLog.Once("switcher-key",error.GetType().Name);}
@@ -378,7 +386,7 @@ namespace OneTaskBar
                 if(message==new IntPtr(0x100) || message==new IntPtr(0x104)) { if(OnKey(key)) return new IntPtr(1); }
                 else if(message==new IntPtr(0x101) || message==new IntPtr(0x105)) return new IntPtr(1);
             }
-            return CallNextHookEx(handle,code,message,info);
+            return Next(code,message,info);
         }
         public void Dispose() { if(handle!=IntPtr.Zero) { UnhookWindowsHookEx(handle); handle=IntPtr.Zero; } }
     }

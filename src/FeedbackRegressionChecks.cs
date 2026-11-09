@@ -76,6 +76,12 @@ namespace OneTaskBar
             Require(helperTask.Contains("<RunLevel>HighestAvailable</RunLevel>")&&helperTask.Contains("--admin-helper")&&helperTask.Contains("OneTaskBar.AdminHelper.v1|S-1-5-21-1"),"Administrator helper task is not elevated, marked and limited to the helper");
             Require(!LogonStartup.Definition(@"C:\Apps\OneTaskBar.exe","S-1-5-21-1").Contains("--admin-helper"),"The startup task must never start the helper mode");
             Require(ProcessElevation.IsElevated((uint)System.Diagnostics.Process.GetCurrentProcess().Id)==LogonStartup.IsAdministrator,"Elevation check disagrees with the current token");
+            string issue=WelcomeWindow.FeedbackAddress();
+            Require(issue.StartsWith("https://github.com/"+SoftwareUpdate.Repository+"/issues/new?title=")&&issue.Length<4000,"Feedback must open a new GitHub issue with the build details filled in");
+            var stable=SoftwareUpdate.Parse("{\"tag_name\":\"v9.5.13-A1Z1\"}");
+            var betaTag=SoftwareUpdate.Parse("{\"tag_name\":\"v10.0.0-A1A3-beta\"}");
+            Require(stable!=null&&stable.Suffix=="A1Z1"&&!stable.Beta&&betaTag!=null&&betaTag.Beta&&betaTag.Suffix=="A1A3","Release tags with build codes and the beta marker are not understood");
+            checks.Add("Feedback opens a prefilled GitHub issue; stable and beta tags with build codes parse");
             checks.Add("Administrator helper task is elevated, marked as the helper's, and the elevation test matches this process");
             checks.Add("Automatic app folders gather three or more alike, leave the rest, and dissolve cleanly");
 

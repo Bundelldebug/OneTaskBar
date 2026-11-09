@@ -45,6 +45,7 @@ namespace OneTaskBar
         public bool NativeStartButton=false;
         public bool GroupAppsByStartMenu=false;
         public bool AutoFolderApps=false;
+        public bool BetaUpdates=false;
         public bool SquircleIcons=false;
         public bool MaximizedBehindDock=false;
         public bool NativeAltTab=false;

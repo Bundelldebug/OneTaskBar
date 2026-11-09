@@ -14,6 +14,7 @@ namespace OneTaskBar
     internal sealed class ReleaseInfo
     {
         internal string Tag,Notes,SetupUrl,Digest,Suffix="";
+        internal bool Beta {get{return Tag!=null&&Tag.EndsWith("-beta",StringComparison.OrdinalIgnoreCase);}}
         internal string VersionText {get{return Version.Major+"."+Version.Minor+"."+Math.Max(0,Version.Build)+(Suffix.Length==1?Suffix:"");}}
         // The number with the build code ("10.0.0 A1A1") for places that show the exact build.
         internal string DetailText {get{return Version.Major+"."+Version.Minor+"."+Math.Max(0,Version.Build)+(Suffix.Length==0?"":(Suffix.Length==1?Suffix:" "+Suffix));}}
@@ -113,9 +114,33 @@ namespace OneTaskBar
             return Parse(json);
         }
 
+        // Newest release including betas (pre-releases), skipping drafts.
+        internal static ReleaseInfo LatestIncludingBeta()
+        {
+            string json=Get("https://api.github.com/repos/"+Repository+"/releases?per_page=20");
+            var list=new JavaScriptSerializer {MaxJsonLength=8*1024*1024}.DeserializeObject(json) as object[];
+            if(list==null)return null;
+            ReleaseInfo best=null;
+            foreach(var item in list.OfType<Dictionary<string,object>>())
+            {
+                if(item.ContainsKey("draft")&&Convert.ToBoolean(item["draft"]))continue;
+                var info=Parse(item);
+                if(info==null||info.SetupUrl==null)continue;
+                if(best==null||Compare(info,best)>0)best=info;
+            }
+            return best;
+        }
+        static int Compare(ReleaseInfo first,ReleaseInfo second)
+        {
+            int order=new Version(first.Version.Major,first.Version.Minor,Math.Max(0,first.Version.Build)).CompareTo(new Version(second.Version.Major,second.Version.Minor,Math.Max(0,second.Version.Build)));
+            return order!=0?order:String.CompareOrdinal(SuffixKey(first.Suffix),SuffixKey(second.Suffix));
+        }
         internal static ReleaseInfo Parse(string json)
         {
-            var root=new JavaScriptSerializer {MaxJsonLength=4*1024*1024}.DeserializeObject(json) as Dictionary<string,object>;
+            return Parse(new JavaScriptSerializer {MaxJsonLength=4*1024*1024}.DeserializeObject(json) as Dictionary<string,object>);
+        }
+        static ReleaseInfo Parse(Dictionary<string,object> root)
+        {
             if(root==null||!root.ContainsKey("tag_name"))return null;
             string tag=Convert.ToString(root["tag_name"]);
             Version version;
