@@ -301,6 +301,7 @@ namespace OneTaskBar
             bool searching=state.Searching;
             bool active=media!=null,detail=state.Expanded&&active&&!searching;
             bool notice=state.NotificationVisible(DateTime.UtcNow)&&!detail&&!searching;
+            ApplyNoticeGlow();
             bool show=state.FeedbackVisible(DateTime.UtcNow)&&!detail&&!notice&&!searching;
             bool charge=show&&state.FeedbackKind=="charge";
             bool compactVisible=active&&!show&&!detail&&!notice&&!searching;

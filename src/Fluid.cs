@@ -57,6 +57,32 @@ namespace OneTaskBar
             return Color.FromArgb(GlowOn?(byte)Math.Max(0,Math.Min(255,alpha)):(byte)0,(byte)(color.R+(255-color.R)*.45),(byte)(color.G+(255-color.G)*.45),(byte)(color.B+(255-color.B)*.45));
         }
 
+        // The main color of an app icon, for a glow that belongs to one notification; null when the glow is off, the icon
+        // has no color of its own, or the owner chose to keep one glow color everywhere.
+        internal static Color? IconGlow(System.Windows.Media.ImageSource icon)
+        {
+            if(!Enabled||!GlowOn||!Preferences.Current.FluidIconGlow)return null;
+            var bitmap=icon as System.Windows.Media.Imaging.BitmapSource;
+            if(bitmap==null)return null;
+            var palette=ArtworkPalette.Read(bitmap);
+            var color=palette.Dominant;
+            // A grey, black or white icon has no color to glow in.
+            bool colorful=Math.Max(color.R,Math.Max(color.G,color.B))-Math.Min(color.R,Math.Min(color.G,color.B))>=28;
+            return Object.ReferenceEquals(palette,ArtworkPalette.Neutral)||!colorful?(Color?)null:color;
+        }
+        static readonly System.Collections.Generic.Dictionary<Color,Brush> iconGlows=new System.Collections.Generic.Dictionary<Color,Brush>();
+        // Light spilling in from the icon side of a banner, frozen and shared per color.
+        internal static Brush IconGlowBrush(Color color)
+        {
+            Brush brush;
+            if(iconGlows.TryGetValue(color,out brush))return brush;
+            if(iconGlows.Count>=32)iconGlows.Clear();
+            var spill=new RadialGradientBrush(Color.FromArgb(150,color.R,color.G,color.B),Color.FromArgb(0,color.R,color.G,color.B)) {Center=new System.Windows.Point(.08,.6),GradientOrigin=new System.Windows.Point(.08,.6),RadiusX=.85,RadiusY=1.3};
+            spill.Freeze();
+            iconGlows[color]=spill;
+            return spill;
+        }
+
         static readonly Brush[] tints=new Brush[2];
         static int tintKey;
         // Thin glass whose top is clear and whose lower part holds the glow with a cool lilac band above it.

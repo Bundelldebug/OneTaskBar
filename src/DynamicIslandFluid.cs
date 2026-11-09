@@ -24,7 +24,16 @@ namespace OneTaskBar
         // A burst of white around the orb at the left end, like the glow in the reference when the capsule fills.
         readonly Ellipse bloom=new Ellipse {Width=120,Height=120,IsHitTestVisible=false,Visibility=Visibility.Collapsed,Opacity=0,HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(-44,0,0,0),RenderTransformOrigin=new Point(.5,.5),RenderTransform=new ScaleTransform(.4,.4),Fill=FluidPaint.Glow(Color.FromArgb(0xF0,255,250,244))};
         bool fluid,fluidMoving;
-        Ellipse warmGlow;int glowKey;
+        Ellipse warmGlow;int glowKey;Color? noticeGlow;bool noticeGlowSet;
+        // While a notification shows, the island glows in the main color of its app icon.
+        void ApplyNoticeGlow()
+        {
+            if(!fluid)return;
+            Color? want=state.NotificationUntil>DateTime.UtcNow&&notification.Entry!=null?Fluid.IconGlow(notification.Entry.Icon):null;
+            if(noticeGlowSet&&noticeGlow==want)return;
+            noticeGlowSet=true;noticeGlow=want;
+            warmGlow.Fill=want.HasValue?FluidPaint.Glow(Color.FromArgb(0xB0,want.Value.R,want.Value.G,want.Value.B)):FluidPaint.Glow(Fluid.Glow(0xA0));
+        }
         internal bool FluidActive {get{return fluid;}}
         internal bool FluidMoving {get{return fluidMoving;}}
 
@@ -60,7 +69,7 @@ namespace OneTaskBar
         // Called with every presentation; changes nothing unless the preference moved.
         void SetFluid(bool on)
         {
-            if(on&&glowKey!=Fluid.StyleKey){glowKey=Fluid.StyleKey;warmGlow.Fill=FluidPaint.Glow(Fluid.Glow(0xA0));fluidRim.BorderBrush=FluidPaint.Rim();}
+            if(on&&glowKey!=Fluid.StyleKey){glowKey=Fluid.StyleKey;noticeGlowSet=false;warmGlow.Fill=FluidPaint.Glow(Fluid.Glow(0xA0));fluidRim.BorderBrush=FluidPaint.Rim();}
             if(on==fluid)return;
             fluid=on;
             var visible=on?Visibility.Visible:Visibility.Collapsed;

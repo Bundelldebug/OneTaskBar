@@ -42,6 +42,8 @@ namespace OneTaskBar
             glowRefresh=()=>{foreach(var refresh in refreshers)refresh();};
             glowRefresh();
             rows.Children.Add(chips);
+            SubHeading(rows,"알림");
+            Row(rows,"알림 글로우를 앱 아이콘 색으로","알림 팝업과 Dynamic Island 알림이 앱 아이콘의 주요 색으로 빛납니다. 끄면 위에서 고른 색을 씁니다. 글로우가 없음이면 적용되지 않습니다",Preferences.Current.FluidIconGlow,v=>Preferences.Set(p=>p.FluidIconGlow=v));
             return rows;
         }
         Action glowRefresh;

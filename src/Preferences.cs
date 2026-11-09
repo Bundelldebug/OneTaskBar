@@ -23,6 +23,8 @@ namespace OneTaskBar
         // Fluid UI only: the color of the glow behind the glass (0 orange, 1 pink, 2 violet, 3 blue, 4 green, 5 none, 6 custom).
         public int FluidGlow=0;
         public string FluidGlowColor="#FFFF8A3D";
+        // Fluid UI only: a notification glows in the main color of its app icon.
+        public bool FluidIconGlow=true;
         public int UITheme=0;
         public bool SeparateDockTheme=false;
         public bool PanelsUseDockColor=false;

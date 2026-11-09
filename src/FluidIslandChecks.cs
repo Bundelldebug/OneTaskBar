@@ -81,6 +81,13 @@ namespace OneTaskBar
                     Require(Fluid.GlowChoice==0,"an unknown glow choice falls back to orange");
                 }
                 finally{Preferences.Set(p=>{p.FluidGlow=glowOld;p.FluidGlowColor=colorOld;});}
+                var red=ArtworkPalette.Sample(System.Windows.Media.Colors.Red);
+                var iconGlow=Fluid.IconGlow(red);
+                Require(iconGlow.HasValue&&iconGlow.Value.R>iconGlow.Value.B+80,"a notification glows in the main color of its icon");
+                Require(Fluid.IconGlow(ArtworkPalette.Sample(System.Windows.Media.Colors.Gray))==null,"an icon with no color of its own keeps the chosen glow");
+                bool iconOld=Preferences.Current.FluidIconGlow;
+                try{Preferences.Set(p=>p.FluidIconGlow=false);Require(Fluid.IconGlow(red)==null,"the icon glow can be turned off");}
+                finally{Preferences.Set(p=>p.FluidIconGlow=iconOld);}
                 Require(Fluid.Beta&&SoftwareUpdate.CurrentText.StartsWith("10.0.0"),"this build is 10.0.0a beta: "+SoftwareUpdate.CurrentText);
                 var choice=Array.Find(UIVersions.Available,c=>c.Value==Fluid.Version);
                 Require(choice!=null&&choice.Label.IndexOf("베타")>=0,"the picker offers the fluid UI with a beta tag");
