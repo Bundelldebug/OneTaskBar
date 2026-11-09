@@ -266,7 +266,7 @@ namespace OneTaskBar
             if(IsKeyboardFocused) dc.DrawRoundedRectangle(null,new Pen(Paint.Brush("#9ED4F0E5"),1.5),new Rect(1,1,Math.Max(0,w-2),Math.Max(0,h-2)),Math.Min(w,h)/2,Math.Min(w,h)/2);
         }
         internal static double PositionValue(double width,double height,Point point,bool vertical,bool capsule){double axis=vertical?height:width,x=vertical?height-point.Y:point.X,diameter=capsule?Math.Min(width,height):0;return Math.Round(Clamp((x-diameter/2)/Math.Max(1,axis-diameter)*100));}
-        void Update(Point point) {Value=WaveMode?PositionValue(Math.Max(1,ActualWidth-16),ActualHeight,new Point(point.X-8,point.Y),false,false):PositionValue(ActualWidth,ActualHeight,point,Vertical,Tablet&&ShowIcon&&!Slim&&!LinearFill);if(Changed!=null)Changed(Value);}
+        void Update(Point point) {Value=WaveMode?PositionValue(Math.Max(1,ActualWidth-2*MediaWave.Inset),ActualHeight,new Point(point.X-MediaWave.Inset,point.Y),false,false):PositionValue(ActualWidth,ActualHeight,point,Vertical,Tablet&&ShowIcon&&!Slim&&!LinearFill);if(Changed!=null)Changed(Value);}
         protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e) { base.OnMouseLeftButtonDown(e); Focus(); dragging=true; CaptureMouse(); Update(e.GetPosition(this)); e.Handled=true; }
         protected override void OnMouseMove(MouseEventArgs e) { if(dragging && e.LeftButton==MouseButtonState.Pressed) Update(e.GetPosition(this)); }
         protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e) { dragging=false; ReleaseMouseCapture(); e.Handled=true; }

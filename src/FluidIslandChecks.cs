@@ -106,7 +106,7 @@ namespace OneTaskBar
                     panel.Pop();
                     Require(panel.BudActive,"a fluid panel opens as a drop from the bar");
                     int waited=0;
-                    foreach(int at in new[]{40,110,200,320,470})
+                    foreach(int at in new[]{30,70,120,190,300})
                     {
                         await Task.Delay(at-waited);waited=at;
                         Program.Save(panel.Content as FrameworkElement,320,220,Path.Combine(AppLog.Data,"fluid-bud-"+at+".png"));
@@ -115,7 +115,7 @@ namespace OneTaskBar
                     Require(!panel.BudActive&&!panel.BackdropClip.HasValue&&((FrameworkElement)panel.Content).Clip==null,"the drop ends as the plain panel");
                     Program.Save(panel.Content as FrameworkElement,320,220,Path.Combine(AppLog.Data,"fluid-panel-rest.png"));
                     panel.Hide();
-                    await Task.Delay(120);
+                    await Task.Delay(90);
                     Program.Save(panel.Content as FrameworkElement,320,220,Path.Combine(AppLog.Data,"fluid-bud-closing.png"));
                     await Task.Delay(400);
                     Require(!panel.IsVisible,"the panel is hidden once it has shrunk into the bar");

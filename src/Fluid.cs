@@ -70,15 +70,15 @@ namespace OneTaskBar
             var brush=new LinearGradientBrush {StartPoint=new System.Windows.Point(.1,0),EndPoint=new System.Windows.Point(.9,1)};
             if(dark)
             {
-                brush.GradientStops.Add(new GradientStop(Color.FromArgb(118,24,26,42),0));
-                brush.GradientStops.Add(new GradientStop(Color.FromArgb(128,44,34,70),.5));
-                brush.GradientStops.Add(new GradientStop(GlowOn?Glow(205):Color.FromArgb(138,40,44,66),1));
+                brush.GradientStops.Add(new GradientStop(Color.FromArgb(74,24,26,42),0));
+                brush.GradientStops.Add(new GradientStop(Color.FromArgb(82,44,34,70),.5));
+                brush.GradientStops.Add(new GradientStop(GlowOn?Glow(165):Color.FromArgb(90,40,44,66),1));
             }
             else
             {
-                brush.GradientStops.Add(new GradientStop(Color.FromArgb(150,255,255,255),0));
-                brush.GradientStops.Add(new GradientStop(Color.FromArgb(142,240,232,252),.5));
-                brush.GradientStops.Add(new GradientStop(GlowOn?Pale(215):Color.FromArgb(150,246,244,252),1));
+                brush.GradientStops.Add(new GradientStop(Color.FromArgb(96,255,255,255),0));
+                brush.GradientStops.Add(new GradientStop(Color.FromArgb(92,240,232,252),.5));
+                brush.GradientStops.Add(new GradientStop(GlowOn?Pale(175):Color.FromArgb(100,246,244,252),1));
             }
             brush.Freeze();
             tints[index]=brush;

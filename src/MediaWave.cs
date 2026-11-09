@@ -8,6 +8,8 @@ namespace OneTaskBar
     // Cubic segments preserve the tangent at the elapsed track and between peaks.
     internal static class MediaWave
     {
+        // The wave and the dot keep this far from both ends of the control so the glow around the dot is never cut off.
+        internal const double Inset=12;
         static double Height(double t,double phase,int layer,out double slope)
         {
             double angle=Math.PI*t,frequency=Math.PI*(4.2+layer*.6);
@@ -21,7 +23,7 @@ namespace OneTaskBar
             length=Math.Max(0,length);amplitude=Math.Max(0,amplitude);
             int samples=Math.Max(16,Math.Min(64,(int)Math.Ceiling(length/20)));
             double step=1.0/samples,previousSlope;
-            var previous=new Point(8,baseline);Height(0,phase,layer,out previousSlope);
+            var previous=new Point(Inset,baseline);Height(0,phase,layer,out previousSlope);
             var shape=new StreamGeometry();
             using(var dc=shape.Open())
             {
@@ -29,7 +31,7 @@ namespace OneTaskBar
                 for(int i=1;i<=samples;i++)
                 {
                     double t=i*step,slope,level=Height(t,phase,layer,out slope);
-                    var next=new Point(8+length*t,baseline-amplitude*level);
+                    var next=new Point(Inset+length*t,baseline-amplitude*level);
                     var first=new Point(previous.X+length*step/3,previous.Y-amplitude*previousSlope*step/3);
                     var second=new Point(next.X-length*step/3,next.Y+amplitude*slope*step/3);
                     first.Y=Math.Max(baseline-amplitude,Math.Min(baseline,first.Y));
@@ -44,7 +46,7 @@ namespace OneTaskBar
             foreach(double length in new[]{0.0,1,90,480,4000})foreach(double phase in new[]{0.0,1,12})for(int layer=0;layer<3;layer++)
             {
                 var shape=Shape(length,24,16,phase,layer);var bounds=shape.Bounds;
-                if(!shape.IsFrozen||bounds.Left<7.99||bounds.Right>8+length+.01||bounds.Top<7.99||bounds.Bottom>24.01)throw new InvalidOperationException("Playback wave escapes the elapsed track");
+                if(!shape.IsFrozen||bounds.Left<Inset-.01||bounds.Right>Inset+length+.01||bounds.Top<7.99||bounds.Bottom>24.01)throw new InvalidOperationException("Playback wave escapes the elapsed track");
             }
         }
     }
@@ -109,16 +111,16 @@ namespace OneTaskBar
                 if(waveStrength>.001&&Motion.Enabled){
                     double phase=waveClock.Elapsed.TotalSeconds*2.7;
                     for(int layer=0;layer<3;layer++){
-                        dc.DrawGeometry(waves[layer],null,MediaWave.Shape(Math.Max(0,width-16),height,height*.86*(1-layer*.14)*waveStrength,phase,layer));
+                        dc.DrawGeometry(waves[layer],null,MediaWave.Shape(Math.Max(0,width-2*MediaWave.Inset),height,height*.86*(1-layer*.14)*waveStrength,phase,layer));
                     }
                 }
                 return;
             }
-            double y=Math.Max(6,height-7),span=Math.Max(0,width-16),length=span*Value/100,x=8+length;
+            double y=Math.Max(6,height-7),span=Math.Max(0,width-2*MediaWave.Inset),length=span*Value/100,x=MediaWave.Inset+length;
             dc.PushClip(new RectangleGeometry(new Rect(0,0,width,height)));
-            dc.DrawRoundedRectangle(waveTrack,null,new Rect(8,y-1.6,span,3.2),1.6,1.6);
+            dc.DrawRoundedRectangle(waveTrack,null,new Rect(MediaWave.Inset,y-1.6,span,3.2),1.6,1.6);
             if(waveStrength>.001&&Motion.Enabled&&length>0){double phase=waveClock.Elapsed.TotalSeconds*2.7;for(int layer=0;layer<3;layer++)dc.DrawGeometry(waves[layer],null,MediaWave.Shape(length,y,Math.Max(0,y-3)*(1-layer*.14)*waveStrength,phase,layer));}
-            if(length>0)dc.DrawRoundedRectangle(waveAccent,null,new Rect(8,y-1.8,length,3.6),1.8,1.8);
+            if(length>0)dc.DrawRoundedRectangle(waveAccent,null,new Rect(MediaWave.Inset,y-1.8,length,3.6),1.8,1.8);
             if(IsEnabled){for(int i=0;i<3;i++)dc.DrawEllipse(glow[i],null,new Point(x,y),10-i*2,10-i*2);dc.DrawEllipse(Paint.ControlWhite,null,new Point(x,y),6,6);dc.DrawEllipse(waveAccent,null,new Point(x,y),4.4,4.4);}
             if(IsKeyboardFocused)dc.DrawRoundedRectangle(null,new Pen(Paint.ControlWhite,1),new Rect(.5,.5,Math.Max(0,width-1),Math.Max(0,height-1)),6,6);
             dc.Pop();

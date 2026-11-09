@@ -11,7 +11,7 @@ namespace OneTaskBar
     // Closing runs the same shape backwards into the bar.
     internal sealed class FluidBud
     {
-        const double Pop=.15,Swell=.5,Orb=36,CloseTime=.3;
+        const double Pop=.17,Swell=.3,Orb=36,Lift=14,CloseTime=.22;
         readonly GlassWindow window;
         readonly Stopwatch watch=new Stopwatch();
         readonly RectangleGeometry clip=new RectangleGeometry();
@@ -73,19 +73,21 @@ namespace OneTaskBar
             if(!closing)
             {
                 double u=Math.Min(1,time/Pop);
-                // The drop pushes out of the bar a little taller than wide, then rounds off.
-                double grow=SpringEase.Position(u,.72),relax=1-u;
-                double w=Math.Max(2,orb*grow*(1-.12*relax)),h=Math.Max(2,orb*grow*(1+.24*relax));
-                Rect drop=new Rect(cx-w/2,fromTop?0:height-h,w,h);
+                // The drop swells out of the bar's edge, stretched tall while it is still attached, then lets go: it
+                // lifts away from the bar on a spring and rounds off into a circle.
+                double grow=SpringEase.Position(u,.6),relax=1-u;
+                double w=Math.Max(2,orb*(.55+.45*grow)),h=Math.Max(2,orb*grow*(1+.5*relax));
+                double lift=Lift*SpringEase.Position(Math.Max(0,(u-.25)/.75),.6);
+                Rect drop=new Rect(cx-w/2,fromTop?lift:height-lift-h,w,h);
                 double v=Math.Max(0,Math.Min(1,(time-Pop)/Swell));
-                double p=u<1?0:SpringEase.Position(v,.84);
+                double p=u<1?0:SpringEase.Position(v,.8);
                 shape=Lerp(drop,full,p);
                 content=Math.Max(0,Math.Min(1,(p-.18)/.5));
             }
             else
             {
                 double v=Math.Max(0,Math.Min(1,time/CloseTime));
-                Rect drop=new Rect(cx-orb/2,fromTop?0:height-orb,orb,orb);
+                Rect drop=new Rect(cx-orb/2,fromTop?Lift:height-Lift-orb,orb,orb);
                 double shrink=Math.Max(0,Math.Min(1,(v-.55)/.45));
                 shape=Lerp(drop,full,1-Ease(v));
                 if(shrink>0)shape=Scale(shape,1-shrink);
