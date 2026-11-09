@@ -269,6 +269,7 @@ namespace OneTaskBar
         void Relayout()
         {
             if(!Desktop || disposed) return;
+            ScheduleStartWarm();
             CloseTrayOverflow();CloseDesktopOverview();CloseIsland();Switcher.Cancel();
             Previews.Close();
             string trayMonitor=trayDock!=null?trayDock.Screen.DeviceName:null;
@@ -525,6 +526,30 @@ namespace OneTaskBar
             var nativeScreen=dock!=null?dock.Screen:Forms.Screen.FromPoint(Forms.Cursor.Position);
             int nativeEdge=dock!=null?dock.Edge:DockGeometry.Edge;
             if(!await Task.Run(()=>{if(!SystemPanels.Start())return false;SystemPanelPlacement.Align(nativeScreen.Bounds,nativeEdge,"start");return true;})){ShowWelcome();Welcome.Feedback("Windows 시작 메뉴를 열지 못했습니다. 다시 눌러 주세요.");}
+        }
+        bool startWarmed;
+        // The start menu is built once the shell is idle after starting, so the first press of the start button opens it at once.
+        void ScheduleStartWarm()
+        {
+            if(startWarmed||Demo||Program.TestProcess||Preferences.Current.NativeStartButton)return;
+            var app=System.Windows.Application.Current;
+            if(app==null)return;
+            startWarmed=true;
+            app.Dispatcher.BeginInvoke(new Action(()=>
+            {
+                try
+                {
+                    if(disposed||StartMenu!=null&&StartMenu.Loaded)return;
+                    var dock=docks.FirstOrDefault(d=>d.Screen.Primary)??docks.FirstOrDefault();
+                    if(dock==null)return;
+                    if(StartMenu==null)StartMenu=new StartWindow(this);
+                    var fit=StartMenuLayout.Fit(dock.Screen.Bounds,Native.WorkArea(dock.Screen),dock.Scale,620,dock.Edge);
+                    StartMenu.Configure(fit.Width,fit.Height);
+                    StartMenu.Reload();
+                    StartMenu.Prepare();
+                }
+                catch(Exception error){AppLog.Once("start-warm",error.GetType().Name);}
+            }),System.Windows.Threading.DispatcherPriority.ApplicationIdle);
         }
         internal void ToggleStart(DockHost dock)
         {

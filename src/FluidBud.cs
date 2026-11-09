@@ -1,33 +1,47 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Windows;
+using System.Windows.Documents;
 using System.Windows.Interop;
 using System.Windows.Media;
 
 namespace OneTaskBar
 {
-    // The Fluid UI's arrival, after the reference: a drop hangs from the bar's edge on a thin neck, widens into a pill
-    // and fills out into the panel while the neck pinches off. One spring, the same kind the Dynamic Island morphs
-    // with, drives the whole shape, so it keeps its speed if it is interrupted. The panel's real outline moves: the
-    // backdrop, the window and the picture all follow it, and nothing is scaled or squashed. The bar itself stays still.
-    // The window is stretched to the bar's edge for the length of the motion so the drop really starts in the bar.
+    // The Fluid UI's arrival, step by step after the reference recording:
+    //   1. a white drop forms on the bar's edge and swells into a glass drop, held to the bar by a thin neck;
+    //   2. the drop widens into an empty glass pill while the neck pinches off;
+    //   3. the pill grows to the size of the panel on the island's spring;
+    //   4. a soft white wavefront runs through the panel from the bar's side, and the picture comes in behind it.
+    // The panel's real outline moves: the backdrop, the window and the picture all follow it, nothing is scaled or
+    // squashed, and the bar stays still. The window is stretched to the bar's edge for the length of the motion so the
+    // drop really starts in the bar. Closing runs the outline back into the bar on a quick spring.
     internal sealed class FluidBud
     {
-        const double Orb=30;
+        const double Orb=30,Total=.72;
         readonly GlassWindow window;
         readonly SpringValue spring=new SpringValue(.002);
         readonly SpringClock clock=new SpringClock();
+        readonly Stopwatch watch=new Stopwatch();
         readonly RectangleGeometry body=new RectangleGeometry();
         readonly GeometryGroup outline=new GeometryGroup {FillRule=FillRule.Nonzero};
+        readonly LinearGradientBrush reveal=new LinearGradientBrush();
+        readonly GradientStop revealBehind=new GradientStop(Colors.Black,0),revealAhead=new GradientStop(Colors.Transparent,1);
+        FluidFlare flare;
+        UIElement masked;
         bool running,closing,hooked;
         double anchor,extra;
         bool fromTop,grown;
         Action finished;
         Native.RectI original;
         double fixedWidth,fixedHeight;
+        Rect lastCut;
+        bool roundedOnce;
         internal FluidBud(GlassWindow owner)
         {
             window=owner;
             outline.Children.Add(body);
+            reveal.GradientStops.Add(revealBehind);
+            reveal.GradientStops.Add(revealAhead);
         }
         internal bool Active {get{return running;}}
 
@@ -49,23 +63,55 @@ namespace OneTaskBar
             closing=close;
             finished=done;
             running=true;
-            // Opening is a lively spring that settles with a small overshoot; closing is quick and does not bounce.
-            spring.Omega=close?34:15;
-            spring.Damping=close?1:.84;
             roundedOnce=false;
-            spring.Value=close?1:0;
-            spring.Velocity=0;
-            spring.Target=close?0:1;
-            clock.Restart();
-            dwell.Reset();
-            emerge=1;
-            if(!close){emerge=0;dwell.Start();}
-            Apply(spring.Value);
+            // The picture is revealed along the direction the panel opens, away from the bar, measured over the whole panel
+            // rather than over the picture's own box, so a line of text near the far edge waits for the front to reach it.
+            reveal.MappingMode=BrushMappingMode.Absolute;
+            var inside=window.Surface.Child as FrameworkElement;
+            double offset=0,panel=grown?fixedHeight:window.Surface.ActualHeight;
+            if(inside!=null&&inside.IsLoaded)
+            {
+                try{offset=inside.TranslatePoint(new Point(0,0),window.Surface).Y;}
+                catch(InvalidOperationException){offset=0;}
+            }
+            reveal.StartPoint=new Point(0,fromTop?-offset:panel-offset);
+            reveal.EndPoint=new Point(0,fromTop?panel-offset:-offset);
+            if(close)
+            {
+                spring.Omega=34;
+                spring.Damping=1;
+                spring.Value=1;
+                spring.Velocity=0;
+                spring.Target=0;
+                clock.Restart();
+            }
+            else
+            {
+                AttachFlare();
+                watch.Restart();
+            }
+            Step(close?1:0);
             if(!hooked){hooked=true;CompositionTarget.Rendering+=Frame;}
         }
 
+        void AttachFlare()
+        {
+            var layer=AdornerLayer.GetAdornerLayer(window.Surface);
+            if(layer==null)return;
+            flare=new FluidFlare(window.Surface);
+            layer.Add(flare);
+        }
+        void DetachFlare()
+        {
+            if(flare==null)return;
+            var layer=AdornerLayer.GetAdornerLayer(window.Surface);
+            if(layer!=null)layer.Remove(flare);
+            flare=null;
+        }
+
         // The panel floats above the bar. For the drop to come out of the bar, the window is made as tall as the gap and
-        // the panel keeps its place; the gap is transparent and only the drop passes through it.
+        // the panel keeps its place, at a fixed size so its contents are not measured again; the gap is transparent and
+        // only the drop passes through it.
         void GrowToBar()
         {
             extra=0;grown=false;
@@ -79,7 +125,6 @@ namespace OneTaskBar
             extra=Math.Min(140,gap);
             int pixels=(int)Math.Round(extra*scale);
             original=rect;
-            // The panel keeps a fixed size while the window grows around it, so its contents are not measured again.
             var surface=window.Surface;
             fixedWidth=surface.ActualWidth;fixedHeight=surface.ActualHeight;
             surface.Width=fixedWidth;surface.Height=fixedHeight;
@@ -93,47 +138,41 @@ namespace OneTaskBar
         {
             if(!grown)return;
             grown=false;extra=0;
-            var restore=window.Surface;
-            restore.ClearValue(FrameworkElement.WidthProperty);restore.ClearValue(FrameworkElement.HeightProperty);
-            restore.VerticalAlignment=VerticalAlignment.Stretch;restore.HorizontalAlignment=HorizontalAlignment.Stretch;
+            var surface=window.Surface;
+            surface.ClearValue(FrameworkElement.WidthProperty);
+            surface.ClearValue(FrameworkElement.HeightProperty);
+            surface.VerticalAlignment=VerticalAlignment.Stretch;
+            surface.HorizontalAlignment=HorizontalAlignment.Stretch;
             var handle=new WindowInteropHelper(window).Handle;
             if(handle!=IntPtr.Zero)Native.SetWindowPos(handle,IntPtr.Zero,original.Left,original.Top,original.Right-original.Left,original.Bottom-original.Top,0x14);
         }
 
-        const double Dwell=.13;
-        double emerge=1;
-        readonly System.Diagnostics.Stopwatch dwell=new System.Diagnostics.Stopwatch();
         void Frame(object sender,EventArgs e)
         {
             var rendering=e as RenderingEventArgs;
             if(rendering==null)return;
-            if(dwell.IsRunning)
+            bool over;
+            if(closing)
             {
-                double u=dwell.Elapsed.TotalSeconds/Dwell;
-                if(u<1)
-                {
-                    emerge=u*u*(3-2*u);
-                    Apply(0);
-                    return;
-                }
-                dwell.Stop();
-                emerge=1;
-                clock.Restart();
+                spring.Step(clock.Next(rendering.RenderingTime));
+                over=spring.Value<=.02;
+                if(!over)Step(spring.Value);
             }
-            spring.Step(clock.Next(rendering.RenderingTime));
-            if(closing?spring.Value<=.02:spring.AtRest)
+            else
             {
-                var done=finished;
-                finished=null;
-                bool wasClosing=closing;
-                Stop();
-                // A closed window is restored after it is hidden; an open one lands on its exact shape.
-                if(!wasClosing)Restore();
-                if(done!=null)done();
-                if(wasClosing&&!running)Restore();
-                return;
+                double t=watch.Elapsed.TotalSeconds;
+                over=t>=Total;
+                if(!over)Step(t);
             }
-            Apply(spring.Value);
+            if(!over)return;
+            var done=finished;
+            bool wasClosing=closing;
+            finished=null;
+            Stop();
+            // A closed window is restored after it is hidden; an open one lands on its exact shape.
+            if(!wasClosing)Restore();
+            if(done!=null)done();
+            if(wasClosing&&!running)Restore();
         }
 
         static double Smooth(double a,double b,double x)
@@ -142,20 +181,42 @@ namespace OneTaskBar
             return t*t*(3-2*t);
         }
         static double Mix(double a,double b,double t){return a+(b-a)*t;}
+        // The island's spring over a span of time, settling a little past its target.
+        static double Spring(double start,double end,double t,double damping)
+        {
+            return SpringEase.Position(Math.Max(0,Math.Min(1,(t-start)/(end-start))),damping);
+        }
 
-        // The shape at spring position v (0 = a drop at the bar, 1 = the panel). It is built as if the bar were below the
-        // panel, with the bar at the bottom edge of the window; a window that opens downward is flipped afterwards.
-        void Apply(double v)
+        // One moment of the motion. Opening takes the time in seconds; closing takes the spring's position (1 = open).
+        void Step(double at)
+        {
+            if(closing)
+            {
+                Apply(at*1.18,at,1,0,0,-1,Math.Max(0,Math.Min(1,(at-.1)*2.2)));
+                return;
+            }
+            double drop=Smooth(0,.12,at);
+            double across=Spring(.1,.38,at,.86),down=Spring(.2,.6,at,.84);
+            double pinch=1-Smooth(.12,.3,at);
+            // White at first, clear glass once the drop has a shape of its own.
+            double white=Smooth(0,.04,at)*(1-Smooth(.1,.34,at));
+            double wave=at<.34?-1:Math.Min(1,(at-.34)/.34);
+            Apply(across,down,drop,pinch,white,wave,wave<0?0:1);
+        }
+
+        // The outline for the given amounts. It is built as if the bar were below the panel, with the bar at the bottom edge
+        // of the window; a window that opens downward is flipped afterwards.
+        void Apply(double across,double down,double formed,double pinch,double white,double wave,double content)
         {
             double width=grown?fixedWidth:window.Surface.ActualWidth,height=grown?fixedHeight:window.Surface.ActualHeight;
             if(width<2||height<2)return;
             double total=height+extra;
             double orb=Math.Min(Orb,Math.Min(width,height));
             double cx=Math.Max(orb/2,Math.Min(width-orb/2,anchor*width));
-            // The width leads, the height follows: a round drop, then a wide pill, then the panel.
-            double across=Math.Max(0,Math.Min(1.06,v*1.18)),down=Math.Max(0,Math.Min(1.06,v));
+            across=Math.Max(0,Math.Min(1.06,across));
+            down=Math.Max(0,Math.Min(1.06,down));
             // Before it widens the drop forms at the bar and is pulled up on its neck, so it reads as a drop first.
-            double formed=closing?1:emerge,size=orb*(.4+.6*formed),pull=orb*.4*formed*(1-Smooth(0,.45,v));
+            double size=orb*(.35+.65*formed),pull=orb*.4*formed*(1-Smooth(0,.45,Math.Max(across,down)));
             double dropTop=total-size*.88-pull;
             double left=Mix(cx-size/2,0,across),right=Mix(cx+size/2,width,across);
             double top=Mix(dropTop,0,down),bottom=Mix(dropTop+size,height,down);
@@ -165,9 +226,9 @@ namespace OneTaskBar
             double radius=Math.Min(window.Radius,Math.Min(shape.Width,shape.Height)/2);
             body.Rect=shape;
             body.RadiusX=body.RadiusY=radius;
+            var drawn=shape;
             Rect region=shape;
             // The neck holds the drop to the bar and pinches off as the drop swells.
-            double pinch=closing?0:1-Smooth(.08,.55,v);
             while(outline.Children.Count>1)outline.Children.RemoveAt(1);
             if(pinch>.04&&shape.Bottom<total-1)
             {
@@ -186,8 +247,7 @@ namespace OneTaskBar
                 outline.Children.Add(neck);
                 region=Rect.Union(region,new Rect(cx-baseHalf,y0,baseHalf*2,total-y0));
             }
-            // The picture shows once the pill is wide enough to hold it.
-            double content=closing?Math.Max(0,Math.Min(1,(v-.1)*2.2)):Smooth(.3,.8,v);
+            if(flare!=null)flare.Set(drawn,fromTop,height,wave,white,radius);
             if(fromTop)
             {
                 outline.Transform=new MatrixTransform(1,0,0,-1,0,total);
@@ -200,22 +260,46 @@ namespace OneTaskBar
             window.RegionClip=region;
             var host=window.Content as UIElement;
             if(host!=null)host.Clip=outline;
-            var inside=window.Surface.Child;
-            if(inside!=null)inside.Opacity=content;
+            ShowContent(wave,content);
             // Setting the window region is the costly part of a frame; it is only redone when the region moved a whole pixel.
             var cut=new Rect(Math.Round(region.X),Math.Round(region.Y),Math.Round(region.Width),Math.Round(region.Height));
             if(cut!=lastCut||!roundedOnce){lastCut=cut;roundedOnce=true;Native.Round(window,window.Radius);}
         }
-        Rect lastCut;bool roundedOnce;
+
+        // The picture comes in behind the wavefront: a soft mask follows the front, so what the front has passed is shown.
+        void ShowContent(double wave,double content)
+        {
+            var inside=window.Surface.Child;
+            if(inside==null)return;
+            if(closing||wave<0)
+            {
+                if(masked!=null){masked.OpacityMask=null;masked=null;}
+                inside.Opacity=closing?content:0;
+                return;
+            }
+            inside.Opacity=1;
+            if(wave>=1)
+            {
+                if(masked!=null){masked.OpacityMask=null;masked=null;}
+                return;
+            }
+            double front=wave*1.3-.02;
+            revealBehind.Offset=Math.Max(0,Math.Min(1,front-.28));
+            revealAhead.Offset=Math.Max(0,Math.Min(1,front));
+            if(masked==null){inside.OpacityMask=reveal;masked=inside;}
+        }
 
         void Stop()
         {
             if(hooked){hooked=false;CompositionTarget.Rendering-=Frame;}
             running=false;
+            watch.Stop();
         }
 
         void Restore()
         {
+            DetachFlare();
+            if(masked!=null){masked.OpacityMask=null;masked=null;}
             window.BackdropClip=null;
             window.RegionClip=null;
             var host=window.Content as UIElement;
@@ -229,7 +313,7 @@ namespace OneTaskBar
         // Stops wherever it is and puts the window back to its normal shape.
         internal void Cancel()
         {
-            bool was=running||hooked||window.RegionClip.HasValue||grown;
+            bool was=running||hooked||window.RegionClip.HasValue||grown||flare!=null;
             Stop();
             finished=null;
             if(was)Restore();

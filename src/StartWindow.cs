@@ -90,6 +90,15 @@ namespace OneTaskBar
         static Grid Heading(string text){var row=new Grid {Height=34,Margin=new Thickness(8,0,8,0)};var title=Paint.TextBlock(text,16,Paint.Text);title.FontWeight=FontWeights.SemiBold;row.Children.Add(title);return row;}
         void QueueSearch(){if(queued||Search.Text.Length==0)return;queued=true;Dispatcher.BeginInvoke(new Action(()=> {queued=false;if(!composing&&IsVisible&&!String.IsNullOrWhiteSpace(Search.Text))shell.ToggleSearch(null,Search.Text);}),System.Windows.Threading.DispatcherPriority.Background);}
         internal bool Loaded {get;private set;}
+        // Builds the window and lays out its tiles ahead of time, so the first open does not wait for them.
+        internal void Prepare()
+        {
+            new System.Windows.Interop.WindowInteropHelper(this).EnsureHandle();
+            var root=Content as UIElement;
+            if(root==null)return;
+            root.Measure(new Size(Width,Height));
+            root.Arrange(new Rect(0,0,Width,Height));
+        }
         internal void Reload()
         {
             Loaded=true;

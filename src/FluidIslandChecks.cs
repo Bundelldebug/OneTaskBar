@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
@@ -122,12 +122,14 @@ namespace OneTaskBar
                     panel.Pop();
                     Require(panel.BudActive,"a fluid panel opens as a drop from the bar");
                     int waited=0;
-                    foreach(int at in new[]{30,60,90,130,180})
+                    // Frames across the whole arrival, at the window's full height while it reaches down to the bar.
+                    foreach(int at in new[]{40,100,160,240,330,420,520,620})
                     {
                         await Task.Delay(at-waited);waited=at;
-                        Program.Save(panel.Content as FrameworkElement,320,220,Path.Combine(AppLog.Data,"fluid-bud-"+at+".png"));
+                        var frame=panel.Content as FrameworkElement;
+                        Program.Save(frame,320,Math.Max(220,(int)Math.Ceiling(frame.ActualHeight)),Path.Combine(AppLog.Data,"fluid-bud-"+at+".png"));
                     }
-                    await Task.Delay(500);
+                    await Task.Delay(380);
                     Require(!panel.BudActive&&!panel.BackdropClip.HasValue&&((FrameworkElement)panel.Content).Clip==null,"the drop ends as the plain panel");
                     Program.Save(panel.Content as FrameworkElement,320,220,Path.Combine(AppLog.Data,"fluid-panel-rest.png"));
                     panel.Hide();
