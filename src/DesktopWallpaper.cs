@@ -24,6 +24,31 @@ namespace OneTaskBar
         }
         [DllImport("user32.dll",CharSet=CharSet.Unicode)]
         static extern bool SystemParametersInfo(int action,int length,System.Text.StringBuilder result,int flags);
+        // The wallpaper file of one monitor and the desktop's background color, from the same source Explorer uses. This also
+        // follows a slideshow, Windows Spotlight and a per-monitor picture, where the classic setting is empty or stale.
+        internal static string CurrentFile(System.Drawing.Rectangle screen,out Color background)
+        {
+            string path=null;uint color=0;object instance=null;
+            try{
+                instance=Activator.CreateInstance(Type.GetTypeFromCLSID(new Guid("C2CF3110-460E-4FC1-B9D0-8A1C0C9CC4BD")));
+                var desktop=(IWallpaper)instance;uint count;desktop.GetMonitorDevicePathCount(out count);long best=-1;
+                for(uint n=0;n<count;n++){
+                    string id;Native.RectI bounds;desktop.GetMonitorDevicePathAt(n,out id);desktop.GetMonitorRECT(id,out bounds);
+                    long area=(long)Math.Max(0,Math.Min(screen.Right,bounds.Right)-Math.Max(screen.Left,bounds.Left))*Math.Max(0,Math.Min(screen.Bottom,bounds.Bottom)-Math.Max(screen.Top,bounds.Top));
+                    if(area<=best)continue;
+                    string file;desktop.GetWallpaper(id,out file);
+                    if(!String.IsNullOrWhiteSpace(file)){best=area;path=file;}
+                }
+                desktop.GetBackgroundColor(out color);
+            }catch(Exception error){AppLog.Once("wallpaper-file-query",error.GetType().Name);}
+            finally{if(instance!=null&&Marshal.IsComObject(instance))Marshal.ReleaseComObject(instance);}
+            if(String.IsNullOrWhiteSpace(path)){
+                var buffer=new System.Text.StringBuilder(32768);
+                if(SystemParametersInfo(0x73,buffer.Capacity,buffer,0))path=buffer.ToString();
+            }
+            background=Color.FromRgb((byte)color,(byte)(color>>8),(byte)(color>>16));
+            return path;
+        }
         internal sealed class Snapshot
         {
             internal Brush Brush;

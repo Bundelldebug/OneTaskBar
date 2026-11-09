@@ -30,12 +30,19 @@ namespace OneTaskBar
                 checkedAt=now;
                 try
                 {
-                    var buffer=new StringBuilder(32768);
-                    string path=SystemParametersInfo(0x73,buffer.Capacity,buffer,0)?buffer.ToString():null;
+                    Color background;
+                    var screen=System.Windows.Forms.Screen.PrimaryScreen;
+                    string path=DesktopWallpaper.CurrentFile(screen==null?new System.Drawing.Rectangle(0,0,1,1):screen.Bounds,out background);
+                    // Wallpaper Engine and similar tools keep their picture elsewhere.
+                    string engine=screen==null?null:WallpaperEngineSource.Current(screen.Bounds);
+                    if(engine!=null)path=engine;
                     if(String.IsNullOrWhiteSpace(path)||!Path.IsPathRooted(path)||path.StartsWith("\\\\",StringComparison.Ordinal)||!File.Exists(path))
                     {
-                        key="";
-                        current=Fallback;
+                        // A plain color desktop glows in that color.
+                        string plain="color|"+background.R+","+background.G+","+background.B;
+                        if(plain==key)return current;
+                        key=plain;
+                        current=Lift(background,false);
                         return current;
                     }
                     string stamp=path+"|"+File.GetLastWriteTimeUtc(path).Ticks;

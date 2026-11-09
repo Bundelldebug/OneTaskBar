@@ -32,10 +32,17 @@ namespace OneTaskBar
         }
         internal int ActionCount {get{return buttons.Children.Count;}}internal Button ActionButton(int index){return buttons.Children[index] as Button;}
         internal void Update(BudsInfo info){Info=info;name.Text=info.Name;detail.Text=info.Detail;detail.ToolTip=info.Detail;bool rich=info.RichImage&&info.Image!=null;product.Source=rich?null:info.Image;product.Visibility=product.Source==null?Visibility.Collapsed:Visibility.Visible;pictureColumn.Width=new GridLength(product.Source==null?0:74);hero.Source=rich?info.Image:null;hero.Visibility=heroHit.Visibility=rich?Visibility.Visible:Visibility.Collapsed;buttons.Children.Clear();foreach(var item in info.Actions.Take(5)){var action=item;var label=Paint.TextBlock(action.Label,12,Paint.OnLight);label.TextTrimming=TextTrimming.CharacterEllipsis;label.TextAlignment=TextAlignment.Center;var button=Paint.Button(label,()=>invoke(action),action.Label);button.Background=Paint.ControlWhite;button.Margin=new Thickness(3,2,3,2);button.Padding=new Thickness(7);buttons.Children.Add(button);}buttons.Columns=Math.Max(1,Math.Min(3,buttons.Children.Count));buttons.Height=37*Math.Ceiling(buttons.Children.Count/3.0);buttons.Visibility=buttons.Children.Count==0?Visibility.Collapsed:Visibility.Visible;Expires=DateTime.UtcNow.AddSeconds(7);}
-        internal static Rect Anchor(System.Drawing.Rectangle screen,System.Drawing.Rectangle work,double scale,double width,double height){return new Rect((work.Right-screen.Left)/scale-width-12,(work.Bottom-screen.Top)/scale-height-12,width,height);}
+        // Centred at the bottom of the work area, like Galaxy Connect's phone notices; a floating dock lifts it clear (dockTop is in screen pixels).
+        internal static Rect Anchor(System.Drawing.Rectangle screen,System.Drawing.Rectangle work,double scale,double width,double height,double? dockTop=null)
+        {
+            double bottom=(work.Bottom-screen.Top)/scale-14;
+            if(dockTop.HasValue)bottom=Math.Min(bottom,(dockTop.Value-screen.Top)/scale-10);
+            return new Rect((screen.Width/scale-width)/2,bottom-height,width,height);
+        }
+        internal Func<Forms.Screen,double?> DockTop;
         internal void Position()
         {
-            var screen=IsVisible?Forms.Screen.FromRectangle(monitor):Forms.Screen.FromHandle(Native.GetForegroundWindow());monitor=screen.Bounds;double scale=ShellController.MonitorScale(screen,this),width=Math.Min(356,screen.WorkingArea.Width/scale-24),height=(product.Source!=null?94:82)+(ActionCount>0?buttons.Height+12:0);if(hero.Source!=null){var bitmap=hero.Source as System.Windows.Media.Imaging.BitmapSource;hero.Height=Math.Min(180,Math.Max(76,(width-44)*(bitmap!=null?(double)bitmap.PixelHeight/bitmap.PixelWidth:.5)));height+=hero.Height+12;}bounds=Anchor(screen.Bounds,screen.WorkingArea,scale,width,height);
+            var screen=IsVisible?Forms.Screen.FromRectangle(monitor):Forms.Screen.FromHandle(Native.GetForegroundWindow());monitor=screen.Bounds;double scale=ShellController.MonitorScale(screen,this),width=Math.Min(356,screen.WorkingArea.Width/scale-24),height=(product.Source!=null?94:82)+(ActionCount>0?buttons.Height+12:0);if(hero.Source!=null){var bitmap=hero.Source as System.Windows.Media.Imaging.BitmapSource;hero.Height=Math.Min(180,Math.Max(76,(width-44)*(bitmap!=null?(double)bitmap.PixelHeight/bitmap.PixelWidth:.5)));height+=hero.Height+12;}bounds=Anchor(screen.Bounds,screen.WorkingArea,scale,width,height,DockTop==null?null:DockTop(screen));
             if(!IsVisible){Native.BlurOpacity(this,0);ShowAt(monitor,bounds.X,bounds.Y,bounds.Width,bounds.Height);}Place();
         }
         internal void Appear(){Animate(1);}

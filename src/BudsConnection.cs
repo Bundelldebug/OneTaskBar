@@ -141,8 +141,15 @@ namespace OneTaskBar
                 if(shell.IslandNotification(entry,e=>{if(source!=null)Task.Run(()=>NotificationActivation.Open(source,false));else shell.ShowDetail("bluetooth");})){lastName=name;lastShown=DateTime.UtcNow;return;}
             }
             bool same=Popup!=null&&(BudsConnectionTracker.Normalize(Popup.Info.Name)==name||info.Container.HasValue&&Popup.Info.Container==info.Container);if(same&&Popup.Info.Notification!=null&&info.Notification==null){Popup.Expires=DateTime.UtcNow.AddSeconds(7);return;}if(Popup!=null&&!same)Hide(false);
-            bool fresh=Popup==null;if(fresh){Popup=new BudsConnectionPopup(Open,()=>Hide(true),OpenAction);Shown++;}Popup.Update(info);lastName=name;lastShown=DateTime.UtcNow;
+            bool fresh=Popup==null;if(fresh){Popup=new BudsConnectionPopup(Open,()=>Hide(true),OpenAction){DockTop=DockTopFor};Shown++;}Popup.Update(info);lastName=name;lastShown=DateTime.UtcNow;
             Popup.Position();if(fresh)Popup.Appear();expiry.Start();
+        }
+        // The dock floats over the work area, so the popup rises from just above it when the dock sits at the bottom.
+        double? DockTopFor(System.Windows.Forms.Screen screen)
+        {
+            var dock=shell.DockFor(screen);Native.RectI apps;
+            if(dock!=null&&dock.Apps.IsVisible&&Native.GetWindowRect(new System.Windows.Interop.WindowInteropHelper(dock.Apps).Handle,out apps)&&apps.Top>screen.Bounds.Top+screen.Bounds.Height/2)return apps.Top;
+            return null;
         }
         async void Open()
         {

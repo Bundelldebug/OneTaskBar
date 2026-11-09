@@ -52,7 +52,7 @@ namespace OneTaskBar
         // Screenshot and screen-recording tools put a borderless, topmost, screen-sized selection layer over the
         // monitor. That layer is not an app, and counting it as fullscreen hid the dock exactly when the capture was
         // taken. Names are matched without the extension; the answer is kept per process.
-        static readonly string[] captureTools={"sharex","snippingtool","screenclippinghost","screensketch","greenshot","lightshot","flameshot","snagit32","snagiteditor","gyazo","gyazowin","picpick","screenpresso","faststone capture","fscapture"};
+        static readonly string[] captureTools={"sharex","snippingtool","screenclippinghost","screensketch","greenshot","lightshot","flameshot","snagit32","snagiteditor","gyazo","gyazowin","picpick","screenpresso","faststone capture","fscapture","aiselect","smartselect"};
         static readonly Dictionary<uint,bool> captureByProcess=new Dictionary<uint,bool>();
         internal static bool IsCaptureTool(string processName)
         {

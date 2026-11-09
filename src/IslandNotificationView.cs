@@ -64,6 +64,10 @@ namespace OneTaskBar
             Entry=entry;
             icon.Source=entry==null?null:entry.Icon;
             icon.Visibility=icon.Source==null?Visibility.Collapsed:Visibility.Visible;
+            // A wide product picture (the buds case) keeps its shape instead of shrinking to a 36 px square.
+            var picture=icon.Source as System.Windows.Media.Imaging.BitmapSource;
+            bool wide=picture!=null&&picture.PixelHeight>0&&(double)picture.PixelWidth/picture.PixelHeight>1.35;
+            icon.Width=wide?Math.Min(88,40*(double)picture.PixelWidth/picture.PixelHeight):36;icon.Height=wide?40:36;
             app.Text=entry==null?"":entry.App??"";
             title.Text=entry==null?"":entry.Title??"알림";
             text.Text=entry==null?"":entry.Body??"";

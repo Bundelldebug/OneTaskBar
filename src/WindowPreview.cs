@@ -48,7 +48,9 @@ namespace OneTaskBar
                 var close=Paint.Button(new Glyph("close",12),()=>CloseSource(source),"이 창 닫기");close.Width=close.Height=24;close.Padding=new Thickness(5);close.HorizontalAlignment=HorizontalAlignment.Right;close.Background=Brushes.Transparent;row.Children.Add(close);
                 var image=new Border {Background=Paint.Brush("#FF383D3A"),Margin=new Thickness(4),CornerRadius=new CornerRadius(8),Child=AppIcons.Visual(app,38)};var button=Paint.Button(image,()=>Open(source),title.Text);button.Padding=new Thickness(0);button.Background=Brushes.Transparent;button.HorizontalContentAlignment=HorizontalAlignment.Stretch;button.VerticalContentAlignment=VerticalAlignment.Stretch;Grid.SetRow(button,1);row.Children.Add(button);tiles.Children.Add(row);previews.Add(new Preview {Source=source,Image=image,Open=button});
             }
-            Width=24+Math.Max(1,previews.Count)*(tileWidth+8);if(IsVisible){UpdateLayout();Attach();}
+            // With several pages the width stays that of a full page: a shorter last page would shrink the popup out from
+            // under the pointer on the arrow and close it before the fourth window could be picked.
+            Width=24+(pages>1?pageSize:Math.Max(1,previews.Count))*(tileWidth+8);if(IsVisible){UpdateLayout();Attach();}
         }
         void Attach(){if(closed)return;var target=new WindowInteropHelper(this).Handle;if(target==IntPtr.Zero)return;foreach(var preview in previews)if(preview.Thumbnail==IntPtr.Zero&&DwmRegisterThumbnail(target,preview.Source,out preview.Thumbnail)==0)preview.Image.Child=null;UpdateLayout();UpdateThumbnails();}
         void UpdateThumbnails()

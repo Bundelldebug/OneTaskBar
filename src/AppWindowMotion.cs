@@ -244,7 +244,9 @@ namespace OneTaskBar
         internal bool IsClosed {get;private set;}
         // Frames drawn uncloaked, across all runs; live-state reports it so a real session shows the drop was on screen.
         internal static int Frames;
-        const double OpenTime=.5,CloseTime=.44,RiseTime=.26,ArriveTime=.36,HoldLimit=2.6;
+        // The close matches the system's own minimize, which shrinks the real window in about a quarter of a second; the
+        // longer drop left the glass shrinking after the window had gone.
+        const double OpenTime=.5,CloseTime=.2,RiseTime=.26,ArriveTime=.36,HoldLimit=2.6;
 
         internal AppGhost()
         {

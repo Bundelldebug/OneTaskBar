@@ -124,6 +124,12 @@ namespace OneTaskBar
             if(item==null)return false;
             string id=item.AppId??"",app=item.App??"";
             if(id.IndexOf("SamsungContinuityService",StringComparison.OrdinalIgnoreCase)>=0||app=="갤럭시 커넥트"||String.Equals(app,"Galaxy Connect",StringComparison.OrdinalIgnoreCase))return true;
+            // Storage sharing and camera sharing from the phone arrive from other Samsung packages but belong in the same place.
+            if(id.IndexOf("SAMSUNGELECTRONICS",StringComparison.OrdinalIgnoreCase)>=0||app.IndexOf("Samsung",StringComparison.OrdinalIgnoreCase)>=0||app.IndexOf("삼성",StringComparison.Ordinal)>=0||app.IndexOf("갤럭시",StringComparison.Ordinal)>=0)
+            {
+                string text=(item.Title??"")+" "+(item.Body??"");
+                if(text.IndexOf("저장공간",StringComparison.Ordinal)>=0||text.IndexOf("카메라 공유",StringComparison.Ordinal)>=0||text.IndexOf("카메라를 공유",StringComparison.Ordinal)>=0||text.IndexOf("Storage sharing",StringComparison.OrdinalIgnoreCase)>=0||text.IndexOf("Camera sharing",StringComparison.OrdinalIgnoreCase)>=0||text.IndexOf("Share storage",StringComparison.OrdinalIgnoreCase)>=0||text.IndexOf("Share camera",StringComparison.OrdinalIgnoreCase)>=0)return true;
+            }
             // Only Samsung Internet's helper reports through the same small bottom popup. The browser's own notifications use the normal path.
             return id.IndexOf("SamsungAccountPluginforSa",StringComparison.OrdinalIgnoreCase)>=0||app.IndexOf("Browser Helper",StringComparison.OrdinalIgnoreCase)>=0||id.IndexOf("SamsungBrowserHelper",StringComparison.OrdinalIgnoreCase)>=0;
         }

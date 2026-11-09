@@ -43,6 +43,17 @@ Updated 2026-11-09 19:10 KST by Claude Code.
 - `Test-UI -Area Media` passed; real device: opening by `--open-panel media-screen` now takes focus and Esc closes it.
 - Not tested: corner-app click, media-pill click, X button, fullscreen interplay with browser F11, caption marquee edge fade (hard cut, left as is). Nothing published.
 
+### Eight-item request 2026-11-09 night (Claude Code)
+
+- Issue 18 (dock hover preview closed on the arrow when a later page had fewer tiles): popup keeps the full-page width when there are several pages (`WindowPreview.Rebuild`).
+- Buds connection popup now appears bottom-centre above a bottom dock (`BudsConnectionPopup.Anchor`, `BudsConnections.DockTopFor`); island buds notice shows a wide product picture at its own aspect (`IslandNotificationView.Present`).
+- Storage-share and camera-share notices from Samsung packages are routed to the Galaxy Connect bottom popup by title/body text (`NotificationBanners.IsGalaxyConnect`). The real AppIds were not observed (the notification database is locked), so this matches text, not ids.
+- Fluid "배경에 맞춤": `FluidAutoGlow` now reads the wallpaper through `DesktopWallpaper.CurrentFile` (IDesktopWallpaper: slideshow, Spotlight, per-monitor) plus Wallpaper Engine and a plain-colour desktop; the old code used only the classic setting. Not reproduced on another PC.
+- AI Select (`AISelect.exe`) and `smartselect` added to the capture tools that must not count as fullscreen (`FullscreenVisibility.captureTools`). Not triggered on the device.
+- Dock app minimize ghost: `CloseTime` .44 → .2 s. 120 Hz recording `min11`/`min12`: the real window shrinks in about 0.1 s and the ghost used to outlast it by 0.5 s; it still starts about 0.08 s after the window does (event latency).
+- Liquid Glass: shared card film and edge rim reworked (clear body, top specular sheen, glow lens at the bottom, soft opposite-corner catch light) in `Glass95.cs`, following the plugin `liquid-glass` skill's principles (it is SwiftUI-specific, so only principles apply). Dock, quick panel and other Fluid brushes (`Fluid.Tint`, `Fluid.Rim`) were left alone.
+- `Test-UI` Glass, Notifications, Media, Dock, Quick: no failures. Installed to this PC. Nothing published.
+
 ## Checkout and publication
 
 Main checkout: `One TaskBar/` under the shared `Documents/Codex` workspace.

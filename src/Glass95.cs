@@ -44,11 +44,14 @@ namespace OneTaskBar
         // Cards in the Fluid UI catch the key light at the upper left and take a little warm light at the bottom.
         static Brush FluidFilm()
         {
+            // Clear glass body: a bright specular sheen hugging the top edge, nothing through the middle so the backdrop stays
+            // legible, and the glow gathering as a lens at the bottom where the light leaves the glass.
             var film=new LinearGradientBrush {StartPoint=new Point(.05,0),EndPoint=new Point(.55,1)};
-            film.GradientStops.Add(new GradientStop(Color.FromArgb(40,255,255,255),0));
-            film.GradientStops.Add(new GradientStop(Color.FromArgb(10,255,255,255),.26));
-            film.GradientStops.Add(new GradientStop(Color.FromArgb(0,255,255,255),.6));
-            film.GradientStops.Add(new GradientStop(Fluid.Glow(34),1));
+            film.GradientStops.Add(new GradientStop(Color.FromArgb(58,255,255,255),0));
+            film.GradientStops.Add(new GradientStop(Color.FromArgb(14,255,255,255),.12));
+            film.GradientStops.Add(new GradientStop(Color.FromArgb(0,255,255,255),.46));
+            film.GradientStops.Add(new GradientStop(Fluid.Glow(22),.84));
+            film.GradientStops.Add(new GradientStop(Fluid.Glow(44),1));
             film.Freeze();return film;
         }
         static Brush Film(bool dark)
@@ -70,7 +73,9 @@ namespace OneTaskBar
             // The Fluid UI's rim is lilac in the middle and picks up a warm light at the far corner.
             bool warm=fluid??Fluid.Enabled;
             edge.GradientStops.Add(new GradientStop(warm?Color.FromArgb(isDark?(byte)30:(byte)50,214,200,255):Color.FromArgb(isDark?(byte)24:(byte)45,221,232,249),.45));
-            edge.GradientStops.Add(new GradientStop(warm?Fluid.Pale(isDark?70:90):Color.FromArgb(isDark?(byte)28:(byte)58,119,140,170),1));if(freeze)edge.Freeze();return edge;
+            // Liquid glass catches light on the edge facing the key light and again, softer, on the opposite corner.
+            if(warm)edge.GradientStops.Add(new GradientStop(Fluid.Pale(isDark?58:78),.8));
+            edge.GradientStops.Add(new GradientStop(warm?Color.FromArgb(isDark?(byte)110:(byte)130,255,255,255):Color.FromArgb(isDark?(byte)28:(byte)58,119,140,170),1));if(freeze)edge.Freeze();return edge;
         }
         internal static void DockInk(DependencyObject root,Brush ink=null)
         {
