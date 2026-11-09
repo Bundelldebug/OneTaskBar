@@ -65,6 +65,13 @@ namespace OneTaskBar
                 shell.AppScreen.ApplyWindowsFolders(shell.Apps,v);
                 if(shell.Drawer!=null)shell.Drawer.RefreshApps();
             });
+            Row(launcher,"앱 자동 폴더 정리","앱 화면에서 브라우저·게임·미디어처럼 비슷한 앱을 큰 폴더로 자동으로 묶습니다",Preferences.Current.AutoFolderApps,v=>
+            {
+                Preferences.Set(p=>p.AutoFolderApps=v);
+                shell.AppScreen.Reconcile(shell.Apps);
+                shell.AppScreen.ApplyAutoFolders(shell.Apps,v);
+                if(shell.Drawer!=null)shell.Drawer.RefreshApps();
+            });
             MaterialSetting(launcher,false);
             Group(groups,"시작과 검색",launcher);
             var hardware=new StackPanel();

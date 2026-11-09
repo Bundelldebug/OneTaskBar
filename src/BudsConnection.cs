@@ -66,7 +66,7 @@ namespace OneTaskBar
         readonly ShellController shell;readonly Dispatcher dispatcher;readonly BudsConnectionTracker tracker=new BudsConnectionTracker();
         readonly Dictionary<string,DeviceInformation> devices=new Dictionary<string,DeviceInformation>(StringComparer.Ordinal);
         readonly DispatcherTimer expiry=new DispatcherTimer {Interval=TimeSpan.FromMilliseconds(500)};
-        DeviceWatcher watcher;bool baseline,disposed;int generation;DateTime retryAfter,lastShown;string lastName;
+        DeviceWatcher watcher;bool baseline,disposed;int generation;DateTime retryAfter,lastShown;string lastName;bool lastNative;
         internal BudsConnectionPopup Popup {get;private set;}
         internal int Shown {get;private set;}internal bool Watching {get{return watcher!=null;}}internal bool TimerActive {get{return expiry.IsEnabled;}}
         internal bool Enabled {get{return !disposed&&shell.Desktop&&shell.DisplayAwake&&Preferences.Current.NotificationPopups&&Preferences.Current.BudsConnectionPopups;}}
@@ -132,7 +132,12 @@ namespace OneTaskBar
         internal void Show(BudsInfo info,bool connection=false)
         {
             if(disposed||info==null)return;string name=BudsConnectionTracker.Normalize(info.Name);
-            if(Popup==null&&!connection&&name==lastName&&(DateTime.UtcNow-lastShown).TotalSeconds<15)return;
+            bool native=info.Notification!=null;
+            // The notice with the battery of each earbud and the case (Samsung's own) outranks the plain "connected" one:
+            // it replaces that one if it comes second, and the plain one is dropped if it comes second.
+            if(connection&&!native&&lastNative&&name==lastName&&(DateTime.UtcNow-lastShown).TotalSeconds<30)return;
+            if(Popup==null&&!connection&&name==lastName&&lastNative&&(DateTime.UtcNow-lastShown).TotalSeconds<15)return;
+            if(native)lastNative=true;else if(name!=lastName||(DateTime.UtcNow-lastShown).TotalSeconds>=30)lastNative=false;
             // With the Dynamic Island on, the connection notice drops out of it like any other notification.
             if(Popup==null&&!shell.Demo)
             {

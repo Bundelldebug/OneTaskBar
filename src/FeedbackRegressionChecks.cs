@@ -62,6 +62,18 @@ namespace OneTaskBar
             Require(folders.FolderCount==1&&folders.Resolve(apps).Select(a=>a.Key).Distinct().Count()==apps.Count,"Disabling automatic folders changed manual folders or lost apps");
             checks.Add("Windows app folders persist, preserve manual folders and every app, and avoid unchanged writes");
 
+            var kinds=new List<AppEntry>();
+            foreach(var name in new[]{"Chrome","Firefox","Microsoft Edge","Steam","Notepad"})kinds.Add(new AppEntry {Name=name,AppID="kind-"+name});
+            var kindStore=new StartPinStore(Path.Combine(directory,"kinds.json"),4096);
+            kindStore.Replace(kinds);
+            Require(kindStore.ApplyAutoFolders(kinds,true),"Automatic folders were not created");
+            var kindTiles=kindStore.Tiles(kinds);
+            Require(kindTiles.Any(t=>t.Folder&&t.Name=="브라우저"&&t.Children.Count==3)&&kindTiles.Count(t=>t.Folder)==1,"Browsers were not gathered into one folder (kinds with under three apps stay loose)");
+            Require(!kindStore.ApplyAutoFolders(kinds,true),"Unchanged automatic folders were written again");
+            kindStore.ApplyAutoFolders(kinds,false);
+            Require(kindStore.FolderCount==0&&kindStore.Resolve(kinds).Count==kinds.Count,"Turning automatic folders off lost apps or kept folders");
+            checks.Add("Automatic app folders gather three or more alike, leave the rest, and dissolve cleanly");
+
             var chrome=new AppEntry {Name="Chrome",AppID=@"C:\Apps\chrome.exe",Executable=@"C:\Apps\chrome.exe"};
             var first=new AppEntry {Name="Profile 1",AppID="Chrome.profile-one",Executable=chrome.Executable};
             var second=new AppEntry {Name="Profile 2",AppID="Chrome.profile-two",Executable=chrome.Executable};

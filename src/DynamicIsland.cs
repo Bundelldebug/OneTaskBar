@@ -406,7 +406,10 @@ namespace OneTaskBar
             search.Reset();
             outsideClick=MenuDismiss.Watch(ContainsScreenPoint,CloseSearch);
             RefreshPresentation();
-            Activate();search.Focus();
+            Activate();
+            // The foreground lock can refuse a plain Activate, which leaves the arrow keys and Enter with nobody to hear them.
+            if(!IsActive)Native.Activate(handle);
+            search.Focus();
             return true;
         }
         internal bool Searching {get{return state.Searching;}}

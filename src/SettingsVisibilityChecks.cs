@@ -47,6 +47,9 @@ namespace OneTaskBar
                     if(Preferences.Current.DynamicIsland||!Preferences.Current.TopStatusBar||Preferences.Current.LiquidGlass||Preferences.Current.Blur||!Preferences.Current.ShowNowBar||Preferences.Current.DuoStatusIcon)throw new InvalidOperationException("Leaving the Mac style does not restore liquid glass, blur and the Now Bar");
                     window.ChooseDesktopStyle(1);window.ChooseDesktopStyle(0);
                     if(Preferences.Current.DynamicIsland||Preferences.Current.TopStatusBar||Preferences.Current.LiquidGlass||!Preferences.Current.ShowNowBar)throw new InvalidOperationException("Windows style does not return the earlier settings");
+                    if(WelcomeWindow.CurrentDesktopStyle()!=0)throw new InvalidOperationException("Windows preset is not recognised after choosing it");
+                    Preferences.Set(p=>p.DuoStatusIcon=true);
+                    if(WelcomeWindow.CurrentDesktopStyle()!=WelcomeWindow.CustomStyle)throw new InvalidOperationException("Changing one option on its own must leave the custom desktop chosen");
                 }
                 finally{Preferences.Set(p=>{p.LiquidGlass=keepGlass;p.Blur=keepBlur;p.ShowNowBar=keepNowBar;p.DynamicIsland=keepIsland;p.TopStatusBar=keepTop;p.DuoStatusIcon=keepDuo;p.DesktopStyleBackup=keepBackup;});}
                 await Task.Delay(300);

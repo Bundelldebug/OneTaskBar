@@ -70,10 +70,16 @@ namespace OneTaskBar
             captureByProcess[pid]=known;
             return known;
         }
+        // The capture layer the owner is working in right now, if any: it is not a fullscreen app, but the bar must not
+        // float over it.
+        internal static IntPtr CaptureLayer {get;private set;}
+        internal static System.Drawing.Rectangle CaptureLayerMonitor {get;private set;}
         internal static List<FullscreenCandidate> Capture()
         {
             var result = new List<FullscreenCandidate>();
             uint own = (uint)Process.GetCurrentProcess().Id;
+            IntPtr layer=IntPtr.Zero;System.Drawing.Rectangle layerMonitor=new System.Drawing.Rectangle();
+            uint frontPid;Native.GetWindowThreadProcessId(Native.GetForegroundWindow(),out frontPid);
             Native.EnumWindows((window, state) =>
             {
                 uint pid;
@@ -86,11 +92,15 @@ namespace OneTaskBar
                 var candidate = Inspect(window, media);
                 // Only a window that would count as fullscreen is worth looking up.
                 if (candidate != null && !media && (ClientCovers(candidate.Client, candidate.Monitor) || Native.CoversMonitor(candidate.Bounds, candidate.Monitor, candidate.Maximized, candidate.Framed)) && CaptureToolProcess(pid))
+                {
+                    if(pid==frontPid&&layer==IntPtr.Zero){layer=window;layerMonitor=candidate.Monitor;}
                     return true;
+                }
                 if (candidate != null)
                     result.Add(candidate);
                 return true;
             }, IntPtr.Zero);
+            CaptureLayer=layer;CaptureLayerMonitor=layerMonitor;
             return result;
         }
         internal static FullscreenCandidate Inspect(IntPtr window)

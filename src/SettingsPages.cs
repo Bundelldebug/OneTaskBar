@@ -130,8 +130,9 @@ namespace OneTaskBar
             for(int start=0;start<sections.Count;start+=3){var category=new Category {Rows=new StackPanel(),Sections=sections.Skip(start).Take(3).ToArray()};category.Card=SettingsCard(category.Rows,false);categories.Add(category);groups.Children.Add(category.Card);}
             emptySettings=Paint.TextBlock("검색 결과가 없습니다",16,AppSettingsPalette.Muted);emptySettings.Margin=new Thickness(15,20,15,20);emptySettings.HorizontalAlignment=HorizontalAlignment.Center;emptySettings.Visibility=Visibility.Collapsed;groups.Children.Add(emptySettings);
             settingsExit=SettingsExitRow();groups.Children.Add(settingsExit);
-            // The categories come first; the UI version choice sits under them.
-            foreach(var element in versionElements){groups.Children.Remove(element);groups.Children.Add(element);}
+            // The UI version choice leads the list, above the categories.
+            int versionAt=0;
+            foreach(var element in versionElements){groups.Children.Remove(element);groups.Children.Insert(versionAt++,element);}
             pageMotion=new SettingsPageMotion(settingsScroll);
             // The category list stays on the left; the chosen page fills the right.
             var body=new Grid();body.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(300)});body.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(22)});body.ColumnDefinitions.Add(new ColumnDefinition());

@@ -136,3 +136,17 @@ Replace this snapshot when work changes; do not append an ever-growing chat tran
 Record the owner's active request (or stopped state), agent/branch/base commit, changed files, completed and unfinished work, and the next concrete step.
 For validation, identify commands actually run, result/report paths, source commit and binary hash when known. Record installation and publication separately, with their own evidence.
 Keep durable rules in [AGENTS.md](../AGENTS.md) and navigation in [DEBUGGING.md](DEBUGGING.md). Both agents should update the same record.
+
+### Eleven-item request 2026-11-09 night, second batch (Claude Code)
+
+- Buds connect: the volume bar is suppressed for 2.5 s after the default output changes (`Shell.cs`); the Samsung battery/case notice replaces the plain connection notice and wins within 30 s (`BudsConnection.cs`). Not tested with real buds.
+- UI version moved to the top of settings. Fresh installs start on Fluid (or 95/90 where unavailable); skipped when `ONE_TASKBAR_DATA` is set so fixtures keep the old default.
+- AI Select / capture overlays: dock windows are sunk just below a covering capture-tool window and raised again afterwards (`DockHost.SinkBelow/RiseAgain`, `FullscreenVisibility.CaptureLayer`). Not triggered on the device; island/top bar are not sunk.
+- Island search also lists up to two files (debounced); arrows/Enter work; window takes focus (`IslandSearchView.cs`, `DynamicIsland.ToggleSearch`).
+- Desktop styles are presets: custom desktop first, Windows, Mac, GoogleBook (`SettingsDesktopStyle.cs`).
+- Quick settings sound page has a button to a separate per-app volume page (icon = mute, slider = level), `AppVolumes.cs`; verified on the device.
+- Desktop switcher animation: spring placement and longer chrome travel in Fluid (`DesktopOverview.cs`); not watched on the device.
+- Automatic app folders (off by default, setting "앱 자동 폴더 정리"): `StartAutoFolders.cs`, 3x3 folder icon in `StartWindow.LargeFolderIcon`; kinds with fewer than 3 apps stay loose; keyword matching by name only. Unit-checked, not seen on the device.
+- Item 4 (Fluid polish): only the desktop switcher and earlier Glass95 work; no broad restyle was done.
+- `Test-UI` Quick, Settings, Launcher, Notifications, Media, Dock, Glass, Startup, Resources passed. Installed with `Apply-ToPC.ps1`. Idle measure of the installed build: CPU 0.045 %, working set 378 MiB (private 234 MiB), report in `.qa-data/runtime-7d2b66c5…json`. Nothing published.
+- One stray click earlier opened a release-notes file pane in the Claude app (harmless).

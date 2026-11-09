@@ -174,8 +174,16 @@ namespace OneTaskBar
         internal void OpenPinFolder(string key){if(!pinned.Any(p=>p.Folder&&p.Key==key))return;openFolder=key;pinPage=0;RenderPins();LauncherMotion.Page(bodyScroll);}
         internal void ClosePinFolder(){CommitFolderName();openFolder=null;pinPage=0;RenderPins();}
         void CommitFolderName(){if(renaming||openFolder==null)return;renaming=true;try{if(shell.StartPins.Rename(openFolder,folderName.Text))pinned=shell.StartPins.Tiles(shell.Apps);var tile=pinned.FirstOrDefault(p=>p.Key==openFolder);if(tile!=null)folderName.Text=tile.Name;}finally{renaming=false;}}
+        // The app screen's automatic folders are larger and show nine apps at once, like a phone's app library.
+        internal static FrameworkElement LargeFolderIcon(StartTile tile)
+        {
+            var icons=new UniformGrid {Columns=3,Rows=3,Width=54,Height=54,UseLayoutRounding=true};
+            foreach(var app in tile.Children.Take(9)){var icon=AppIcons.Visual(app.App,16);icon.Margin=new Thickness(1);icon.HorizontalAlignment=HorizontalAlignment.Center;icon.VerticalAlignment=VerticalAlignment.Center;icons.Children.Add(icon);}
+            return new Border {Width=64,Height=64,Padding=new Thickness(5),CornerRadius=new CornerRadius(16),Background=Paint.Brush("#32FFFFFF"),UseLayoutRounding=true,Child=icons};
+        }
         internal static FrameworkElement FolderIcon(StartTile tile)
         {
+            if(tile.Key!=null&&tile.Key.StartsWith(AppCategories.KeyPrefix,StringComparison.Ordinal))return LargeFolderIcon(tile);
             var icons=new UniformGrid {Columns=2,Rows=2,Width=32,Height=32,UseLayoutRounding=true};foreach(var app in tile.Children.Take(4)){var icon=AppIcons.Visual(app.App,13);icon.Margin=new Thickness(1);icon.HorizontalAlignment=HorizontalAlignment.Center;icon.VerticalAlignment=VerticalAlignment.Center;icons.Children.Add(icon);}return new Border {Width=40,Height=40,Padding=new Thickness(4),CornerRadius=new CornerRadius(11),Background=Paint.Brush("#32FFFFFF"),UseLayoutRounding=true,Child=icons};
         }
         ContextMenu PinMenu(StartTile tile)

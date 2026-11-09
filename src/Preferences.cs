@@ -44,6 +44,7 @@ namespace OneTaskBar
         public bool NativeStartKey=true,NativeSearch=false;
         public bool NativeStartButton=false;
         public bool GroupAppsByStartMenu=false;
+        public bool AutoFolderApps=false;
         public bool SquircleIcons=false;
         public bool MaximizedBehindDock=false;
         public bool NativeAltTab=false;
@@ -98,7 +99,9 @@ namespace OneTaskBar
         internal static event Action DesktopWidgetsChanged;
         internal static event Action WidgetMaterialChanged;
         internal static PreferenceData Normalize(PreferenceData value){if(!ReleaseFeatures.GlassUI&&value.UIVersion>=95)value.UIVersion=90;value.UITheme=Math.Max(0,Math.Min(2,value.UITheme));value.DockTheme=Math.Max(0,Math.Min(2,value.DockTheme));value.DockScalePercent=DockSizing.Clamp(value.DockScalePercent);value.FullscreenClockPercent=Math.Max(50,Math.Min(200,value.FullscreenClockPercent));value.WidgetOpacity=Math.Max(10,Math.Min(100,value.WidgetOpacity));value.WidgetBlur=Math.Max(0,Math.Min(40,value.WidgetBlur));value.TrayPanelPercent=TrayPanelSizing.Clamp(value.TrayPanelPercent);SurfaceMaterial.Normalize(value);return value;}
-        static PreferenceData Load(){try{if(File.Exists(file))return Normalize(new JavaScriptSerializer().Deserialize<PreferenceData>(File.ReadAllText(file))??new PreferenceData());}catch(Exception e){AppLog.Once("settings-read",e.Message);}return Normalize(new PreferenceData());}
+        static PreferenceData Load(){try{if(File.Exists(file))return Normalize(new JavaScriptSerializer().Deserialize<PreferenceData>(File.ReadAllText(file))??new PreferenceData());}catch(Exception e){AppLog.Once("settings-read",e.Message);}return Normalize(Fresh());}
+        // A first install starts on the newest interface this build offers; saved settings keep their own choice.
+        static PreferenceData Fresh(){var value=new PreferenceData();if(!File.Exists(file)&&Environment.GetEnvironmentVariable("ONE_TASKBAR_DATA")==null)value.UIVersion=Fluid.Available&&ReleaseFeatures.GlassUI?Fluid.Version:ReleaseFeatures.GlassUI?95:90;return value;}
         internal static void Set(Action<PreferenceData> change)
         {
             change(Current);Normalize(Current);Save();var notify=Changed;if(notify!=null)notify();

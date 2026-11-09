@@ -15,6 +15,10 @@ namespace OneTaskBar
     {
         readonly ShellController shell;readonly string page;
         Border outputArtwork;
+        // The sound page leads on to a page of its own for each app's volume; the back button returns from it.
+        bool appsPage;TextBlock heading;
+        internal bool AppsPage {get{return appsPage;}}
+        internal void ShowApps(bool on){if(page!="sound"||appsPage==on)return;appsPage=on;if(heading!=null)heading.Text=on?"앱별 음량":PageName(page);Reload();}
         internal string PageKey {get{return page;}}
         readonly StackPanel body=new StackPanel();readonly TextBlock status=Paint.TextBlock("",12,Paint.Muted);
         readonly DispatcherTimer ticker=new DispatcherTimer {Interval=TimeSpan.FromSeconds(1)};
@@ -36,15 +40,15 @@ namespace OneTaskBar
             shell=controller;page=kind;scanLoader=loader;Title="One TaskBar · "+PageName(kind);Width=380;Height=540;Radius=30;Dark=true;Surface.CornerRadius=new CornerRadius(30);Surface.Background=QuickPanel.Glass;Surface.BorderBrush=Paint.Brush("#48FFFFFF");Surface.BorderThickness=new Thickness(.7);
             var root=new DockPanel {Margin=new Thickness(20)};
             var header=new Grid {Height=44,Margin=new Thickness(0,0,0,12)};
-            var back=Paint.Button(new Glyph("back",18),()=> {Hide();shell.ToggleQuick(null);},"빠른 설정으로 돌아가기");back.Width=back.Height=34;back.VerticalAlignment=VerticalAlignment.Center;back.Background=Brushes.Transparent;back.Padding=new Thickness(0);back.HorizontalAlignment=HorizontalAlignment.Left;header.Children.Add(back);
-            var title=Paint.TextBlock(PageName(kind),21,Paint.Text);title.FontWeight=FontWeights.SemiBold;title.Margin=new Thickness(40,0,30,0);header.Children.Add(title);
+            var back=Paint.Button(new Glyph("back",18),()=> {if(appsPage){ShowApps(false);return;}Hide();shell.ToggleQuick(null);},"빠른 설정으로 돌아가기");back.Width=back.Height=34;back.VerticalAlignment=VerticalAlignment.Center;back.Background=Brushes.Transparent;back.Padding=new Thickness(0);back.HorizontalAlignment=HorizontalAlignment.Left;header.Children.Add(back);
+            var title=Paint.TextBlock(PageName(kind),21,Paint.Text);title.FontWeight=FontWeights.SemiBold;title.Margin=new Thickness(40,0,30,0);heading=title;header.Children.Add(title);
             refreshButton=Paint.Button(scanIndicator,()=>{Reload();if(page=="power")CheckSamsungAccess(true);},"다시 검색");refreshButton.Width=refreshButton.Height=34;refreshButton.VerticalAlignment=VerticalAlignment.Center;refreshButton.Background=Brushes.Transparent;refreshButton.Padding=new Thickness(0);refreshButton.HorizontalAlignment=HorizontalAlignment.Right;header.Children.Add(refreshButton);DockPanel.SetDock(header,Dock.Top);root.Children.Add(header);
             status.TextWrapping=TextWrapping.Wrap;status.Margin=new Thickness(5,10,5,0);DockPanel.SetDock(status,Dock.Bottom);root.Children.Add(status);
             root.Children.Add(new SmoothScrollViewer {Content=body,VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});Surface.Child=root;
             if(page=="sound"){SmoothLauncher=true;var layers=new Grid();var clip=new RectangleGeometry {RadiusX=Radius,RadiusY=Radius};layers.Clip=clip;layers.SizeChanged+=(s,e)=>clip.Rect=new Rect(new Point(),e.NewSize);var fade=new LinearGradientBrush {StartPoint=new Point(0,0),EndPoint=new Point(0,1)};fade.GradientStops.Add(new GradientStop(Color.FromArgb(170,255,255,255),0));fade.GradientStops.Add(new GradientStop(Colors.Transparent,1));fade.Freeze();outputArtwork=new Border {Opacity=.45,Height=260,VerticalAlignment=VerticalAlignment.Top,IsHitTestVisible=false,OpacityMask=fade,Background=ArtworkPalette.OutputSurface(shell.Services.Media.Artwork)};layers.Children.Add(outputArtwork);Surface.Child=null;layers.Children.Add(root);Surface.Child=layers;TransitionContent=layers;}
             Closed+=(s,e)=> {closed=true;ticker.Stop();CancelScan();};Deactivated+=(s,e)=> {if(deviceActions==0&&!Program.Inspectable&&IsVisible&&!IsMouseOver)Hide();};if(!Wireless)Reload();
             ticker.Tick+=(s,e)=> {if(page=="focus")FocusStatus();else if(page=="power"&&!busy&&!changingMode&&!changingSamsung)RefreshPowerSelection();};
-            IsVisibleChanged+=(s,e)=> {if(IsVisible&&(page=="focus"||page=="power"))ticker.Start();else ticker.Stop();if(Wireless){if(IsVisible)Reload();else CancelScan();}else scanIndicator.SetScanning(busy&&IsVisible);};
+            IsVisibleChanged+=(s,e)=> {if(!IsVisible&&appsPage){appsPage=false;heading.Text=PageName(page);}if(IsVisible&&(page=="focus"||page=="power"))ticker.Start();else ticker.Stop();if(Wireless){if(IsVisible)Reload();else CancelScan();}else scanIndicator.SetScanning(busy&&IsVisible);};
         }
         bool Wireless {get{return page=="wifi"||page=="bluetooth";}}
         static string PageName(string kind) {return kind=="wifi"?"Wi-Fi":kind=="bluetooth"?"블루투스":kind=="sound"?"소리 및 출력":kind=="power"?"배터리 및 전원":kind=="focus"?"집중 타이머":"디스플레이";}
@@ -57,7 +61,11 @@ namespace OneTaskBar
             if(busy||closed||changingMode||changingSamsung)return;busy=true;if(page!="sound")body.Children.Clear();samsungButtons.Clear();windowsButtons.Clear();status.Text=page=="sound"&&body.Children.Count>0?"":"불러오는 중…";
             refreshButton.IsEnabled=false;scanIndicator.SetScanning(IsVisible);
             try {
-                if(page=="sound") {
+                if(page=="sound"&&appsPage) {
+                    var appVolumes=await BackgroundWork.Run(AppVolumes.Read);if(closed||!appsPage)return;
+                    body.Children.Clear();body.Children.Add(AppVolumeView.Build(appVolumes));status.Text="";
+                    LauncherMotion.Page(TransitionContent);
+                } else if(page=="sound") {
                     var outputs=await BackgroundWork.Run(Native.AudioOutputs);if(closed)return;ImageSource symbol=null;var budsOutput=outputs.FirstOrDefault(o=>BudsInfo.IsBuds(o.Name));if(budsOutput!=null){string model=budsOutput.Name;symbol=await BackgroundWork.Run(()=>BudsDeviceData.ShortcutIcon(model));if(closed)return;}
                     body.Children.Clear();
                     if(outputArtwork!=null)outputArtwork.Background=ArtworkPalette.OutputSurface(shell.Services.Media.Artwork);
@@ -73,6 +81,7 @@ namespace OneTaskBar
                         }
                         finally {deviceActions--;}
                     },shell.Volume,()=>{shell.Mute();Reload();},()=>shell.Media("play"),()=>shell.OpenMediaApplication(shell.Services.Media.AppId),message=>status.Text=message,symbol));
+                    Action("앱별 음량  ›",()=>ShowApps(true));
                     status.Text="";
                     LauncherMotion.Page(TransitionContent);
                 } else if(page=="power") {

@@ -199,8 +199,9 @@ namespace OneTaskBar
         }
         void PlacePreviews(double progress)
         {
-            double eased=SpringEase.Out(progress);
-            double opacity=leaving?transitionFrom*(1-eased):transitionFrom+(1-transitionFrom)*eased;
+            // The Fluid UI opens on a soft spring that settles a hair past its place, and closes quickly on the plain ease.
+            double eased=Fluid.Enabled&&!leaving?SpringEase.Position(progress,.82):SpringEase.Out(progress);
+            double opacity=leaving?transitionFrom*(1-eased):transitionFrom+(1-transitionFrom)*Math.Max(0,Math.Min(1,eased));
             foreach(var preview in previews)
             {
                 preview.Card.Opacity=chromeTransition?1:opacity;
@@ -210,8 +211,10 @@ namespace OneTaskBar
             {
                 Surface.Opacity=opacity;
                 Native.BlurOpacity(this,opacity);
-                headerOffset.Y=-12*(1-opacity);
-                footerOffset.Y=12*(1-opacity);
+                // The title row drops in from above and the buttons rise from below, a little further than a plain fade.
+                double travel=Fluid.Enabled?22:12,place=leaving?opacity:Math.Min(1.2,Math.Max(0,eased));
+                headerOffset.Y=-travel*(1-place);
+                footerOffset.Y=travel*(1-place);
             }
             else
             {
@@ -233,7 +236,7 @@ namespace OneTaskBar
             CompositionTarget.Rendering+=Animate;
             Animate(null,EventArgs.Empty);
         }
-        void Animate(object sender,EventArgs args){double progress=Math.Min(1,transition.Elapsed.TotalMilliseconds/(leaving?190:220));PlacePreviews(progress);if(progress>=1)StopTransition();}
+        void Animate(object sender,EventArgs args){double progress=Math.Min(1,transition.Elapsed.TotalMilliseconds/(leaving?190:Fluid.Enabled?300:220));PlacePreviews(progress);if(progress>=1)StopTransition();}
         void StopTransition(){transition.Stop();CompositionTarget.Rendering-=Animate;}
         void Execute(int operation,IntPtr window=default(IntPtr))
         {

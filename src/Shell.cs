@@ -748,7 +748,7 @@ namespace OneTaskBar
             if(foregroundPid!=ownPid)RememberForeground(foreground);Lap("remember");if(Desktop&&foreground!=lastForeground)Switcher.Update(Running);Lap("switcher");
             // A window that just came forward may be new; the dock should not wait for the slow battery read.
             if(battery&&foreground!=lastForeground&&foregroundPid!=ownPid&&!Running.Any(a=>a.Windows.Contains(foreground)))appsAt=DateTime.MinValue;
-            if(Desktop){browserFullscreen.Update(foreground);Lap("browserfs");SyncAutoHide(false);Lap("pre");var fullscreenWindows=FullscreenVisibility.Capture();Lap("capture");RefreshIsland(fullscreenWindows);Lap("island");foreach(var dock in docks){dock.UpdateVisibility(FullscreenVisibility.IsFullScreen(dock.Screen.Bounds,fullscreenWindows),DockAutoHide,fullscreenWindows.Count==0);if(foreground!=lastForeground)dock.UpdateActive(LastApplication);}Lap("dockvis");}
+            if(Desktop){browserFullscreen.Update(foreground);Lap("browserfs");SyncAutoHide(false);Lap("pre");var fullscreenWindows=FullscreenVisibility.Capture();Lap("capture");RefreshIsland(fullscreenWindows);Lap("island");foreach(var dock in docks){dock.UpdateVisibility(FullscreenVisibility.IsFullScreen(dock.Screen.Bounds,fullscreenWindows),DockAutoHide,fullscreenWindows.Count==0);if(foreground!=lastForeground)dock.UpdateActive(LastApplication);if(FullscreenVisibility.CaptureLayer!=IntPtr.Zero&&dock.Screen.Bounds==FullscreenVisibility.CaptureLayerMonitor)dock.SinkBelow(FullscreenVisibility.CaptureLayer);else if(dock.Sunk)dock.RiseAgain();}Lap("dockvis");}
             lastForeground=foreground;ObserveMediaMotion(foreground);Lap("motion");
             double cadence=RuntimeCadence.Pulse(Desktop,battery,interactive,docks.Count>0&&docks.All(d=>!d.Apps.IsVisible),true);if(timer.Interval.TotalMilliseconds!=cadence)timer.Interval=TimeSpan.FromMilliseconds(cadence);
             if(Welcome!=null&&Welcome.IsVisible)Welcome.PreviewBattery.Update(Power);
@@ -756,7 +756,11 @@ namespace OneTaskBar
             if(celebrate&&Power.Known&&Island!=null&&Island.IsVisible)Island.ShowFeedback("charge",Power.Level,false);
             if(celebrate && Power.Known&&Desktop&&Preferences.Current.ChargeAnimation&&Preferences.Current.Animations) PreviewCharge(false);
             Audio.Read();
-            if(previousVolume>=0 && Audio.Available && (Math.Abs(Audio.Value-previousVolume)>=1 || Audio.Muted!=previousMuted) && (Quick==null || !Quick.IsVisible)) ShowHud("volume",Audio.Value,Audio.Muted);
+            // Switching the output (earbuds connecting) changes the level to that device's own; that is not the owner's
+            // doing and its bar would cover the connection notice.
+            int outputRevision=Audio.DeviceRevision;if(outputRevision!=hudOutputDevice){hudOutputDevice=outputRevision;outputSwitchedAt=DateTime.UtcNow;}
+            bool outputSwitching=(DateTime.UtcNow-outputSwitchedAt).TotalSeconds<2.5;
+            if(previousVolume>=0 && Audio.Available && !outputSwitching && (Math.Abs(Audio.Value-previousVolume)>=1 || Audio.Muted!=previousMuted) && (Quick==null || !Quick.IsVisible)) ShowHud("volume",Audio.Value,Audio.Muted);
             previousVolume=Audio.Value; previousMuted=Audio.Muted;
             Services.Interactive=FullscreenMediaLive||IslandExpanded||(Quick!=null&&Quick.IsVisible)||(Center!=null&&Center.IsVisible)||(Detail!=null&&Detail.IsVisible)||docks.Any(d=>d.MediaBar!=null&&d.MediaBar.Expanded);Notifications.Interactive=Center!=null&&Center.IsVisible;
             if(now>=servicesAt&&!servicesBusy) {servicesAt=now.AddSeconds(RuntimeCadence.Services(interactive,battery));servicesBusy=true;RefreshServices();}
@@ -830,6 +834,7 @@ namespace OneTaskBar
                 if(panel==null||!panel.IsVisible)continue;Native.RectI rect;if(Native.GetWindowRect(new WindowInteropHelper(panel).Handle,out rect)&&dock.Screen.Bounds.Contains((rect.Left+rect.Right)/2,(rect.Top+rect.Bottom)/2))return true;
             }return false;
         }
+        int hudOutputDevice=-1;DateTime outputSwitchedAt=DateTime.MinValue;
         internal void ShowHud(string kind,double value,bool muted)
         {
             if(!Desktop&&!Demo)return;
@@ -857,7 +862,7 @@ namespace OneTaskBar
         async void RefreshHudOutput(int revision){try{string output=await BackgroundWork.Run(Native.DefaultAudioOutputName);if(!disposed&&revision==hudOutputRevision&&HudKind=="volume"&&HudVisible){Services.OutputName=output;if(hud!=null&&hud.IsVisible)hud.Set("volume",Audio.Value,Audio.Muted,output);if(Island!=null)Island.OutputChanged(output);}}catch(Exception error){AppLog.Once("hud-output-name",error.GetType().Name);}}
         bool ReplaceNativeOsd()
         {
-            Audio.Read();if(previousVolume>=0&&(Math.Abs(Audio.Value-previousVolume)>=1||Audio.Muted!=previousMuted)){previousVolume=Audio.Value;previousMuted=Audio.Muted;ShowHud("volume",Audio.Value,Audio.Muted);return true;}
+            Audio.Read();if(previousVolume>=0&&(Math.Abs(Audio.Value-previousVolume)>=1||Audio.Muted!=previousMuted)){previousVolume=Audio.Value;previousMuted=Audio.Muted;if((DateTime.UtcNow-outputSwitchedAt).TotalSeconds<2.5)return true;ShowHud("volume",Audio.Value,Audio.Muted);return true;}
             if(HudVisible&&HudKind=="volume"&&(DateTime.UtcNow-hudChangedAt).TotalMilliseconds<350)return true;
             if(Brightness<0)return false;if(osdBrightnessBusy)return true;osdBrightnessBusy=true;
             Task.Run(()=>BrightnessService.Read()).ContinueWith(t=>Application.Current.Dispatcher.BeginInvoke(new Action(()=>{osdBrightnessBusy=false;if(disposed||t.Status!=TaskStatus.RanToCompletion||t.Result<0)return;Brightness=t.Result;if(Quick==null||!Quick.IsVisible)ShowHud("brightness",Brightness,false);})));return true;

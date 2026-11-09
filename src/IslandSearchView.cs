@@ -25,6 +25,11 @@ namespace OneTaskBar
         readonly List<Button> buttons=new List<Button>();
         readonly List<Action> actions=new List<Action>();
         int selected;
+        // Files come from the Windows index a moment after the typing pauses; the rows above never wait for them.
+        readonly System.Windows.Threading.DispatcherTimer debounce=new System.Windows.Threading.DispatcherTimer {Interval=TimeSpan.FromMilliseconds(260)};
+        System.Threading.CancellationTokenSource lookup;
+        List<SearchFile> fileMatches=new List<SearchFile>();
+        string fileQuery="";
         internal Action Changed;
         internal int RowCount {get{return actions.Count;}}
         internal double DesiredHeight {get{return actions.Count==0?HeaderHeight:HeaderHeight+actions.Count*RowHeight+8;}}
@@ -46,6 +51,28 @@ namespace OneTaskBar
             Grid.SetRow(rows,1);Children.Add(rows);
             Query.TextChanged+=(s,e)=>{hint.Visibility=Query.Text.Length==0?Visibility.Visible:Visibility.Collapsed;Reload();};
             Query.PreviewKeyDown+=OnKey;
+            debounce.Tick+=(s,e)=>{debounce.Stop();FindFiles();};
+            IsVisibleChanged+=(s,e)=>{if(!IsVisible)CancelLookup();};
+        }
+        void CancelLookup()
+        {
+            debounce.Stop();
+            if(lookup!=null){lookup.Cancel();lookup.Dispose();lookup=null;}
+        }
+        async void FindFiles()
+        {
+            string text=Query.Text.Trim();if(text.Length<2)return;
+            CancelLookup();var source=new System.Threading.CancellationTokenSource();lookup=source;
+            try
+            {
+                var found=await System.Threading.Tasks.Task.Run(()=>LauncherSearch.Files(text,source.Token));
+                if(source.IsCancellationRequested||Query.Text.Trim()!=text)return;
+                fileMatches=found.Take(3).ToList();fileQuery=text;
+                Reload(false);
+            }
+            catch(OperationCanceledException){}
+            catch(Exception error){AppLog.Once("island-files",error.GetType().Name);}
+            finally{if(lookup==source){lookup=null;}source.Dispose();}
         }
         void OnKey(object sender,KeyEventArgs e)
         {
@@ -66,14 +93,17 @@ namespace OneTaskBar
             divider.Visibility=actions.Count>0?Visibility.Visible:Visibility.Collapsed;
             divider.VerticalAlignment=VerticalAlignment.Top;divider.Margin=new Thickness(14,HeaderHeight-1,14,0);
         }
-        void Reload()
+        void Reload(bool fresh=true)
         {
+            int keep=fresh?0:selected;
             rows.Children.Clear();buttons.Clear();actions.Clear();selected=0;
             string text=Query.Text.Trim();
+            if(fresh){CancelLookup();if(fileQuery!=text)fileMatches=new List<SearchFile>();if(text.Length>=2)debounce.Start();}
+            var files=fileQuery==text?fileMatches:new List<SearchFile>();
             var apps=find(text)??new List<AppEntry>();
             var matched=text.Length>0&&settings!=null?LauncherSearch.Settings.Where(s=>LauncherSearch.Matches(s.Name+" "+s.Keywords,text)).ToList():new List<SearchSetting>();
             // Rows: apps first, up to two settings kept in reach, and the web row always last.
-            int appRows=Math.Max(0,(int)MaxRows-(text.Length>0?1:0)-Math.Min(matched.Count,2));
+            int appRows=Math.Max(0,(int)MaxRows-(text.Length>0?1:0)-Math.Min(matched.Count,2)-Math.Min(files.Count,2));
             foreach(var entry in apps.Take(appRows))
             {
                 var app=entry;
@@ -82,6 +112,16 @@ namespace OneTaskBar
                 var name=Paint.TextBlock(app.Name,14,Paint.ControlWhite);name.TextTrimming=TextTrimming.CharacterEllipsis;name.MaxWidth=250;
                 line.Children.Add(icon);line.Children.Add(name);
                 Add(Kinded(line,"앱"),()=>launch(app),app.Name);
+            }
+            foreach(var item in files.Take(Math.Max(0,Math.Min(2,(int)MaxRows-1-actions.Count))))
+            {
+                var file=item;
+                var line=new StackPanel {Orientation=Orientation.Horizontal};
+                FrameworkElement icon=file.Icon!=null?AppIcons.Visual(file.Icon,22):new Glyph(file.Folder?"folder":"window",18){Color=Paint.ControlWhite};
+                icon.Margin=new Thickness(file.Icon!=null?0:2,0,11,0);icon.VerticalAlignment=VerticalAlignment.Center;
+                var label=Paint.TextBlock(file.Name,14,Paint.ControlWhite);label.TextTrimming=TextTrimming.CharacterEllipsis;label.MaxWidth=250;
+                line.Children.Add(icon);line.Children.Add(label);
+                Add(Kinded(line,"파일"),()=>{close();Native.Open(file.Path);},file.Path);
             }
             // Windows and One TaskBar settings are found the same way the launcher finds them.
             if(matched.Count>0)
@@ -104,7 +144,7 @@ namespace OneTaskBar
                 line.Children.Add(label);
                 Add(Kinded(line,"웹"),()=>web(text),"웹 검색");
             }
-            Select(0);
+            Select(Math.Min(keep,Math.Max(0,actions.Count-1)));
             var changed=Changed;if(changed!=null)changed();
         }
         static UIElement Kinded(UIElement line,string kind)

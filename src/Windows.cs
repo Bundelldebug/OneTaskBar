@@ -238,7 +238,17 @@ namespace OneTaskBar
             bool hidden=!Apps.IsVisible;visible=value;if(hidden){reveal=0;foreach(var w in DockWindows){w.Opacity=0;Native.BlurOpacity(w,0);w.Show();}}
             revealFrom=reveal;revealTarget=value?1:0;revealDuration=value?230:160;visibilityWatch.Restart();visibilityTimer.Start();ApplyReveal();
         }
-        void EnsureVisibleWindows(bool raise=false){foreach(var window in DockWindows)Native.EnsureDockVisible(window,raise);}
+        void EnsureVisibleWindows(bool raise=false){if(sunk)return;foreach(var window in DockWindows)Native.EnsureDockVisible(window,raise);}
+        // While a screen-capture layer (AI Select, a snipping tool) covers the monitor the bar goes just under it, so the
+        // layer's dimming and selection draw over the bar instead of the bar floating above them.
+        bool sunk;
+        internal bool Sunk {get{return sunk;}}
+        internal void SinkBelow(IntPtr layer)
+        {
+            if(closed||layer==IntPtr.Zero)return;sunk=true;
+            foreach(var window in DockWindows){var handle=new WindowInteropHelper(window).Handle;if(handle!=IntPtr.Zero&&Native.IsWindowVisible(handle))Native.SetWindowPos(handle,layer,0,0,0,0,0x13);}
+        }
+        internal void RiseAgain(){if(!sunk)return;sunk=false;EnsureVisibleWindows(true);}
         void RecoverPlacement()
         {
             if(targetLayout==null||resizeTimer.IsEnabled||visibilityTimer.IsEnabled)return;
@@ -479,7 +489,7 @@ namespace OneTaskBar
         }
         internal void Reload()
         {
-            if(loadedApps==shell.Apps&&loadedWidth==cellWidth&&folder==null)return;loadedApps=shell.Apps;loadedWidth=cellWidth;folder=null;shell.AppScreen.Reconcile(shell.Apps);if(Preferences.Current.GroupAppsByStartMenu)shell.AppScreen.ApplyWindowsFolders(shell.Apps,true);RefreshApps();
+            if(loadedApps==shell.Apps&&loadedWidth==cellWidth&&folder==null)return;loadedApps=shell.Apps;loadedWidth=cellWidth;folder=null;shell.AppScreen.Reconcile(shell.Apps);if(Preferences.Current.GroupAppsByStartMenu)shell.AppScreen.ApplyWindowsFolders(shell.Apps,true);if(Preferences.Current.AutoFolderApps)shell.AppScreen.ApplyAutoFolders(shell.Apps,true);RefreshApps();
         }
         internal void RefreshApps(){tiles=shell.AppScreen.Tiles(shell.Apps);if(folder!=null&&!tiles.Any(t=>t.Key==folder&&t.Folder))folder=null;RenderApps();}
         internal void RestoreSearch(string value){bool previous=composing;composing=true;try{Search.Text=value??"";}finally{composing=previous;}}
@@ -491,7 +501,7 @@ namespace OneTaskBar
                 var tile=value;
                 var body=new StackPanel {Width=cellWidth-16,Height=cellHeight-12};
                 double iconSize=Math.Min(48,cellHeight-58);
-                var icon=tile.Folder?StartWindow.FolderIcon(tile):AppIcons.Visual(tile.App,iconSize);icon.Margin=new Thickness(0,7,0,7);icon.HorizontalAlignment=HorizontalAlignment.Center;body.Children.Add(icon);
+                var icon=tile.Folder?StartWindow.FolderIcon(tile):AppIcons.Visual(tile.App,iconSize);icon.Margin=tile.Folder&&tile.Key.StartsWith(AppCategories.KeyPrefix,StringComparison.Ordinal)?new Thickness(0,0,0,3):new Thickness(0,7,0,7);icon.HorizontalAlignment=HorizontalAlignment.Center;body.Children.Add(icon);
                 var label=Paint.TextBlock(tile.Name,12,Paint.Text);label.TextAlignment=TextAlignment.Center;label.TextWrapping=TextWrapping.Wrap;label.TextTrimming=TextTrimming.CharacterEllipsis;label.MaxHeight=34;body.Children.Add(label);
                 var cell=Paint.Button(body,()=> {if(tile.Folder)OpenFolder(tile.Key);else Launch(tile.App);},tile.Folder?tile.Name+" · 앱 "+tile.Children.Count+"개":tile.Name);cell.Padding=new Thickness(7,4,7,4);cell.Margin=new Thickness(2);cell.Background=Brushes.Transparent;items.Children.Add(cell);
                 cell.Width=cellWidth-4;cell.Height=cellHeight-4;cell.ContextMenu=AppMenu(tile);cell.RenderTransform=new TranslateTransform();buttons[tile.Key]=cell;
