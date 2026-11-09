@@ -5,9 +5,9 @@ namespace OneTaskBar
     internal static class MediaFlightTiming
     {
         // The Fluid UI's flight eases at both ends, so it needs no more time than the classic one to stay visible; the
-        // owner found the earlier 620/640 ms too slow.
-        internal static double MinimizeMilliseconds {get{return Fluid.Enabled?420:480;}}
-        internal static double RestoreMilliseconds {get{return Fluid.Enabled?440:520;}}
+        // owner found 620/640 ms too slow, then asked for it a little quicker still than 420/440.
+        internal static double MinimizeMilliseconds {get{return Fluid.Enabled?360:480;}}
+        internal static double RestoreMilliseconds {get{return Fluid.Enabled?380:520;}}
 
         internal static double Smooth(double value)
         {

@@ -373,8 +373,12 @@ namespace OneTaskBar
             if(windows.Count==1) {
                 Native.Activate(windows[0]); return;
             }
-            if(appMotion!=null)appMotion.Launching(entry);
-            var launch=entry.Copy();launch.Windows.Clear();launch.Launch();appsAt=DateTime.MinValue;
+            var launch=entry.Copy();launch.Windows.Clear();
+            // With the Fluid drop playing, the app is started off the interface thread: a slow start used to block the
+            // first frames of the drop, which then showed up only as the window did.
+            if(appMotion!=null&&appMotion.Launching(entry))System.Threading.Tasks.Task.Run(()=>launch.Launch());
+            else launch.Launch();
+            appsAt=DateTime.MinValue;
         }
         internal void LaunchApp(AppEntry entry,System.Windows.Input.ModifierKeys modifiers)
         {

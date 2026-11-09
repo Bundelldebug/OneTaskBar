@@ -25,6 +25,12 @@ namespace OneTaskBar
         readonly ShellController shell;
         readonly EventCallback callback;
         readonly IntPtr hook;
+        readonly EventCallback shownCallback;
+        readonly System.Collections.Generic.HashSet<IntPtr> before=new System.Collections.Generic.HashSet<IntPtr>();
+        IntPtr[] shownHooks;
+        delegate bool WindowCallback(IntPtr window,IntPtr parameter);
+        [DllImport("user32.dll")] static extern bool EnumWindows(WindowCallback callback,IntPtr parameter);
+        DispatcherTimer launchTimer;
         AppGhost ghost;
         bool disposed;
         internal int Played {get;private set;}
@@ -36,7 +42,22 @@ namespace OneTaskBar
             callback=OnEvent;
             // Minimize start, from any process; the restore is caught as it is asked for, before the window shows.
             hook=SetWinEventHook(0x16,0x16,IntPtr.Zero,callback,0,0,2);
+            shownCallback=OnShown;
             WindowActivation.Restoring+=OnRestoring;
+            // The first drop would otherwise pay for building a full-screen window, a visible delay after the click.
+            var dispatcher=Application.Current==null?null:Application.Current.Dispatcher;
+            if(dispatcher!=null)dispatcher.BeginInvoke(new Action(Warm),DispatcherPriority.ApplicationIdle);
+        }
+
+        void Warm()
+        {
+            try
+            {
+                if(disposed||!Wanted||ghost!=null)return;
+                ghost=new AppGhost();
+                ghost.Warm();
+            }
+            catch(Exception error){AppLog.Once("app-window-warm",error.GetType().Name);}
         }
 
         static bool Wanted {get{return Fluid.Enabled&&Motion.Enabled;}}
@@ -84,15 +105,75 @@ namespace OneTaskBar
         // Why a motion did not play, once per reason, so a real session can be read afterwards.
         static void Note(string reason){AppLog.Once("app-motion-"+reason,reason);}
 
-        // An app started from its dock icon: the drop rises toward the middle of the screen, where it usually opens.
-        internal void Launching(AppEntry app)
+        // An app started from its dock icon: a drop rises out of the icon and waits above it while the app starts, then
+        // spreads over the window the moment that window appears. Where the window opens is not guessed.
+        // Returns whether the motion took over; the caller then starts the app off the interface thread, because a slow
+        // start blocking it is what made the drop arrive late.
+        internal bool Launching(AppEntry app)
         {
-            if(disposed||!Wanted||app==null)return;
+            if(disposed||!Wanted||app==null)return false;
             var icon=DockHost.IconRect(IntPtr.Zero,app);
-            if(icon==null)return;
-            var screen=System.Windows.Forms.Screen.FromPoint(new System.Drawing.Point((int)icon.Value.X,(int)icon.Value.Y)).WorkingArea;
-            var to=new Rect(screen.X+screen.Width*.2,screen.Y+screen.Height*.16,screen.Width*.6,screen.Height*.62);
-            Play(icon.Value,to,false,0);
+            if(icon==null)return false;
+            var r=icon.Value;
+            var screen=System.Windows.Forms.Screen.FromPoint(new System.Drawing.Point((int)(r.X+r.Width/2),(int)(r.Y+r.Height/2))).Bounds;
+            double w=r.Width*4.4,h=r.Width*3.6;
+            double x=Math.Max(screen.X+16,Math.Min(screen.Right-w-16,r.X+r.Width/2-w/2));
+            var hover=new Rect(x,Math.Max(screen.Y+16,r.Y-h-r.Width*.3),w,h);
+            try
+            {
+                if(ghost==null||ghost.IsClosed)ghost=new AppGhost();
+                ghost.Launch(r,hover);
+                Played++;
+                WatchForWindow();
+            }
+            catch(Exception error){AppLog.Once("app-window-launch",error.GetType().Name);return false;}
+            return true;
+        }
+
+        // While an app starts, the first suitable window to be shown is the one the drop spreads over.
+        // A window can appear three ways: shown (0x8002), uncloaked (0x8018, how packaged apps surface their frame) or made
+        // the foreground window (0x0003). Windows that were already on screen when the app was started are not candidates.
+        void WatchForWindow()
+        {
+            StopWatching();
+            before.Clear();
+            EnumWindows((w,l)=>{if(Ordinary(w))before.Add(w);return true;},IntPtr.Zero);
+            shownHooks=new[]
+            {
+                SetWinEventHook(0x8002,0x8002,IntPtr.Zero,shownCallback,0,0,2),
+                SetWinEventHook(0x8018,0x8018,IntPtr.Zero,shownCallback,0,0,2),
+                SetWinEventHook(0x0003,0x0003,IntPtr.Zero,shownCallback,0,0,2)
+            };
+            launchTimer=new DispatcherTimer {Interval=TimeSpan.FromSeconds(4)};
+            launchTimer.Tick+=(s,e)=>StopWatching();
+            launchTimer.Start();
+        }
+
+        void StopWatching()
+        {
+            if(shownHooks!=null){foreach(var one in shownHooks)if(one!=IntPtr.Zero)UnhookWinEvent(one);shownHooks=null;}
+            if(launchTimer!=null){launchTimer.Stop();launchTimer=null;}
+        }
+
+        void OnShown(IntPtr h,uint id,IntPtr window,int objectId,int child,uint thread,uint time)
+        {
+            if(disposed||ghost==null||objectId!=0||child!=0||before.Contains(window)||!Ordinary(window))return;
+            var bounds=WindowBounds(window);
+            if(bounds==null||bounds.Value.Width<240||bounds.Value.Height<160)return;
+            StopWatching();
+            ghost.Arrive(bounds.Value);
+        }
+
+        // A top-level window a person would call an app window: visible, not a tool window or tooltip, not cloaked.
+        static bool Ordinary(IntPtr window)
+        {
+            if(window==IntPtr.Zero||!Native.IsWindowVisible(window)||Native.IsIconic(window))return false;
+            if(Native.GetAncestor(window,2)!=window)return false;
+            int style=Native.GetWindowLong(window,-20);
+            if((style&0x80)!=0||(style&0x08000000)!=0)return false;
+            int cloaked;
+            if(Native.DwmGetWindowAttribute(window,14,out cloaked,4)==0&&cloaked!=0)return false;
+            return true;
         }
 
         static Rect? WindowBounds(IntPtr window)
@@ -135,6 +216,7 @@ namespace OneTaskBar
             if(disposed)return;
             disposed=true;
             WindowActivation.Restoring-=OnRestoring;
+            StopWatching();
             if(hook!=IntPtr.Zero)UnhookWinEvent(hook);
             if(ghost!=null)ghost.Close();
             ghost=null;
@@ -149,7 +231,12 @@ namespace OneTaskBar
         readonly Canvas canvas=new Canvas();
         readonly Border drop=new Border(),outline=new Border();
         readonly Stopwatch watch=new Stopwatch();
-        Rect from,to,host;
+        // Normal: a timed drop. Launch: Rise out of the icon, Hold above it while the app starts, Arrive over the window.
+        enum Phase {Normal,Rise,Hold,Arrive}
+        Phase phase;
+        readonly Stopwatch holdWatch=new Stopwatch();
+        Rect from,to,host,shown;
+        Rect? pending;
         double scale=1;
         bool closing,hooked,cloaked;
         double duration;
@@ -157,7 +244,7 @@ namespace OneTaskBar
         internal bool IsClosed {get;private set;}
         // Frames drawn uncloaked, across all runs; live-state reports it so a real session shows the drop was on screen.
         internal static int Frames;
-        const double OpenTime=.5,CloseTime=.44;
+        const double OpenTime=.5,CloseTime=.44,RiseTime=.26,ArriveTime=.36,HoldLimit=2.6;
 
         internal AppGhost()
         {
@@ -180,8 +267,40 @@ namespace OneTaskBar
             Closed+=(s,e)=>{IsClosed=true;Unhook();};
         }
 
+        // Builds the window once, cloaked, so the first real drop does not pay for it.
+        internal void Warm()
+        {
+            var handle=new WindowInteropHelper(this).EnsureHandle();
+            int cloak=1;DwmSetWindowAttribute(handle,13,ref cloak,4);cloaked=true;
+            Width=8;Height=8;Left=0;Top=0;
+            Show();
+            Dispatcher.BeginInvoke(new Action(()=>{if(!hooked)Hide();}),DispatcherPriority.Background);
+        }
+
+        // A drop that rises out of the icon to the hover rectangle and waits there for the app's window.
+        internal void Launch(Rect icon,Rect hover)
+        {
+            Run(icon,hover,false,RiseTime);
+            phase=Phase.Rise;
+            pending=null;
+        }
+
+        // The app's window has appeared: the drop spreads over it and fades.
+        internal void Arrive(Rect window)
+        {
+            if(phase==Phase.Hold)StartArrive(window);
+            else if(phase==Phase.Rise)pending=window;
+        }
+
+        void StartArrive(Rect window)
+        {
+            from=shown;to=window;closing=false;duration=ArriveTime;phase=Phase.Arrive;pending=null;
+            watch.Restart();
+        }
+
         internal void Run(Rect start,Rect end,bool close,double time)
         {
+            phase=Phase.Normal;pending=null;
             from=start;to=end;closing=close;duration=time>0?time:close?CloseTime:OpenTime;
             var center=new System.Drawing.Point((int)((start.X+end.X)/2+start.Width/4),(int)((start.Y+end.Y)/2+start.Height/4));
             var monitor=System.Windows.Forms.Screen.FromPoint(center).Bounds;
@@ -213,8 +332,25 @@ namespace OneTaskBar
                 watch.Restart();
             }
             Frames++;
+            if(phase==Phase.Hold)
+            {
+                // Nothing came up in time (the app has no window of its own): the drop settles away where it is.
+                if(holdWatch.Elapsed.TotalSeconds>HoldLimit){StartArrive(new Rect(shown.X-shown.Width*.04,shown.Y-shown.Height*.04,shown.Width*1.08,shown.Height*1.08));return;}
+                Place(1);
+                return;
+            }
             double t=watch.Elapsed.TotalSeconds/duration;
-            if(t>=1){Unhook();outline.Opacity=0;Hide();return;}
+            if(t>=1)
+            {
+                if(phase==Phase.Rise)
+                {
+                    phase=Phase.Hold;holdWatch.Restart();Place(1);
+                    if(pending.HasValue)StartArrive(pending.Value);
+                    return;
+                }
+                Unhook();outline.Opacity=0;phase=Phase.Normal;Hide();
+                return;
+            }
             Place(t);
         }
 
@@ -276,6 +412,10 @@ namespace OneTaskBar
             // icon is what becomes the window; near the window it takes the window's corners.
             double nearIcon=closing?Smooth(.55,1,t):1-Smooth(0,.4,t);
             double radius=Math.Min(w,h)*.28*nearIcon+12*scale*(1-nearIcon);
+            if(phase==Phase.Rise){nearIcon=1-Smooth(0,.7,t);radius=Math.Min(w,h)*.28*nearIcon+22*scale*(1-nearIcon);}
+            else if(phase==Phase.Hold)radius=22*scale;
+            else if(phase==Phase.Arrive)radius=(22-10*Smooth(0,1,t))*scale;
+            shown=new Rect(x,y,w,h);
             Canvas.SetLeft(outline,(x-host.X)/scale-1);Canvas.SetTop(outline,(y-host.Y)/scale-1);
             outline.Width=w/scale+2;outline.Height=h/scale+2;
             double corner=Math.Min(radius,Math.Min(w,h)/2)/scale;
@@ -283,7 +423,10 @@ namespace OneTaskBar
             outline.CornerRadius=new CornerRadius(corner+1);
             // Opening, the drop leads the window out of the icon and is gone before the window settles, so it never washes
             // over the restored window; closing, it covers the shrinking window and stays bright until it reaches the icon.
-            outline.Opacity=closing?.55+.45*Smooth(0,.3,t)-Smooth(.86,1,t):Smooth(0,.08,t)*(1-Smooth(.22,.48,t));
+            if(phase==Phase.Rise)outline.Opacity=Smooth(0,.25,t);
+            else if(phase==Phase.Hold)outline.Opacity=.88+.1*Math.Sin(holdWatch.Elapsed.TotalSeconds*6);
+            else if(phase==Phase.Arrive)outline.Opacity=1-Smooth(.4,.95,t);
+            else outline.Opacity=closing?.55+.45*Smooth(0,.3,t)-Smooth(.86,1,t):Smooth(0,.08,t)*(1-Smooth(.22,.48,t));
         }
 
         void Unhook(){if(hooked){hooked=false;CompositionTarget.Rendering-=Frame;}}
