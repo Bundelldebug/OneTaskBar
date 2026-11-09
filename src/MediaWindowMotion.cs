@@ -33,7 +33,7 @@ namespace OneTaskBar
         IntPtr snapshotWindow,proactiveRestore,observedForeground,captureWindow;
         DateTime proactiveRestoreUntil;
         Rect snapshotBounds,preparedBounds,preparedCapsule,from,to;
-        TimeSpan? started,lastFrame;
+        TimeSpan? started,lastFrame,holdUntil;
         bool capturing,minimizeHover,disposed,placing,restore,finishing;
         volatile int captureGeneration;
 
@@ -267,7 +267,7 @@ namespace OneTaskBar
             from=start;
             to=end;
             restore=restoring;
-            started=lastFrame=null;
+            started=lastFrame=holdUntil=null;
             finishing=false;
             FrameCount=0;
             FirstProgress=Double.NaN;
@@ -362,7 +362,17 @@ namespace OneTaskBar
             }
             // Let WPF present the exact endpoint before removing the texture.
             // Construction time never consumes any of the animation timeline.
-            if(p>=1)finishing=true;
+            // A restored window can still be blank (a browser paints white first), so the plane keeps showing the window's
+            // picture a moment longer before it steps aside.
+            if(p>=1)
+            {
+                if(!restore||plane==null){finishing=true;}
+                else
+                {
+                    if(!holdUntil.HasValue)holdUntil=rendering.RenderingTime+TimeSpan.FromMilliseconds(160);
+                    if(rendering.RenderingTime>=holdUntil.Value)finishing=true;
+                }
+            }
         }
 
         void Place(double progress)

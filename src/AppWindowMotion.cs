@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -28,6 +28,7 @@ namespace OneTaskBar
         AppGhost ghost;
         bool disposed;
         internal int Played {get;private set;}
+        internal int Heard {get;private set;}
 
         internal AppWindowMotion(ShellController owner)
         {
@@ -60,20 +61,28 @@ namespace OneTaskBar
 
         void Minimizing(IntPtr window,Rect? from)
         {
-            if(disposed||!Wanted||from==null||MediaWindow(window))return;
+            Heard++;
+            if(disposed)return;
+            if(!Wanted){Note("skipped: motion off");return;}
+            if(from==null||MediaWindow(window)){Note("minimize skipped: "+(from==null?"no bounds":"media window"));return;}
             var icon=DockHost.IconRect(window);
-            if(icon==null)return;
+            if(icon==null){Note("minimize skipped: no dock icon");return;}
             Play(from.Value,icon.Value,true);
         }
 
         void OnRestoring(IntPtr window)
         {
-            if(disposed||!Wanted||MediaWindow(window))return;
+            if(disposed)return;
+            if(!Wanted){Note("skipped: motion off");return;}
+            if(MediaWindow(window)){Note("restore skipped: media window");return;}
             var icon=DockHost.IconRect(window);
             var to=RestoredBounds(window);
-            if(icon==null||to==null)return;
-            Play(icon.Value,to.Value,false);
+            if(icon==null||to==null){Note("restore skipped: "+(icon==null?"no dock icon":"no bounds"));return;}
+            Play(icon.Value,to.Value,false,RestoreTime);
         }
+
+        // Why a motion did not play, once per reason, so a real session can be read afterwards.
+        static void Note(string reason){AppLog.Once("app-motion-"+reason,reason);}
 
         // An app started from its dock icon: the drop rises toward the middle of the screen, where it usually opens.
         internal void Launching(AppEntry app)
@@ -83,7 +92,7 @@ namespace OneTaskBar
             if(icon==null)return;
             var screen=System.Windows.Forms.Screen.FromPoint(new System.Drawing.Point((int)icon.Value.X,(int)icon.Value.Y)).WorkingArea;
             var to=new Rect(screen.X+screen.Width*.2,screen.Y+screen.Height*.16,screen.Width*.6,screen.Height*.62);
-            Play(icon.Value,to,false);
+            Play(icon.Value,to,false,0);
         }
 
         static Rect? WindowBounds(IntPtr window)
@@ -108,12 +117,14 @@ namespace OneTaskBar
             return new Rect(normal.Left+offset.X,normal.Top+offset.Y,normal.Right-normal.Left,normal.Bottom-normal.Top);
         }
 
-        void Play(Rect from,Rect to,bool closing)
+        // Windows draws a restored window within a few frames, so the restore drop is quick and only leads it out of the icon.
+        const double RestoreTime=.32;
+        void Play(Rect from,Rect to,bool closing,double time=0)
         {
             try
             {
                 if(ghost==null||ghost.IsClosed)ghost=new AppGhost();
-                ghost.Run(from,to,closing);
+                ghost.Run(from,to,closing,time);
                 Played++;
             }
             catch(Exception error){AppLog.Once("app-window-motion",error.GetType().Name);}
@@ -136,13 +147,16 @@ namespace OneTaskBar
     {
         [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr window,int attribute,ref int value,int size);
         readonly Canvas canvas=new Canvas();
-        readonly Border drop=new Border();
+        readonly Border drop=new Border(),outline=new Border();
         readonly Stopwatch watch=new Stopwatch();
         Rect from,to,host;
         double scale=1;
         bool closing,hooked,cloaked;
+        double duration;
         int framesUntilShown;
         internal bool IsClosed {get;private set;}
+        // Frames drawn uncloaked, across all runs; live-state reports it so a real session shows the drop was on screen.
+        internal static int Frames;
         const double OpenTime=.5,CloseTime=.44;
 
         internal AppGhost()
@@ -150,8 +164,11 @@ namespace OneTaskBar
             Title="One TaskBar · 앱 전환";
             WindowStyle=WindowStyle.None;ResizeMode=ResizeMode.NoResize;AllowsTransparency=false;Background=Brushes.Transparent;
             ShowActivated=false;ShowInTaskbar=false;Topmost=true;IsHitTestVisible=false;Focusable=false;
-            drop.BorderThickness=new Thickness(1.2);
-            canvas.Children.Add(drop);
+            drop.BorderThickness=new Thickness(1.5);
+            outline.BorderThickness=new Thickness(1);
+            outline.BorderBrush=edge;
+            outline.Child=drop;
+            canvas.Children.Add(outline);
             Content=canvas;
             SourceInitialized+=(s,e)=>
             {
@@ -163,24 +180,24 @@ namespace OneTaskBar
             Closed+=(s,e)=>{IsClosed=true;Unhook();};
         }
 
-        internal void Run(Rect start,Rect end,bool close)
+        internal void Run(Rect start,Rect end,bool close,double time)
         {
-            from=start;to=end;closing=close;
+            from=start;to=end;closing=close;duration=time>0?time:close?CloseTime:OpenTime;
             var center=new System.Drawing.Point((int)((start.X+end.X)/2+start.Width/4),(int)((start.Y+end.Y)/2+start.Height/4));
             var monitor=System.Windows.Forms.Screen.FromPoint(center).Bounds;
             host=new Rect(monitor.X,monitor.Y,monitor.Width,monitor.Height);
             var handle=new WindowInteropHelper(this).EnsureHandle();
             scale=Native.PrepareMonitor(this,monitor);
             Width=host.Width/scale;Height=host.Height/scale;
-            // The drop is the Fluid glass: thin tint with the glow and a lit rim.
-            bool dark=Glass95.Dark;
-            drop.Background=Fluid.Tint(dark);
-            drop.BorderBrush=Fluid.Rim();
-            drop.Opacity=0;
+            // Glass, not paint: almost clear, a highlight across the top, the glow only where it pools at the bottom and a
+            // lit rim. A tinted fill would read as a colored card laid over the window instead of glass.
+            drop.Background=GlassFill(Glass95.Dark);
+            drop.BorderBrush=Rim();
+            outline.Opacity=0;
             if(!cloaked){int cloak=1;DwmSetWindowAttribute(handle,13,ref cloak,4);cloaked=true;}
             if(!IsVisible)Show();
             Native.SetWindowPos(handle,new IntPtr(-1),(int)host.X,(int)host.Y,(int)host.Width,(int)host.Height,0x10|0x40);
-            framesUntilShown=2;
+            framesUntilShown=1;
             Place(0);
             watch.Restart();
             if(!hooked){hooked=true;CompositionTarget.Rendering+=Frame;}
@@ -195,12 +212,46 @@ namespace OneTaskBar
                 int cloak=0;DwmSetWindowAttribute(handle,13,ref cloak,4);cloaked=false;
                 watch.Restart();
             }
-            double t=watch.Elapsed.TotalSeconds/(closing?CloseTime:OpenTime);
-            if(t>=1){Unhook();drop.Opacity=0;Hide();return;}
+            Frames++;
+            double t=watch.Elapsed.TotalSeconds/duration;
+            if(t>=1){Unhook();outline.Opacity=0;Hide();return;}
             Place(t);
         }
 
         static double Smooth(double a,double b,double x){double t=Math.Max(0,Math.Min(1,(x-a)/(b-a)));return t*t*(3-2*t);}
+
+        static Brush fill;static int fillKey;static bool fillDark;
+        static Brush GlassFill(bool dark)
+        {
+            int key=Fluid.StyleKey;
+            if(fill!=null&&fillKey==key&&fillDark==dark)return fill;
+            var brush=new LinearGradientBrush {StartPoint=new Point(.5,0),EndPoint=new Point(.5,1)};
+            // Strong enough to read over a white page as well as a dark one: a bright sheen, a frosted body and the glow pooled
+            // at the bottom. The real test showed the earlier, nearly clear fill vanishing over bright windows.
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb((byte)(dark?120:150),255,255,255),0));
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb((byte)(dark?56:72),230,236,246),.3));
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb((byte)(dark?48:64),214,222,236),.72));
+            brush.GradientStops.Add(new GradientStop(Fluid.GlowOn?Fluid.Glow(dark?150:130):Color.FromArgb(90,236,240,248),1));
+            brush.Freeze();
+            fill=brush;fillKey=key;fillDark=dark;
+            return brush;
+        }
+
+        // A lit rim: bright along the top where light catches the glass, fading down the sides.
+        static Brush rim;
+        static Brush Rim()
+        {
+            if(rim!=null)return rim;
+            var brush=new LinearGradientBrush {StartPoint=new Point(.5,0),EndPoint=new Point(.5,1)};
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(235,255,255,255),0));
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(120,255,255,255),.4));
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(170,255,255,255),1));
+            brush.Freeze();
+            return rim=brush;
+        }
+        // A thin dark edge outside the rim keeps the shape visible over white pages.
+        static readonly Brush edge=Frozen(Color.FromArgb(70,0,0,0));
+        static Brush Frozen(Color color){var brush=new SolidColorBrush(color);brush.Freeze();return brush;}
 
         // The drop's outline at a moment: it keeps a round, drop-like shape near the icon and the window's corners near
         // the window. Opening, the width leads like the panels' arrival; closing, it eases in and drops into the icon.
@@ -221,15 +272,18 @@ namespace OneTaskBar
             double x=from.X+(to.X-from.X)*across,w=from.Width+(to.Width-from.Width)*across;
             double y=from.Y+(to.Y-from.Y)*down,h=from.Height+(to.Height-from.Height)*down;
             w=Math.Max(4,w);h=Math.Max(4,h);
-            // Near the icon (the start when opening, the end when closing) the corners round fully into a drop.
+            // Near the icon (the start when opening, the end when closing) it keeps the icon's own rounded square, so the
+            // icon is what becomes the window; near the window it takes the window's corners.
             double nearIcon=closing?Smooth(.55,1,t):1-Smooth(0,.4,t);
-            double radius=Math.Min(w,h)/2*nearIcon+14*scale*(1-nearIcon);
-            Canvas.SetLeft(drop,(x-host.X)/scale);Canvas.SetTop(drop,(y-host.Y)/scale);
-            drop.Width=w/scale;drop.Height=h/scale;
-            drop.CornerRadius=new CornerRadius(Math.Min(radius,Math.Min(w,h)/2)/scale);
-            // Opening, the drop is clear at first, brightest as it swells and fades as the window takes its place;
-            // closing, it starts faint over the window and is brightest as it reaches the icon.
-            drop.Opacity=closing?.25+.65*Smooth(0,.4,t)-.9*Smooth(.82,1,t):Smooth(0,.12,t)*.9*(1-Smooth(.62,1,t));
+            double radius=Math.Min(w,h)*.28*nearIcon+12*scale*(1-nearIcon);
+            Canvas.SetLeft(outline,(x-host.X)/scale-1);Canvas.SetTop(outline,(y-host.Y)/scale-1);
+            outline.Width=w/scale+2;outline.Height=h/scale+2;
+            double corner=Math.Min(radius,Math.Min(w,h)/2)/scale;
+            drop.CornerRadius=new CornerRadius(corner);
+            outline.CornerRadius=new CornerRadius(corner+1);
+            // Opening, the drop leads the window out of the icon and is gone before the window settles, so it never washes
+            // over the restored window; closing, it covers the shrinking window and stays bright until it reaches the icon.
+            outline.Opacity=closing?.55+.45*Smooth(0,.3,t)-Smooth(.86,1,t):Smooth(0,.08,t)*(1-Smooth(.22,.48,t));
         }
 
         void Unhook(){if(hooked){hooked=false;CompositionTarget.Rendering-=Frame;}}
