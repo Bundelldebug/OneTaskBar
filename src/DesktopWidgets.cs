@@ -211,6 +211,16 @@ namespace OneTaskBar
                 if(stale&&!disposed)LoadWallpaper(screen);
             }
         }
+        DateTime wallpaperWaitSince=DateTime.MinValue;
+        bool WallpaperReady(DesktopWidgetSlot item)
+        {
+            var screen=ScreenFor(item);
+            if(wallpapers.ContainsKey(screen.DeviceName))return true;
+            if(wallpaperWaitSince==DateTime.MinValue)wallpaperWaitSince=DateTime.UtcNow;
+            if(DateTime.UtcNow-wallpaperWaitSince>TimeSpan.FromSeconds(3))return true;
+            LoadWallpaper(screen);
+            return false;
+        }
         Brush WallpaperFor(Forms.Screen screen)
         {
             Brush wallpaper;
@@ -702,6 +712,9 @@ namespace OneTaskBar
                     hosts.Remove(item.Id);
                     host=null;
                 }
+                // Tinted widgets take their ink from the wallpaper. Building them before it is read meant building every widget
+                // twice at startup, the second time all at once in one long pause, so they wait for it (a few seconds at most).
+                if(host==null&&WidgetMaterial.Tinted&&!WallpaperReady(item))continue;
                 if(host==null)
                 {
                     try

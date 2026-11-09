@@ -1,10 +1,12 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace OneTaskBar
 {
     internal static class RuntimeCadence
     {
+        // Set by the shell's tick; lets steady decorations such as the playback wave save their extra frames on battery.
+        internal static bool OnBattery;
         internal static int Pulse(bool desktop,bool battery,bool interactive,bool hidden,bool displayAwake)
         {
             if(!displayAwake)return 30000;

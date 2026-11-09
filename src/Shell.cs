@@ -732,7 +732,7 @@ namespace OneTaskBar
             if(now>=releaseAt){releaseAt=now.AddSeconds(5);ReleaseDormantPanels(now);}
             Widgets.Pulse();Lap("widgets");
             if(!DisplayAwake){CloseIsland();double sleep=RuntimeCadence.Pulse(Desktop,true,false,false,false);if(FocusUntil!=DateTime.MinValue)sleep=Math.Min(sleep,Math.Max(100,(FocusUntil-now).TotalMilliseconds));timer.Interval=TimeSpan.FromMilliseconds(sleep);return;}
-            bool battery=Power.Known&&!Power.Connected;
+            bool battery=Power.Known&&!Power.Connected;RuntimeCadence.OnBattery=battery;
             bool interactive=FullscreenMediaLive||(StartMenu!=null&&StartMenu.IsVisible)||(Quick!=null&&Quick.IsVisible)||(Center!=null&&Center.IsVisible)||(Detail!=null&&Detail.IsVisible)||(Drawer!=null&&Drawer.IsVisible)||(Finder!=null&&Finder.IsVisible)||(Welcome!=null&&Welcome.IsVisible)||IslandExpanded||docks.Any(d=>d.MediaBar!=null&&d.MediaBar.Expanded);
             if(now>=osdScanAt){osdScanAt=now.AddSeconds(RuntimeCadence.OsdScan(battery));if(osdGate!=null)osdGate.Refresh();}
             LiveBackdrop.SweepOrphans();Lap("sweep");

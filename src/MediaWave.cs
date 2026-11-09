@@ -98,7 +98,7 @@ namespace OneTaskBar
             var frame=args as RenderingEventArgs;if(frame!=null){if(frame.RenderingTime==waveRendering)return;waveRendering=frame.RenderingTime;}
             double now=waveClock.Elapsed.TotalSeconds;
             // The same 60 updates a second on every PC and display (a 120 Hz screen skips every other frame), so it never depends on the machine.
-            if(now==lastWaveFrame||lastWaveFrame>=0&&now-lastWaveFrame<(FrameRate.Target>60?.0065:.014))return;lastWaveFrame=now;
+            if(now==lastWaveFrame||lastWaveFrame>=0&&now-lastWaveFrame<(FrameRate.Target>60&&!RuntimeCadence.OnBattery?.0065:.014))return;lastWaveFrame=now;
             double t=Math.Min(1,(now-waveAt)/.26),ease=t*t*(3-2*t);
             waveStrength=waveFrom+(waveTarget-waveFrom)*ease;
             if(!dragging&&WaveProgress!=null&&!WaveDecoration)Value=WaveProgress();
