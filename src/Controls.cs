@@ -302,6 +302,8 @@ namespace OneTaskBar
         internal bool StableSurface=true,UnifiedFade,SmoothLauncher;internal FrameworkElement TransitionContent;
         GlassLens lens;
         FluidLight fluidLight;
+        // A window with its own opaque picture (fullscreen media) may still take the Fluid light over it.
+        internal bool FluidLightOnOpaque;
         internal bool HasFluidLight {get{return fluidLight!=null;}}
         static readonly DependencyProperty SurfaceFadeProperty=DependencyProperty.Register("SurfaceFade",typeof(double),typeof(GlassWindow),new PropertyMetadata(1.0,(d,e)=>{var window=(GlassWindow)d;if(window.Surface!=null)window.Surface.Opacity=(double)e.NewValue;Native.BlurOpacity(window,(double)e.NewValue);}));
         void ResetFade(){BeginAnimation(SurfaceFadeProperty,null);SetValue(SurfaceFadeProperty,1.0);Surface.Opacity=1;Native.BlurOpacity(this,1);}
@@ -341,7 +343,7 @@ namespace OneTaskBar
             MouseMove+=(s,e)=>{var at=e.GetPosition(Surface);MoveGlassHighlight(at);if(fluidLight!=null)fluidLight.Move(at);};MouseLeave+=(s,e)=>{MoveGlassHighlight(new Point(Surface.ActualWidth/2,Surface.ActualHeight/2));if(fluidLight!=null)fluidLight.Leave();};
             Loaded+=(s,e)=>{if(lens==null){var layer=AdornerLayer.GetAdornerLayer(Surface);if(layer!=null){lens=new GlassLens(this);layer.Add(lens);}}
                 // The Fluid UI adds its light to every glass window: panels, the dock, the Now Bar, HUDs and banners. The opaque island has its own.
-                if(fluidLight==null&&Fluid.Enabled&&!OpaqueSurface&&!Performance.Light&&(!DockSurface||!DockAppearance.Custom&&!DockAppearance.IconsOnly)){var layer=AdornerLayer.GetAdornerLayer(Surface);if(layer!=null){fluidLight=new FluidLight(this);layer.Add(fluidLight);}}
+                if(fluidLight==null&&Fluid.Enabled&&(!OpaqueSurface||FluidLightOnOpaque)&&!Performance.Light&&(!DockSurface||!DockAppearance.Custom&&!DockAppearance.IconsOnly)){var layer=AdornerLayer.GetAdornerLayer(Surface);if(layer!=null){fluidLight=new FluidLight(this);layer.Add(fluidLight);}}
                 ApplyMaterial();if(Program.CaptureReview){ShowInTaskbar=true;var h=new WindowInteropHelper(this).Handle;Native.SetWindowLong(h,-20,(Native.GetWindowLong(h,-20)|0x40000)&~(0x80|0x08000000));}};
             IsVisibleChanged+=(s,e)=> {if(!IsVisible)HiddenSince=DateTime.UtcNow;;};
             Closed+=(s,e)=> {closed=true;++motion;if(fluidLight!=null)fluidLight.Dispose();LauncherMotion.Cancel(TransitionContent);CompleteDismissal(false);Preferences.Changed-=ApplyMaterial;Preferences.AppearanceChanged-=ApplyAppearance;};

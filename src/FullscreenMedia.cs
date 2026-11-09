@@ -71,7 +71,7 @@ namespace OneTaskBar
         internal FullscreenMedia(Action<string> dispatch,Func<double,Task<bool>> seekCommand,Action output,Action lockPC,Func<string,AppEntry> sourceApp=null,ShellController controller=null)
         {
             shell=controller;
-            Title="One TaskBar · 전체화면 미디어";OpaqueSurface=true;Radius=0;
+            Title="One TaskBar · 전체화면 미디어";OpaqueSurface=true;FluidLightOnOpaque=true;Radius=0;
             Surface.CornerRadius=new CornerRadius(0);Surface.BorderThickness=new Thickness(0);
             SetMaterial(Brushes.Black,Brushes.Black);
             var root=new Grid();root.Children.Add(wallpaper);root.Children.Add(artworkWash);
@@ -122,7 +122,26 @@ namespace OneTaskBar
         internal void Present(Forms.Screen screen,double scale)
         {
             ShowAt(screen.Bounds,0,0,screen.Bounds.Width/scale,screen.Bounds.Height/scale);
-            Layout(false);Activate();Pop();
+            Layout(false);Activate();
+            fill.BorderBrush=Fluid.Enabled?(Brush)Glass95.Edge(true,true,true):Paint.Brush("#35FFFFFF");
+            if(Fluid.Enabled&&Motion.Enabled&&springsReady)DropIn();
+            else Pop();
+        }
+        // The Fluid UI's arrival: the cover and the player start as small drops below their place and swell into it on springs.
+        void DropIn()
+        {
+            ShrinkToward(cardX,cardY,cardW,cardH,.5,.45,70);
+            ShrinkToward(coverX,coverY,coverW,coverH,.3,.3,-34);
+            coverRound.Value=Math.Max(coverRound.Value,coverW.Value/2);
+            Surface.BeginAnimation(UIElement.OpacityProperty,new DoubleAnimation(0,1,TimeSpan.FromMilliseconds(170)) {FillBehavior=FillBehavior.Stop});
+            Surface.Opacity=1;ApplyMotion();StartMotion();
+        }
+        static void ShrinkToward(SpringValue x,SpringValue y,SpringValue width,SpringValue height,double widthPart,double heightPart,double drop)
+        {
+            double cx=x.Target+width.Target/2,cy=y.Target+height.Target/2;
+            width.Value=Math.Max(1,width.Target*widthPart);height.Value=Math.Max(1,height.Target*heightPart);
+            x.Value=cx-width.Value/2;y.Value=cy-height.Value/2+drop;
+            x.Velocity=y.Velocity=width.Velocity=height.Velocity=0;
         }
         async void LoadWallpaper()
         {
@@ -283,6 +302,9 @@ namespace OneTaskBar
         {
             if(springs==null)springs=new[]{coverX,coverY,coverW,coverH,cardX,cardY,cardW,cardH,coverRound,cardRound,clockTopSpring,clockSizeSpring,dateTopSpring,washSpring,shadeSpring,tilesSpring};
             foreach(var spring in springs)spring.Omega=32;
+            // In the Fluid UI the shapes overshoot a little and settle like liquid; fades and tiles stay smooth.
+            double shape=Fluid.Enabled?.62:1;
+            foreach(var spring in new[]{coverX,coverY,coverW,coverH,cardX,cardY,cardW,cardH,coverRound,cardRound})spring.Damping=shape;
             return springs;
         }
         // Settles every part on its target at once, for a hidden window or a plain resize.
