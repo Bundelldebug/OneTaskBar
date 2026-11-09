@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
@@ -34,9 +34,25 @@ namespace OneTaskBar
         {
             if(String.IsNullOrEmpty(key))return;
             Point origin=new Point();bool armed=false;target.AllowDrop=true;
-            handle.PreviewMouseLeftButtonDown+=(s,e)=> {if(Program.Inspectable&&scope=="start.pins")AppLog.Write("start-drag-down","handled="+e.Handled+" stylus="+(e.StylusDevice!=null)+" enabled="+enabled());if(e.Handled||e.StylusDevice!=null||!enabled())return;origin=e.GetPosition(handle);armed=true;};
-            handle.PreviewMouseLeftButtonUp+=(s,e)=>armed=false;
+            // A finger scrolls with a swipe, so it lifts an item only after resting on it; the mouse and a pen start at once.
+            var hold=new System.Windows.Threading.DispatcherTimer {Interval=TimeSpan.FromMilliseconds(420)};
+            bool touching=false;
+            hold.Tick+=(s,e)=>{hold.Stop();if(touching&&enabled()){armed=true;touching=false;}};
+            handle.PreviewMouseLeftButtonDown+=(s,e)=> {
+                if(Program.Inspectable&&scope=="start.pins")AppLog.Write("start-drag-down","handled="+e.Handled+" stylus="+(e.StylusDevice!=null)+" enabled="+enabled());
+                if(e.Handled||!enabled())return;
+                origin=e.GetPosition(handle);
+                if(e.StylusDevice!=null&&e.StylusDevice.TabletDevice!=null&&e.StylusDevice.TabletDevice.Type==TabletDeviceType.Touch){touching=true;hold.Stop();hold.Start();return;}
+                armed=true;
+            };
+            handle.PreviewMouseLeftButtonUp+=(s,e)=>{armed=false;touching=false;hold.Stop();};
             handle.PreviewMouseMove+=(s,e)=> {
+                if(touching)
+                {
+                    Point moved=e.GetPosition(handle);
+                    if(Math.Abs(moved.X-origin.X)>=SystemParameters.MinimumHorizontalDragDistance||Math.Abs(moved.Y-origin.Y)>=SystemParameters.MinimumVerticalDragDistance){touching=false;hold.Stop();}
+                    return;
+                }
                 if(!armed||Active||!enabled()||e.LeftButton!=MouseButtonState.Pressed)return;
                 Point now=e.GetPosition(handle);if(Math.Abs(now.X-origin.X)<SystemParameters.MinimumHorizontalDragDistance&&Math.Abs(now.Y-origin.Y)<SystemParameters.MinimumVerticalDragDistance)return;
                 armed=false;e.Handled=true;Mouse.Capture(null);active=new Session {Scope=scope,Key=key};double opacity=target.Opacity;DragGhost ghost=null;GiveFeedbackEventHandler feedback=null;
