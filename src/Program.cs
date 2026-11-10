@@ -30,7 +30,7 @@ namespace OneTaskBar
         internal static bool CaptureReview;
         [STAThread] static int Main(string[] args){
             // The administrator helper and the small one-shot helpers have no window: they must not start the display machinery.
-            bool windowless=args.Length>0&&(args[0]=="--admin-helper"||args[0]=="--elevated-startup"||args[0]=="--run-startup-after");
+            bool windowless=args.Length>0&&(args[0]=="--admin-helper"||args[0]=="--elevated-startup"||args[0]=="--run-startup-after"||args[0]=="--elevate");
             if(!windowless)FrameRate.Raise();int code=Run(args);Environment.Exit(code);return code;}
         static int Run(string[] args)
         {
@@ -46,6 +46,7 @@ namespace OneTaskBar
             if(args.Length==2&&args[0]=="--run-startup-after")return AdminMode.RunAfter(args[1]);
             if(args.Length==1&&args[0]=="--admin-helper")return AdminHelperHost.Run();
             if(args.Length==2&&args[0]=="--elevated-startup")return LogonStartup.ElevatedHelper(args[1]=="on");
+            if(args.Length==4&&args[0]=="--elevate")return AdminMode.Broker(args);
             if(args.Length==3&&args[0]=="--register-notifications")return NotificationIdentity.RegisterHelper(args[1],args[2]);
             if(args.Length>0&&args[0]=="--notification-restart")return NotificationIdentity.RestartHelper(args);
             if(args.Contains("--notification-probe")) { Signal("ProbeNotifications"); return 0; }

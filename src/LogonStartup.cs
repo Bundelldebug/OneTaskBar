@@ -138,6 +138,82 @@ namespace OneTaskBar
                 catch(Exception error){AppLog.Once("admin-helper-read",error.GetType().Name);return false;}
             }
         }
+        // A child of the app carries the notification package identity, and Windows does not run a process that has both that
+        // identity and an administrator token properly (it is ended by a fail-fast, and on some PCs spins a processor core).
+        // Task Scheduler starts a process outside the package, so the administrator request is made from a copy started this way.
+        internal const string OnceTask="OneTaskBar.Once";
+        internal static string OnceDefinition(string executable,string userSid,string arguments)
+        {
+            var text=new StringBuilder();
+            using(var writer=XmlWriter.Create(text,new XmlWriterSettings {OmitXmlDeclaration=true}))
+            {
+                writer.WriteStartElement("Task",TaskNamespace);
+                writer.WriteAttributeString("version","1.2");
+                writer.WriteStartElement("RegistrationInfo");
+                writer.WriteElementString("Description","One TaskBar: asks Windows for consent to change administrator window support. Removed when done.");
+                writer.WriteElementString("Source","OneTaskBar.Once.v1|"+userSid);
+                writer.WriteEndElement();
+                writer.WriteStartElement("Principals");
+                writer.WriteStartElement("Principal");
+                writer.WriteAttributeString("id","CurrentUser");
+                writer.WriteElementString("UserId",userSid);
+                writer.WriteElementString("LogonType","InteractiveToken");
+                writer.WriteElementString("RunLevel","LeastPrivilege");
+                writer.WriteEndElement();
+                writer.WriteEndElement();
+                writer.WriteStartElement("Settings");
+                writer.WriteElementString("MultipleInstancesPolicy","IgnoreNew");
+                writer.WriteElementString("DisallowStartIfOnBatteries","false");
+                writer.WriteElementString("StopIfGoingOnBatteries","false");
+                writer.WriteElementString("AllowHardTerminate","true");
+                writer.WriteElementString("AllowStartOnDemand","true");
+                writer.WriteElementString("Enabled","true");
+                writer.WriteElementString("Hidden","true");
+                writer.WriteElementString("ExecutionTimeLimit","PT10M");
+                writer.WriteElementString("Priority","4");
+                writer.WriteEndElement();
+                writer.WriteStartElement("Actions");
+                writer.WriteAttributeString("Context","CurrentUser");
+                writer.WriteStartElement("Exec");
+                writer.WriteElementString("Command",executable);
+                writer.WriteElementString("Arguments",arguments);
+                writer.WriteElementString("WorkingDirectory",Path.GetDirectoryName(executable));
+                writer.WriteEndElement();
+                writer.WriteEndElement();
+                writer.WriteEndElement();
+            }
+            return text.ToString();
+        }
+        internal static bool RunOnce(string arguments)
+        {
+            try
+            {
+                lock(gate)using(var scheduler=new Scheduler())
+                {
+                    scheduler.Keep(Invoke(scheduler.Root,"RegisterTask",BindingFlags.InvokeMethod,OnceTask,OnceDefinition(Exe,Sid,arguments),6,null,null,3,null));
+                    var task=scheduler.Find(OnceTask);
+                    if(task==null)return false;
+                    scheduler.Keep(Invoke(task,"Run",BindingFlags.InvokeMethod,(object)null));
+                    return true;
+                }
+            }
+            catch(Exception error)
+            {
+                AppLog.Once("once-task",error.GetType().Name);
+                return false;
+            }
+        }
+        internal static void RemoveOnce()
+        {
+            try
+            {
+                lock(gate)using(var scheduler=new Scheduler())
+                {
+                    if(scheduler.Find(OnceTask)!=null)Invoke(scheduler.Root,"DeleteTask",BindingFlags.InvokeMethod,OnceTask,0);
+                }
+            }
+            catch(Exception error){AppLog.Once("once-task-remove",error.GetType().Name);}
+        }
         // Runs in the elevated helper process: registers the sign-in task with or without the administrator token.
         internal static int ElevatedHelper(bool on)
         {
@@ -160,7 +236,7 @@ namespace OneTaskBar
                         scheduler.Keep(Invoke(scheduler.Root,"RegisterTask",BindingFlags.InvokeMethod,AdminHelperTask,AdminHelperDefinition(Exe,Sid),helper==null?2:6,null,null,3,null));
                         var registered=scheduler.Find(AdminHelperTask);
                         if(registered==null)throw new InvalidOperationException("관리자 도우미 작업을 확인하지 못했습니다.");
-                        Invoke(registered,"Run",BindingFlags.InvokeMethod,(object)null);
+                        scheduler.Keep(Invoke(registered,"Run",BindingFlags.InvokeMethod,(object)null));
                     }
                     else if(helper!=null)
                     {

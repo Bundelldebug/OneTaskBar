@@ -129,9 +129,13 @@ namespace OneTaskBar
             }
         }        static bool Running {get{return File.Exists(@"\\.\pipe\"+AdminPipes.Command);}}
         static int launches;
+        static volatile bool held;
         internal static bool Registered {get{return registered;}}
+        // While the setting is being changed the helper is left alone: starting it again would race the change.
+        internal static void Hold(bool on){held=on;}
         static void EnsureRunning()
         {
+            if(held)return;
             // A helper that keeps failing to appear is retried less and less often (20 s, 40 s ... at most 5 min) instead of forever.
             double wait=Math.Min(300,20*Math.Pow(2,Math.Min(launches,4)));
             if(Running)
@@ -182,6 +186,12 @@ namespace OneTaskBar
                 return false;
             }
             return answer=="1";
+        }
+        // True when the helper minimized an administrator window (this app's own request is refused by Windows).
+        internal static bool Minimize(IntPtr window)
+        {
+            if(!WantsHelper(window)||DateTime.UtcNow<offlineUntil)return false;
+            return Ask("M "+window.ToInt64(),60)=="1";
         }
         internal static bool WantsHelper(IntPtr window)
         {
@@ -355,6 +365,16 @@ namespace OneTaskBar
                             {
                                 var window=new IntPtr(value);
                                 ok=Native.IsWindow(window)&&WindowActivation.TryActivate(window);
+                            }
+                        }
+                        else if(line.StartsWith("M ",StringComparison.Ordinal))
+                        {
+                            // A click on the dock icon of the administrator window in front minimizes it, like any other window.
+                            long value;
+                            if(Int64.TryParse(line.Substring(2),out value)&&Native.IsWindow(new IntPtr(value)))
+                            {
+                                Native.ShowWindow(new IntPtr(value),6);
+                                ok=true;
                             }
                         }
                         else if(line=="Q"){ok=true;quit=true;}
