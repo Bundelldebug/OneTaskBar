@@ -5,7 +5,7 @@
 [assembly: AssemblyCompany("OneTaskBar contributors")]
 [assembly: AssemblyCopyright("Copyright 2026 OneTaskBar contributors. MIT License.")]
 // Increment only the patch number unless the owner requests a major/minor change.
-[assembly: AssemblyVersion("9.5.13.0")]
-[assembly: AssemblyFileVersion("9.5.13.0")]
+[assembly: AssemblyVersion("10.0.0.0")]
+[assembly: AssemblyFileVersion("10.0.0.0")]
 
-[assembly: AssemblyInformationalVersion("9.5.13 A1Z5")]
+[assembly: AssemblyInformationalVersion("10.0.0 A1A6")]
