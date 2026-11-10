@@ -191,3 +191,10 @@ Keep durable rules in [AGENTS.md](../AGENTS.md) and navigation in [DEBUGGING.md]
 - Also added: dock click on the focused administrator window minimizes it through the helper (`M <hwnd>`). The helper command was checked directly; the dock click itself could not be driven (injected clicks are dropped while an administrator window has focus).
 - Rule: never start this program elevated as a child of the packaged app. An elevated Resource Monitor opened for the test may still be open.
 - `Test-UI` Settings, Startup, Dock and the build self-test passed. Installed here; not published.
+
+### Releases A1Z3 / A1A5 (Claude Code, 2026-11-10)
+
+- Published at the owner's request: [9.5.13 A1Z3](https://github.com/Bundelldebug/OneTaskBar/releases/tag/v9.5.13-A1Z3) (stable, commit `5b1ce84`) and [10.0.0 A1A5 Beta](https://github.com/Bundelldebug/OneTaskBar/releases/tag/v10.0.0-A1A5-beta) (commit `65e22dd`). Both unsigned. They carry the administrator-consent fix described above. Installed on this PC: A1A5.
+- Test-UI: A1Z3 build passed Settings, Startup, Dock, Quick. A1A5 build passed Settings, Startup, Dock, Quick; Media failed twice (fullscreen-tiles-probe "scrolling title ... 43" updates/s, fluid-island-probe "settles") and passed on the third run. These are timing probes; the failures were not investigated.
+- Idle measure of the installed builds: A1Z3 CPU 0.083 %, WS 252 MiB (private 117); A1A5 CPU 0.122 %, WS 272 MiB (private 137).
+- Not verified: the other PC's CPU spin (inferred from the crash, not observed); dock click minimizing a focused administrator window.
