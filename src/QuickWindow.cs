@@ -137,7 +137,7 @@ namespace OneTaskBar
             themeCircle=new Border {Width=44,Height=44,CornerRadius=new CornerRadius(22),Background=Paint.Brush(QuickPanel.Inactive),Child=themeToggle};AddSection("brightness",SliderRow(brightness,themeCircle));
             mute=IconButton("volume",()=>shell.Mute(),"음소거 전환",44);soundGlyphs.Add((Glyph)mute.Content);muteCircle=new Border {Width=44,Height=44,CornerRadius=new CornerRadius(22),Background=Paint.Brush(QuickPanel.Inactive),Child=mute};
             AddSection("volume",SliderRow(volume,muteCircle,()=>shell.ShowDetail("sound")));
-            mediaPlayer=new MediaPlayerView(shell.Media,shell.SeekMedia,()=>shell.ShowDetail("sound"),condensed:true,openApp:shell.OpenMediaApplication);
+            mediaPlayer=new MediaPlayerView(shell.Media,shell.SeekMedia,()=>shell.ShowDetail("sound"),condensed:true,openApp:shell.OpenMediaApplication);mediaPlayer.SeekBar.WaveInterval=.033;
             var mediaCard=Card(mediaPlayer,28,new Thickness(0,0,0,10));mediaPlayer.PaletteChanged=palette=>{mediaCard.Background=mediaPlayer.IsCompact?QuickPanel.Card:mediaPlayer.MediaBackground;mediaCard.CornerRadius=new CornerRadius(mediaPlayer.IsCompact?34:28);};AddSection("media",mediaCard);
             shortcuts=new UniformGrid {Columns=2};var bottomOrder=new ReorderGroup("quick.shortcuts",shortcuts,Orientation.Horizontal,()=>editing,PlacePair);groups.Add(bottomOrder);
             devicesTile=WideTile("devices","주변 기기 연결","samsung-devices",new Thickness(0));windowsTile=WideTile("windows-settings","Windows 설정","windows-settings",new Thickness(0));bottomOrder.Add("devices",devicesTile);bottomOrder.Add("focus",windowsTile);AddSection("shortcuts",shortcuts);

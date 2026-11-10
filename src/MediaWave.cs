@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Media;
@@ -81,14 +81,14 @@ namespace OneTaskBar
         internal int WaveFrames {get;private set;}
         // Listening to the compositor's frame event keeps the whole window rendering every frame, even between updates; a timer
         // wakes the interface only when the wave moves, and the phase follows the clock, so a late tick never slows it.
-        System.Windows.Threading.DispatcherTimer waveTimer;
+        System.Windows.Threading.DispatcherTimer waveTimer;bool waveByTimer;
         // Seconds between redraws; 0 follows the power state (60 a second plugged in, 30 on battery). Small panel cards ask
         // for 30: each redraw presents the whole translucent panel, and the wave there is a few centimetres wide.
         internal double WaveInterval;
         double WavePeriod {get{return WaveInterval>0?Math.Max(WaveInterval,RuntimeCadence.OnBattery?.030:.014):RuntimeCadence.OnBattery?.030:.014;}}
         void StopWave()
         {
-            if(waveHooked&&waveTimer!=null)waveTimer.Stop();
+            if(waveHooked){if(waveByTimer)waveTimer.Stop();else CompositionTarget.Rendering-=WaveFrame;}
             waveHooked=false;waveClock.Stop();lastWaveFrame=-1;waveRendering=TimeSpan.MinValue;waveStrength=waveFrom=waveTarget=0;
         }
         void UpdateWaveClock()
@@ -100,9 +100,16 @@ namespace OneTaskBar
             if(!waveHooked)
             {
                 waveClock.Start();waveHooked=true;
-                if(waveTimer==null){waveTimer=new System.Windows.Threading.DispatcherTimer(System.Windows.Threading.DispatcherPriority.Render);waveTimer.Tick+=(s,e)=>WaveFrame(s,e);}
-                waveTimer.Interval=TimeSpan.FromSeconds(WavePeriod>.020?WavePeriod:.016);
-                waveTimer.Start();
+                // A small panel card asks for a slower wave and uses the timer; a full player follows the frame event, whose frames
+                // line up with the motion around it (a timer between frames made fullscreen motion uneven).
+                waveByTimer=WaveInterval>0;
+                if(!waveByTimer)CompositionTarget.Rendering+=WaveFrame;
+                else
+                {
+                    if(waveTimer==null){waveTimer=new System.Windows.Threading.DispatcherTimer(System.Windows.Threading.DispatcherPriority.Render);waveTimer.Tick+=(s,e)=>WaveFrame(s,e);}
+                    waveTimer.Interval=TimeSpan.FromSeconds(WavePeriod>.020?WavePeriod:.016);
+                    waveTimer.Start();
+                }
             }
         }
         void WaveFrame(object sender,EventArgs args)
@@ -113,7 +120,7 @@ namespace OneTaskBar
             // 60 updates a second on a PC that is plugged in, 30 on battery, whatever the display's refresh rate: a wave that
             // followed a 144 Hz screen frame by frame cost several times more for no visible gain, and each update redraws
             // the whole translucent panel it sits in.
-            if(now==lastWaveFrame||lastWaveFrame>=0&&now-lastWaveFrame<WavePeriod)return;lastWaveFrame=now;
+            if(now==lastWaveFrame||lastWaveFrame>=0&&now-lastWaveFrame<(waveByTimer?WavePeriod:FrameRate.Target>60&&!RuntimeCadence.OnBattery?.0065:.014))return;lastWaveFrame=now;
             double t=Math.Min(1,(now-waveAt)/.26),ease=t*t*(3-2*t);
             waveStrength=waveFrom+(waveTarget-waveFrom)*ease;
             if(!dragging&&WaveProgress!=null&&!WaveDecoration)Value=WaveProgress();

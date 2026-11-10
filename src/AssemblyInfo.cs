@@ -8,4 +8,4 @@
 [assembly: AssemblyVersion("9.5.13.0")]
 [assembly: AssemblyFileVersion("9.5.13.0")]
 
-[assembly: AssemblyInformationalVersion("9.5.13 A1Z4")]
+[assembly: AssemblyInformationalVersion("9.5.13 A1Z5")]

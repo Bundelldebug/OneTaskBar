@@ -363,7 +363,7 @@ namespace OneTaskBar
             });
             Brightness.Changed+=shell.Bright;
             Volume.Changed+=shell.Volume;
-            media=new MediaPlayerView(shell.Media,shell.SeekMedia,()=>shell.ShowDetail("sound"),condensed:true,openApp:shell.OpenMediaApplication,dense:true,sourceApp:id=>MediaApplication.Resolve(id,shell.Running.Concat(shell.Apps)));
+            media=new MediaPlayerView(shell.Media,shell.SeekMedia,()=>shell.ShowDetail("sound"),condensed:true,openApp:shell.OpenMediaApplication,dense:true,sourceApp:id=>MediaApplication.Resolve(id,shell.Running.Concat(shell.Apps)));media.SeekBar.WaveInterval=.033;
             media.HorizontalAlignment=HorizontalAlignment.Stretch;
             media.VerticalAlignment=VerticalAlignment.Center;
             mediaBody.Children.Add(mediaGlow);
