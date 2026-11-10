@@ -79,9 +79,16 @@ namespace OneTaskBar
         internal bool WaveAnimating {get{return waveHooked;}}
         internal double WaveStrength {get{return waveStrength;}}
         internal int WaveFrames {get;private set;}
+        // Listening to the compositor's frame event keeps the whole window rendering every frame, even between updates; a timer
+        // wakes the interface only when the wave moves, and the phase follows the clock, so a late tick never slows it.
+        System.Windows.Threading.DispatcherTimer waveTimer;
+        // Seconds between redraws; 0 follows the power state (60 a second plugged in, 30 on battery). Small panel cards ask
+        // for 30: each redraw presents the whole translucent panel, and the wave there is a few centimetres wide.
+        internal double WaveInterval;
+        double WavePeriod {get{return WaveInterval>0?Math.Max(WaveInterval,RuntimeCadence.OnBattery?.030:.014):RuntimeCadence.OnBattery?.030:.014;}}
         void StopWave()
         {
-            if(waveHooked)CompositionTarget.Rendering-=WaveFrame;
+            if(waveHooked&&waveTimer!=null)waveTimer.Stop();
             waveHooked=false;waveClock.Stop();lastWaveFrame=-1;waveRendering=TimeSpan.MinValue;waveStrength=waveFrom=waveTarget=0;
         }
         void UpdateWaveClock()
@@ -90,15 +97,23 @@ namespace OneTaskBar
             double target=wavePlaying?1:0;
             if(target!=waveTarget){waveFrom=waveStrength;waveTarget=target;waveAt=waveClock.Elapsed.TotalSeconds;}
             if(!wavePlaying&&waveStrength<=.001){StopWave();return;}
-            if(!waveHooked){waveClock.Start();waveHooked=true;CompositionTarget.Rendering+=WaveFrame;}
+            if(!waveHooked)
+            {
+                waveClock.Start();waveHooked=true;
+                if(waveTimer==null){waveTimer=new System.Windows.Threading.DispatcherTimer(System.Windows.Threading.DispatcherPriority.Render);waveTimer.Tick+=(s,e)=>WaveFrame(s,e);}
+                waveTimer.Interval=TimeSpan.FromSeconds(WavePeriod>.020?WavePeriod:.016);
+                waveTimer.Start();
+            }
         }
         void WaveFrame(object sender,EventArgs args)
         {
             if(!waveMode||!IsVisible||!Motion.Enabled){StopWave();return;}
             var frame=args as RenderingEventArgs;if(frame!=null){if(frame.RenderingTime==waveRendering)return;waveRendering=frame.RenderingTime;}
             double now=waveClock.Elapsed.TotalSeconds;
-            // The same 60 updates a second on every PC and display (a 120 Hz screen skips every other frame), so it never depends on the machine.
-            if(now==lastWaveFrame||lastWaveFrame>=0&&now-lastWaveFrame<(FrameRate.Target>60&&!RuntimeCadence.OnBattery?.0065:.014))return;lastWaveFrame=now;
+            // 60 updates a second on a PC that is plugged in, 30 on battery, whatever the display's refresh rate: a wave that
+            // followed a 144 Hz screen frame by frame cost several times more for no visible gain, and each update redraws
+            // the whole translucent panel it sits in.
+            if(now==lastWaveFrame||lastWaveFrame>=0&&now-lastWaveFrame<WavePeriod)return;lastWaveFrame=now;
             double t=Math.Min(1,(now-waveAt)/.26),ease=t*t*(3-2*t);
             waveStrength=waveFrom+(waveTarget-waveFrom)*ease;
             if(!dragging&&WaveProgress!=null&&!WaveDecoration)Value=WaveProgress();

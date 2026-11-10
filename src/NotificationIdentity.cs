@@ -80,6 +80,23 @@ namespace OneTaskBar
             ManifestIdentity(xml).SetAttribute("Version",version.ToString());
             return xml.OuterXml;
         }
+        [DllImport("kernel32.dll",CharSet=CharSet.Unicode,SetLastError=true)]static extern uint GetShortPathName(string path,System.Text.StringBuilder buffer,uint length);
+        static string ShortPath(string path)
+        {
+            var text=new System.Text.StringBuilder(1024);
+            uint length=GetShortPathName(path,text,(uint)text.Capacity);
+            return length==0||length>=text.Capacity?null:text.ToString();
+        }
+        static void Deploy(PackageManager manager,Uri uri,AddPackageOptions options)
+        {
+            var operation=manager.AddPackageByUriAsync(uri,options);
+            var watch=Stopwatch.StartNew();
+            while(operation.Status==AsyncStatus.Started&&watch.Elapsed.TotalSeconds<90)Thread.Sleep(40);
+            if(operation.Status==AsyncStatus.Started){operation.Cancel();throw new TimeoutException("Windows 앱 등록이 시간 안에 끝나지 않았습니다.");}
+            if(operation.Status==AsyncStatus.Error)throw operation.ErrorCode;
+            if(operation.Status==AsyncStatus.Canceled)throw new OperationCanceledException();
+            NotificationRegistration.CheckResult(operation.GetResults());
+        }
         internal static int RegisterHelper(string nonce,string userSid)
         {
             Guid parsed;if(!Guid.TryParseExact(nonce,"N",out parsed))return 2;var result=new IdentityResult();int exit=1;
@@ -100,15 +117,26 @@ namespace OneTaskBar
                     File.WriteAllText(manifest,Manifest(version),new System.Text.UTF8Encoding(false));
                     string package=IdentityPackage.Build(manifest,folder);
                     var options=new AddPackageOptions {AllowUnsigned=true,ExternalLocationUri=FileUri(external+Path.DirectorySeparatorChar)};
-                    var uri=FileUri(PhysicalFile(package));
-                    AppLog.Write("notification-register-path",uri.AbsoluteUri+" | "+options.ExternalLocationUri.AbsoluteUri);
-                    var operation=manager.AddPackageByUriAsync(uri,options);
-                    var watch=Stopwatch.StartNew();
-                    while(operation.Status==AsyncStatus.Started&&watch.Elapsed.TotalSeconds<90)Thread.Sleep(40);
-                    if(operation.Status==AsyncStatus.Started){operation.Cancel();throw new TimeoutException("Windows 앱 등록이 시간 안에 끝나지 않았습니다.");}
-                    if(operation.Status==AsyncStatus.Error)throw operation.ErrorCode;
-                    if(operation.Status==AsyncStatus.Canceled)throw new OperationCanceledException();
-                    NotificationRegistration.CheckResult(operation.GetResults());
+                    string physical=PhysicalFile(package);
+                    // Error 0x80070003 ("cannot open the package") was reported on a PC whose profile path Windows could not open from a
+                    // long Unicode URI. The 8.3 short path is plain ASCII, so it is tried when the normal path is refused.
+                    var attempts=new System.Collections.Generic.List<string>{physical};
+                    string shortPath=ShortPath(physical);
+                    if(!String.IsNullOrEmpty(shortPath)&&!String.Equals(shortPath,physical,StringComparison.OrdinalIgnoreCase))attempts.Add(shortPath);
+                    Exception failure=null;
+                    foreach(string candidate in attempts)
+                    {
+                        var uri=FileUri(candidate);
+                        AppLog.Write("notification-register-path",uri.AbsoluteUri+" | "+options.ExternalLocationUri.AbsoluteUri);
+                        try{Deploy(manager,uri,options);failure=null;break;}
+                        catch(Exception error)
+                        {
+                            failure=error;
+                            if(error.HResult!=unchecked((int)0x80070003))break;
+                            AppLog.Write("notification-register-retry",error.Message);
+                        }
+                    }
+                    if(failure!=null)throw failure;
                     result=Find();if(!result.Registered)throw new InvalidOperationException("Windows 앱 등록을 확인하지 못했습니다.");exit=0;
                 }
             }catch(Exception error){result.Error=error.Message;result.ErrorCode=error.HResult;result.AdministratorRequired=error.HResult==unchecked((int)0x80070005)||error.HResult==unchecked((int)0x80073D2B)||error is UnauthorizedAccessException;exit=result.AdministratorRequired?5:1;AppLog.Write("notification-register",error.ToString());}

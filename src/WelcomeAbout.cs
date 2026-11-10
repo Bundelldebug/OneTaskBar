@@ -14,6 +14,7 @@ namespace OneTaskBar
         StackPanel AboutSection()
         {
             var about=new StackPanel();
+            LanguageSetting(about);
             AboutLine(about,"현재 버전","One TaskBar "+SoftwareUpdate.CurrentText+(Fluid.ShowBeta?" Beta":"")+(Program.Inspectable?" (개발 빌드)":""));
             AboutLine(about,"상세 버전",SoftwareUpdate.DetailText+(Fluid.ShowBeta?" Beta":""));
             AboutLine(about,"개발","OneTaskBar contributors · MIT 라이선스");

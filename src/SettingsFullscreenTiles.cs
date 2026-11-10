@@ -19,7 +19,7 @@ namespace OneTaskBar
             // Sizes are chosen on the screen itself; this list stays for anyone who prefers it.
             var sizes=new StackPanel {Visibility=Visibility.Collapsed};
             foreach(var family in InfoTileCatalog.Families)TileSizePicker(sizes,family);
-            var toggle=Paint.Action("위젯별 크기를 목록에서 고르기",()=>{});
+            var toggle=SettingsChip.Action("위젯별 크기를 목록에서 고르기",()=>{});
             toggle.HorizontalAlignment=HorizontalAlignment.Left;
             toggle.Margin=new Thickness(12,0,12,10);
             var label=(TextBlock)toggle.Content;
@@ -134,7 +134,7 @@ namespace OneTaskBar
             var result=Paint.TextBlock("",12,Paint.Muted);
             result.Margin=new Thickness(15,0,15,8);
             Button apply=null;
-            apply=Paint.Action("적용",async()=>
+            apply=SettingsChip.Action("적용",async()=>
             {
                 apply.IsEnabled=false;
                 result.Text="위치를 찾는 중입니다";
@@ -159,7 +159,7 @@ namespace OneTaskBar
             var channelLine=new DockPanel {Margin=new Thickness(15,0,15,12)};
             var channelKey=new PasswordBox {Password=Preferences.Current.WeatherChannelKey??"",Background=Paint.ControlWhite,Foreground=Paint.OnLight,BorderThickness=new Thickness(0),FontSize=14,Padding=new Thickness(12,8,12,8),MaxLength=128};
             System.Windows.Automation.AutomationProperties.SetName(channelKey,"The Weather Channel API 키");
-            var channelSave=Paint.Action("저장",()=>
+            var channelSave=SettingsChip.Action("저장",()=>
             {
                 string value=channelKey.Password.Trim();
                 Preferences.SetMediaAppearance(p=>p.WeatherChannelKey=value.Length==0?null:value);

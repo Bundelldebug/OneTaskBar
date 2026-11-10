@@ -61,7 +61,7 @@ namespace OneTaskBar
                 return dialog.ShowDialog(this)==true?dialog.FileName:null;
             };
             var buttons=new WrapPanel {Margin=new Thickness(-3,10,0,0)};
-            Action<string,Action> add=(label,click)=>{var button=Paint.Action(label,click);button.Margin=new Thickness(3);buttons.Children.Add(button);};
+            Action<string,Action> add=(label,click)=>{var button=SettingsChip.Action(label,click);button.Margin=new Thickness(3);buttons.Children.Add(button);};
             add("바탕화면 선택",()=>{string file=pick("바탕화면 사진");if(file==null)return;Preferences.Set(p=>p.PresetDesktopWallpaper=file);show();});
             add("현재 바탕화면 가져오기",()=>{string file=WallpaperPreset.CurrentDesktop();if(!WallpaperPreset.Usable(file)){Feedback("현재 바탕화면 파일을 찾지 못했습니다");return;}Preferences.Set(p=>p.PresetDesktopWallpaper=file);show();});
             add("잠금화면 선택",()=>{string file=pick("잠금화면 사진");if(file==null)return;Preferences.Set(p=>p.PresetLockScreen=file);show();});

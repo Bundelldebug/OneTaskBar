@@ -11,7 +11,7 @@ namespace OneTaskBar
         internal static bool Vertical(int edge){return edge==0||edge==2;}
         internal const double SideStatusWidth=44;
         internal static double SideStatusLength(double powerWidth){return (powerWidth>0?128:106)-(40-DockClock.SideHeight);}
-        internal static string ClockLabel(DateTime time,bool seconds,bool vertical){return time.ToString(vertical?seconds?"tt\nh:mm:ss\nMM-dd":"tt\nh:mm\nMM-dd":seconds?"tt h:mm:ss\nyyyy-MM-dd":"tt h:mm\nyyyy-MM-dd",System.Globalization.CultureInfo.GetCultureInfo("ko-KR"));}
+        internal static string ClockLabel(DateTime time,bool seconds,bool vertical){return time.ToString(vertical?seconds?"tt\nh:mm:ss\nMM-dd":"tt\nh:mm\nMM-dd":seconds?"tt h:mm:ss\nyyyy-MM-dd":"tt h:mm\nyyyy-MM-dd",Loc.Culture);}
         internal static Rect Rect(System.Drawing.Rectangle screen,double scale,int edge,Rect logical)
         {
             double width=screen.Width/scale,height=screen.Height/scale;

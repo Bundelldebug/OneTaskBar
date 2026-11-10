@@ -198,3 +198,11 @@ Keep durable rules in [AGENTS.md](../AGENTS.md) and navigation in [DEBUGGING.md]
 - Test-UI: A1Z3 build passed Settings, Startup, Dock, Quick. A1A5 build passed Settings, Startup, Dock, Quick; Media failed twice (fullscreen-tiles-probe "scrolling title ... 43" updates/s, fluid-island-probe "settles") and passed on the third run. These are timing probes; the failures were not investigated.
 - Idle measure of the installed builds: A1Z3 CPU 0.083 %, WS 252 MiB (private 117); A1A5 CPU 0.122 %, WS 272 MiB (private 137).
 - Not verified: the other PC's CPU spin (inferred from the crash, not observed); dock click minimizing a focused administrator window.
+
+
+### Nine-item bug patch and languages (Claude Code, 2026-11-10)
+
+- Issue 19: package-open failure 0x80070003 now retries through a short path (speculative; not reproduced). Pinned apps launched separately fall back to their `Executable` when not in AppsFolder (not tried on a device). CPU: media wave moved off `CompositionTarget.Rendering` to a timer (about 11-14 % Quick, 6 % Notifications on battery; owner's 4 % not reproduced). Collapsed Now Bar thumbnail only expands; notification media player resized to the 4x2 player (built, not visually checked).
+- Squircle icons get the 3D rim (`AppIconShape.Rim`). Settings buttons use `SettingsChip` under Fluid/Glass. Launcher search: English-layout Korean (qmfkdnwj -> 브라우저) and Korean aliases for English names (`SearchKorean.cs`).
+- Languages en/ja/zh: `Loc.cs` translates Korean source text at display (TextBlock, ToolTip, Content), tables in `LocEnglish/Japanese/Chinese.cs` (about 950 keys, machine-written, not reviewed by native speakers). Setting `Preferences.Language` (auto follows Windows; fixtures with `ONE_TASKBAR_DATA` stay Korean). Picker is the first row of the About page (`WelcomeLanguage.cs`). Late-built page content is caught by a settle walk (`Loc.Settle`). Dates go through `Loc.Date`. Untranslated wording stays Korean; some notification/tooltip text built at runtime may remain so. Sidebar "Dynamic Island and top bar" is clipped in English.
+- Verified: build self-test, Test-UI Settings, Launcher, Quick, Notifications, Media, Dock, Glass, Startup, Resources (0 failed), screenshots of About/Desktop in en/ja/zh. Installed with Apply-ToPC. Idle: CPU 0.087 %, WS 338 MiB (private 196). Not published.

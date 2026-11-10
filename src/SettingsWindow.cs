@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -46,7 +46,7 @@ namespace OneTaskBar
             Row(panels,"One Taskbar 알림 팝업","Windows 알림을 둥근 블러 카드로 표시합니다. 방해 금지와 앱별 배너 설정을 따릅니다",Preferences.Current.NotificationPopups,v=>Preferences.Set(p=>p.NotificationPopups=v));
             NotificationSoundSetting(panels);
             Row(panels,"Galaxy Buds 연결 팝업","버즈 연결 정보를 오른쪽 아래에 표시합니다. 등록된 기기의 상태 변경만 감지합니다",Preferences.Current.BudsConnectionPopups,v=>Preferences.Set(p=>p.BudsConnectionPopups=v));
-            var notificationLink=Paint.Action("Windows 알림 연결 · 권한 관리",()=>shell.ShowNotificationConnection());notificationLink.HorizontalContentAlignment=HorizontalAlignment.Left;notificationLink.Margin=new Thickness(12,5,12,12);panels.Children.Add(notificationLink);
+            var notificationLink=SettingsChip.Action("Windows 알림 연결 · 권한 관리",()=>shell.ShowNotificationConnection());notificationLink.HorizontalContentAlignment=HorizontalAlignment.Left;notificationLink.Margin=new Thickness(12,5,12,12);panels.Children.Add(notificationLink);
             ChoiceRow(panels,"빠른 설정","Wi-Fi·소리·배터리 버튼에서 열 화면",Preferences.Current.NativeQuickSettings,v=>Preferences.Set(p=>p.NativeQuickSettings=v));
             ChoiceRow(panels,"데스크톱 전환","독 버튼과 Win+Tab에서 열 화면",Preferences.Current.NativeTaskView,v=>Preferences.Set(p=>p.NativeTaskView=v));
             ChoiceRow(panels,"숨겨진 트레이 아이콘","상태 영역의 화살표에서 열 화면",Preferences.Current.NativeTrayOverflow,v=>Preferences.Set(p=>p.NativeTrayOverflow=v));
@@ -103,7 +103,7 @@ namespace OneTaskBar
                 Row(nowBar,"측면 미디어 세로 캡슐","왼쪽·오른쪽 작업표시줄에서 커버와 재생 표시를 세로로 배치합니다",
                     Preferences.Current.NowBarSideCapsule,v=>Preferences.Set(p=>p.NowBarSideCapsule=v));
                 SubHeading(nowBar,"전체화면 미디어");
-                var fullscreen=Paint.Action("전체화면 미디어 열기",shell.OpenFullscreenMedia);
+                var fullscreen=SettingsChip.Action("전체화면 미디어 열기",shell.OpenFullscreenMedia);
                 fullscreen.Margin=new Thickness(15,8,15,12);
                 nowBar.Children.Add(fullscreen);
                 var clockSize=MaterialSlider(nowBar,"전체화면 미디어 시계 크기",Preferences.Current.FullscreenClockPercent,200,"%",value=>
@@ -134,13 +134,13 @@ namespace OneTaskBar
             var motion=new StackPanel();Row(motion,"부드러운 전환","패널 열기와 닫기 애니메이션을 사용합니다",Preferences.Current.Animations,v=>Preferences.Set(p=>p.Animations=v));
             Row(motion,"충전 애니메이션","연결할 때 배터리 아이콘이 커졌다가 돌아옵니다",Preferences.Current.ChargeAnimation,v=>Preferences.Set(p=>p.ChargeAnimation=v));
             var preview=new Grid {Margin=new Thickness(15,5,15,12),Height=44};PreviewBattery.State=controller.Power;PreviewBattery.VerticalAlignment=VerticalAlignment.Center;PreviewBattery.HorizontalAlignment=HorizontalAlignment.Left;PreviewBattery.Margin=new Thickness(34,0,0,0);preview.Children.Add(PreviewBattery);
-            var tryCharge=Paint.Action("충전 효과 미리 보기",()=>shell.PreviewCharge());tryCharge.HorizontalAlignment=HorizontalAlignment.Right;preview.Children.Add(tryCharge);motion.Children.Add(preview);Group(groups,"움직임",motion);
+            var tryCharge=SettingsChip.Action("충전 효과 미리 보기",()=>shell.PreviewCharge());tryCharge.HorizontalAlignment=HorizontalAlignment.Right;preview.Children.Add(tryCharge);motion.Children.Add(preview);Group(groups,"움직임",motion);
             var sounds=new StackPanel();var soundToggle=Row(sounds,"충전 연결음","충전기를 새로 연결하면 선택한 소리 파일을 재생합니다",Preferences.Current.ChargeSoundEnabled,v=>Preferences.Set(p=>p.ChargeSoundEnabled=v));
             var soundName=Paint.TextBlock(String.IsNullOrEmpty(Preferences.Current.ChargeSoundFile)?"선택한 파일 없음":Path.GetFileName(Preferences.Current.ChargeSoundFile),12,Paint.Muted);soundName.Margin=new Thickness(15,3,15,7);soundName.TextTrimming=TextTrimming.CharacterEllipsis;sounds.Children.Add(soundName);
             var soundActions=new StackPanel {Orientation=Orientation.Horizontal,Margin=new Thickness(12,0,12,12)};
-            soundActions.Children.Add(Paint.Action("소리 파일 선택",()=> {var picker=new Microsoft.Win32.OpenFileDialog {Title="충전 연결음 선택",Filter="소리 파일|*.wav;*.mp3;*.wma;*.m4a;*.aac",CheckFileExists=true,Multiselect=false};if(picker.ShowDialog(this)!=true)return;Preferences.Set(p=> {p.ChargeSoundFile=picker.FileName;p.ChargeSoundEnabled=true;});soundName.Text=Path.GetFileName(picker.FileName);soundToggle.Refresh(true);status.Text="충전 연결음을 저장했습니다";}));
-            soundActions.Children.Add(Paint.Action("미리 듣기",()=>shell.ConnectionSound.Play(Preferences.Current.ChargeSoundFile,message=>status.Text=message)));
-            soundActions.Children.Add(Paint.Action("파일 지우기",()=> {Preferences.Set(p=> {p.ChargeSoundFile=null;p.ChargeSoundEnabled=false;});soundName.Text="선택한 파일 없음";soundToggle.Refresh(false);}));sounds.Children.Add(soundActions);Group(groups,"충전 소리",sounds);
+            soundActions.Children.Add(SettingsChip.Action("소리 파일 선택",()=> {var picker=new Microsoft.Win32.OpenFileDialog {Title="충전 연결음 선택",Filter="소리 파일|*.wav;*.mp3;*.wma;*.m4a;*.aac",CheckFileExists=true,Multiselect=false};if(picker.ShowDialog(this)!=true)return;Preferences.Set(p=> {p.ChargeSoundFile=picker.FileName;p.ChargeSoundEnabled=true;});soundName.Text=Path.GetFileName(picker.FileName);soundToggle.Refresh(true);status.Text="충전 연결음을 저장했습니다";}));
+            soundActions.Children.Add(SettingsChip.Action("미리 듣기",()=>shell.ConnectionSound.Play(Preferences.Current.ChargeSoundFile,message=>status.Text=message)));
+            soundActions.Children.Add(SettingsChip.Action("파일 지우기",()=> {Preferences.Set(p=> {p.ChargeSoundFile=null;p.ChargeSoundEnabled=false;});soundName.Text="선택한 파일 없음";soundToggle.Refresh(false);}));sounds.Children.Add(soundActions);Group(groups,"충전 소리",sounds);
             if(island.Children.Count>0)Group(groups,"다이나믹 아일랜드와 상단바",island);
             if(Fluid.Available&&Preferences.Current.UIVersion>=Fluid.Version)Group(groups,"플루이드 UI",FluidSection());
             // Ordered by what people reach for: the bar itself, how it looks and moves, panels, launcher, media, then upkeep.
@@ -155,7 +155,7 @@ namespace OneTaskBar
             var labels=new StackPanel {VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(0,0,16,0)};var heading=Paint.TextBlock(title,15,AppSettingsPalette.Text);heading.FontWeight=FontWeights.SemiBold;heading.TextWrapping=TextWrapping.Wrap;labels.Children.Add(heading);var detail=Paint.TextBlock(description,13,AppSettingsPalette.Muted);detail.TextWrapping=TextWrapping.Wrap;detail.LineHeight=19;detail.Margin=new Thickness(0,5,0,0);labels.Children.Add(detail);row.Children.Add(labels);
             var options=new System.Windows.Controls.Primitives.UniformGrid {Columns=2};Button custom=null,windows=null;
             Action refresh=()=> {custom.Background=!native?AppSettingsPalette.Accent:Brushes.Transparent;windows.Background=native?AppSettingsPalette.Accent:Brushes.Transparent;custom.Foreground=!native?Paint.ControlWhite:AppSettingsPalette.Text;windows.Foreground=native?Paint.ControlWhite:AppSettingsPalette.Text;((TextBlock)custom.Content).Foreground=custom.Foreground;((TextBlock)windows.Content).Foreground=windows.Foreground;};
-            custom=Paint.Action(customLabel,()=> {if(!native)return;native=false;refresh();changed(false);});windows=Paint.Action(windowsLabel,()=> {if(native)return;native=true;refresh();changed(true);});
+            custom=SettingsChip.Action(customLabel,()=> {if(!native)return;native=false;refresh();changed(false);});windows=SettingsChip.Action(windowsLabel,()=> {if(native)return;native=true;refresh();changed(true);});
             foreach(var button in new[]{custom,windows}){button.Height=40;button.Padding=new Thickness(6,5,6,5);button.Margin=new Thickness(1);((TextBlock)button.Content).FontSize=13;options.Children.Add(button);}refresh();
             var frame=new Border {CornerRadius=new CornerRadius(22),Padding=new Thickness(2),Background=AppSettingsPalette.Card,Child=options,VerticalAlignment=VerticalAlignment.Center};Grid.SetColumn(frame,1);row.Children.Add(frame);parent.Children.Add(row);
         }

@@ -708,6 +708,7 @@ namespace OneTaskBar
         // How long the shell's regular pass takes on the interface thread, so a slow pass shows up in live-state.json.
         internal double TickAverageMs {get{return tickCount==0?0:tickTotalMs/tickCount;}}
         internal double TickMaxMs {get{return tickMaxMs;}}
+        bool panelWasOpen;DateTime panelRefreshAt;
         long lap;readonly Dictionary<string,double> tickSections=new Dictionary<string,double>();
         void Lap(string name){long now=Stopwatch.GetTimestamp();double ms=(now-lap)*1000.0/Stopwatch.Frequency;lap=now;double old;if(!tickSections.TryGetValue(name,out old)||ms>old)tickSections[name]=ms;}
         internal string TickSections {get{return String.Join(", ",tickSections.OrderByDescending(p=>p.Value).Take(6).Select(p=>p.Key+"="+Math.Round(p.Value,1)));}}
@@ -765,8 +766,16 @@ namespace OneTaskBar
             previousVolume=Audio.Value; previousMuted=Audio.Muted;
             Services.Interactive=FullscreenMediaLive||IslandExpanded||(Quick!=null&&Quick.IsVisible)||(Center!=null&&Center.IsVisible)||(Detail!=null&&Detail.IsVisible)||docks.Any(d=>d.MediaBar!=null&&d.MediaBar.Expanded);Notifications.Interactive=Center!=null&&Center.IsVisible;
             if(now>=servicesAt&&!servicesBusy) {servicesAt=now.AddSeconds(RuntimeCadence.Services(interactive,battery));servicesBusy=true;RefreshServices();}
-            if(Center!=null&&Center.IsVisible)Center.Refresh();
-            if(Quick!=null && Quick.IsVisible) Quick.Refresh(Power,Brightness,Audio.Value,Audio.Muted,Audio.Available,Brightness>=0);
+            // An open panel reads and redraws all its controls; doing that on every 100 ms pass was the largest steady cost of
+            // an open panel. A quarter of a second still shows the clock second and any change at once to the eye.
+            bool panelOpen=(Center!=null&&Center.IsVisible)||(Quick!=null&&Quick.IsVisible);
+            if(panelOpen&&(!panelWasOpen||now>=panelRefreshAt))
+            {
+                panelRefreshAt=now.AddMilliseconds(250);
+                if(Center!=null&&Center.IsVisible)Center.Refresh();
+                if(Quick!=null && Quick.IsVisible) Quick.Refresh(Power,Brightness,Audio.Value,Audio.Muted,Audio.Available,Brightness>=0);
+            }
+            panelWasOpen=panelOpen;
             foreach(var dock in docks) dock.Refresh(Power);Lap("dockrefresh");RefreshFullscreenMedia();Lap("fsmedia");
             for(int i=charges.Count-1;i>=0;i--) if(!Power.Connected&&!charges[i].AllowDisconnected || !charges[i].Frame(now)) { charges[i].Close(); charges.RemoveAt(i); }
             if(hud!=null && hud.IsVisible && now>hudUntil) hud.Hide();

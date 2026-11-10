@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -242,7 +242,7 @@ namespace OneTaskBar
             recentSignature=signature;
             recentMore.Content=Paint.TextBlock(moreRecent?"‹  뒤로":"더 보기  ›",11,Paint.Text);recentMore.ToolTip=moreRecent?"시작 화면으로 돌아가기":"최근 항목 화면 열기";recentMore.IsEnabled=moreRecent||entries.Count>8;recentMore.Opacity=recentMore.IsEnabled?1:.45;
             recent.Children.Clear();foreach(var value in entries.Take(moreRecent?24:8)){var item=value;var app=item.App;var row=new Grid();row.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(58)});row.ColumnDefinitions.Add(new ColumnDefinition());row.Children.Add(new RecentThumbnail(app));
-                var words=new StackPanel {VerticalAlignment=VerticalAlignment.Center};var name=Paint.TextBlock(app.Name,12,Paint.Text);name.TextTrimming=TextTrimming.CharacterEllipsis;words.Children.Add(name);words.Children.Add(Paint.TextBlock("최근 열람 · "+item.Time.ToString("M월 d일  H:mm"),10,Paint.Muted));Grid.SetColumn(words,1);row.Children.Add(words);
+                var words=new StackPanel {VerticalAlignment=VerticalAlignment.Center};var name=Paint.TextBlock(app.Name,12,Paint.Text);name.TextTrimming=TextTrimming.CharacterEllipsis;words.Children.Add(name);words.Children.Add(Paint.TextBlock("최근 열람 · "+Loc.Date(item.Time,"M월 d일  H:mm"),10,Paint.Muted));Grid.SetColumn(words,1);row.Children.Add(words);
                 var button=Paint.Button(row,()=>Launch(app),app.Name);button.Background=Brushes.Transparent;button.HorizontalContentAlignment=HorizontalAlignment.Stretch;button.Margin=new Thickness(1,1,1,2);button.Padding=new Thickness(9);button.Height=56;recent.Children.Add(button);
             }
             if(entries.Count==0){var empty=Paint.TextBlock("Windows에서 기록한 최근 항목이 여기에 표시됩니다.",12,Paint.Muted);empty.TextWrapping=TextWrapping.Wrap;empty.Margin=new Thickness(9,12,9,15);recent.Children.Add(empty);}

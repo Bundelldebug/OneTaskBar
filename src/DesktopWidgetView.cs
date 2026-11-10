@@ -349,7 +349,7 @@ namespace OneTaskBar
             else if(Slot.Key=="clock")
             {
                 var now=DateTime.Now;
-                string clock=now.ToString("h:mm"),date=now.ToString("M월 d일 dddd",System.Globalization.CultureInfo.GetCultureInfo("ko-KR"));
+                string clock=now.ToString("h:mm"),date=Loc.Date(now,"M월 d일 dddd");
                 if(lastClock!=clock){lastClock=clock;primary.Text=clock;}
                 if(lastDate!=date){lastDate=date;secondary.Text=date;}
             }

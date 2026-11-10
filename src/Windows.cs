@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -327,7 +327,7 @@ namespace OneTaskBar
             }
             QueueHide();
         }
-        static readonly System.Globalization.CultureInfo KoreanCulture=System.Globalization.CultureInfo.GetCultureInfo("ko-KR");
+        static System.Globalization.CultureInfo KoreanCulture{get{return Loc.Culture;}}
         long clockToolSecond=-1;
         sealed class QuickTipKey
         {

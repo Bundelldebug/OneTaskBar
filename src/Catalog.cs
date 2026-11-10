@@ -25,6 +25,12 @@ namespace OneTaskBar
             if(Windows.Count>0) { Native.Activate(Windows[0]); return; }
             if(!String.IsNullOrEmpty(Target)) Native.Open(Target);
             else if(!String.IsNullOrEmpty(AppID)) {
+                // An id that only the running window carries is not a Start entry: start the program itself instead.
+                if(AppID!="Microsoft.Windows.Explorer"&&!String.IsNullOrEmpty(Executable)&&Executable.EndsWith(".exe",StringComparison.OrdinalIgnoreCase)&&File.Exists(Executable)&&!Native.AppsFolderHas(AppID))
+                {
+                    try{Process.Start(new ProcessStartInfo(Executable){UseShellExecute=true,WorkingDirectory=Path.GetDirectoryName(Executable)});return;}
+                    catch(Exception e){AppLog.Write("launch",e.Message);}
+                }
                 try { Process.Start(new ProcessStartInfo("explorer.exe","\"shell:AppsFolder\\"+AppID+"\"") { UseShellExecute=true }); }
                 catch(Exception e) { AppLog.Write("launch",e.Message); }
             }

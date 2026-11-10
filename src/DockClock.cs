@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
@@ -28,7 +28,7 @@ namespace OneTaskBar
                 if(next==0)View.Inlines.Add(line);
                 if(next!=1)View.Inlines.Add(date);
             }
-            var culture=CultureInfo.GetCultureInfo("ko-KR");
+            var culture=Loc.Culture;
             string nextTime=value.ToString(side?Preferences.Current.Seconds?"tt\nh:mm:ss":"tt\nh:mm":Preferences.Current.Seconds?"tt h:mm:ss":"tt h:mm",culture);
             string nextDate=value.ToString(side?"MM-dd":"yyyy-MM-dd",culture);
             if(time.Text!=nextTime)time.Text=nextTime;

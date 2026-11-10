@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -43,6 +43,7 @@ namespace OneTaskBar
             if(args.Length==2&&args[0]=="--open-panel"&&new[]{"notifications","quick","start","search","desktops","media-screen","widgets"}.Contains(args[1])){Signal("Panel-"+args[1]);return 0;}
             if(args.Length==2&&args[0]=="--review-edge"&&new[]{"0","1","2","3"}.Contains(args[1])){Signal("Panel-edge"+args[1]);return 0;}
             if(args.Length==2&&args[0]=="--review-background"&&new[]{"0","1","2","3"}.Contains(args[1])){Signal("Panel-background"+args[1]);return 0;}
+            Loc.Install();
             if(args.Length==2&&args[0]=="--run-startup-after")return AdminMode.RunAfter(args[1]);
             if(args.Length==1&&args[0]=="--admin-helper")return AdminHelperHost.Run();
             if(args.Length==2&&args[0]=="--elevated-startup")return LogonStartup.ElevatedHelper(args[1]=="on");

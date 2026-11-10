@@ -380,7 +380,7 @@ namespace OneTaskBar
             caption.Set(media.Title,media.Artist,player.SourceLogo);
             var now = DateTime.Now;
             clock.Text = FormatTime(now);
-            date.Text = now.ToString("M월 d일 dddd",System.Globalization.CultureInfo.GetCultureInfo("ko-KR"));
+            date.Text = Loc.Date(now,"M월 d일 dddd");
             if(!large&&tiles!=null&&tiles.Visibility==Visibility.Visible)tiles.Refresh(now);
             if(!large&&corners!=null)corners.Refresh();
             if(artwork!=media.Artwork){

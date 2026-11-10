@@ -318,7 +318,7 @@ namespace OneTaskBar
             if(availableConnections.Length==1)availableConnections[0].Margin=new Thickness(0);
             sectionFrames["brightness"].Visibility=brightAvailable?Visibility.Visible:Visibility.Collapsed;
             double powerSlot=PowerDisplay.Slot(state,Preferences.Current.DesktopPowerWatts);footerPower.Visibility=powerSlot>0?Visibility.Visible:Visibility.Collapsed;battery.Width=powerSlot==78?70:62;footerPower.ToolTip=state.Known?"배터리 및 전원":"직접 입력한 PC 전력값 · 실시간 측정 아님";
-            var now=DateTime.Now;long second=now.Ticks/TimeSpan.TicksPerSecond;if(second!=clockSecond){clockSecond=second;time.Text=now.ToString("H:mm:ss");}if(calendarDate!=now.Date){calendarDate=now.Date;date.Text=now.ToString("M월 d일 dddd",System.Globalization.CultureInfo.GetCultureInfo("ko-KR"));}battery.Update(state);
+            var now=DateTime.Now;long second=now.Ticks/TimeSpan.TicksPerSecond;if(second!=clockSecond){clockSecond=second;time.Text=now.ToString("H:mm:ss");}if(calendarDate!=now.Date){calendarDate=now.Date;date.Text=Loc.Date(now,"M월 d일 dddd");}battery.Update(state);
             brightness.Value=Math.Max(0,bright);brightness.IsEnabled=brightAvailable;brightness.ToolTip=brightAvailable?"밝기":"연결된 디스플레이는 Windows 밝기 조절을 지원하지 않습니다";
             string soundKind=SoundIcon.For(sound,muted,audioAvailable);if(volume.Kind!=soundKind){volume.Kind=soundKind;volume.InvalidateVisual();}volume.Value=muted?0:sound;volume.IsEnabled=audioAvailable;
             foreach(var glyph in soundGlyphs)if(glyph.Kind!=soundKind){glyph.Kind=soundKind;glyph.InvalidateVisual();Motion.Fade(glyph,.45,1,150);}Motion.Background(muteCircle,soundKind=="mute"?QuickPanel.Inactive:Paint.ControlWhiteColor);

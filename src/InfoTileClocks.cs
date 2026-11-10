@@ -9,7 +9,7 @@ namespace OneTaskBar
 {
     internal static class TileTime
     {
-        static readonly CultureInfo Korean=CultureInfo.GetCultureInfo("ko-KR");
+        static CultureInfo Korean{get{return Loc.Culture;}}
         // Keeps the time itself on the center line, with AM/PM hanging to its left.
         internal static Grid Centered(TextBlock period,TextBlock clock)
         {
@@ -25,8 +25,8 @@ namespace OneTaskBar
         }
         internal static string Period(DateTime value){return value.ToString("tt",Korean);}
         internal static string Clock(DateTime value){return value.ToString("h:mm",CultureInfo.InvariantCulture);}
-        internal static string LongDate(DateTime value){return value.ToString("M월 d일 dddd",Korean);}
-        internal static string ShortDate(DateTime value){return value.ToString("dddd,\nM월 d일",Korean);}
+        internal static string LongDate(DateTime value){return Loc.Date(value,"M월 d일 dddd");}
+        internal static string ShortDate(DateTime value){return Loc.Date(value,"dddd,\nM월 d일");}
     }
 
     internal sealed class DigitalClockTile : InfoTile
@@ -89,7 +89,7 @@ namespace OneTaskBar
             shown=text;
             clock.Text=text;
             period.Text=TileTime.Period(now);
-            date.Text=Wide==4?TileTime.LongDate(now):now.ToString("M월 d일\ndddd",CultureInfo.GetCultureInfo("ko-KR"));
+            date.Text=Wide==4?TileTime.LongDate(now):Loc.Date(now,"M월 d일\ndddd");
         }
     }
 

@@ -289,6 +289,7 @@ namespace OneTaskBar
                 draw.DrawGeometry(new SolidColorBrush(tint), null, shape);
                 draw.PushClip(shape);
                 draw.DrawImage(source, new Rect(x, y, drawnWidth, drawnHeight));
+                Rim(draw, shape);
                 draw.Pop();
             }
 
@@ -296,6 +297,43 @@ namespace OneTaskBar
             var image = new DrawingImage(group);
             image.Freeze();
             return image;
+        }
+
+        static readonly Pen[] rim = BuildRim();
+
+        // The bevel the Samsung icons carry: a soft light edge along the top and a deeper shade along the
+        // bottom, stacked in a few widening strokes so it fades inward. Drawn inside the clip, so only the
+        // inner half of each stroke shows.
+        static Pen[] BuildRim()
+        {
+            var pens = new Pen[3];
+            double[] width = { 11, 6.5, 3 };
+            double[] light = { .10, .16, .26 };
+            double[] shade = { .06, .10, .16 };
+            for (int i = 0; i < pens.Length; i++)
+            {
+                var brush = new LinearGradientBrush
+                {
+                    StartPoint = new Point(.3, 0),
+                    EndPoint = new Point(.7, 1)
+                };
+                brush.GradientStops.Add(new GradientStop(Color.FromArgb((byte)(255 * light[i] * 2.2), 255, 255, 255), 0));
+                brush.GradientStops.Add(new GradientStop(Color.FromArgb((byte)(255 * light[i] * .5), 255, 255, 255), .35));
+                brush.GradientStops.Add(new GradientStop(Color.FromArgb(0, 0, 0, 0), .55));
+                brush.GradientStops.Add(new GradientStop(Color.FromArgb((byte)(255 * shade[i]), 0, 0, 0), 1));
+                brush.Freeze();
+                var pen = new Pen(brush, width[i]);
+                pen.Freeze();
+                pens[i] = pen;
+            }
+
+            return pens;
+        }
+
+        static void Rim(DrawingContext draw, Geometry shape)
+        {
+            foreach (var pen in rim)
+                draw.DrawGeometry(null, pen, shape);
         }
 
         internal static ImageSource Tile(ImageSource source, string color, int artworkPercent)
@@ -337,6 +375,7 @@ namespace OneTaskBar
                 w *= scale;
                 h *= scale;
                 draw.DrawImage(source, new Rect(50 - w / 2, 50 - h / 2, w, h));
+                Rim(draw, shape);
                 draw.Pop();
             }
 

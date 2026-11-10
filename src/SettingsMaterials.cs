@@ -19,7 +19,7 @@ namespace OneTaskBar
                     Preferences.SetAppearance(p=>{if(dock)p.DockMaterialCustom=value;else p.StartMaterialCustom=value;});
                 });
             var actions=new WrapPanel {Margin=new Thickness(15,8,15,3)};
-            var color=Paint.Action("색상 선택",()=>{
+            var color=SettingsChip.Action("색상 선택",()=>{
                 using(var picker=new Forms.ColorDialog()){
                     System.Windows.Media.Color selected;
                     DockAppearance.TryColor(dock?data.DockMaterialColor:data.StartMaterialColor,out selected);
@@ -35,7 +35,7 @@ namespace OneTaskBar
             var blur=MaterialSlider(controls,name+" 블러 강도",dock?data.DockMaterialBlur:data.StartMaterialBlur,40,"",value=>
                 Preferences.SetAppearance(p=>{if(dock)p.DockMaterialBlur=value;else p.StartMaterialBlur=value;}));
             parent.Children.Add(controls);
-            var reset=Paint.Action("기본 재질로 되돌리기",()=>{
+            var reset=SettingsChip.Action("기본 재질로 되돌리기",()=>{
                 Preferences.SetAppearance(p=>{
                     if(dock){p.DockMaterialCustom=false;p.DockMaterialColor="#FF52616D";p.DockMaterialOpacity=30;p.DockMaterialBlur=16;}
                     else{p.StartMaterialCustom=false;p.StartMaterialColor="#FF3D4854";p.StartMaterialOpacity=30;p.StartMaterialBlur=16;}

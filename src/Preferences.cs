@@ -20,6 +20,8 @@ namespace OneTaskBar
         public bool BudsConnectionPopups=true;
         public bool QuickGalaxyBuds=false;
         public int UIVersion=85;
+        // Interface language: auto (the Windows display language), ko, en, ja or zh.
+        public string Language="auto";
         // Fluid UI only: the color of the glow behind the glass (0 orange, 1 pink, 2 violet, 3 blue, 4 green, 5 none, 6 custom).
         public int FluidGlow=0;
         public string FluidGlowColor="#FFFF8A3D";

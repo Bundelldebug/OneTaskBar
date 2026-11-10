@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
@@ -7,7 +7,7 @@ namespace OneTaskBar
 {
     internal sealed class UIVersionChoice
     {
-        public string Label {get;set;}public int Value {get;set;}public string Description {get;set;}
+        string label;public string Label {get{return Loc.T(label);}set{label=value;}}public int Value {get;set;}public string Description {get;set;}
         public override string ToString(){return Label??"";}
     }
     internal sealed class PickerChoice

@@ -84,8 +84,17 @@ namespace OneTaskBar
         }
         static string Fold(string text) {return new string((text??"").Normalize(NormalizationForm.FormKC).ToLowerInvariant().Where(c=>!Char.IsWhiteSpace(c)).ToArray());}
         internal static string Initials(string text) {var result=new StringBuilder();foreach(char c in Fold(text)){if(c>=0xac00&&c<=0xd7a3)result.Append((char)(0x1100+(c-0xac00)/588));else result.Append(c);}return result.ToString();}
-        internal static bool Matches(string text,string query) {string normal=Fold(text),heads=Initials(text);return (query??"").Split(new[]{' ','\t'},StringSplitOptions.RemoveEmptyEntries).All(word=>normal.Contains(Fold(word))||heads.Contains(Fold(word)));}
-        static string Aliases(AppEntry app) {string name=app.Name??"",id=(app.AppID??"")+" "+(app.Target??"");if((name+id).IndexOf("ChatGPT",StringComparison.OrdinalIgnoreCase)>=0)name+=" 챗지피티 챗GPT";if((name+id).IndexOf("Codex",StringComparison.OrdinalIgnoreCase)>=0)name+=" 코덱스";return name;}
+        internal static bool Matches(string text,string query)
+        {
+            string normal=Fold(text),heads=Initials(text);
+            // The same text typed with the wrong keyboard layout (qmfkdnwj for 브라우저) counts too.
+            foreach(string variant in SearchKorean.Variants(query))
+            {
+                if(variant.Split(new[]{' ','\t'},StringSplitOptions.RemoveEmptyEntries).All(word=>normal.Contains(Fold(word))||heads.Contains(Fold(word))))return true;
+            }
+            return false;
+        }
+        static string Aliases(AppEntry app) {return (app.Name??"")+SearchKorean.Aliases(app.Name,(app.AppID??"")+" "+System.IO.Path.GetFileNameWithoutExtension(app.Executable??app.Target??""));}
         internal static List<AppEntry> Apps(IEnumerable<AppEntry> apps,string query) {return apps.Where(a=>Matches(Aliases(a),query)).OrderBy(a=>Fold(a.Name)==Fold(query)?0:Fold(a.Name).StartsWith(Fold(query))?1:2).ThenBy(a=>a.Name,StringComparer.CurrentCultureIgnoreCase).Take(40).ToList();}
         internal static bool IsPicture(string path) {return new[]{".png",".jpg",".jpeg",".bmp"}.Contains(System.IO.Path.GetExtension(path).ToLowerInvariant());}
         internal static List<SearchFile> Files(string query,CancellationToken token)
@@ -94,9 +103,14 @@ namespace OneTaskBar
             string home=Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             try {using(var connection=new OleDbConnection("Provider=Search.CollatorDSO;Extended Properties='Application=Windows';")) {
                 connection.Open();using(var command=connection.CreateCommand()) {
-                    var words=query.Split(new[]{' ','\t'},StringSplitOptions.RemoveEmptyEntries).Take(6).Select(w=>w.Replace("'","''").Replace("%","").Replace("_","").Replace("[","").Replace("]","")).Where(w=>w.Length>0).ToArray();
-                    if(words.Length==0)return result;
-                    command.CommandText="SELECT TOP 30 System.ItemNameDisplay, System.ItemPathDisplay FROM SYSTEMINDEX WHERE SCOPE='file:"+home.Replace('\\','/').Replace("'","''")+"' AND "+String.Join(" AND ",words.Select(w=>"System.ItemNameDisplay LIKE '%"+w+"%'"))+" ORDER BY System.DateModified DESC";command.CommandTimeout=2;
+                    var groups=new List<string>();
+                    foreach(string variant in SearchKorean.Variants(query))
+                    {
+                        var words=variant.Split(new[]{' ','\t'},StringSplitOptions.RemoveEmptyEntries).Take(6).Select(w=>w.Replace("'","''").Replace("%","").Replace("_","").Replace("[","").Replace("]","")).Where(w=>w.Length>0).ToArray();
+                        if(words.Length>0)groups.Add("("+String.Join(" AND ",words.Select(w=>"System.ItemNameDisplay LIKE '%"+w+"%'"))+")");
+                    }
+                    if(groups.Count==0)return result;
+                    command.CommandText="SELECT TOP 30 System.ItemNameDisplay, System.ItemPathDisplay FROM SYSTEMINDEX WHERE SCOPE='file:"+home.Replace('\\','/').Replace("'","''")+"' AND ("+String.Join(" OR ",groups)+") ORDER BY System.DateModified DESC";command.CommandTimeout=2;
                     using(token.Register(()=> {try{command.Cancel();}catch{}}))using(var reader=command.ExecuteReader())while(reader!=null&&reader.Read()){token.ThrowIfCancellationRequested();string path=reader.IsDBNull(1)?null:reader.GetString(1);if(!String.IsNullOrEmpty(path)&&Inside(path,home))AddFile(result,path);}
                 }
             }}catch(OperationCanceledException){throw;}catch{}

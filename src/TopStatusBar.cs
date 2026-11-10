@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -219,7 +219,7 @@ namespace OneTaskBar
         void RefreshLeft(Brush ink,System.Windows.Media.Effects.Effect effect)
         {
             var now=DateTime.Now;
-            string clock=now.ToString("h:mm",CultureInfo.InvariantCulture),day=now.ToString("M월 d일 dddd",CultureInfo.GetCultureInfo("ko-KR"));
+            string clock=now.ToString("h:mm",CultureInfo.InvariantCulture),day=Loc.Date(now,"M월 d일 dddd");
             if(time.Text!=clock)time.Text=clock;
             if(date.Text!=day)date.Text=day;
             time.Foreground=date.Foreground=ink;time.Effect=date.Effect=effect;

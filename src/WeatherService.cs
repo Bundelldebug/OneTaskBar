@@ -239,7 +239,7 @@ namespace OneTaskBar
                 seen++;
             }
             report.RainPercent=next;
-            report.Summary=rainAt.HasValue&&!Wet(report.Code)?rainAt.Value.ToString("tt h:mm",CultureInfo.GetCultureInfo("ko-KR"))+" 이후에 비가 내릴 가능성이 있습니다":Describe(report.Code);
+            report.Summary=rainAt.HasValue&&!Wet(report.Code)?rainAt.Value.ToString("tt h:mm",Loc.Culture)+" 이후에 비가 내릴 가능성이 있습니다":Describe(report.Code);
             return report;
         }
         static bool Wet(int code){return code>=51&&code<=67||code>=80&&code<=82||code>=95;}

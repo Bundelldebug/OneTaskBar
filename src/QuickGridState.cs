@@ -76,7 +76,7 @@ namespace OneTaskBar
             if(day!=now.Date.Ticks)
             {
                 day=now.Date.Ticks;
-                date.Text=now.ToString("M월 d일 dddd",System.Globalization.CultureInfo.GetCultureInfo("ko-KR"));
+                date.Text=Loc.Date(now,"M월 d일 dddd");
             }
             battery.Update(power);
             batteryButton.Visibility=PowerDisplay.Slot(power,Preferences.Current.DesktopPowerWatts)>0?Visibility.Visible:Visibility.Collapsed;
@@ -84,8 +84,12 @@ namespace OneTaskBar
             Brightness.Value=bright<0?0:bright;
             Volume.IsEnabled=audioAvailable;
             Volume.Value=muted?0:sound;
-            Volume.Kind=SoundIcon.For(sound,muted,audioAvailable);
-            Volume.InvalidateVisual();
+            string soundKind=SoundIcon.For(sound,muted,audioAvailable);
+            if(Volume.Kind!=soundKind)
+            {
+                Volume.Kind=soundKind;
+                Volume.InvalidateVisual();
+            }
             Brightness.WheelAdjust=Volume.WheelAdjust=Preferences.Current.QuickSliderScroll;
             bool wifi=shell.Services.WifiOn??shell.Wifi!=null,bluetooth=shell.Services.BluetoothOn??false;
             tiles["wifi"].Text("Wi-Fi",shell.Wifi??(wifi?"연결 안 됨":"꺼짐"));

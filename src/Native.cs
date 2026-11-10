@@ -211,6 +211,19 @@ namespace OneTaskBar
         [DllImport("shell32.dll", CharSet=CharSet.Unicode, PreserveSig=true)]
         static extern int SHCreateItemFromParsingName(string path, IntPtr ctx, ref Guid id, [MarshalAs(UnmanagedType.Interface)] out IImageFactory result);
         [DllImport("shell32.dll",CharSet=CharSet.Unicode)]static extern int SHCreateItemInKnownFolder(ref Guid folder,uint flags,string item,ref Guid iid,[MarshalAs(UnmanagedType.Interface)]out IImageFactory result);
+        // True when the Start apps folder knows this application id. A window can carry an id of its own (Chrome, Steam) that no
+        // Start entry has; opening shell:AppsFolder\<that id> then falls back to showing the Documents folder.
+        internal static bool AppsFolderHas(string appId)
+        {
+            IImageFactory factory=null;
+            try
+            {
+                var id=new Guid("BCC18B79-BA16-442F-80C4-8A59C30C463B");var folder=new Guid("1E87508D-89C2-42F0-8A7E-645A0F50CA58");
+                return SHCreateItemInKnownFolder(ref folder,0,appId,ref id,out factory)==0&&factory!=null;
+            }
+            catch{return false;}
+            finally{if(factory!=null)Marshal.ReleaseComObject(factory);}
+        }
         internal static ImageSource AppIcon(string target)
         {
             IImageFactory factory=null;
