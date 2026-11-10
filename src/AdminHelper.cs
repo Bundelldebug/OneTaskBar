@@ -128,14 +128,27 @@ namespace OneTaskBar
                 if(current!=null)current.Dispose();
             }
         }        static bool Running {get{return File.Exists(@"\\.\pipe\"+AdminPipes.Command);}}
+        static int launches;
+        internal static bool Registered {get{return registered;}}
         static void EnsureRunning()
         {
-            if(Running||(DateTime.UtcNow-launchedAt).TotalSeconds<20)return;
+            // A helper that keeps failing to appear is retried less and less often (20 s, 40 s ... at most 5 min) instead of forever.
+            double wait=Math.Min(300,20*Math.Pow(2,Math.Min(launches,4)));
+            if(Running)
+            {
+                launches=0;
+                return;
+            }
+            if((DateTime.UtcNow-launchedAt).TotalSeconds<wait)return;
             launchedAt=DateTime.UtcNow;
+            launches++;
             try
             {
                 var info=new ProcessStartInfo(Path.Combine(Environment.SystemDirectory,"schtasks.exe"),"/run /tn "+LogonStartup.AdminHelperTask){UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden};
-                using(Process.Start(info)){}
+                using(var run=Process.Start(info))
+                {
+                    if(run!=null&&!run.WaitForExit(5000))run.Kill();
+                }
             }
             catch(Exception error){AppLog.Once("admin-helper-run",error.GetType().Name);}
         }
@@ -198,6 +211,7 @@ namespace OneTaskBar
         {
             while(!stopped)
             {
+                Thread.Sleep(20);
                 try
                 {
                     using(var pipe=new NamedPipeServerStream(AdminPipes.Keys,PipeDirection.InOut,1,PipeTransmissionMode.Byte,PipeOptions.None,64,64,AdminPipes.Security()))
@@ -275,17 +289,40 @@ namespace OneTaskBar
                 callback=OnKey;
                 hook=SetWindowsHookEx(13,callback,GetModuleHandle(null),0);
                 var timer=new System.Windows.Forms.Timer{Interval=3000};
+                int own,ticks=0;
+                double cpuBefore;
+                DateTime cpuAt=DateTime.UtcNow;
+                using(var self=Process.GetCurrentProcess()){own=self.Id;cpuBefore=self.TotalProcessorTime.TotalMilliseconds;}
+                int busy=0;
                 timer.Tick+=(s,e)=>
                 {
-                    Connect();
+                    ticks++;
+                    bool connected=Connect();
                     // A pipe whose other end has gone can still look connected, so the app's own process is what counts.
-                    int own=Process.GetCurrentProcess().Id;
-                    foreach(var other in Process.GetProcessesByName("OneTaskBar"))
+                    // Listing processes is the costly part: once the app's pipe is up it is only done now and then.
+                    if(!connected||ticks%5==0)
                     {
-                        using(other)if(other.Id!=own)lastSeen=DateTime.UtcNow;
+                        foreach(var other in Process.GetProcessesByName("OneTaskBar"))
+                        {
+                            using(other)if(other.Id!=own)lastSeen=DateTime.UtcNow;
+                        }
                     }
                     // The normal app has been gone for a while: nothing left to help, and the installed files must be free for an update.
                     if((DateTime.UtcNow-lastSeen).TotalSeconds>20)System.Windows.Forms.Application.Exit();
+                    // A helper that is using a whole core for no reason steps aside (and says so) rather than heat the machine;
+                    // the app starts it again later, with a growing pause.
+                    using(var self=Process.GetCurrentProcess())
+                    {
+                        double now=self.TotalProcessorTime.TotalMilliseconds,span=(DateTime.UtcNow-cpuAt).TotalMilliseconds;
+                        double share=span>0?(now-cpuBefore)/span:0;
+                        cpuBefore=now;cpuAt=DateTime.UtcNow;
+                        busy=share>0.25?busy+1:0;
+                        if(busy>=3)
+                        {
+                            AppLog.Once("admin-helper-busy","The administrator helper used "+(int)(share*100)+"% of a core for 9 s and stopped itself.");
+                            System.Windows.Forms.Application.Exit();
+                        }
+                    }
                 };
                 timer.Start();
                 System.Windows.Forms.Application.Run();
@@ -299,6 +336,8 @@ namespace OneTaskBar
         {
             while(true)
             {
+                // No client can make this loop run faster than about 50 times a second.
+                Thread.Sleep(20);
                 try
                 {
                     using(var pipe=new NamedPipeServerStream(AdminPipes.Command,PipeDirection.InOut,4,PipeTransmissionMode.Byte,PipeOptions.None,256,256,AdminPipes.Security()))

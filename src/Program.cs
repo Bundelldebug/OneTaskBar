@@ -28,7 +28,10 @@ namespace OneTaskBar
         internal static bool Inspectable;
         internal static bool TestProcess;
         internal static bool CaptureReview;
-        [STAThread] static int Main(string[] args){FrameRate.Raise();int code=Run(args);Environment.Exit(code);return code;}
+        [STAThread] static int Main(string[] args){
+            // The administrator helper and the small one-shot helpers have no window: they must not start the display machinery.
+            bool windowless=args.Length>0&&(args[0]=="--admin-helper"||args[0]=="--elevated-startup"||args[0]=="--run-startup-after");
+            if(!windowless)FrameRate.Raise();int code=Run(args);Environment.Exit(code);return code;}
         static int Run(string[] args)
         {
             StartupTrace.Mark("entry");

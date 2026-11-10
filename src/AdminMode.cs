@@ -75,7 +75,12 @@ namespace OneTaskBar
             {
                 using(var parent=Process.GetProcessById(id))
                 {
-                    if(!parent.WaitForExit(15000))return 3;
+                    // An app that was asked to close but is stuck is ended, so the normal one can start; otherwise nothing would come back.
+                    if(!parent.WaitForExit(8000))
+                    {
+                        try{parent.Kill();}catch(Exception){}
+                        if(!parent.WaitForExit(5000))return 3;
+                    }
                 }
             }
             catch(ArgumentException){}

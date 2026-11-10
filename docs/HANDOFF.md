@@ -177,3 +177,8 @@ Keep durable rules in [AGENTS.md](../AGENTS.md) and navigation in [DEBUGGING.md]
 - `Build.ps1` self-test reads the real data dir unless `ONE_TASKBAR_DATA` is set: with UI 100 saved and a 9.5.x build, `NowBarLayout.Check` fails. Build the stable with `ONE_TASKBAR_DATA` pointing to an empty folder.
 - Idle measure, installed: A1Z2 CPU 0.048 %, WS 444 MiB (private 294); A1A4 CPU 0.067 %, WS 451 MiB (private 298). Working set is about 100 MiB above the A1A3 figure (348 MiB); cause not investigated (could be machine state).
 - Not verified: the toggle's UAC flow on this PC, admin game keys, auto-folder drawer view (screenshot opened the launcher instead).
+
+### Admin helper CPU report (Claude Code, 2026-11-10)
+
+- Owner report (other PC, Ryzen 7700X3D): after allowing the admin-support toggle, one OneTaskBar process used about 6 % (one core), the dock froze; starting from the desktop shortcut fixed the dock but the CPU stayed high; ending that process turned admin support off. Not reproduced here (helper idle: 0 ms per thread over 15 s, also right after a fresh start); root cause NOT confirmed.
+- Hardening (uncommitted until noted, installed here, not published): the windowless helper modes skip `FrameRate.Raise`; helper lists processes only every 15 s once the app's pipe is up; helper stops itself and logs `admin-helper-busy` if it uses over 25 % of a core for 9 s; pipe loops cannot run faster than 50/s; `EnsureRunning` backs off 20 s to 5 min and kills a stuck `schtasks`; `RunAfter` kills a parent that does not exit within 8 s (otherwise a hung old elevated app left no app running); settings toggle no longer reads the Task Scheduler on the UI thread. If it recurs, check app.log for `admin-helper-busy`.
