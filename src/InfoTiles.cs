@@ -56,15 +56,15 @@ namespace OneTaskBar
     {
         internal static readonly InfoTileFamily[] Families=
         {
-            new InfoTileFamily {Key="weather",Title="날씨",Icon="brightness",Spans=new[]{"2x2"}},
+            new InfoTileFamily {Key="weather",Title="날씨",Icon="brightness",Spans=new[]{"2x2","2x1","1x1"}},
             new InfoTileFamily {Key="moon",Title="달의 위상",Icon="moon",Spans=new[]{"1x1"}},
             new InfoTileFamily {Key="rain",Title="강수 확률",Icon="brightness",Spans=new[]{"1x1"}},
             new InfoTileFamily {Key="gauges",Title="배터리 상태(원형)",Icon="battery",Spans=new[]{"2x1","2x2","4x1"}},
             new InfoTileFamily {Key="power-list",Title="배터리 상태(목록형)",Icon="battery",Spans=new[]{"2x2","4x2"}},
             new InfoTileFamily {Key="calendar",Title="달력",Icon="calendar",Spans=new[]{"2x2"}},
             new InfoTileFamily {Key="todo",Title="리마인더",Icon="focus",Spans=new[]{"2x1","2x2","4x2"}},
-            new InfoTileFamily {Key="clock-digital",Title="디지털 시계",Icon="focus",Spans=new[]{"2x1","2x2","4x1","4x2"}},
-            new InfoTileFamily {Key="clock-analog",Title="아날로그 시계",Icon="focus",Spans=new[]{"2x1","2x2"}},
+            new InfoTileFamily {Key="clock-digital",Title="디지털 시계",Icon="focus",Spans=new[]{"2x1","2x2","4x1","4x2","1x1"}},
+            new InfoTileFamily {Key="clock-analog",Title="아날로그 시계",Icon="focus",Spans=new[]{"2x1","2x2","1x1"}},
             new InfoTileFamily {Key="clock-dual",Title="듀얼 시계",Icon="focus",Spans=new[]{"2x1","2x2","4x1","4x2"}},
             new InfoTileFamily {Key="player",Title="플레이어",Icon="play",Spans=new[]{"2x2","4x1"}},
             new InfoTileFamily {Key="care",Title="디바이스 케어",Icon="computer",Spans=new[]{"2x1","2x2","4x1","4x2"}},
@@ -112,6 +112,10 @@ namespace OneTaskBar
         readonly Brush Today=TileScheme.Creating.Track;
         DateTime shown=DateTime.MinValue;
         readonly UniformGrid grid;
+        static readonly Brush SundayDark=Paint.Brush("#FF9A2233"),SaturdayDark=Paint.Brush("#FF16479B");
+        static readonly Brush SundayLight=Paint.Brush("#FFFFA8A8"),SaturdayLight=Paint.Brush("#FFA9CCFF");
+        readonly Brush sunday,saturday;
+        Dictionary<DateTime,string> holidays;
         internal static int Weeks(DateTime first){return (Offset(first)+DateTime.DaysInMonth(first.Year,first.Month)+6)/7;}
         internal CalendarTile(int columns,int rows):base(columns,rows)
         {
@@ -121,9 +125,13 @@ namespace OneTaskBar
             month.Margin=new Thickness(0,0,0,4);
             stack.Children.Add(month);
             var names=new UniformGrid {Columns=7};
-            foreach(string name in new[]{"일","월","화","수","목","금","토"})
+            bool paleInk=TileScheme.Luminance(((SolidColorBrush)Scheme.Ink).Color)>.5;
+            sunday=paleInk?SundayLight:SundayDark;
+            saturday=paleInk?SaturdayLight:SaturdayDark;
+            var weekdays=new[]{"일","월","화","수","목","금","토"};
+            for(int i=0;i<weekdays.Length;i++)
             {
-                var label=Label(name,11,Faint);
+                var label=Label(weekdays[i],11,i==0?sunday:i==6?saturday:Faint);
                 label.HorizontalAlignment=HorizontalAlignment.Center;
                 names.Children.Add(label);
             }
@@ -143,6 +151,8 @@ namespace OneTaskBar
         internal override void Refresh(ShellController shell,DateTime now)
         {
             if(shown==now.Date)return;
+            if(holidays==null||shown.Year!=now.Year)
+                holidays=CalendarHolidays.ForYear(now.Year,RegionInfo.CurrentRegion.TwoLetterISORegionName);
             shown=now.Date;
             month.Text=now.Month+"월";
             var first=new DateTime(now.Year,now.Month,1);
@@ -155,7 +165,12 @@ namespace OneTaskBar
                 int day=i-offset+1;
                 bool real=day>=1&&day<=count;
                 days[i].Text=real?day.ToString(CultureInfo.InvariantCulture):"";
-                cells[i].Background=real&&day==now.Day?Today:null;
+                string name;
+                bool holiday=holidays.TryGetValue(first.AddDays(i-offset),out name)&&real;
+                days[i].Foreground=holiday||i%7==0?sunday:i%7==6?saturday:Scheme.Ink;
+                days[i].FontWeight=holiday?FontWeights.SemiBold:FontWeights.Normal;
+                cells[i].Background=real&&day==now.Day?Today:holiday?Brushes.Transparent:null;
+                cells[i].ToolTip=holiday?name:null;
             }
         }
     }
@@ -240,15 +255,45 @@ namespace OneTaskBar
         internal WeatherTile(int columns,int rows):base(columns,rows)
         {
             temperature.FontWeight=FontWeights.SemiBold;
-            summary.TextWrapping=TextWrapping.Wrap;
-            summary.TextTrimming=TextTrimming.None;
-            summary.Margin=new Thickness(0,2,0,4);
             var stack=new StackPanel {VerticalAlignment=VerticalAlignment.Bottom,Margin=new Thickness(14)};
-            stack.Children.Add(temperature);
-            stack.Children.Add(summary);
-            stack.Children.Add(place);
+            if(rows==2)
+            {
+                summary.TextWrapping=TextWrapping.Wrap;
+                summary.TextTrimming=TextTrimming.None;
+                summary.Margin=new Thickness(0,2,0,4);
+                stack.Children.Add(temperature);
+                stack.Children.Add(summary);
+                stack.Children.Add(place);
+                Children.Add(stack);
+                Children.Add(symbol);
+                return;
+            }
+
+            stack.VerticalAlignment=VerticalAlignment.Center;
+            symbol.Width=symbol.Height=columns==1?29:34;
+            symbol.Margin=new Thickness(0);
+            symbol.HorizontalAlignment=HorizontalAlignment.Center;
+            symbol.VerticalAlignment=VerticalAlignment.Center;
+            if(columns==1)
+            {
+                stack.Margin=new Thickness(6);
+                temperature.FontSize=23;
+                temperature.HorizontalAlignment=HorizontalAlignment.Center;
+                stack.Children.Add(symbol);
+                stack.Children.Add(temperature);
+            }
+            else
+            {
+                stack.Margin=new Thickness(0,0,10,0);
+                ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(62)});
+                ColumnDefinitions.Add(new ColumnDefinition());
+                temperature.FontSize=27;
+                stack.Children.Add(temperature);
+                stack.Children.Add(summary);
+                Grid.SetColumn(stack,1);
+                Children.Add(symbol);
+            }
             Children.Add(stack);
-            Children.Add(symbol);
         }
         internal override void Refresh(ShellController shell,DateTime now)
         {
@@ -264,6 +309,7 @@ namespace OneTaskBar
             temperature.Text=report==null?"--°":Math.Round(report.Temperature).ToString(CultureInfo.InvariantCulture)+"°";
             summary.Text=report!=null?report.Summary:WeatherService.Problem??(WeatherService.Configured?"날씨를 불러오는 중입니다":"설정에서 위치를 입력하세요");
             place.Text=where??"";
+            if(Tall==1)ToolTip=String.IsNullOrEmpty(where)?summary.Text:where+" · "+summary.Text;
         }
     }
 }

@@ -13,11 +13,13 @@ namespace OneTaskBar
         internal Native.RectI Bounds,Client;
         internal Rectangle Monitor;
         internal bool Maximized,Framed;
+        internal bool Captioned;
         internal string Kind="";
         internal int ExStyle;
     }
     internal static class FullscreenVisibility
     {
+        static readonly uint ownProcess = CurrentProcessId();
         static readonly object mediaGate = new object();
         static readonly HashSet<IntPtr> mediaSurfaces = new HashSet<IntPtr>();
 
@@ -40,6 +42,12 @@ namespace OneTaskBar
                 return mediaSurfaces.Contains(window);
         }
 
+        static uint CurrentProcessId()
+        {
+            using (var process = Process.GetCurrentProcess()) return (uint)process.Id;
+        }
+
+        [DllImport("user32.dll", CharSet=CharSet.Unicode)]static extern int GetWindowTextLength(IntPtr window);
         [DllImport("user32.dll")]static extern bool GetClientRect(IntPtr window,out Native.RectI rect);
         [DllImport("user32.dll")]static extern bool ClientToScreen(IntPtr window,ref Native.PointI point);
         internal static bool PassiveSurface(int extended,bool foreground,string kind,bool titled)
@@ -77,19 +85,23 @@ namespace OneTaskBar
         internal static List<FullscreenCandidate> Capture()
         {
             var result = new List<FullscreenCandidate>();
-            uint own = (uint)Process.GetCurrentProcess().Id;
-            IntPtr layer=IntPtr.Zero;System.Drawing.Rectangle layerMonitor=new System.Drawing.Rectangle();
-            uint frontPid;Native.GetWindowThreadProcessId(Native.GetForegroundWindow(),out frontPid);
+            var className = new StringBuilder(100);
+            IntPtr layer = IntPtr.Zero;
+            var layerMonitor = Rectangle.Empty;
+            IntPtr foreground = Native.GetForegroundWindow();
+            IntPtr frontRoot = Native.GetAncestor(foreground, 3);
+            uint frontPid;
+            Native.GetWindowThreadProcessId(foreground, out frontPid);
             Native.EnumWindows((window, state) =>
             {
                 uint pid;
                 Native.GetWindowThreadProcessId(window, out pid);
-                bool media = pid == own && MediaSurface(window);
+                bool media = pid == ownProcess && MediaSurface(window);
                 // Ordinary shell surfaces must not hide the dock. The explicitly
                 // registered fullscreen player is the one owned exception.
-                if (pid == own && !media)
+                if (pid == ownProcess && !media)
                     return true;
-                var candidate = Inspect(window, media);
+                var candidate = Inspect(window, media, window == frontRoot, className);
                 // Only a window that would count as fullscreen is worth looking up.
                 if (candidate != null && !media && (ClientCovers(candidate.Client, candidate.Monitor) || Native.CoversMonitor(candidate.Bounds, candidate.Monitor, candidate.Maximized, candidate.Framed)) && CaptureToolProcess(pid))
                 {
@@ -105,18 +117,24 @@ namespace OneTaskBar
         }
         internal static FullscreenCandidate Inspect(IntPtr window)
         {
-            return Inspect(window, MediaSurface(window));
+            bool foreground = Native.GetAncestor(Native.GetForegroundWindow(), 3) == window;
+            return Inspect(window, MediaSurface(window), foreground, new StringBuilder(100));
         }
-        static FullscreenCandidate Inspect(IntPtr window, bool media)
+        static FullscreenCandidate Inspect(IntPtr window, bool media, bool foreground, StringBuilder className)
         {
-            if(!Native.IsWindowVisible(window)||Native.IsIconic(window))return null;
-            int cloaked;if(Native.DwmGetWindowAttribute(window,14,out cloaked,4)>=0&&cloaked!=0)return null;
-            var name=new StringBuilder(100);Native.GetClassName(window,name,100);string kind=name.ToString();
-            var title=new StringBuilder(256);Native.GetWindowText(window,title,title.Capacity);
-            bool foreground=Native.GetAncestor(Native.GetForegroundWindow(),3)==window;
-            if(!media&&PassiveSurface(Native.GetWindowLong(window,-20),foreground,kind,title.Length>0))return null;
+            if (!Native.IsWindowVisible(window) || Native.IsIconic(window)) return null;
+            int cloaked;
+            if (Native.DwmGetWindowAttribute(window, 14, out cloaked, 4) >= 0 && cloaked != 0) return null;
+            int extended = Native.GetWindowLong(window, -20);
+            bool checkTitle = !media && !foreground && (extended & 0x80) != 0 && (extended & (0x40000 | 0x08000000 | 0x20)) == 0;
+            bool titled = !checkTitle || GetWindowTextLength(window) > 0;
+            className.Length = 0;
+            Native.GetClassName(window, className, className.Capacity);
+            string kind = className.ToString();
+            if (!media && PassiveSurface(extended, foreground, kind, titled)) return null;
             Native.RectI bounds,client;if(!Native.GetWindowRect(window,out bounds)||!GetClientRect(window,out client)||bounds.Right<=bounds.Left||bounds.Bottom<=bounds.Top)return null;
             var first=new Native.PointI {X=client.Left,Y=client.Top};var last=new Native.PointI {X=client.Right,Y=client.Bottom};if(!ClientToScreen(window,ref first)||!ClientToScreen(window,ref last))return null;
+            int style = Native.GetWindowLong(window, -16);
             var candidate = new FullscreenCandidate
             {
                 Window = window,
@@ -124,11 +142,12 @@ namespace OneTaskBar
                 Client = new Native.RectI { Left = first.X, Top = first.Y, Right = last.X, Bottom = last.Y },
                 Monitor = System.Windows.Forms.Screen.FromHandle(window).Bounds,
                 Maximized = Native.IsZoomed(window),
-                Framed = (Native.GetWindowLong(window, -16) & 0xC40000) != 0,
+                Framed = (style & 0xC40000) != 0,
+                Captioned = (style & 0xC00000) != 0,
                 Kind = kind,
-                ExStyle = Native.GetWindowLong(window, -20)
+                ExStyle = extended
             };
-            if ((Native.GetWindowLong(window, -20) & 0x80) != 0 && !ClientCovers(candidate.Client, candidate.Monitor)
+            if ((extended & 0x80) != 0 && !ClientCovers(candidate.Client, candidate.Monitor)
                 && !Native.CoversMonitor(candidate.Bounds, candidate.Monitor, candidate.Maximized, candidate.Framed))
                 return null;
             return candidate;
@@ -143,17 +162,41 @@ namespace OneTaskBar
         internal static bool BandFriendly(FullscreenCandidate window)
         {
             string kind=window==null?"":window.Kind??"";
-            return kind.StartsWith("Chrome_WidgetWin",StringComparison.Ordinal)||kind=="MozillaWindowClass"||kind=="ApplicationFrameWindow"||
+            return BrowserWindow(kind)||kind=="ApplicationFrameWindow"||
                 kind.StartsWith("PotPlayer",StringComparison.OrdinalIgnoreCase)||kind.StartsWith("mpv",StringComparison.OrdinalIgnoreCase)||kind.StartsWith("VLC",StringComparison.OrdinalIgnoreCase);
         }
+        static bool BrowserWindow(string kind)
+        {
+            return kind.StartsWith("Chrome_WidgetWin",StringComparison.Ordinal)||kind=="MozillaWindowClass";
+        }
+
+        static bool Covers(FullscreenCandidate window,Rectangle screen)
+        {
+            if(window.Maximized&&Preferences.Current.MaximizedBehindDock)
+            {
+                // A browser can enter fullscreen from a maximized window without clearing WS_MAXIMIZE.
+                // Its native caption is removed and its client matches the monitor, including all four edges.
+                return !window.Captioned&&BrowserWindow(window.Kind??"")&&window.Monitor==screen
+                    && Math.Abs(window.Client.Left-screen.Left)<=1&&Math.Abs(window.Client.Top-screen.Top)<=1
+                    && Math.Abs(window.Client.Right-screen.Right)<=1&&Math.Abs(window.Client.Bottom-screen.Bottom)<=1;
+            }
+            return ClientCovers(window.Client,screen)||Native.CoversMonitor(window.Bounds,screen,window.Maximized,window.Framed);
+        }
+
         // Like Cover, but unframed tool windows (other overlays and floating widgets) are not the app on screen.
         internal static FullscreenCandidate BandCover(Rectangle screen,IEnumerable<FullscreenCandidate> windows)
         {
-            var apps=new List<FullscreenCandidate>();
-            foreach(var window in windows)if(window.Framed||window.Maximized||(window.ExStyle&0x80)==0)apps.Add(window);
-            return Cover(screen,apps);
+            return Cover(screen, windows, true);
         }
-        internal static FullscreenCandidate Cover(Rectangle screen,IEnumerable<FullscreenCandidate> windows)
+        internal static FullscreenCandidate Cover(Rectangle screen, IEnumerable<FullscreenCandidate> windows)
+        {
+            return Cover(screen, windows, false);
+        }
+        static bool IsToolOverlay(FullscreenCandidate window)
+        {
+            return !window.Framed && !window.Maximized && (window.ExStyle & 0x80) != 0;
+        }
+        static FullscreenCandidate Cover(Rectangle screen, IEnumerable<FullscreenCandidate> windows, bool skipTools)
         {
             // The window being used decides first. After Alt-Tab back to a borderless game, another app's overlay or a
             // window that has not finished leaving can still sit above it in stacking order, which left the dock up.
@@ -162,17 +205,22 @@ namespace OneTaskBar
             {
                 foreach(var window in windows)
                 {
-                    if(window.Window!=front||window.Monitor!=screen)continue;
-                    bool intended=window.Maximized&&Preferences.Current.MaximizedBehindDock;
-                    if(!intended&&(ClientCovers(window.Client,screen)||Native.CoversMonitor(window.Bounds,screen,window.Maximized,window.Framed)))return window;
+                    if(window.Window!=front||window.Monitor!=screen||skipTools&&IsToolOverlay(window))continue;
+                    if(Covers(window,screen))return window;
                     break;
                 }
             }
             // EnumWindows is in stacking order. An inactive fullscreen window on a
             // second monitor still hides that monitor's dock; a normal app above it does not.
-            foreach(var window in windows){var overlap=Rectangle.Intersect(screen,Rectangle.FromLTRB(window.Bounds.Left,window.Bounds.Top,window.Bounds.Right,window.Bounds.Bottom));if(overlap.Width<=0||overlap.Height<=0)continue;// With "maximize to the taskbar" on, a maximized window is meant to fill the monitor. Office windows draw their own title bar, so their client area also covers it and they looked like a fullscreen app, which hid the dock and left auto-hide unable to reveal it again.
-                bool intended=window.Maximized&&Preferences.Current.MaximizedBehindDock;
-                if(!intended&&(ClientCovers(window.Client,screen)||Native.CoversMonitor(window.Bounds,screen,window.Maximized,window.Framed)))return window;if(window.Monitor==screen)return null;}return null;
+            foreach(var window in windows)
+            {
+                if (skipTools && IsToolOverlay(window)) continue;
+                var bounds=window.Bounds;
+                if(bounds.Right<=screen.Left||bounds.Left>=screen.Right||bounds.Bottom<=screen.Top||bounds.Top>=screen.Bottom)continue;
+                if(Covers(window,screen))return window;
+                if(window.Monitor==screen)return null;
+            }
+            return null;
         }
     }
 }

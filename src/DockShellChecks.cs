@@ -11,6 +11,7 @@ namespace OneTaskBar
     {
         internal static async Task Run(DockHost dock)
         {
+            CheckHiddenOwners(dock);
             foreach(var window in new[]{dock.Start,dock.Apps,dock.Status})
             {
                 var handle=new WindowInteropHelper(window).Handle;
@@ -62,6 +63,30 @@ namespace OneTaskBar
             finally {Preferences.Current.Blur=blur;}
             if(SystemPanelPlacement.Supported("SamsungBrowser","quick")||SystemPanelPlacement.Supported("explorer","start"))
                 throw new Exception("Native panel placement may not move application windows");
+        }
+        static void CheckHiddenOwners(DockHost dock)
+        {
+            foreach(bool opaque in new[]{true,false})
+            using(LiveBackdrop.WithoutHostForFixture())
+            {
+                var window=new GlassWindow {ShowActivated=false,OpaqueSurface=opaque,Width=160,Height=44,DockSurface=true};
+                try
+                {
+                    window.ShowAt(dock.Screen.Bounds,20,20,160,44);
+                    var handle=new WindowInteropHelper(window).Handle;
+                    var owner=Native.GetWindow(handle,4);
+                    if(window.HasBlur||owner==IntPtr.Zero||Native.IsWindowVisible(owner))
+                        throw new Exception("Hidden-owner fixture did not use WPF's invisible owner");
+                    for(int i=0;i<24;i++)
+                    {
+                        Native.ShowWindow(handle,i%2==0?0:6);
+                        Native.EnsureDockVisible(window,true);
+                        if(!Native.IsWindowVisible(handle)||Native.IsIconic(handle)||Native.IsWindowVisible(owner))
+                            throw new Exception("Dock recovery exposed a hidden WPF owner with an opaque or unavailable backdrop");
+                    }
+                }
+                finally {window.Close();}
+            }
         }
     }
 }

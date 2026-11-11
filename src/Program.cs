@@ -153,6 +153,8 @@ namespace OneTaskBar
             if(args.Contains("--desktop-probe")) return DesktopProbe();
             if(args.Contains("--tray-probe")) return DesktopProbe(true);
             if(args.Contains("--recover")) {int index=Array.IndexOf(args,"--session");DesktopLease.Recover(index>=0&&index+1<args.Length?args[index+1]:null);NativeOsdGate.Recover();NativeToastGate.Recover();NativeNotificationRoute.Recover();IslandSafeArea.Recover();return 0;}
+            if(args.Contains("--topbar-probe"))return TopBarChecks.Run(false);
+            if(args.Contains("--topbar-runtime-probe"))return TopBarChecks.Run(true);
             if(args.Contains("--guard-fixture")){Thread.Sleep(Timeout.Infinite);return 0;}
             if(args.Contains("--render")) return Render(args);
             if(args.Contains("--logon")&&DesktopInstanceRunning())return 0;

@@ -37,7 +37,7 @@ namespace OneTaskBar
         {
             bool tall=rows==2,wide=columns==4;
             period=Label("",tall?12:11,Faint);
-            clock=Label("",wide?(tall?60:44):tall?38:24);
+            clock=Label("",wide?(tall?60:44):tall?38:columns==1?22:24);
             clock.FontWeight=FontWeights.SemiBold;
             date=Label("",wide?20:14);
             date.FontWeight=FontWeights.SemiBold;
@@ -155,6 +155,12 @@ namespace OneTaskBar
             if(rows==2)
             {
                 face=new AnalogClockFace(Span(2)-12);
+                Children.Add(face);
+                return;
+            }
+            if(columns==1)
+            {
+                face=new AnalogClockFace(72);
                 Children.Add(face);
                 return;
             }

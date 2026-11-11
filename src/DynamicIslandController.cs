@@ -64,7 +64,9 @@ namespace OneTaskBar
                     topRight.Present(monitor,dpi,islandSpace.Bottom);Lap("top-right");
                 }
                 else CloseTopBar();
-                UpdateCurtain(monitor,dpi,shade,islandSpace.Bottom);
+                var matched=System.Drawing.Rectangle.Empty;
+                IntPtr source=TopBarEnabled?FindTopBarMatch(monitor,dpi,islandSpace.Bottom,windows,out matched):IntPtr.Zero;
+                UpdateCurtain(monitor,dpi,shade||source!=IntPtr.Zero,islandSpace.Bottom,source,matched);
             }
             catch(Exception error){CloseIsland();AppLog.Once("island-safety-area",error.ToString());}
         }
@@ -114,7 +116,7 @@ namespace OneTaskBar
             if(topRight==null)topRight=new TopStatusBar(this,TopStatusBar.Side.Right);
             topLeft.Present(monitor,dpi,bottom);
             topRight.Present(monitor,dpi,bottom);
-            UpdateCurtain(monitor,dpi,true,bottom);
+            UpdateCurtain(monitor,dpi,true,bottom,IntPtr.Zero,System.Drawing.Rectangle.Empty);
             return true;
         }
         bool ShadeWanted(Forms.Screen monitor,IEnumerable<FullscreenCandidate> windows)
@@ -122,21 +124,27 @@ namespace OneTaskBar
             // The Android-style top bar stays visible; only the island turns its band black.
             return IslandEnabled&&!Preferences.Current.MaximizedBehindDock&&MaximizedAbove(monitor,windows);
         }
-        void UpdateCurtain(Forms.Screen monitor,double dpi,bool wanted,bool bottom)
+        void UpdateCurtain(Forms.Screen monitor,double dpi,bool wanted,bool bottom,IntPtr source,System.Drawing.Rectangle area)
         {
             if(!wanted){CloseCurtain();return;}
+            if(curtain!=null&&!curtain.Fits(monitor,dpi,bottom))CloseCurtain();
             bool fresh=curtain==null;
             if(fresh)
             {
                 curtain=new SafeAreaCurtain(monitor,dpi,bottom);
-                curtain.Hold=()=>Quick!=null&&Quick.IsVisible||Center!=null&&Center.IsVisible||topLeft!=null&&topLeft.CardOpen;
-                curtain.RevealChanged=revealed=>{if(topLeft!=null)topLeft.Conceal(!revealed,true);if(topRight!=null)topRight.Conceal(!revealed,true);};
+                curtain.Hold=()=>Quick!=null&&Quick.IsVisible||Center!=null&&Center.IsVisible||Detail!=null&&Detail.IsVisible||topLeft!=null&&topLeft.CardOpen;
+                curtain.RevealChanged=revealed=>SetTopBarShade(!revealed,true);
+                curtain.MatchChanged=colors=>
+                {
+                    if(topLeft!=null)topLeft.SetMatchedBackground(colors==null?(System.Windows.Media.Color?)null:colors[0]);
+                    if(topRight!=null)topRight.SetMatchedBackground(colors==null?(System.Windows.Media.Color?)null:colors[colors.Length-1]);
+                };
             }
-            // The Android-style bar keeps its clock and battery on the black band instead of hiding until the pointer comes.
-            if(!IslandEnabled&&TopBarEnabled)curtain.Pin();
+            bool match=source!=IntPtr.Zero;
+            curtain.Pin(match||!IslandEnabled&&TopBarEnabled);
+            curtain.Match(source,area,curtain.Hold());
             curtain.Present();
-            if(topLeft!=null)topLeft.Conceal(!curtain.Revealed,true);
-            if(topRight!=null)topRight.Conceal(!curtain.Revealed,true);
+            SetTopBarShade(!curtain.Revealed,!match);
             // Created last, the curtain would sit over the island and the bar: raise them once above it.
             if(fresh)
             {
@@ -145,6 +153,26 @@ namespace OneTaskBar
                 if(topRight!=null&&topRight.IsVisible)Native.SetWindowPos(new System.Windows.Interop.WindowInteropHelper(topRight).Handle,new IntPtr(-1),0,0,0,0,0x53);
             }
         }
+        void SetTopBarShade(bool hidden,bool onBlack)
+        {
+            if(topLeft!=null)topLeft.Conceal(hidden,onBlack);
+            if(topRight!=null)topRight.Conceal(hidden,onBlack);
+        }
+
+        static IntPtr FindTopBarMatch(Forms.Screen monitor,double dpi,bool bottom,IEnumerable<FullscreenCandidate> windows,out System.Drawing.Rectangle area)
+        {
+            area=System.Drawing.Rectangle.Empty;
+            foreach(var window in windows)
+            {
+                if(window.Monitor!=monitor.Bounds||!window.Framed&&!window.Maximized)continue;
+                if(!window.Maximized)break;
+                area=TopBarBand.SampleArea(monitor.Bounds,Native.VisibleArrangeBounds(window.Window),dpi,bottom);
+                if(!area.IsEmpty)return window.Window;
+                break;
+            }
+            return IntPtr.Zero;
+        }
+
         static bool MaximizedAbove(Forms.Screen monitor,IEnumerable<FullscreenCandidate> windows)
         {
             foreach(var window in windows)
@@ -161,8 +189,9 @@ namespace OneTaskBar
             if(curtain==null)return;
             curtain.Retire();
             curtain=null;
-            if(topLeft!=null)topLeft.Conceal(false,false);
-            if(topRight!=null)topRight.Conceal(false,false);
+            if(topLeft!=null)topLeft.SetMatchedBackground(null);
+            if(topRight!=null)topRight.SetMatchedBackground(null);
+            SetTopBarShade(false,false);
         }
         void CloseTopBar()
         {

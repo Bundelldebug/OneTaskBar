@@ -881,7 +881,7 @@ namespace OneTaskBar
         {
             if(!Power.Known)return;
             foreach(var charge in charges) charge.Close(); charges.Clear();
-            if(TopBarActive&&topRight!=null&&topRight.IsVisible)charges.Add(new BatteryAnimation(topRight.Battery,preview));
+            if(TopBarActive&&topRight!=null&&topRight.IsVisible)topRight.PlayCharge(preview);
             else foreach(var dock in docks){if(Preferences.Current.DuoStatusIcon)dock.DuoChargePulse();else charges.Add(new BatteryAnimation(dock.Battery,preview));}
             if((docks.Count==0||Preferences.Current.DuoStatusIcon)&&Welcome!=null&&(preview||Welcome.IsVisible)){Welcome.PreviewBattery.Update(Power);charges.Add(new BatteryAnimation(Welcome.PreviewBattery,preview));}
         }

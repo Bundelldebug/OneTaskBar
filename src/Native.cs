@@ -140,13 +140,18 @@ namespace OneTaskBar
         {
             // Explorer can hide or minimize an HWND without changing WPF Visibility.
             // Restore only a dock that its controller already intends to display.
-            var handle=new WindowInteropHelper(window).Handle;if(handle==IntPtr.Zero)return;
+            var handle=new WindowInteropHelper(window).Handle;
+            if(handle==IntPtr.Zero)return;
             if(!window.IsVisible)window.Show();
             ShellWindowPolicy.Apply(window);
             if(!IsWindowVisible(handle)||IsIconic(handle))ShowWindow(handle,4);
-            if(raise){var owner=GetWindow(handle,4);if(owner!=IntPtr.Zero)SetWindowPos(owner,new IntPtr(-1),0,0,0,0,0x53);}
-            if(raise||(GetWindowLong(handle,-20)&8)==0)SetWindowPos(handle,new IntPtr(-1),0,0,0,0,0x53);
-            RegionState state;if(regions.TryGetValue(window,out state)&&state.Backdrop!=null)state.Backdrop.EnsureDockVisible();
+            // ShowInTaskbar=false can give WPF an invisible "Hidden Window" owner.
+            // Only the registered backdrop is a visible part of the dock.
+            RegionState state;
+            if(regions.TryGetValue(window,out state)&&state.Backdrop!=null)
+                state.Backdrop.EnsureDockVisible();
+            if(raise||(GetWindowLong(handle,-20)&8)==0)
+                SetWindowPos(handle,new IntPtr(-1),0,0,0,0,0x53);
         }
         internal static double PrepareMonitor(Window window,System.Drawing.Rectangle screen)
         {

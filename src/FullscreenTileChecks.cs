@@ -19,6 +19,20 @@ namespace OneTaskBar
             Require(Math.Abs(MoonTile.Phase(new DateTime(2026,3,3,11,38,0,DateTimeKind.Utc))-.5)<.03,"a known full moon has phase near one half");
             foreach(double phase in new[]{0,.1,.25,.4,.5,.6,.75,.9})Require(MoonTile.Shape(phase,32).IsFrozen,"moon shapes are frozen");
             Require(CalendarTile.Offset(new DateTime(2026,11,1))==0&&CalendarTile.Offset(new DateTime(2026,12,1))==2,"calendar weeks start on Sunday");
+            var korea=CalendarHolidays.ForYear(2026,"KR");
+            Require(korea.ContainsKey(new DateTime(2026,2,16))&&korea.ContainsKey(new DateTime(2026,5,25))&&
+                korea.ContainsKey(new DateTime(2026,6,3))&&korea.ContainsKey(new DateTime(2026,7,17))&&
+                !korea.ContainsKey(new DateTime(2026,9,28))&&CalendarHolidays.ForYear(2026,"US").Count==0,
+                "Korean calendar marks lunar and substituted holidays in the Korean region");
+            var nextYear=CalendarHolidays.ForYear(2027,"KR");
+            Require(nextYear.ContainsKey(new DateTime(2027,2,9))&&nextYear.ContainsKey(new DateTime(2027,7,19)),
+                "Korean calendar keeps the first working day after the festival");
+            var overlapping=CalendarHolidays.ForYear(2025,"KR");
+            Require(overlapping.ContainsKey(new DateTime(2025,5,6))&&!overlapping.ContainsKey(new DateTime(2025,5,7)),
+                "two holidays on one weekday do not create duplicate replacement dates");
+            Require(InfoTileCatalog.Known("weather:1x1")&&InfoTileCatalog.Known("weather:2x1")&&
+                InfoTileCatalog.Known("clock-digital:1x1")&&InfoTileCatalog.Known("clock-analog:1x1"),
+                "compact clock and weather sizes are available");
             var report=WeatherService.Parse(Forecast,new DateTime(2026,11,5,1,30,0));
             Require(report.Temperature==8.4&&report.Code==3&&!report.Day,"current weather fields are read");
             Require(report.RainPercent==70&&report.Summary.Contains("4:00"),"a null hour is skipped and the first likely rain hour is named");
@@ -90,11 +104,22 @@ namespace OneTaskBar
                     var titleWindow=new Window {Width=240,Height=80,Content=scrolling,ShowActivated=false,ShowInTaskbar=false,WindowStyle=WindowStyle.ToolWindow};
                     titleWindow.Show();
                     await Task.Delay(1500);
-                    int titleFrames=scrolling.RenderCount;
+                    int titleFrames=scrolling.RenderCount,delivered=0;
+                    TimeSpan lastFrame=TimeSpan.MinValue;
+                    EventHandler countFrame=(sender,args)=>
+                    {
+                        var frame=args as RenderingEventArgs;
+                        if(frame!=null&&frame.RenderingTime!=lastFrame){lastFrame=frame.RenderingTime;delivered++;}
+                    };
+                    var titleWatch=System.Diagnostics.Stopwatch.StartNew();
+                    CompositionTarget.Rendering+=countFrame;
                     await Task.Delay(1000);
-                    int titleRate=scrolling.RenderCount-titleFrames;
+                    CompositionTarget.Rendering-=countFrame;
+                    double titleRate=(scrolling.RenderCount-titleFrames)/titleWatch.Elapsed.TotalSeconds;
+                    double displayRate=delivered/titleWatch.Elapsed.TotalSeconds;
                     titleWindow.Close();
-                    Require(titleRate>=45&&titleRate<=70,"a scrolling title updates about 60 times a second on any display: "+titleRate);
+                    Require(titleRate>=Math.Min(45,displayRate*.8)&&titleRate<=70,
+                        "a scrolling title follows delivered display frames with a sixty-per-second cap: "+titleRate+" / "+displayRate);
                     shell=new ShellController(true);
                     shell.Apps.Add(new AppEntry {Name="메모 앱",AppID="OneTaskBar.Fixture!Notes"});
                     shell.Apps.Add(new AppEntry {Name="카메라 앱",AppID="OneTaskBar.Fixture!Camera"});

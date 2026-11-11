@@ -61,6 +61,9 @@ namespace OneTaskBar
                 }
                 window.VersionPicker.SelectedValue=Preferences.Current.UIVersion;window.VersionPicker.IsDropDownOpen=false;
                 await SettingsMotionChecks.Navigate(window);
+                window.OpenSettings("화면");await Task.Delay(300);
+                if(!Children<Button>(window).Any(b=>System.Windows.Automation.AutomationProperties.GetName(b)=="야간 모드"))
+                    throw new InvalidOperationException("Display settings has no Windows Night light shortcut");
                 window.OpenSettings("데스크톱");await Task.Delay(300);
                 for(int i=0;i<4;i++)
                 {

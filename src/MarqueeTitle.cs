@@ -76,15 +76,24 @@ namespace OneTaskBar
             if(delay>0){Unhook();timer.Interval=TimeSpan.FromMilliseconds(Math.Max(1,delay));if(!timer.IsEnabled)timer.Start();return;}
             // While the title moves it follows the display's own frames; a timer drifts against them and the scroll stutters.
             timer.Stop();
-            if(!hooked){hooked=true;lastRendering=TimeSpan.MinValue;CompositionTarget.Rendering+=Rendering;}
+            if(!hooked){hooked=true;lastRendering=TimeSpan.MinValue;nextRendering=TimeSpan.MinValue;CompositionTarget.Rendering+=Rendering;}
         }
-        bool hooked;TimeSpan lastRendering;
+        bool hooked;TimeSpan lastRendering,nextRendering;
         void Unhook(){if(hooked){CompositionTarget.Rendering-=Rendering;hooked=false;}}
         void Rendering(object sender,EventArgs args)
         {
             var frame=args as RenderingEventArgs;
-            // Sixty updates a second everywhere: a 120 Hz display skips every other frame, a 60 Hz one uses all of them.
-            if(frame!=null){if(frame.RenderingTime==lastRendering||lastRendering!=TimeSpan.MinValue&&(frame.RenderingTime-lastRendering).TotalMilliseconds<14)return;lastRendering=frame.RenderingTime;}
+            // Keep the cadence across display frames, including refresh rates that are not multiples of sixty.
+            if(frame!=null)
+            {
+                var at=frame.RenderingTime;
+                if(at==lastRendering)return;
+                lastRendering=at;
+                if(nextRendering!=TimeSpan.MinValue&&at.TotalMilliseconds+.5<nextRendering.TotalMilliseconds)return;
+                var interval=TimeSpan.FromTicks(TimeSpan.TicksPerSecond/60);
+                nextRendering=nextRendering==TimeSpan.MinValue?at+interval:nextRendering+interval;
+                if(nextRendering<=at)nextRendering=at+interval;
+            }
             Frame();
         }
         protected override Size MeasureOverride(Size constraint){return new Size(Math.Min(NaturalWidth,Double.IsInfinity(constraint.Width)?NaturalWidth:constraint.Width),Math.Min(Math.Max(22,Formatted.Height),constraint.Height));}

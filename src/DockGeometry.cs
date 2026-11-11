@@ -10,7 +10,11 @@ namespace OneTaskBar
         internal static int Edge {get{return Preferences.Current.DockEdge>=0&&Preferences.Current.DockEdge<=3?Preferences.Current.DockEdge:3;}}
         internal static bool Vertical(int edge){return edge==0||edge==2;}
         internal const double SideStatusWidth=44;
-        internal static double SideStatusLength(double powerWidth){return (powerWidth>0?128:106)-(40-DockClock.SideHeight);}
+        internal const double SideStatusInset=2,SideTrayHeight=22,SideQuickHeight=34,SideBatteryHeight=22;
+        internal static double SideStatusLength(double powerWidth)
+        {
+            return 2*SideStatusInset+SideTrayHeight+SideQuickHeight+(powerWidth>0?SideBatteryHeight:0)+DockClock.SideHeight;
+        }
         internal static string ClockLabel(DateTime time,bool seconds,bool vertical){return time.ToString(vertical?seconds?"tt\nh:mm:ss\nMM-dd":"tt\nh:mm\nMM-dd":seconds?"tt h:mm:ss\nyyyy-MM-dd":"tt h:mm\nyyyy-MM-dd",Loc.Culture);}
         internal static Rect Rect(System.Drawing.Rectangle screen,double scale,int edge,Rect logical)
         {
@@ -50,11 +54,27 @@ namespace OneTaskBar
         static readonly RotateTransform upright=new RotateTransform(-90);
         void ConfigureEdge()
         {
-            if(!DockGeometry.Vertical(Edge))return;appCanvas.LayoutTransform=new RotateTransform(90);var status=(Grid)Status.Surface.Child;status.Margin=new Thickness(3,3,3,3);status.ColumnDefinitions.Clear();status.ColumnDefinitions.Add(new ColumnDefinition());status.RowDefinitions.Clear();
-            // Equal slots, each item centered in its own: the tray chevron, the quick settings icons, the battery and the clock sit the same distance apart and fill the capsule, instead of stacking from the top and leaving a gap below.
-            double[] sizes={22.0,32,22,0,38};
-            foreach(double height in sizes)status.RowDefinitions.Add(new RowDefinition {Height=height==0?new GridLength(0):new GridLength(1,GridUnitType.Star),MinHeight=height});
-            int index=0;foreach(FrameworkElement child in status.Children){Grid.SetColumn(child,0);Grid.SetRow(child,index++);child.HorizontalAlignment=HorizontalAlignment.Center;child.VerticalAlignment=VerticalAlignment.Center;child.Height=sizes[index-1];child.Width=38;}clock.FontSize=8.5;clock.TextAlignment=TextAlignment.Center;
+            if(!DockGeometry.Vertical(Edge))return;
+            appCanvas.LayoutTransform=new RotateTransform(90);
+            var status=(Grid)Status.Surface.Child;
+            status.Margin=new Thickness(DockGeometry.SideStatusInset);
+            status.ColumnDefinitions.Clear();
+            status.ColumnDefinitions.Add(new ColumnDefinition());
+            status.RowDefinitions.Clear();
+
+            // These same slot heights are used when the dock reserves space for the capsule.
+            double[] heights={DockGeometry.SideTrayHeight,DockGeometry.SideQuickHeight,DockGeometry.SideBatteryHeight,0,DockClock.SideHeight};
+            for(int i=0;i<heights.Length;i++)
+            {
+                status.RowDefinitions.Add(new RowDefinition {Height=new GridLength(heights[i])});
+                var child=(FrameworkElement)status.Children[i];
+                Grid.SetColumn(child,0);
+                Grid.SetRow(child,i);
+                child.HorizontalAlignment=HorizontalAlignment.Stretch;
+                child.VerticalAlignment=VerticalAlignment.Stretch;
+            }
+            clock.FontSize=8.5;
+            clock.TextAlignment=TextAlignment.Center;
         }
         void OrientIcons()
         {

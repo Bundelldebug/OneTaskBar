@@ -68,7 +68,7 @@ namespace OneTaskBar
             for(int i=0;i<12;i++){
                 foreach(var window in windows){var handle=new WindowInteropHelper(window).Handle;Native.ShowWindow(handle,i%2==0?0:6);var owner=Native.GetWindow(handle,4);if(owner!=IntPtr.Zero)Native.ShowWindow(owner,0);mismatch|=dock.DockVisible&&(!Native.IsWindowVisible(handle)||Native.IsIconic(handle));}
                 dock.UpdateActive(IntPtr.Zero);dock.UpdateVisibility(false,false);await Task.Delay(15);
-                passed&=Contents(dock)&&windows.All(w=>{var handle=new WindowInteropHelper(w).Handle;var owner=Native.GetWindow(handle,4);return Native.IsWindowVisible(handle)&&!Native.IsIconic(handle)&&(owner==IntPtr.Zero||Native.IsWindowVisible(owner));});
+                passed&=Contents(dock)&&windows.All(w=>{var handle=new WindowInteropHelper(w).Handle;var owner=Native.GetWindow(handle,4);return Native.IsWindowVisible(handle)&&!Native.IsIconic(handle)&&(!w.HasBlur||owner==IntPtr.Zero||Native.IsWindowVisible(owner));});
             }
             // A recovery must not override intentional fullscreen or auto-hide hiding.
             dock.UpdateVisibility(true,false);dock.UpdateVisibility(true,false);bool fullHidden=windows.All(w=>!Native.IsWindowVisible(new WindowInteropHelper(w).Handle));dock.UpdateVisibility(false,false);

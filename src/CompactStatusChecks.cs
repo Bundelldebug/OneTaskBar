@@ -34,7 +34,7 @@ namespace OneTaskBar
                     "explicit on and off settings survive the stable upgrade");
             }
             foreach(double volume in new[]{0.0,1,25,26,50,51,75,76,100}){int expected=volume<=0?0:volume<=25?1:volume<=50?2:volume<=75?3:4;Require(DuoStatusGlyph.Dots(volume,false,true)==expected&&DuoStatusGlyph.Dots(volume,true,true)==0&&DuoStatusGlyph.Dots(volume,false,false)==0,"volume dots reflect endpoints, mute and missing devices");}
-            Require(DuoStatusGlyph.Dots(Double.NaN,false,true)==0&&DuoStatusGlyph.Dots(300,false,true)==4,"invalid volume is bounded");Require(DockGeometry.SideStatusWidth==44&&DockGeometry.SideStatusLength(58)==128-(40-DockClock.SideHeight)&&DockGeometry.SideStatusLength(0)==106-(40-DockClock.SideHeight),"side status remains narrow with or without power data");var date=new DateTime(2026,10,26,13,52,2);Require(DockGeometry.ClockLabel(date,true,true).Split('\n').Length==3&&DockGeometry.ClockLabel(date,true,false).Contains("2026-10-26"),"compact clock fits three lines while horizontal clock keeps the year");
+            Require(DuoStatusGlyph.Dots(Double.NaN,false,true)==0&&DuoStatusGlyph.Dots(300,false,true)==4,"invalid volume is bounded");Require(DockGeometry.SideStatusWidth==44&&DockGeometry.SideStatusLength(0)==60+DockClock.SideHeight&&DockGeometry.SideStatusLength(58)==DockGeometry.SideStatusLength(0)+22,"side status reserves only visible rows");var date=new DateTime(2026,10,26,13,52,2);Require(DockGeometry.ClockLabel(date,true,true).Split('\n').Length==3&&DockGeometry.ClockLabel(date,true,false).Contains("2026-10-26"),"compact clock fits three lines while horizontal clock keeps the year");
             for(int i=0;i<4;i++){var dot=DuoStatusGlyph.VolumeDot(i);Require(Math.Abs((dot-DuoStatusGlyph.RingCenter).Length-12.7)<.001,"volume dots follow the battery arc curvature");}Require(DuoStatusGlyph.VolumeDot(1).Y>DuoStatusGlyph.VolumeDot(0).Y&&DuoStatusGlyph.VolumeDot(2).Y>DuoStatusGlyph.VolumeDot(3).Y,"center dots are lower than the outer dots");
             checks.Add("Optional Duo battery/network/volume icon, compact side status and default-off slider numbers persist and respect state boundaries");
         }
@@ -78,7 +78,9 @@ namespace OneTaskBar
                     var root=(Grid)dock.Status.Surface.Child;foreach(FrameworkElement child in root.Children){if(child.Visibility!=Visibility.Visible)continue;var bounds=child.TransformToAncestor(root).TransformBounds(new Rect(child.RenderSize));Require(bounds.Left>=-.1&&bounds.Right<=root.ActualWidth+.1&&bounds.Top>=-.1&&bounds.Bottom<=root.ActualHeight+.1,"status controls are not clipped");}Program.Save(dock.Status.Surface,44,length,Path.Combine(AppLog.Data,"side-status-"+edge+(duo?"-duo":"-classic")+".png"));if(edge==0&&duo)await Charging(glyph);dock.Close();dock=null;
                 }
                 await MediaCapsuleVisibility(shell,screen);
-                await CustomStatus(shell,screen);await BudsStatus(shell,screen);
+                await CustomStatus(shell,screen);
+                await SideClockModes(shell,screen);
+                await BudsStatus(shell,screen);
             }finally{if(dock!=null)dock.Close();shell.Power=oldPower;shell.Services.Media=oldMedia;shell.Desktop=oldDesktop;Preferences.Current.DockEdge=oldEdge;Preferences.Current.DuoStatusIcon=oldDuo;Preferences.Current.SliderValueNumbers=oldNumbers;}
         }
         static async Task MediaCapsuleVisibility(ShellController shell,System.Windows.Forms.Screen screen)
@@ -115,6 +117,45 @@ namespace OneTaskBar
                 Require(DockStatusItems.Clean(new[]{"invalid","buds","buds","calendar","capture","settings","manager"}).SequenceEqual(new[]{"buds","calendar","capture","settings"}),"custom status rejects unknown and duplicate entries and caps four shortcuts");
                 Preferences.Current.DockStatusItems=new[]{"buds","calendar","capture","settings"};foreach(int edge in new[]{0,1,2,3}){Preferences.Current.DockEdge=edge;var dock=new DockHost(shell,screen);try{dock.Show();dock.Refresh(shell.Power);await Task.Delay(50);var root=(Grid)dock.Status.Surface.Child;foreach(FrameworkElement child in root.Children){if(child.Visibility!=Visibility.Visible)continue;var bounds=child.TransformToAncestor(root).TransformBounds(new Rect(child.RenderSize));Require(bounds.Left>=-.5&&bounds.Right<=root.ActualWidth+.5&&bounds.Top>=-.5&&bounds.Bottom<=root.ActualHeight+.5,"four extra shortcuts fit every taskbar edge");}Require(Children<Button>(root).Count(b=>b.ToolTip as string=="달력")==1,"selected shortcuts appear once");}finally{dock.Close();}}
             }finally{Preferences.Current.DockStatusItems=saved;}
+        }
+        static async Task SideClockModes(ShellController shell,System.Windows.Forms.Screen screen)
+        {
+            int original=Preferences.Current.DockClockMode;
+            bool seconds=Preferences.Current.Seconds;
+            try
+            {
+                Preferences.Current.Seconds=true;
+                foreach(int edge in new[]{0,2})
+                foreach(bool duo in new[]{false,true})
+                {
+                    Preferences.Current.DockEdge=edge;
+                    Preferences.Current.DuoStatusIcon=duo;
+                    var dock=new DockHost(shell,screen);
+                    try
+                    {
+                        dock.Show();
+                        for(int mode=0;mode<=2;mode++)
+                        {
+                            Preferences.Current.DockClockMode=mode;
+                            dock.Rebuild();
+                            await Task.Delay(40);
+                            var grid=(Grid)dock.Status.Surface.Child;
+                            var clock=(TextBlock)((Button)grid.Children[4]).Content;
+                            var status=(Grid)((Button)grid.Children[1]).Content;
+                            clock.Measure(new Size(Double.PositiveInfinity,Double.PositiveInfinity));
+                            Require(clock.DesiredSize.Width<=clock.ActualWidth+.8&&clock.DesiredSize.Height<=clock.ActualHeight+.8,"vertical clock has room for every line");
+                            Require(status.ActualHeight>=33.2,"vertical status row has room for the glyphs");
+                            Require(Math.Abs(grid.RowDefinitions[2].ActualHeight-(duo?0:22))<.8,"hidden battery leaves no empty slot");
+                        }
+                    }
+                    finally{dock.Close();}
+                }
+            }
+            finally
+            {
+                Preferences.Current.DockClockMode=original;
+                Preferences.Current.Seconds=seconds;
+            }
         }
         static async Task BudsStatus(ShellController shell,System.Windows.Forms.Screen screen)
         {

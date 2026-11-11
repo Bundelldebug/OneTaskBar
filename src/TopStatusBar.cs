@@ -30,26 +30,40 @@ namespace OneTaskBar
         readonly Glyph wifi=new Glyph("wifi",19),volume=new Glyph("volume",17);
         readonly TranslateTransform iconShift=new TranslateTransform();
         bool shifted;double shiftBy;Button chipButton;bool chipShown;
-        // The dock's own battery pill, so the icon and the charging animation are the same ones.
-        internal readonly BatteryPill Battery=new BatteryPill {Width=46,Height=18,Compact=true,Margin=new Thickness(7,0,0,0),VerticalAlignment=VerticalAlignment.Center};
-        bool charging;
-        // Over the black band beside a Dynamic Island the three status icons collapse into the dock's Duo glyph.
-        readonly DuoStatusGlyph duo=new DuoStatusGlyph {Width=22.6,Height=24,Margin=new Thickness(2,0,2,0),VerticalAlignment=VerticalAlignment.Center,Visibility=Visibility.Collapsed};
-        bool duoMode;
+        readonly BatteryPill battery=new BatteryPill {Width=46,Height=18,Compact=true,Margin=new Thickness(7,0,0,0),VerticalAlignment=VerticalAlignment.Center};
+        TopBarCharge charge;
+        internal bool ChargingEffect {get{return charge!=null&&charge.Active;}}
+        internal void PlayCharge(bool preview){if(charge!=null&&!concealed)charge.Play(shell.Power,preview);}
         Popup card;MediaPlayerView player;Border cardSurface;
         Forms.Screen screen;double scale=1;bool bottom,closed;
-        Rect host;string iconKey="";ImageSource chipArtwork;
+        Rect host;
+        bool layoutDirty=true,reposition=true,measureQueued;
+        long clockMinute=-1;
+        string clockLanguage,mediaTitle,mediaArtist,iconKey="";
+        List<NotificationEntry> notificationItems;
+        int notificationCount=-1,notificationSize;
+        ImageSource chipArtwork;
         internal Side Placement {get{return side;}}
         bool concealed;
         readonly TranslateTransform lift=new TranslateTransform();
         internal bool OnBlack {get;private set;}
+        Brush matchedInk;
+        internal void SetMatchedBackground(Color? color)
+        {
+            Brush next=color.HasValue?(TopBarBand.UseLightInk(color.Value)?lightInk:darkInk):null;
+            if(next==matchedInk)return;
+            matchedInk=next;
+            inkAt=DateTime.MinValue;
+            if(!closed&&IsVisible)Refresh();
+        }
         // Over the black safe-area band the bar is light-on-dark, and it can be tucked away until the pointer reaches the edge.
         internal void Conceal(bool hidden,bool onBlack)
         {
             if(closed)return;
-            if(OnBlack!=onBlack){OnBlack=onBlack;layoutKey="";if(IsVisible)Refresh();}
+            if(OnBlack!=onBlack){OnBlack=onBlack;if(IsVisible)Refresh();}
             if(concealed==hidden)return;
             concealed=hidden;
+            if(hidden&&charge!=null)charge.Stop();
             IsHitTestVisible=!hidden;
             var fade=new System.Windows.Media.Animation.DoubleAnimation(hidden?0:1,TimeSpan.FromMilliseconds(hidden?140:180)){FillBehavior=System.Windows.Media.Animation.FillBehavior.HoldEnd};
             row.BeginAnimation(UIElement.OpacityProperty,fade);
@@ -80,12 +94,20 @@ namespace OneTaskBar
                 Native.SetWindowLong(handle,-20,(Native.GetWindowLong(handle,-20)|0x80|0x08000000)&~0x40000);
                 HwndSource.FromHwnd(handle).AddHook((IntPtr h,int msg,IntPtr w,IntPtr l,ref bool handled)=>{if(msg==0x21){handled=true;return new IntPtr(3);}return IntPtr.Zero;});
             };
-            Closed+=(s,e)=>{closed=true;StopOutside();if(card!=null)card.IsOpen=false;chipArt.Background=null;icons.Children.Clear();};
+            Closed+=(s,e)=>
+            {
+                closed=true;
+                if(charge!=null)charge.Stop();
+                StopOutside();
+                if(card!=null)card.IsOpen=false;
+                chipArt.Background=null;
+                icons.Children.Clear();
+            };
         }
         static readonly Brush Hit=HitBrush();
         static Brush HitBrush(){var brush=new SolidColorBrush(Color.FromArgb(3,0,0,0));brush.Freeze();return brush;}
         static readonly Brush darkInk=Paint.Brush("#FF10151C"),lightInk=Paint.Brush("#FFF7FAFC");
-        static readonly System.Windows.Media.Effects.Effect darkHalo=Halo(Colors.Black),lightHalo=Halo(Colors.White);
+        static readonly System.Windows.Media.Effects.Effect lightHalo=Halo(Colors.White);
         static System.Windows.Media.Effects.Effect Halo(Color color){var effect=new System.Windows.Media.Effects.DropShadowEffect {Color=color,BlurRadius=4,ShadowDepth=0,Opacity=.5};effect.Freeze();return effect;}
         // White text over dark wallpaper, dark over light; read from the strip just under the bar a few times a second.
         DateTime inkAt=DateTime.MinValue;bool? lightText;bool sampling;
@@ -94,30 +116,29 @@ namespace OneTaskBar
             get
             {
                 if(OnBlack)return lightInk;
+                if(matchedInk!=null)return matchedInk;
                 if(DateTime.UtcNow>=inkAt&&screen!=null&&host.Width>0&&!sampling)
                 {
                     inkAt=DateTime.UtcNow.AddSeconds(2.5);
-                    int thick=(int)Math.Ceiling(IslandSafeArea.Height*scale),gap=(int)Math.Ceiling(3*scale);
+                    int thick=(int)Math.Ceiling(IslandSafeArea.Height*scale);
                     var box=Native.PlacementBounds(screen.Bounds,scale,host.X,host.Y,host.Width,host.Height);
-                    // The bar itself is read, since that is what its text sits on. Its own text is part of what the screen
-                    // shows there, so it is taken back out; reading the strip beside it instead followed whatever window sat below.
                     var area=new System.Drawing.Rectangle(box.Left,box.Top,box.Right-box.Left,Math.Min(box.Bottom-box.Top,thick));
                     // The bar itself is read, since that is what its text sits on; its own text is part of what the screen
                     // shows there and is taken back out. The read can take tens of milliseconds, so it runs off the
                     // interface thread and the result is applied when it comes back.
-                    bool wasLight=lightText==true;sampling=true;
+                    sampling=true;
                     BackgroundWork.Run(()=>LiquidReadability.Sample(area)).ContinueWith(task=>
                     {
                         Dispatcher.BeginInvoke(new Action(()=>
                         {
                             sampling=false;
-                            if(closed||task.Status!=System.Threading.Tasks.TaskStatus.RanToCompletion||task.Result<0)return;
+                            if(closed||matchedInk!=null||OnBlack||task.Status!=System.Threading.Tasks.TaskStatus.RanToCompletion||task.Result<0)return;
                             const double coverage=.12;
                             double own=lightText==false?.06:.97;
                             double behind=Math.Max(0,Math.Min(1,(task.Result-coverage*own)/(1-coverage)));
                             // Two thresholds, so a value near the middle cannot make the text flip back and forth.
                             bool light=lightText.HasValue?(lightText.Value?behind<.60:behind<.50):behind<.55;
-                            if(lightText!=light){lightText=light;layoutKey="";Refresh();}
+                            if(lightText!=light){lightText=light;Refresh();}
                         }));
                     });
                 }                return lightText.HasValue?(lightText.Value?lightInk:darkInk):Glass95.DockForeground;
@@ -148,11 +169,11 @@ namespace OneTaskBar
             var cluster=new StackPanel {Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center};
             wifi.Margin=new Thickness(0,0,7,0);
             cluster.Children.Add(wifi);cluster.Children.Add(volume);
-            cluster.Children.Add(Battery);cluster.Children.Add(duo);
-            Battery.MorphChanged=morph=>{bool next=morph>.001;if(next==charging)return;charging=next;if(!closed)Refresh();};
+            cluster.Children.Add(battery);
+            charge=new TopBarCharge(cluster) {VerticalAlignment=VerticalAlignment.Center};
             row.HorizontalAlignment=HorizontalAlignment.Right;row.VerticalAlignment=VerticalAlignment.Top;
-            var button=Paint.Button(cluster,()=>shell.ToggleQuick(Dock(),false,true),"빠른 설정");
-            button.Background=Hit;cluster.Background=Hit;button.Padding=new Thickness(8,0,8,0);button.VerticalAlignment=VerticalAlignment.Stretch;
+            var button=Paint.Button(charge,()=>shell.ToggleQuick(Dock(),false,true),"빠른 설정");
+            button.Background=Hit;charge.Background=Hit;button.Padding=new Thickness(8,0,8,0);button.VerticalAlignment=VerticalAlignment.Stretch;
             // Hidden tray icons: a down-pointing chevron before the status cluster; the panel opens downward from it.
             trayGlyph.RenderTransformOrigin=new Point(.5,.5);trayGlyph.RenderTransform=new RotateTransform(90);
             trayButton=Paint.Button(trayGlyph,OpenTray,"숨겨진 아이콘");
@@ -174,6 +195,11 @@ namespace OneTaskBar
         internal void Present(Forms.Screen monitor,double dpi,bool atBottom)
         {
             if(closed)return;
+            if(screen==null||screen.Bounds!=monitor.Bounds||scale!=dpi||bottom!=atBottom)
+            {
+                layoutDirty=reposition=true;
+                inkAt=DateTime.MinValue;
+            }
             screen=monitor;scale=dpi;bottom=atBottom;
             Refresh();
         }
@@ -181,27 +207,29 @@ namespace OneTaskBar
         {
             var ink=Ink;
             // A faint halo in the opposite tone keeps the text readable where the picture behind it is busy.
-            var effect=!OnBlack&&lightText==false?lightHalo:null;
+            var effect=!OnBlack&&matchedInk==null&&lightText==false?lightHalo:null;
             if(side==Side.Left)RefreshLeft(ink,effect);else RefreshRight(ink,effect);
-            // Measuring and moving the window cost real time on every shell pass; they happen only when what is shown changed.
-            string key=side==Side.Left?time.Text+"|"+date.Text+"|"+chip.Visibility+chipTitle.Text+"|"+iconKey+"|"+shifted+"|"+(lightText==true):wifi.Kind+"|"+volume.Kind+"|"+duoMode+"|"+Battery.Visibility+"|"+Battery.State.Level+"|"+Battery.State.Connected+"|"+charging+"|"+(lightText==true);
-            if(key==layoutKey&&IsVisible&&screen!=null&&host.Width>0)return;
-            layoutKey=key;
-            if(key!=checkedKey){checkedKey=key;Dispatcher.BeginInvoke(new Action(()=>
+            if(screen==null||!layoutDirty&&IsVisible)return;
+            layoutDirty=false;
+            MeasureAndPlace();
+            if(measureQueued)return;
+            measureQueued=true;
+            Dispatcher.BeginInvoke(new Action(()=>
             {
-                if(closed||!IsVisible||shifted)return;
-                row.Measure(new Size(Double.PositiveInfinity,IslandSafeArea.Height));
-                if(Math.Ceiling(row.DesiredSize.Width+4)>host.Width+1){layoutKey="";Refresh();}
-            }),System.Windows.Threading.DispatcherPriority.Loaded);}
+                measureQueued=false;
+                if(!closed&&IsVisible&&!shifted)MeasureAndPlace();
+            }),System.Windows.Threading.DispatcherPriority.Loaded);
+        }
+
+        void MeasureAndPlace()
+        {
             row.Measure(new Size(Double.PositiveInfinity,IslandSafeArea.Height));
             double maximum=Math.Max(80,screen.Bounds.Width/scale*(side==Side.Left?.34:.28));
-            // While the battery pill celebrates it grows to the left and a little taller: give it room, then take it back.
-            double extra=side==Side.Right&&charging?Math.Max(0,Battery.ExpandedWidth-Battery.Width)+8:0;
-            row.Margin=new Thickness(0,side==Side.Right&&charging?1:0,0,0);
-            double width=Math.Ceiling(Math.Min(maximum+extra,row.DesiredSize.Width+4+extra));
+            double width=Math.Ceiling(Math.Min(maximum,row.DesiredSize.Width+4));
             var next=Place(width);
-            if(host!=next||!IsVisible)
+            if(reposition||host!=next||!IsVisible)
             {
+                reposition=false;
                 host=next;Width=host.Width;Height=host.Height;
                 new WindowInteropHelper(this).EnsureHandle();
                 var box=Native.PlacementBounds(screen.Bounds,scale,host.X,host.Y,host.Width,host.Height);
@@ -214,25 +242,43 @@ namespace OneTaskBar
         {
             double wide=screen.Bounds.Width/scale,top=bottom?screen.Bounds.Height/scale-IslandSafeArea.Height:0;
             double x=side==Side.Left?6:wide-width-6;
-            return new Rect(x,top,width,IslandSafeArea.Height+(side==Side.Right&&charging?4:0));
+            return new Rect(x,top,width,IslandSafeArea.Height);
         }
         void RefreshLeft(Brush ink,System.Windows.Media.Effects.Effect effect)
         {
             var now=DateTime.Now;
-            string clock=now.ToString("h:mm",CultureInfo.InvariantCulture),day=Loc.Date(now,"M월 d일 dddd");
-            if(time.Text!=clock)time.Text=clock;
-            if(date.Text!=day)date.Text=day;
+            long minute=now.Ticks/TimeSpan.TicksPerMinute;
+            string language=Loc.Code;
+            if(clockMinute!=minute||clockLanguage!=language)
+            {
+                clockMinute=minute;
+                clockLanguage=language;
+                string clock=now.ToString("h:mm",CultureInfo.InvariantCulture),day=Loc.Date(now,"M월 d일 dddd");
+                layoutDirty|=time.Text!=clock||date.Text!=day;
+                time.Text=clock;
+                date.Text=day;
+            }
             time.Foreground=date.Foreground=ink;time.Effect=date.Effect=effect;
             var media=shell.Services.Media;
             bool playing=Preferences.Current.ShowNowBar&&media!=null&&media.Available&&media.Active;
             chip.Visibility=playing?Visibility.Visible:Visibility.Collapsed;
-            if(chipButton.Visibility!=chip.Visibility)chipButton.Visibility=chip.Visibility;
+            if(chipButton.Visibility!=chip.Visibility)
+            {
+                chipButton.Visibility=chip.Visibility;
+                layoutDirty=true;
+            }
             // The chip arrives the way the NowBar does at the dock: a short rise with a soft settle and fade.
             if(playing&&!chipShown&&Motion.Enabled&&IsVisible&&!closing)Motion.Launcher(chip,true,true);
             chipShown=playing;
             if(playing)
             {
-                chipTitle.Text=String.IsNullOrWhiteSpace(media.Artist)?media.Title:media.Title+" · "+media.Artist;
+                if(mediaTitle!=media.Title||mediaArtist!=media.Artist)
+                {
+                    mediaTitle=media.Title;
+                    mediaArtist=media.Artist;
+                    chipTitle.Text=String.IsNullOrWhiteSpace(mediaArtist)?mediaTitle:mediaTitle+" · "+mediaArtist;
+                    layoutDirty=true;
+                }
                 if(!Object.ReferenceEquals(chipArtwork,media.Artwork))
                 {
                     chipArtwork=media.Artwork;
@@ -249,18 +295,32 @@ namespace OneTaskBar
                 if(card!=null&&card.IsOpen&&player!=null&&!closing){player.Update(media,shell.Services.OutputName);cardSurface.Background=player.MediaBackground??cardSurface.Background;}
             }
             else if(card!=null&&card.IsOpen)FinishClose();
-            // The apps that have notifications, once each, most recent first.
-            var apps=shell.Notifications.Items.Where(n=>n!=null&&n.Icon!=null).OrderByDescending(n=>n.Created).GroupBy(n=>n.AppId??n.App).Select(g=>g.First()).Take(5).ToList();
+            RefreshNotificationIcons();
+        }
+
+        void RefreshNotificationIcons()
+        {
+            // NotificationService replaces its snapshot when it refreshes and can clear it in place.
+            var items=shell.Notifications.Items;
+            int size=Math.Max(32,(int)Math.Ceiling(24*scale));
+            if(ReferenceEquals(notificationItems,items)&&notificationCount==items.Count&&notificationSize==size)return;
+            bool sizeChanged=notificationSize!=size;
+            notificationItems=items;
+            notificationCount=items.Count;
+            notificationSize=size;
+            var apps=items.Where(n=>n!=null&&n.Icon!=null).OrderByDescending(n=>n.Created).GroupBy(n=>n.AppId??n.App).Select(g=>g.First()).Take(5).ToList();
             string key=String.Join("|",apps.Select(n=>(n.AppId??n.App)+":"+System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(n.Icon)));
-            if(key!=iconKey)
+            if(key!=iconKey||sizeChanged)
             {
-                iconKey=key;icons.Children.Clear();
+                iconKey=key;
+                layoutDirty=true;
+                icons.Children.Clear();
                 foreach(var entry in apps)
                 {
                     ImageSource source;
                     try
                     {
-                        source=ArtworkThumbnail.Square(entry.Icon,Math.Max(32,(int)Math.Ceiling(24*scale)));
+                        source=ArtworkThumbnail.Square(entry.Icon,size);
                         if(source!=null&&!source.IsFrozen&&source.CanFreeze)source=source.Clone();
                         if(source!=null&&!source.IsFrozen&&source.CanFreeze)source.Freeze();
                     }
@@ -283,7 +343,7 @@ namespace OneTaskBar
             if(wifi.Generation!=generation){wifi.Generation=generation;wifi.InvalidateVisual();}
             int signal=wifiKind=="wifi"?shell.WifiSignal:0,traffic=wifiKind=="wifi"?shell.WifiTraffic:-1;
             if(wifi.Signal!=signal||wifi.Traffic!=traffic){wifi.Signal=signal;wifi.Traffic=traffic;wifi.InvalidateVisual();}
-            volume.Opacity=shell.Audio.Available?wifi.Opacity:.4;
+            volume.Opacity=shell.Audio.Available?1:.4;
             if(volume.Kind!=soundKind){volume.Kind=soundKind;volume.InvalidateVisual();}
             if(wifi.Color!=ink||volume.Color!=ink){wifi.Color=volume.Color=ink;wifi.InvalidateVisual();volume.InvalidateVisual();}
             wifi.Effect=volume.Effect=effect;
@@ -291,24 +351,14 @@ namespace OneTaskBar
             trayGlyph.Effect=effect;
             var power=shell.Power;
             bool known=power!=null&&power.Known;
-            // The top bar keeps the regular Wi-Fi, volume and battery icons, also over the black band.
-            bool together=false;
-            if(together!=duoMode)
+            var visibility=known?Visibility.Visible:Visibility.Collapsed;
+            if(battery.Visibility!=visibility)
             {
-                duoMode=together;layoutKey="";
-                var separate=together?Visibility.Collapsed:Visibility.Visible;
-                wifi.Visibility=volume.Visibility=separate;
-                duo.Visibility=together?Visibility.Visible:Visibility.Collapsed;
+                battery.Visibility=visibility;
+                layoutDirty=true;
             }
-            if(together)
-            {
-                duo.Update(power,wifiKind,signal,shell.Audio.Value,shell.Audio.Muted,shell.Audio.Available,ink);
-                duo.Effect=effect;
-                Battery.Visibility=Visibility.Collapsed;
-                return;
-            }
-            Battery.Visibility=known?Visibility.Visible:Visibility.Collapsed;
-            if(known){Battery.ExpandedWidth=96;Battery.Update(power);}
+            if(known)battery.Update(power);
+            charge.Update(power);
         }
         // The expanded media card is the pill's own look. It opens the way the Android status bar's does: the chip
         // swells into the card (a rounded clip growing from the chip's size to the card's, on the spring the rest of the
@@ -434,7 +484,6 @@ namespace OneTaskBar
             chip.BeginAnimation(UIElement.OpacityProperty,chipFade);
         }
         bool closing;
-        string layoutKey="",checkedKey="";
         readonly System.Windows.Threading.DispatcherTimer closeTimer=new System.Windows.Threading.DispatcherTimer {Interval=TimeSpan.FromMilliseconds(250)};
         void CloseCard()
         {
@@ -455,7 +504,7 @@ namespace OneTaskBar
         }        internal void ToggleMediaCard(){ToggleCard();}
         internal object Inspect()
         {
-            return new {side=side.ToString(),visible=IsVisible,left=host.X,top=host.Y,width=host.Width,height=host.Height,chip=chip.Visibility==Visibility.Visible,notificationIcons=icons.Children.Count,cardOpen=CardOpen};
+            return new {side=side.ToString(),visible=IsVisible,left=host.X,top=host.Y,width=host.Width,height=host.Height,chip=chip.Visibility==Visibility.Visible,notificationIcons=icons.Children.Count,cardOpen=CardOpen,charging=charge!=null&&charge.Active};
         }
     }
 }

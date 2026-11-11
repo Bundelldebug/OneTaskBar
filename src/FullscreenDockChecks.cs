@@ -21,6 +21,20 @@ namespace OneTaskBar
                     Preferences.Current.MaximizedBehindDock=false;
                     Require(FullscreenVisibility.IsFullScreen(screen,new[]{office}),"the same window still counts as fullscreen when that option is off");
                     Preferences.Current.MaximizedBehindDock=true;
+                    foreach(string kind in new[]{"Chrome_WidgetWin_1","MozillaWindowClass"})
+                    {
+                        var browser=new FullscreenCandidate
+                        {
+                            Window=new IntPtr(2),Bounds=box,Client=box,Monitor=screen,
+                            Maximized=true,Framed=true,Captioned=true,Kind=kind
+                        };
+                        Require(!FullscreenVisibility.IsFullScreen(screen,new[]{browser}),"a normal maximized browser keeps the dock visible");
+                        browser.Captioned=false;
+                        browser.Client.Top+=32;
+                        Require(!FullscreenVisibility.IsFullScreen(screen,new[]{browser}),"a captionless browser that leaves a strip is not fullscreen");
+                        browser.Client=box;
+                        Require(FullscreenVisibility.IsFullScreen(screen,new[]{browser}),"browser fullscreen still hides the dock with WS_MAXIMIZE set");
+                    }
                     office.Maximized=false;
                     Require(FullscreenVisibility.IsFullScreen(screen,new[]{office}),"a window that is not maximized and covers the monitor is fullscreen");
                 }
