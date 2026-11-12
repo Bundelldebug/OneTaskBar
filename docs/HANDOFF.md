@@ -2,9 +2,9 @@
 
 Checked: 2026-11-12, Asia/Seoul. Maintained by the active agent.
 
-## Active request
+## Completed request
 
-Fix GitHub #20–#25, optimize, validate and publish **9.5.13 A1Z6 stable** and **10.0.0 A1A7 Beta**. Publication is authorized. Do not install or restart the installed application. The owner clarified that the separate charging-icon window appeared during QA, not a charger connection.
+GitHub #20–#25 fixes, optimization, validation and both authorized releases are complete: **9.5.13 A1Z6 stable** and **10.0.0 A1A7 Beta**. No release work remains pending. Do not install or restart the installed application. The owner clarified that the separate charging-icon window appeared during QA, not a charger connection.
 
 Checkout: `C:/Users/Bundell/Documents/Codex/One TaskBar`, branch `codex/release-9-5-0`, base `3d6eff4`. Main #20–#24 work is committed as `9f0f10623f53be0afab130ad8cb85a7e9dd5b3f4`; #25 and charging guards are committed as `bdb56092d8e046168ca3aad925c1da063c792c2f`. Preexisting `AGENTS.md` and `CLAUDE.md` edits belong to the owner/Claude: leave them unchanged and uncommitted. No other agent is working in this checkout. Historical chat requests are not a queue.
 
@@ -32,7 +32,7 @@ Stable packaging passed: `.qa-data/packages-A1Z6-final/verification.json` matche
 
 Stable is publicly released as latest: https://github.com/Bundelldebug/OneTaskBar/releases/tag/v9.5.13-A1Z6 . Remote API verified draft=false, prerelease=false, tag bdb5609, and all three asset sizes/SHA256 digests against the frozen package record. Evidence: `.qa-data/packages-A1Z6-final/github-release.json`.
 
-Beta selected in AssemblyInfo.cs: 10.0.0 A1A7 Beta. Snapshot `.qa-data/release-A1A7-final/OneTaskBar.exe`, SHA256 `8FB470B65905880779DCCE4AE8E2980DF5CD0CD4CB5C04DA280DB76C732F3002`. All 35 checks passed in `.qa-data/release-A1A7-final-all`. Final idle CPU 0.0097%, average working set 147.43 MiB / private working set 75.13 MiB; `.qa-data/release-A1A7-final-runtime/runtime.json`. No media/helper/hooks, not total-product use. Earlier beta CPU/memory variability is retained in VALIDATION.md. Beta staging matched all 19 files, Setup exit 0, both signatures NotSigned and Defender passed four targets without protection/exclusion changes: `.qa-data/packages-A1A7-final/verification.json` and `defender.json`. Next: commit beta source, tag v10.0.0-A1A7-beta and publish as prerelease with the three frozen assets. Keep stable as latest. No installation. Old packages and beta artifacts are superseded. GUI checks run sequentially.
+Beta selected in AssemblyInfo.cs: 10.0.0 A1A7 Beta. Snapshot `.qa-data/release-A1A7-final/OneTaskBar.exe`, SHA256 `8FB470B65905880779DCCE4AE8E2980DF5CD0CD4CB5C04DA280DB76C732F3002`. All 35 checks passed in `.qa-data/release-A1A7-final-all`. Final idle CPU 0.0097%, average working set 147.43 MiB / private working set 75.13 MiB; `.qa-data/release-A1A7-final-runtime/runtime.json`. No media/helper/hooks, not total-product use. Earlier beta CPU/memory variability is retained in VALIDATION.md. Beta staging matched all 19 files, Setup exit 0, both signatures NotSigned and Defender passed four targets without protection/exclusion changes: `.qa-data/packages-A1A7-final/verification.json` and `defender.json`. Beta source/tag: `7806545cc6df5851a507000387d1b0c6fc581510`, `v10.0.0-A1A7-beta`. Published prerelease: https://github.com/Bundelldebug/OneTaskBar/releases/tag/v10.0.0-A1A7-beta . API verified draft=false/prerelease=true, the tag commit and all three asset sizes/SHA256 digests. Stable remains latest. Evidence: `.qa-data/packages-A1A7-final/github-release.json`. Setup SHA256 `73B6E78594B6E31B445672ACD42896C09C47C96DAE12AC76EADDF9B2987334C1`; portable `376752EE70233F79AF5CF24E6E407480D75D50E7D109DB572F6D8860747B44A8`. No installation. Old packages and beta artifacts are superseded. No issue was commented on or closed.
 
 ## Publication constraints
 
