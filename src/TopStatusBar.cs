@@ -33,7 +33,11 @@ namespace OneTaskBar
         readonly BatteryPill battery=new BatteryPill {Width=46,Height=18,Compact=true,Margin=new Thickness(7,0,0,0),VerticalAlignment=VerticalAlignment.Center};
         TopBarCharge charge;
         internal bool ChargingEffect {get{return charge!=null&&charge.Active;}}
-        internal void PlayCharge(bool preview){if(charge!=null&&!concealed)charge.Play(shell.Power,preview);}
+        internal void PlayCharge(bool preview)
+        {
+            if(closed||concealed||!IsVisible||charge==null)return;
+            charge.Play(shell.Power,preview);
+        }
         Popup card;MediaPlayerView player;Border cardSurface;
         Forms.Screen screen;double scale=1;bool bottom,closed;
         Rect host;

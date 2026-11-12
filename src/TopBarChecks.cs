@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Interop;
@@ -63,6 +65,20 @@ namespace OneTaskBar
             return a.Left == b.Left && a.Right == b.Right && a.Top == b.Top && a.Bottom == b.Bottom;
         }
 
+        static HashSet<IntPtr> OwnedWindows()
+        {
+            var windows = new HashSet<IntPtr>();
+            uint ownProcess = (uint)Process.GetCurrentProcess().Id;
+            Native.EnumWindows((window, state) =>
+            {
+                uint process;
+                Native.GetWindowThreadProcessId(window, out process);
+                if (process == ownProcess) windows.Add(window);
+                return true;
+            }, IntPtr.Zero);
+            return windows;
+        }
+
         internal static int Run(bool runtime)
         {
             var application = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
@@ -85,8 +101,10 @@ namespace OneTaskBar
                     shell = new ShellController(true);
                     shell.Power = new PowerState { Known = true, Level = 81, Connected = true };
                     var screen = Forms.Screen.PrimaryScreen;
-                    left = new TopStatusBar(shell, TopStatusBar.Side.Left);
-                    right = new TopStatusBar(shell, TopStatusBar.Side.Right);
+                    // The charging fixture uses real HWNDs without painting a
+                    // separate capsule over the owner's desktop.
+                    left = new TopStatusBar(shell, TopStatusBar.Side.Left) { Opacity = 0 };
+                    right = new TopStatusBar(shell, TopStatusBar.Side.Right) { Opacity = 0 };
                     double dpi = Native.PrepareMonitor(right, screen.Bounds);
                     left.SetMatchedBackground(Colors.DimGray);
                     right.SetMatchedBackground(Colors.DimGray);
@@ -94,10 +112,13 @@ namespace OneTaskBar
                     right.Present(screen, dpi, false);
                     await Task.Delay(350);
                     var before = Bounds(right);
+                    var windowsBefore = OwnedWindows();
                     right.PlayCharge(true);
                     await Task.Delay(350);
                     Require(right.ChargingEffect && Same(before, Bounds(right)),
                         "The charging capsule animates without moving the status window");
+                    Require(windowsBefore.SetEquals(OwnedWindows()),
+                        "Charging uses the status bar's existing visual tree without a separate native window");
                     await Task.Delay(2600);
                     Require(!right.ChargingEffect && Same(before, Bounds(right)),
                         "Charging returns to the normal status icons at their original positions");
@@ -109,9 +130,15 @@ namespace OneTaskBar
                     right.Conceal(true, true);
                     Require(!right.ChargingEffect, "Hiding the top bar releases the charging animation");
                     right.Conceal(false, false);
+                    right.HideImmediately();
+                    right.PlayCharge(true);
+                    Require(!right.IsVisible && !right.ChargingEffect && windowsBefore.SetEquals(OwnedWindows()),
+                        "A charging preview never opens a hidden status bar or creates another window");
+                    right.Present(screen, dpi, false);
                     if (runtime)
                     {
                         // Exercise the idle topbar and dock pulse without desktop hooks, appbar reservations or hardware writes.
+                        left.Opacity = right.Opacity = 1;
                         dock = new DockHost(shell, screen);
                         dock.Show();
                         dock.Refresh(shell.Power);
@@ -130,7 +157,8 @@ namespace OneTaskBar
                         }
                     }
                     AppLog.Json("topbar-probe.json", new { passed = true, chargingKeepsGeometry = true,
-                        chargingStopsAfterUnplug = true, sampledBandGeometry = true, dpi = dpi });
+                        chargingStopsAfterUnplug = true, chargingCreatesNoWindows = true,
+                        sampledBandGeometry = true, dpi = dpi });
                     result = 0;
                 }
                 catch (Exception error)

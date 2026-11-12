@@ -23,6 +23,14 @@ namespace OneTaskBar
         public void Launch()
         {
             if(Windows.Count>0) { Native.Activate(Windows[0]); return; }
+            if(SteamLauncher.IsClient(this))
+            {
+                var launch=SteamLauncher.Prepare(this);
+                if(launch!=null)try{using(var process=Process.Start(launch)){} }
+                    catch(Exception error){AppLog.Write("launch-steam",error.Message);}
+                else AppLog.Once("launch-steam","The Steam client executable is unavailable.");
+                return;
+            }
             if(!String.IsNullOrEmpty(Target)) Native.Open(Target);
             else if(!String.IsNullOrEmpty(AppID)) {
                 // An id that only the running window carries is not a Start entry: start the program itself instead.
@@ -112,20 +120,21 @@ namespace OneTaskBar
         internal static bool Same(AppEntry a,AppEntry b)
         {
             if(a==null||b==null) return false;
+            if(SteamLauncher.IsClient(a)&&SteamLauncher.IsClient(b))return true;
             if(!String.IsNullOrEmpty(a.AppID) && !String.IsNullOrEmpty(b.AppID)) return String.Equals(a.AppID,b.AppID,StringComparison.OrdinalIgnoreCase);
             string x=a.Executable??a.Target,y=b.Executable??b.Target;
             return !String.IsNullOrEmpty(x)&&!String.IsNullOrEmpty(y)&&String.Equals(x,y,StringComparison.OrdinalIgnoreCase);
         }
         internal static AppEntry ResolveInstalled(AppEntry saved,IEnumerable<AppEntry> installed)
         {
-            var apps=installed.ToList();var known=apps.FirstOrDefault(a=>String.Equals(a.Key,saved.Key,StringComparison.OrdinalIgnoreCase))??apps.FirstOrDefault(a=>Same(a,saved));
+            var apps=installed.ToList();saved=SteamLauncher.Resolve(saved,apps);var known=apps.FirstOrDefault(a=>String.Equals(a.Key,saved.Key,StringComparison.OrdinalIgnoreCase))??apps.FirstOrDefault(a=>Same(a,saved));
             string old=saved.Executable??saved.Target;
             if(known==null&&saved.Windows.Count>0&&!String.IsNullOrEmpty(old)&&!String.IsNullOrEmpty(saved.AppID)&&!saved.AppID.Contains("!")&&!WebAppIcons.HasSeparateIdentity(saved.AppID)){var exact=apps.Where(a=>String.Equals(a.Executable,old,StringComparison.OrdinalIgnoreCase)&&!String.IsNullOrEmpty(a.AppID)&&String.Equals(a.AppID,a.Executable,StringComparison.OrdinalIgnoreCase)).Take(2).ToArray();if(exact.Length==1)known=exact[0];}
             string folder=ExecutableFolder(old,true);
             if(known==null&&folder!=null){
                 var aliases=apps.Where(a=>String.Equals(ExecutableFolder(a.Executable??a.Target??a.AppID,false),folder,StringComparison.OrdinalIgnoreCase)).Take(2).ToArray();if(aliases.Length==1)known=aliases[0];
             }
-            if(known==null)return saved.Copy();var result=known.Copy();if(saved.Windows.Count>0&&WebAppIcons.HasSeparateIdentity(saved.AppID)&&saved.Icon!=null)result.Icon=saved.Icon;result.StoredKey=saved.Key;result.Pinned=saved.Pinned;result.ExplorerItem=saved.ExplorerItem;result.StartedUtcTicks=saved.StartedUtcTicks;foreach(var window in saved.Windows)if(!result.Windows.Contains(window))result.Windows.Add(window);return result;
+            if(known==null)return saved.Copy();var result=known.Copy();if(SteamLauncher.IsClient(saved))result=SteamLauncher.Resolve(result,new[]{saved}.Concat(apps));if(saved.Windows.Count>0&&WebAppIcons.HasSeparateIdentity(saved.AppID)&&saved.Icon!=null)result.Icon=saved.Icon;result.StoredKey=saved.Key;result.Pinned=saved.Pinned;result.ExplorerItem=saved.ExplorerItem;result.StartedUtcTicks=saved.StartedUtcTicks;foreach(var window in saved.Windows)if(!result.Windows.Contains(window))result.Windows.Add(window);return result;
         }
         internal static bool PresentationChanged(IList<AppEntry> before,IList<AppEntry> after){return before.Count!=after.Count||before.Where((a,i)=>!String.Equals(a.Key,after[i].Key,StringComparison.OrdinalIgnoreCase)||a.Name!=after[i].Name||a.Target!=after[i].Target||a.AppID!=after[i].AppID||!Object.ReferenceEquals(a.Icon,after[i].Icon)).Any();}
         static string ExecutableFolder(string path,bool electron)

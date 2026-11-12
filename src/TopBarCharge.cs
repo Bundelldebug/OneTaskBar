@@ -57,7 +57,10 @@ namespace OneTaskBar
         internal void Play(PowerState power, bool preview)
         {
             Stop();
-            if (!Motion.Enabled || power == null || !power.Known) return;
+            // Charging belongs to the existing status bar. Never make a hidden
+            // bar visible, or host this effect in a popup/standalone window.
+            if (!IsVisible || !(Window.GetWindow(this) is TopStatusBar) ||
+                !Motion.Enabled || power == null || !power.Known) return;
             this.preview = preview;
             SetLevel(power.Level);
             capsule.Visibility = label.Visibility = Visibility.Visible;
