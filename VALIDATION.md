@@ -1,5 +1,13 @@
 # Validation
 
+## 10.0.0 A1A7 Beta — 2026-11-12
+
+- Source: stable `bdb56092d8e046168ca3aad925c1da063c792c2f` with the assembly switched to major 10 / A1A7 Beta. Shipping executable SHA256: `8FB470B65905880779DCCE4AE8E2980DF5CD0CD4CB5C04DA280DB76C732F3002`. All 35 isolated checks passed: `.qa-data/release-A1A7-final-all/summary.json`, including #25 Steam pins and the charging native-window guard.
+- Fluid UI is available in this major version. The island fixture passed version switching, material changes and paused rendering; expansion peak 206.76 DIP for a 204 DIP target. Stable major 9 separately passed its unavailable-feature check. Existing compiler warnings remain unchanged.
+- Final isolated idle, UI version 100: 30-second sample, CPU 0.0097%, average working set 147.43 MiB / private working set 75.13 MiB. `.qa-data/release-A1A7-final-runtime/runtime.json`. This is the idle topbar/dock fixture with no media, recovery helper or desktop hooks, not installed whole-product memory. It is not a controlled comparison with UI 95 or a battery-drain test. The 150 MB total-product target remains unverified/unmet.
+- Earlier superseded beta `A8240D437B0128DAC79DE57BB3A803FBDBF02DC210E4AE7766A6F99A21E2B609` also passed all 35 checks, but one idle sample used CPU 0.6512% / average working set 277.95 MiB. The reports remain under `.qa-data/release-A1A7-all` and `release-A1A7-runtime`; the different single-run values do not establish a performance improvement. No forced GC or working-set trimming was used.
+- Both channels use the same fixes. Setup is staged without installation, and file hashes / Defender results are recorded under `.qa-data/packages-A1A7-final`. No installed application, startup, notification registration, protection setting or exclusions were changed. The build is unsigned.
+
 ## 9.5.13 A1Z6 — 2026-11-12
 
 - Source: `9f0f106` plus the #25 Steam repair and hidden charging-host guards on `codex/release-9-5-0`. Shipping executable SHA256: `B13E42A6D207AAF096624910718F048CADE538DFEB3F3CD075DB607384B3A85D`. All 35 isolated checks passed: `.qa-data/release-A1Z6-final4-all/summary.json`. Stable excludes Fluid; the beta-only fixture confirms that gate. The five existing compiler warnings remain.

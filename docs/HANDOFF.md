@@ -6,7 +6,7 @@ Checked: 2026-11-12, Asia/Seoul. Maintained by the active agent.
 
 Fix GitHub #20–#25, optimize, validate and publish **9.5.13 A1Z6 stable** and **10.0.0 A1A7 Beta**. Publication is authorized. Do not install or restart the installed application. The owner clarified that the separate charging-icon window appeared during QA, not a charger connection.
 
-Checkout: `C:/Users/Bundell/Documents/Codex/One TaskBar`, branch `codex/release-9-5-0`, base `3d6eff4`. Main #20–#24 work is committed as `9f0f10623f53be0afab130ad8cb85a7e9dd5b3f4`; #25 and charging guards are pending. Preexisting `AGENTS.md` and `CLAUDE.md` edits belong to the owner/Claude: leave them unchanged and uncommitted. No other agent is working in this checkout. Historical chat requests are not a queue.
+Checkout: `C:/Users/Bundell/Documents/Codex/One TaskBar`, branch `codex/release-9-5-0`, base `3d6eff4`. Main #20–#24 work is committed as `9f0f10623f53be0afab130ad8cb85a7e9dd5b3f4`; #25 and charging guards are committed as `bdb56092d8e046168ca3aad925c1da063c792c2f`. Preexisting `AGENTS.md` and `CLAUDE.md` edits belong to the owner/Claude: leave them unchanged and uncommitted. No other agent is working in this checkout. Historical chat requests are not a queue.
 
 ## Current changes
 
@@ -22,7 +22,7 @@ New files: `TopBarCharge.cs`, `TopBarBand.cs`, `TopBarChecks.cs`, `CalendarHolid
 
 ## Shipping validation
 
-Stable source is still selected in AssemblyInfo.cs. Executable: `.qa-data/release-A1Z6-final4/OneTaskBar.exe`, SHA256 `B13E42A6D207AAF096624910718F048CADE538DFEB3F3CD075DB607384B3A85D`. All 35 fixtures passed: `.qa-data/release-A1Z6-final4-all/summary.json`. Stable major 9 hides Fluid; the beta-only fixture confirms the gate. Full dist assets are included in this snapshot.
+Stable shipping snapshot: `.qa-data/release-A1Z6-final4/OneTaskBar.exe`, SHA256 `B13E42A6D207AAF096624910718F048CADE538DFEB3F3CD075DB607384B3A85D`. All 35 fixtures passed: `.qa-data/release-A1Z6-final4-all/summary.json`. Stable major 9 hides Fluid; the beta-only fixture confirms the gate. Full dist assets are included in this snapshot.
 
 Two final stable idle samples: CPU 0.2102% / 0.0097%, average working set 186.04 / 151.24 MiB and private working set 103.99 / 78.95 MiB. Reports: `.qa-data/release-A1Z6-final-runtime/runtime.json` and `release-A1Z6-final-runtime-repeat/runtime.json`. These are isolated topbar/dock scenes, no active media or recovery helper, not installed whole-product use. No forced GC or working-set trimming. Total-RAM 150 MB and hourly battery-drain goals remain unmet/unmeasured.
 
@@ -30,7 +30,9 @@ Retain failed reports: final2 lacked QA assets; final3 exceeded the existing ful
 
 Stable packaging passed: `.qa-data/packages-A1Z6-final/verification.json` matches all 19 files, Setup exit 0, executable SHA256 as above, no installation. Defender passed all four targets with protection enabled and no exclusion changes: `defender.json`. Assets are frozen in that directory. Setup SHA256 `45BDCF51BC17E0C3082A8D08662793310DA58E4B248FDEE6FBC21107C26FEFB7`; portable SHA256 `E74A32754789C456C948DD0E13B2E62D630662C833CD37125B1B8CAE4DAAFAE2`.
 
-Next: commit all owned changes except AGENTS/CLAUDE as the stable source. Switch assembly to 10.0.0 A1A7 Beta, build/full-snapshot, run all checks and measure final idle, package/verify/scan, commit, tag and publish both. Old packages and earlier beta artifacts are superseded: do not upload them. Helpers `.qa-data/measure-shipping.ps1` and `.qa-data/package-shipping.ps1` stage without installation. Run native GUI fixtures sequentially with native-window permissions.
+Stable is publicly released as latest: https://github.com/Bundelldebug/OneTaskBar/releases/tag/v9.5.13-A1Z6 . Remote API verified draft=false, prerelease=false, tag bdb5609, and all three asset sizes/SHA256 digests against the frozen package record. Evidence: `.qa-data/packages-A1Z6-final/github-release.json`.
+
+Beta selected in AssemblyInfo.cs: 10.0.0 A1A7 Beta. Snapshot `.qa-data/release-A1A7-final/OneTaskBar.exe`, SHA256 `8FB470B65905880779DCCE4AE8E2980DF5CD0CD4CB5C04DA280DB76C732F3002`. All 35 checks passed in `.qa-data/release-A1A7-final-all`. Final idle CPU 0.0097%, average working set 147.43 MiB / private working set 75.13 MiB; `.qa-data/release-A1A7-final-runtime/runtime.json`. No media/helper/hooks, not total-product use. Earlier beta CPU/memory variability is retained in VALIDATION.md. Beta staging matched all 19 files, Setup exit 0, both signatures NotSigned and Defender passed four targets without protection/exclusion changes: `.qa-data/packages-A1A7-final/verification.json` and `defender.json`. Next: commit beta source, tag v10.0.0-A1A7-beta and publish as prerelease with the three frozen assets. Keep stable as latest. No installation. Old packages and beta artifacts are superseded. GUI checks run sequentially.
 
 ## Publication constraints
 
