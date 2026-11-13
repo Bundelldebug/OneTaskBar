@@ -2,7 +2,6 @@ using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using System.Windows.Media.Effects;
 
 namespace OneTaskBar
 {
@@ -30,18 +29,6 @@ namespace OneTaskBar
         static Brush fluidCardBrush;static int fluidCardKey;
         static Brush fluidCard{get{int key=Fluid.StyleKey;if(fluidCardBrush==null||fluidCardKey!=key){fluidCardBrush=FluidFilm();fluidCardKey=key;}return fluidCardBrush;}}
         internal static bool CardBrush(Brush brush){return brush!=null&&(brush==light.Card||brush==dark.Card||brush==fluidCardBrush);}
-        // One UI 9.5 look without changing the glass: cards keep their transparency and stand off the panel on a soft shadow.
-        internal static bool Raised {get{return Enabled&&!Fluid.Enabled&&!SystemParameters.HighContrast;}}
-        static Effect lift;
-        // A shared soft shadow for a raised card; frozen so every card reuses the one effect.
-        internal static Effect Lift
-        {
-            get
-            {
-                if(lift==null){var shadow=new System.Windows.Media.Effects.DropShadowEffect {BlurRadius=12,ShadowDepth=4,Direction=270,Opacity=.2,Color=Colors.Black,RenderingBias=System.Windows.Media.Effects.RenderingBias.Performance};shadow.Freeze();lift=shadow;}
-                return lift;
-            }
-        }
         internal static bool Transparent {get{return Preferences.Current.Blur&&!SystemParameters.HighContrast;}}
         internal static Brush Surface {get{return PanelMaterial.PanelSurface(Dark,true);}}
         internal static Brush Card {get{return Transparent?(Fluid.Enabled?fluidCard:Current.Card):PanelMaterial.Card(Dark);}}
