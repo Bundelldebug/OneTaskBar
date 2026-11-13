@@ -44,6 +44,7 @@ namespace OneTaskBar
             var panels=new StackPanel();
             ChoiceRow(panels,"알림센터","시계와 알림 버튼에서 열 화면",Preferences.Current.NativeNotifications,v=>Preferences.Set(p=>p.NativeNotifications=v));
             Row(panels,"One Taskbar 알림 팝업","Windows 알림을 둥근 블러 카드로 표시합니다. 방해 금지와 앱별 배너 설정을 따릅니다",Preferences.Current.NotificationPopups,v=>Preferences.Set(p=>p.NotificationPopups=v));
+            Row(panels,"알림 표시 점","독의 시계 위에 받은 알림 수를 작은 점으로 표시합니다. 알림센터를 열면 사라집니다",Preferences.Current.NotificationBadge,v=>Preferences.Set(p=>p.NotificationBadge=v));
             NotificationSoundSetting(panels);
             Row(panels,"Galaxy Buds 연결 팝업","버즈 연결 정보를 오른쪽 아래에 표시합니다. 등록된 기기의 상태 변경만 감지합니다",Preferences.Current.BudsConnectionPopups,v=>Preferences.Set(p=>p.BudsConnectionPopups=v));
             var notificationLink=SettingsChip.Action("Windows 알림 연결 · 권한 관리",()=>shell.ShowNotificationConnection());notificationLink.HorizontalContentAlignment=HorizontalAlignment.Left;notificationLink.Margin=new Thickness(12,5,12,12);panels.Children.Add(notificationLink);
@@ -124,10 +125,6 @@ namespace OneTaskBar
             DataObject.AddPastingHandler(watts,(s,e)=> {string value=e.DataObject.GetData(typeof(string)) as string;int number;if(String.IsNullOrEmpty(value)||value.Length>4||!Int32.TryParse(value,out number)||number<0||number>9999)e.CancelCommand();});
             watts.TextChanged+=(s,e)=> {int number;if(Int32.TryParse(watts.Text,out number)&&number>=0&&number<=9999&&Preferences.Current.DesktopPowerWatts!=number)Preferences.Set(p=>p.DesktopPowerWatts=number);};watts.LostKeyboardFocus+=(s,e)=>watts.Text=PowerDisplay.Clamp(Preferences.Current.DesktopPowerWatts).ToString();Grid.SetColumn(watts,1);powerRow.Children.Add(watts);hardware.Children.Add(powerRow);Group(groups,"PC 호환성",hardware);
             var appearance=new StackPanel();ThemeSetting(appearance);Row(appearance,"동적 블러","배경의 창과 화면 색을 캡슐에 반영합니다",Preferences.Current.Blur,v=>Preferences.Set(p=>p.Blur=v));if(Preferences.Current.UIVersion>=95)Row(appearance,"리퀴드 글래스","실시간 블러에 채도를 더하고 틴트를 얇게 해 배경이 더 투명하게 비치는 재질입니다. UI 9.5와 동적 블러가 켜져 있어야 하며 기본은 꺼짐입니다",Preferences.Current.LiquidGlass,v=>Preferences.Set(p=>p.LiquidGlass=v));
-            var nightLight=SettingsChip.Action("야간 모드",()=>Native.Open("ms-settings:nightlight"));
-            nightLight.Margin=new Thickness(15,8,15,12);
-            nightLight.HorizontalAlignment=HorizontalAlignment.Left;
-            appearance.Children.Add(nightLight);
             AppIconSetting(appearance);
             Row(appearance,"듀오 스타일 상태 아이콘","배터리 원 게이지 · Wi-Fi · 음량 네 점을 하나로 표시합니다",Preferences.Current.DuoStatusIcon,v=>Preferences.Set(p=>p.DuoStatusIcon=v));
             StatusItemsSetting(appearance);

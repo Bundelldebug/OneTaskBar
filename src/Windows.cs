@@ -24,6 +24,10 @@ namespace OneTaskBar
         internal readonly GlassWindow Start=new GlassWindow(),Apps=new GlassWindow(),Status=new GlassWindow();
         internal readonly BatteryPill Battery=new BatteryPill();
         readonly DockClock clockFace=new DockClock();
+        // A small count over the clock tells that notifications arrived; the clock opens the notification center.
+        readonly Border noticeDot=new Border {Width=15,Height=15,CornerRadius=new CornerRadius(8),Background=Paint.Brush("#FFEF4C4C"),HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Top,Margin=new Thickness(0,2,0,0),IsHitTestVisible=false,Visibility=Visibility.Collapsed};
+        readonly TextBlock noticeText=Paint.TextBlock("",9,Brushes.White);
+        int noticeShown=-1;
         readonly TextBlock clock;
         readonly Glyph wifiStatus=new Glyph("wifi",22){Color=Glass95.DockForeground},volumeStatus=new Glyph("volume",19){Color=Glass95.DockForeground};
         readonly Grid statusIcons=new Grid {Height=34};readonly StackPanel classicStatus=new StackPanel {Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};readonly DuoStatusGlyph duoStatus=new DuoStatusGlyph {HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};
@@ -108,7 +112,10 @@ namespace OneTaskBar
             Grid.SetColumn(extraStatus,3);status.Children.Add(extraStatus);
             var time=Paint.Button(clock,()=>controller.ToggleNotifications(this),"알림센터");time.Padding=new Thickness(0);time.Background=Brushes.Transparent;time.BorderBrush=Brushes.Transparent;time.BorderThickness=new Thickness(0);
             clockAccess=time;
-            Grid.SetColumn(time,4); status.Children.Add(time); Status.Surface.Child=status;
+            Grid.SetColumn(time,4); status.Children.Add(time);
+            noticeText.FontWeight=FontWeights.Bold;noticeText.HorizontalAlignment=HorizontalAlignment.Center;noticeText.VerticalAlignment=VerticalAlignment.Center;noticeDot.Child=noticeText;
+            Grid.SetColumn(noticeDot,4);Panel.SetZIndex(noticeDot,20);status.Children.Add(noticeDot);
+            Status.Surface.Child=status;
             var menu=new ContextMenu(); var settings=new MenuItem {Header="One TaskBar 설정",Icon=new Glyph("home",18){Color=Glass95.DockForeground}};settings.Click+=(s,e)=>controller.ShowWelcome();menu.Items.Add(settings);
             var resetOrder=new MenuItem {Header="앱 순서 초기화"};resetOrder.Click+=(s,e)=>controller.ResetDockOrder();menu.Items.Add(resetOrder);
             var restore=new MenuItem {Header="Windows 작업표시줄로 돌아가기"};restore.Click+=(s,e)=>controller.SetDesktop(false);menu.Items.Add(restore);Start.ContextMenu=menu;
@@ -340,6 +347,17 @@ namespace OneTaskBar
             public override int GetHashCode(){return 0;}
         }
         QuickTipKey lastQuickTip;
+        void RefreshNoticeDot()
+        {
+            var items=controller.Notifications.Items;
+            bool opened=controller.Center!=null&&controller.Center.IsVisible;
+            int count=!Preferences.Current.NotificationBadge||opened||items==null?0:items.Count;
+            if(count==noticeShown)return;
+            noticeShown=count;
+            noticeDot.Visibility=count>0?Visibility.Visible:Visibility.Collapsed;
+            noticeText.Text=count>9?"9+":count.ToString();
+            noticeDot.Width=count>9?20:15;
+        }
         internal void Refresh(PowerState state)
         {
             if(closed) return;
@@ -353,6 +371,7 @@ namespace OneTaskBar
             RefreshMedia();if(top&&Status.IsVisible){Status.HideImmediately();Native.BlurOpacity(Status,0);}powerAccess.ToolTip=state.Known?"배터리 · 빠른 설정":"직접 입력한 PC 전력값 · 실시간 측정 아님";
             Battery.Update(state);var now=DateTime.Now;clockFace.Update(now,Edge);
             long clockSecond=now.Ticks/TimeSpan.TicksPerSecond;
+            RefreshNoticeDot();
             if(clockSecond!=clockToolSecond){clockToolSecond=clockSecond;clockAccess.ToolTip=now.ToString("yyyy-MM-dd ddd tt h:mm:ss",KoreanCulture)+" · 알림센터";}
             bool radioOff=controller.Services.WifiOn==false;string wifiKind=NetworkRouteInfo.Glyph(controller.Services.NetworkRoute,controller.Services.WifiPresent,radioOff,controller.Wifi!=null,controller.Services.NetworkConnected);
             string soundKind=SoundIcon.For(controller.Audio.Value,controller.Audio.Muted,controller.Audio.Available);

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -62,8 +62,10 @@ namespace OneTaskBar
                 window.VersionPicker.SelectedValue=Preferences.Current.UIVersion;window.VersionPicker.IsDropDownOpen=false;
                 await SettingsMotionChecks.Navigate(window);
                 window.OpenSettings("화면");await Task.Delay(300);
-                if(!Children<Button>(window).Any(b=>System.Windows.Automation.AutomationProperties.GetName(b)=="야간 모드"))
-                    throw new InvalidOperationException("Display settings has no Windows Night light shortcut");
+                if(Children<Button>(window).Any(b=>System.Windows.Automation.AutomationProperties.GetName(b)=="야간 모드"))
+                    throw new InvalidOperationException("Night light belongs in the quick settings toggles, not Display settings");
+                if(!QuickActionCatalog.Specs.Any(s=>s[0]=="night-light"&&s[2]=="야간 모드")||!QuickActionCatalog.Commands.Contains("night-light"))
+                    throw new InvalidOperationException("Night light is not a quick settings toggle option");
                 window.OpenSettings("데스크톱");await Task.Delay(300);
                 for(int i=0;i<4;i++)
                 {

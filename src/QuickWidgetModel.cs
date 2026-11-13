@@ -15,7 +15,7 @@ namespace OneTaskBar
     internal sealed class QuickWidgetLayout
     {
         internal const int Columns=4,MaximumHeight=5,MaximumRow=96;
-        internal static readonly string[] BaseKeys={"wifi","bluetooth","toggles","brightness","theme","volume","mute","media","devices","buds","windows","capture","manager","ai-select","quick-share","second-screen","storage-share","camera-share","dnd","efficiency","awake","animations","startup","slider-scroll"};
+        internal static readonly string[] BaseKeys={"wifi","bluetooth","toggles","brightness","theme","volume","mute","media","devices","buds","windows","capture","manager","ai-select","quick-share","second-screen","storage-share","camera-share","night-light","dnd","efficiency","awake","animations","startup","slider-scroll"};
         internal static readonly string[] Keys=BaseKeys.Concat(QuickSettingCatalog.All.Select(s=>s.Key)).ToArray();
         readonly string file;readonly bool presentation;
         internal List<QuickWidgetSlot> Items {get;private set;}
@@ -37,7 +37,7 @@ namespace OneTaskBar
         internal void Reset(bool save=true){Items=Defaults();if(save)Save();}
         static List<QuickWidgetSlot> Defaults()
         {
-            return new List<QuickWidgetSlot>{Slot("wifi",0,0,2,1),Slot("bluetooth",2,0,2,1),Slot("toggles",0,1,4,2),Slot("brightness",0,3,3,1),Slot("theme",3,3,1,1),Slot("volume",0,4,3,1),Slot("mute",3,4,1,1),Slot("media",0,5,4,2),Slot("devices",0,7,2,1),Slot("buds",2,7,2,1),Slot("windows",0,8,2,1),Slot("capture",2,8,2,1),Slot("manager",2,7,2,1,true),Slot("ai-select",0,10,2,1,true),Slot("quick-share",2,10,2,1,true),Slot("second-screen",0,11,2,1,true),Slot("storage-share",0,9,2,1,true),Slot("camera-share",0,12,2,1,true),Slot("dnd",0,11,1,1,true),Slot("efficiency",1,11,1,1,true),Slot("awake",2,11,1,1,true),Slot("animations",3,11,1,1,true),Slot("startup",0,9,1,1,true),Slot("slider-scroll",1,12,1,1,true)}.Concat(QuickSettingCatalog.All.Select((s,i)=>Slot(s.Key,i%4,13+i/4,1,1,true))).ToList();
+            return new List<QuickWidgetSlot>{Slot("wifi",0,0,2,1),Slot("bluetooth",2,0,2,1),Slot("toggles",0,1,4,2),Slot("brightness",0,3,3,1),Slot("theme",3,3,1,1),Slot("volume",0,4,3,1),Slot("mute",3,4,1,1),Slot("media",0,5,4,2),Slot("devices",0,7,2,1),Slot("buds",2,7,2,1),Slot("windows",0,8,2,1),Slot("capture",2,8,2,1),Slot("manager",2,7,2,1,true),Slot("ai-select",0,10,2,1,true),Slot("quick-share",2,10,2,1,true),Slot("second-screen",0,11,2,1,true),Slot("storage-share",0,9,2,1,true),Slot("camera-share",0,12,2,1,true),Slot("night-light",1,9,1,1,true),Slot("dnd",0,11,1,1,true),Slot("efficiency",1,11,1,1,true),Slot("awake",2,11,1,1,true),Slot("animations",3,11,1,1,true),Slot("startup",0,9,1,1,true),Slot("slider-scroll",1,12,1,1,true)}.Concat(QuickSettingCatalog.All.Select((s,i)=>Slot(s.Key,i%4,13+i/4,1,1,true))).ToList();
         }
         static QuickWidgetSlot Slot(string key,int x,int y,int w,int h,bool hidden=false){return new QuickWidgetSlot {Key=key,X=x,Y=y,Columns=w,Rows=h,Hidden=hidden};}
         internal bool Move(string key,int x,int y)

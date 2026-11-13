@@ -21,8 +21,9 @@ namespace OneTaskBar
         // Press and hover scaling: a plain tween, or in the Fluid UI a spring that overshoots a little before it settles.
         internal static AnimationTimeline Press(double from,double to,int milliseconds)
         {
-            if(!Fluid.Enabled)return Tween(from,to,milliseconds);
-            var motion=Elastic(from,to,milliseconds+120,SpringEase.Snappy);
+            if(!Fluid.Enabled&&!Glass95.Enabled)return Tween(from,to,milliseconds);
+            // One UI 9.5 buttons give a little under the finger and spring back past rest before they settle.
+            var motion=Elastic(from,to,milliseconds+(Fluid.Enabled?120:90),SpringEase.Snappy);
             return motion;
         }
         internal static DoubleAnimationUsingKeyFrames PanelTween(double from,double to,int milliseconds)
@@ -88,7 +89,55 @@ namespace OneTaskBar
             if(opening&&Fluid.Enabled){content.RenderTransformOrigin=Anchor(content,fromTop);DropCurves(scale,shift,0,620);}else if(opening){scale.BeginAnimation(ScaleTransform.ScaleXProperty,Spring(Math.Min(1,fromScale),.999,1,Fluid.Enabled?520:340));scale.BeginAnimation(ScaleTransform.ScaleYProperty,Spring(Math.Min(1,fromScale),.999,1,Fluid.Enabled?520:340));shift.BeginAnimation(TranslateTransform.YProperty,Spring(fromTop?Math.Min(0,Math.Max(rise,fromY)):Math.Max(0,Math.Min(12,fromY)),.4,0,Fluid.Enabled?520:340));}
             else if(Fluid.Enabled){content.RenderTransformOrigin=Anchor(content,fromTop);scale.BeginAnimation(ScaleTransform.ScaleXProperty,Tween(fromScale,.2,190));scale.BeginAnimation(ScaleTransform.ScaleYProperty,Tween(fromScale,.2,190));}
             else {scale.BeginAnimation(ScaleTransform.ScaleXProperty,Tween(fromScale,.985,145));scale.BeginAnimation(ScaleTransform.ScaleYProperty,Tween(fromScale,.985,145));shift.BeginAnimation(TranslateTransform.YProperty,Tween(fromY,rise,145));}
-            content.Opacity=opening?1:0;var fade=Tween(fromOpacity,opening?1:0,opening?135:145);if(opening)content.BeginAnimation(UIElement.OpacityProperty,fade);return fade;
+            content.Opacity=opening?1:0;var fade=Tween(fromOpacity,opening?1:0,opening?135:145);if(opening){content.BeginAnimation(UIElement.OpacityProperty,fade);Reveal(content);}return fade;
+        }
+        // One UI 9.5 arrival: the container settles first and the rows inside follow one after another, each rising a little
+        // while it fades in. Only opacity and a temporary offset are touched, and both return to what the row had.
+        internal static void Reveal(FrameworkElement content)
+        {
+            if(!Enabled||!Glass95.Enabled||content==null)return;
+            var rows=FirstRows(content);
+            if(rows==null)return;
+            int index=0;
+            foreach(UIElement child in rows.Children)
+            {
+                var row=child as FrameworkElement;
+                if(row==null||row.Visibility!=Visibility.Visible||row.Opacity<=0||row.HasAnimatedProperties||index>=9)continue;
+                double rest=row.Opacity;
+                int wait=70+index*28;index++;
+                var fade=new DoubleAnimationUsingKeyFrames {Duration=TimeSpan.FromMilliseconds(wait+230),FillBehavior=FillBehavior.Stop};
+                fade.KeyFrames.Add(new DiscreteDoubleKeyFrame(0,KeyTime.FromTimeSpan(TimeSpan.Zero)));
+                fade.KeyFrames.Add(new DiscreteDoubleKeyFrame(0,KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(wait))));
+                fade.KeyFrames.Add(new EasingDoubleKeyFrame(rest,KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(wait+230)),SpringEase.Smooth));
+                row.BeginAnimation(UIElement.OpacityProperty,fade);
+                if(row.RenderTransform==null||row.RenderTransform.IsFrozen&&row.RenderTransform.Value.IsIdentity)
+                {
+                    var rise=new TranslateTransform();
+                    var lift=new DoubleAnimationUsingKeyFrames {Duration=fade.Duration,FillBehavior=FillBehavior.Stop};
+                    lift.KeyFrames.Add(new DiscreteDoubleKeyFrame(9,KeyTime.FromTimeSpan(TimeSpan.Zero)));
+                    lift.KeyFrames.Add(new DiscreteDoubleKeyFrame(9,KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(wait))));
+                    lift.KeyFrames.Add(new EasingDoubleKeyFrame(0,KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(wait+230)),SpringEase.Smooth));
+                    var original=row.RenderTransform;
+                    row.RenderTransform=rise;
+                    lift.Completed+=(s,e)=>{if(ReferenceEquals(row.RenderTransform,rise))row.RenderTransform=original;};
+                    rise.BeginAnimation(TranslateTransform.YProperty,lift);
+                }
+            }
+        }
+        static Panel FirstRows(FrameworkElement content)
+        {
+            var queue=new System.Collections.Generic.Queue<Tuple<DependencyObject,int>>();
+            queue.Enqueue(Tuple.Create((DependencyObject)content,0));
+            while(queue.Count>0)
+            {
+                var item=queue.Dequeue();
+                var panel=item.Item1 as Panel;
+                if(panel!=null&&item.Item1!=content&&panel.Children.Count>=3&&!(panel is Canvas))return panel;
+                if(item.Item2>=7)continue;
+                int count=VisualTreeHelper.GetChildrenCount(item.Item1);
+                for(int i=0;i<count;i++)queue.Enqueue(Tuple.Create(VisualTreeHelper.GetChild(item.Item1,i),item.Item2+1));
+            }
+            return null;
         }
         internal static void Fade(FrameworkElement element,double from,double to,int milliseconds)
         {

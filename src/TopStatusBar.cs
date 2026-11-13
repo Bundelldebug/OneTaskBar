@@ -361,6 +361,8 @@ namespace OneTaskBar
                 battery.Visibility=visibility;
                 layoutDirty=true;
             }
+            bool paleBattery=ink==lightInk;
+            if(battery.LightInk!=paleBattery){battery.LightInk=paleBattery;battery.InvalidateVisual();}
             if(known)battery.Update(power);
             charge.Update(power);
         }

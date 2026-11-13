@@ -14,6 +14,8 @@ namespace OneTaskBar
         internal double DrawWidth {get{return ActualWidth+(Math.Max(ActualWidth,ExpandedWidth)-ActualWidth)*Morph;}}
         public PowerState State=new PowerState();
         public bool Celebration;public double Phase;internal bool Compact;
+        // On a dark bar the capsule turns light: a pale fill with dark digits over it and light digits over the empty part.
+        internal bool LightInk;
         internal static bool IsLow(PowerState state,bool celebration=false){return state!=null&&state.Known&&state.Level>=0&&state.Level<=20&&!state.Connected&&!state.Charging&&!celebration;}
         int desktopWatts;
         public BatteryPill(){Width=52;Height=23;IsHitTestVisible=false;}
@@ -45,9 +47,17 @@ namespace OneTaskBar
             if(!State.Known){int watts=PowerDisplay.Clamp(Preferences.Current.DesktopPowerWatts);if(watts>0){dc.DrawRoundedRectangle(Paint.Brush("#FF19221E"),null,rect,height/2,height/2);Digits(dc,watts+" W",rect,Paint.ControlWhite,false);}return;}
             double fillWidth=width*Math.Max(0,State.Level)/100*(Celebration?Reveal:1);
             string label=State.Level>=0?State.Level.ToString():"–";bool bolt=State.Connected||Celebration;
-            bool low=IsLow(State,Celebration);dc.PushClip(outline);dc.DrawRectangle(Paint.Brush(Celebration?"#FF5F7470":"#667B8581"),null,rect);
-            if(fillWidth>0)dc.DrawRectangle(Celebration?ChargeBrush():low?Paint.Brush("#FFB92835"):Paint.Brush("#FF19221E"),null,new Rect(rect.X,rect.Y,fillWidth,height));
-            Digits(dc,label,rect,Paint.ControlWhite,bolt);
+            bool low=IsLow(State,Celebration);dc.PushClip(outline);
+            bool pale=LightInk&&!Celebration&&!low;
+            dc.DrawRectangle(Paint.Brush(Celebration?"#FF5F7470":pale?"#55FFFFFF":"#667B8581"),null,rect);
+            if(fillWidth>0)dc.DrawRectangle(Celebration?ChargeBrush():low?Paint.Brush("#FFB92835"):pale?Paint.Brush("#FFF7FAFC"):Paint.Brush("#FF19221E"),null,new Rect(rect.X,rect.Y,fillWidth,height));
+            if(pale)
+            {
+                // The digits sit on both parts, so each part gets the tone that reads on it.
+                dc.PushClip(new RectangleGeometry(new Rect(rect.X,rect.Y,fillWidth,height)));Digits(dc,label,rect,Paint.Brush("#FF10151C"),bolt);dc.Pop();
+                dc.PushClip(new RectangleGeometry(new Rect(rect.X+fillWidth,rect.Y,Math.Max(0,rect.Width-fillWidth),height)));Digits(dc,label,rect,Paint.ControlWhite,bolt);dc.Pop();
+            }
+            else Digits(dc,label,rect,Paint.ControlWhite,bolt);
             dc.Pop();
         }
         internal static void Check(){foreach(int level in new[]{-1,0,1,19,20,21,100}){var state=new PowerState {Known=true,Level=level};if(IsLow(state)!=(level>=0&&level<=20))throw new InvalidOperationException("Low battery threshold");state.Connected=true;if(IsLow(state))throw new InvalidOperationException("AC must keep the charging presentation");state.Connected=false;state.Charging=true;if(IsLow(state))throw new InvalidOperationException("Charging must keep its existing icon");state.Charging=false;state.Known=false;if(IsLow(state))throw new InvalidOperationException("Unknown battery cannot be low");}if(IsLow(new PowerState {Known=true,Level=19},true))throw new InvalidOperationException("Charging animation cannot turn red");}

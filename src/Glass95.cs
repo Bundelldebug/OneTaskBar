@@ -57,10 +57,11 @@ namespace OneTaskBar
         static Brush Film(bool dark)
         {
             var film=new LinearGradientBrush {StartPoint=new Point(.08,0),EndPoint=new Point(.4,1)};
-            film.GradientStops.Add(new GradientStop(Color.FromArgb(13,255,255,255),0));
-            film.GradientStops.Add(new GradientStop(Color.FromArgb(3,255,255,255),.23));
-            film.GradientStops.Add(new GradientStop(Color.FromArgb(12,6,14,24),.58));
-            film.GradientStops.Add(new GradientStop(Color.FromArgb(32,5,12,20),1));
+            // A card sits a little above its backdrop: light on the upper face, and the lower face falls into a soft shade.
+            film.GradientStops.Add(new GradientStop(Color.FromArgb(30,255,255,255),0));
+            film.GradientStops.Add(new GradientStop(Color.FromArgb(8,255,255,255),.23));
+            film.GradientStops.Add(new GradientStop(Color.FromArgb(16,6,14,24),.58));
+            film.GradientStops.Add(new GradientStop(Color.FromArgb(38,5,12,20),1));
             film.Freeze();return film;
         }
         internal static Brush ToggleInk(bool value){return value?Paint.OnLight:Paint.Text;}
@@ -75,7 +76,8 @@ namespace OneTaskBar
             edge.GradientStops.Add(new GradientStop(warm?Color.FromArgb(isDark?(byte)30:(byte)50,214,200,255):Color.FromArgb(isDark?(byte)24:(byte)45,221,232,249),.45));
             // Liquid glass catches light on the edge facing the key light and again, softer, on the opposite corner.
             if(warm)edge.GradientStops.Add(new GradientStop(Fluid.Pale(isDark?58:78),.8));
-            edge.GradientStops.Add(new GradientStop(warm?Color.FromArgb(isDark?(byte)110:(byte)130,255,255,255):Color.FromArgb(isDark?(byte)28:(byte)58,119,140,170),1));if(freeze)edge.Freeze();return edge;
+            // Without the Fluid light the far edge is a thin shade, which reads as the card standing off the surface.
+            edge.GradientStops.Add(new GradientStop(warm?Color.FromArgb(isDark?(byte)110:(byte)130,255,255,255):isDark?Color.FromArgb(96,0,0,0):Color.FromArgb(66,80,100,132),1));if(freeze)edge.Freeze();return edge;
         }
         internal static void DockInk(DependencyObject root,Brush ink=null)
         {

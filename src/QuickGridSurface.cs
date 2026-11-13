@@ -262,6 +262,7 @@ namespace OneTaskBar
             AddTile("windows","windows-settings","Windows 설정",shell.OpenWindowsSettings);
             AddTile("capture","screenshot","화면 캡처",shell.OpenScreenCapture);
             AddTile("manager","task-manager","작업 관리자",shell.OpenTaskManager);
+            AddTile("night-light","night-light","야간 모드",()=>Native.Open("ms-settings:nightlight"));
             foreach(var feature in SamsungLink.Features)
             {
                 string featureKey=feature[0];

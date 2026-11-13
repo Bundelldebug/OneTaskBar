@@ -14,7 +14,7 @@ namespace OneTaskBar
         public bool DynamicIsland=false;
         public bool ShowNowBar=true;
         public bool NotificationIntegration=true;
-        public bool NotificationPopups=true;
+        public bool NotificationPopups=true;public bool NotificationBadge=true;
         public bool NotificationSoundEnabled=false;
         public string NotificationSoundFile;
         public bool BudsConnectionPopups=true;

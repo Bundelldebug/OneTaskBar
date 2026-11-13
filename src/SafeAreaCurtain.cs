@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
@@ -22,8 +22,11 @@ namespace OneTaskBar
         IntPtr source;
         SampleRect sampleArea;
         Color[] palette;
-        DateTime sampleAt;
-        bool sampling;
+        bool sampling,obstructedNow;
+        // The strip under the bar is read a few times a second; a new colour pours in from the top edge downwards.
+        readonly System.Windows.Controls.Border under=new System.Windows.Controls.Border(),over=new System.Windows.Controls.Border {Visibility=Visibility.Collapsed};
+        readonly DispatcherTimer sampler=new DispatcherTimer(DispatcherPriority.Background);
+        Brush pouring;
         readonly DispatcherTimer watch=new DispatcherTimer {Interval=TimeSpan.FromMilliseconds(100)};
         DateTime leftAt=DateTime.MinValue;
         bool closed,retiring;
@@ -73,8 +76,12 @@ namespace OneTaskBar
                 var handle=new WindowInteropHelper(this).Handle;
                 Native.SetWindowLong(handle,-20,(Native.GetWindowLong(handle,-20)|0x20|0x80|0x08000000)&~0x40000);
             };
+            var layers=new System.Windows.Controls.Grid();
+            layers.Children.Add(under);layers.Children.Add(over);
+            Content=layers;
+            sampler.Tick+=(s,e)=>Sample();
             watch.Tick+=(s,e)=>Watch();
-            Closed+=(s,e)=>{closed=true;watch.Stop();};
+            Closed+=(s,e)=>{closed=true;watch.Stop();sampler.Stop();};
         }
 
         internal void Present()
@@ -101,16 +108,38 @@ namespace OneTaskBar
                 if(source!=window)
                 {
                     palette=null;
+                    ClearLayers();
                     Background=window==IntPtr.Zero?Brushes.Black:Brushes.Transparent;
                     if(MatchChanged!=null)MatchChanged(null);
                 }
                 source=window;
                 sampleArea=area;
-                sampleAt=DateTime.MinValue;
+                if(source!=IntPtr.Zero)sampling=false;
             }
-            if(source==IntPtr.Zero||sampling||obstructed||DateTime.UtcNow<sampleAt)return;
+            obstructedNow=obstructed;
+            if(source==IntPtr.Zero){sampler.Stop();return;}
+            if(!sampler.IsEnabled)
+            {
+                sampler.Interval=TimeSpan.FromMilliseconds(RuntimeCadence.OnBattery?100:60);
+                sampler.Start();
+                Sample();
+            }
+        }
+
+        void ClearLayers()
+        {
+            over.BeginAnimation(UIElement.OpacityProperty,null);
+            over.Visibility=Visibility.Collapsed;
+            over.Clip=null;
+            under.Background=null;
+            pouring=null;
+        }
+
+        void Sample()
+        {
+            if(closed||retiring||sampling||obstructedNow||source==IntPtr.Zero||!IsVisible)return;
+            var window=source;var area=sampleArea;
             sampling=true;
-            sampleAt=DateTime.UtcNow.AddSeconds(2);
             BackgroundWork.Run(()=>TopBarBand.Capture(area)).ContinueWith(task=>
             {
                 var result=task.Status==TaskStatus.RanToCompletion?task.Result:null;
@@ -124,11 +153,39 @@ namespace OneTaskBar
                     for(int i=0;i<result.Length;i++)
                         brush.GradientStops.Add(new GradientStop(result[i],(i+.5)/result.Length));
                     brush.Freeze();
-                    Background=brush;
+                    Background=Brushes.Transparent;
+                    Pour(brush,palette!=null);
                     palette=result;
                     if(MatchChanged!=null)MatchChanged(result);
                 }));
             });
+        }
+
+        // The new colour covers the old one from the top edge down. A colour that arrives mid-pour starts from what shows now.
+        void Pour(Brush brush,bool animate)
+        {
+            if(!animate||!Motion.Enabled||ActualWidth<=0||ActualHeight<=0)
+            {
+                over.BeginAnimation(UIElement.OpacityProperty,null);
+                over.Visibility=Visibility.Collapsed;over.Clip=null;
+                under.Background=brush;pouring=null;
+                return;
+            }
+
+            if(pouring!=null)under.Background=pouring;
+            pouring=brush;
+            over.Background=brush;over.Visibility=Visibility.Visible;
+            double width=ActualWidth,height=ActualHeight;
+            var reveal=new RectangleGeometry(new Rect(0,0,width,0));
+            over.Clip=reveal;
+            var grow=new System.Windows.Media.Animation.RectAnimation(new Rect(0,0,width,0),new Rect(0,0,width,height),TimeSpan.FromMilliseconds(170)){EasingFunction=new CubicEase {EasingMode=EasingMode.EaseOut}};
+            grow.Completed+=(s,e)=>
+            {
+                if(pouring!=brush)return;
+                under.Background=brush;
+                over.Visibility=Visibility.Collapsed;over.Clip=null;pouring=null;
+            };
+            reveal.BeginAnimation(RectangleGeometry.RectProperty,grow);
         }
 
         // Fades out instead of vanishing, then closes.
@@ -136,7 +193,7 @@ namespace OneTaskBar
         {
             if(closed||retiring)return;
             retiring=true;
-            watch.Stop();
+            watch.Stop();sampler.Stop();
             RevealChanged=null;
             MatchChanged=null;
             Hold=null;

@@ -37,3 +37,13 @@ Beta selected in AssemblyInfo.cs: 10.0.0 A1A7 Beta. Snapshot `.qa-data/release-A
 ## Publication constraints
 
 Stable major 9 excludes Fluid UI; beta major 10 exposes it. Preserve settings, pins, widget keys and disabled defaults. Stable is latest, beta prerelease. Both remain unsigned: manual GitHub CLI publication is authorized; do not bypass or weaken Publish-Release.ps1's signing gate. No GitHub issue comments/closures were requested. Do not change startup, notification registration, Windows protection or the installed application. Record published URLs and verified asset hashes after publication.
+
+
+### Five-item request 2026-11-13 (Claude Code, not published)
+
+- Issue 26 (GoogleBook top bar): battery capsule turns pale with split-tone digits when the bar ink is light (BatteryPill.LightInk); the colour under the bar is read every 60 ms (100 ms on battery) by its own timer instead of every 2 s, and a new colour pours in from the top edge downwards (SafeAreaCurtain.Sample/Pour). The black-window bug was not reproduced; it most likely was the 2 s staleness, so it is unconfirmed.
+- Night light moved from Display settings to a quick settings toggle option (
+ight-light, opens ms-settings:nightlight; off by default, added through the toggle editor). It is a shortcut, not a real on/off switch.
+- Notification arrival dot: dock clock shows the notification count (NotificationBadge, default on, setting under notifications); hidden while the notification center is open.
+- 9.5+ look: Glass95 card film and edge got a lit top, shaded lower face and thin dark far edge (film alpha kept <= 38 for the backdrop check). Buttons spring on press in 9.5 (Motion.Press), and panel rows rise and fade in one after another (Motion.Reveal, from Motion.Launcher). This is an approximation of the One UI 9.5 clips; the phone-app video could not be read and no exact copy was made.
+- Not checked on a device: the dock dot, the pouring animation, the new arrival motion. Test-UI Settings, Quick, Glass, Notifications, Dock, Launcher, Media, Startup, Resources passed (Media dynamic-island-probe once on the first try, flaky). Installed A1A7 build with these changes; idle CPU 0.106 %, WS 325 MiB (private 186). The 60 ms sampler was not included in that idle measure.
