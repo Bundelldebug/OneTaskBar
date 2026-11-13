@@ -38,7 +38,7 @@ namespace OneTaskBar
         {
             get
             {
-                if(lift==null){var shadow=new System.Windows.Media.Effects.DropShadowEffect {BlurRadius=18,ShadowDepth=7,Direction=270,Opacity=.55,Color=Colors.Black,RenderingBias=System.Windows.Media.Effects.RenderingBias.Performance};shadow.Freeze();lift=shadow;}
+                if(lift==null){var shadow=new System.Windows.Media.Effects.DropShadowEffect {BlurRadius=12,ShadowDepth=4,Direction=270,Opacity=.2,Color=Colors.Black,RenderingBias=System.Windows.Media.Effects.RenderingBias.Performance};shadow.Freeze();lift=shadow;}
                 return lift;
             }
         }

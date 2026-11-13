@@ -130,7 +130,7 @@ namespace OneTaskBar
     }
     internal sealed class GlassTileShadow : FrameworkElement
     {
-        static readonly Brush shade=Paint.Brush("#05020913"),raised=Paint.Brush("#10000000");
+        static readonly Brush shade=Paint.Brush("#05020913"),raised=Paint.Brush("#0B000000");
         internal double Radius=30;internal GlassTileShadow(){IsHitTestVisible=false;}
         protected override void OnRender(DrawingContext dc)
         {
@@ -138,12 +138,16 @@ namespace OneTaskBar
             if(Glass95.Raised)
             {
                 // Layered soft shadow below the card: wide and faint at the outside, tight and darker next to the card.
-                for(int i=9;i>=1;i--)
+                // The shadow is cut out under the card itself, so a see-through card is never dirtied by it.
+                var hole=new CombinedGeometry(GeometryCombineMode.Exclude,new RectangleGeometry(new Rect(-40,-40,ActualWidth+80,ActualHeight+90)),new RectangleGeometry(new Rect(0,0,ActualWidth,ActualHeight),Radius,Radius));
+                dc.PushClip(hole);
+                for(int i=6;i>=1;i--)
                 {
-                    double grow=i*1.1;
-                    var box=new Rect(-grow+1,6-grow*.35+i*.2,Math.Max(0,ActualWidth+grow*2-2),Math.Max(0,ActualHeight+grow*.9));
+                    double grow=i*.9;
+                    var box=new Rect(-grow+2,4+i*.5-grow*.2,Math.Max(0,ActualWidth+grow*2-4),Math.Max(0,ActualHeight+grow*.5));
                     dc.DrawRoundedRectangle(raised,null,box,Radius+grow,Radius+grow);
                 }
+                dc.Pop();
                 return;
             }
             if(!Glass95.Transparent)return;
