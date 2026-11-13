@@ -57,7 +57,7 @@ namespace OneTaskBar
         internal NotificationStackView(NotificationStack group,Action<NotificationEntry> onOpen,Action<NotificationEntry> onDismiss,Action<NotificationStack> onClear)
         {
             open=onOpen;dismiss=onDismiss;clear=onClear;Margin=new Thickness(0,4,0,7);
-            front.CornerRadius=new CornerRadius(32);front.Background=NotificationStyle.Card;Children.Add(front);front.Child=content;front.SizeChanged+=(s,e)=>front.CornerRadius=new CornerRadius(!Expanded&&fullText.Count==0?Math.Min(64,front.ActualHeight/2):28);arrow.Color=NotificationStyle.Muted;
+            front.CornerRadius=new CornerRadius(32);front.Background=NotificationStyle.Card;if(Glass95.Raised)front.Effect=Glass95.Lift;Children.Add(front);front.Child=content;front.SizeChanged+=(s,e)=>front.CornerRadius=new CornerRadius(!Expanded&&fullText.Count==0?Math.Min(64,front.ActualHeight/2):28);arrow.Color=NotificationStyle.Muted;
             header.Margin=new Thickness(13,8,8,0);header.Height=28;
             var heading=new StackPanel {Orientation=Orientation.Horizontal};label.VerticalAlignment=VerticalAlignment.Center;heading.Children.Add(label);arrow.Margin=new Thickness(7,0,0,0);heading.Children.Add(arrow);
             expand=Paint.Button(heading,()=>SetExpanded(!Expanded),"앱 알림 펼치기 · 접기");expand.Background=Brushes.Transparent;expand.Padding=new Thickness(0);expand.HorizontalContentAlignment=HorizontalAlignment.Left;expand.HorizontalAlignment=HorizontalAlignment.Stretch;expand.Margin=new Thickness(0,0,30,0);header.Children.Add(expand);
