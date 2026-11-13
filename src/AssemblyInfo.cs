@@ -1,11 +1,11 @@
-﻿using System.Reflection;
+using System.Reflection;
 [assembly: AssemblyTitle("One TaskBar")]
 [assembly: AssemblyProduct("One TaskBar")]
 [assembly: AssemblyDescription("Windows desktop dock, app launcher and control center")]
 [assembly: AssemblyCompany("OneTaskBar contributors")]
 [assembly: AssemblyCopyright("Copyright 2026 OneTaskBar contributors. MIT License.")]
 // Increment only the patch number unless the owner requests a major/minor change.
-[assembly: AssemblyVersion("10.0.0.0")]
-[assembly: AssemblyFileVersion("10.0.0.0")]
+[assembly: AssemblyVersion("9.5.13.0")]
+[assembly: AssemblyFileVersion("9.5.13.0")]
 
-[assembly: AssemblyInformationalVersion("10.0.0 A1A7 Beta")]
+[assembly: AssemblyInformationalVersion("9.5.13 A1Z7")]
