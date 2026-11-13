@@ -89,7 +89,7 @@ namespace OneTaskBar
             if(!animate||!IsVisible||!Motion.Enabled||before<1||ActualWidth<1)return;
             Measure(new Size(ActualWidth,Double.PositiveInfinity));double target=DesiredSize.Height-Margin.Top-Margin.Bottom;
             if(target<1||Math.Abs(before-target)<.5)return;
-            ClipToBounds=true;var transition=Motion.Tween(before,target,260);transition.Completed+=(s,e)=>{BeginAnimation(HeightProperty,null);Height=Double.NaN;ClipToBounds=false;};BeginAnimation(HeightProperty,transition);Motion.Fade(items,.65,1,210);
+            ClipToBounds=true;var transition=Motion.Morph(before,target,280);transition.Completed+=(s,e)=>{BeginAnimation(HeightProperty,null);Height=Double.NaN;ClipToBounds=false;};BeginAnimation(HeightProperty,transition);Motion.Fade(items,.65,1,210);
         }
         static string Version(NotificationEntry entry){return entry.App+"|"+entry.Title+"|"+entry.Body+"|"+entry.Created.UtcDateTime.Ticks+"|"+(entry.Icon!=null?entry.Icon.GetHashCode():0)+"|"+(entry.Artwork!=null?entry.Artwork.GetHashCode():0);}
         string CardVersion(NotificationEntry entry,bool grouped){return Version(entry)+"|"+grouped+"|"+(Expanded?"expanded":"capsule:"+Count)+"|"+DetailExpanded(entry);}

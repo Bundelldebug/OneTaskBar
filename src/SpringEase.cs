@@ -8,6 +8,21 @@ namespace OneTaskBar
     // motion Apple's systems use: quick to leave, then a long, soft arrival. A damping ratio of 1 never
     // overshoots; lower ratios overshoot a little and settle, which is what gives presses and pop-ins their life.
     // Every timed tween, WPF animation or hand-driven frame loop shares this one curve.
+    // One UI 9.5 sheets and cards: the biggest step is the first one, then a long soft arrival with no overshoot.
+    // Measured from the frame differences of the One UI 9.5 clips (sheet rise, card collapse, pill to bar).
+    internal sealed class SwiftEase : EasingFunctionBase
+    {
+        internal static readonly SwiftEase Instance=Make();
+        static SwiftEase Make(){var ease=new SwiftEase();ease.Freeze();return ease;}
+        public SwiftEase(){EasingMode=EasingMode.EaseIn;}
+        protected override Freezable CreateInstanceCore(){return new SwiftEase();}
+        protected override double EaseInCore(double normalizedTime)
+        {
+            if(normalizedTime<=0)return 0;
+            if(normalizedTime>=1)return 1;
+            return (1-Math.Exp(-7*normalizedTime))/(1-Math.Exp(-7));
+        }
+    }
     internal sealed class SpringEase : EasingFunctionBase
     {
         // Critically damped: the default for anything that moves, fades or resizes.

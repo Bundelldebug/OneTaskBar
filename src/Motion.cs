@@ -37,7 +37,13 @@ namespace OneTaskBar
         {
             var motion=new DoubleAnimationUsingKeyFrames {Duration=TimeSpan.FromMilliseconds(milliseconds),FillBehavior=FillBehavior.Stop};
             motion.KeyFrames.Add(new LinearDoubleKeyFrame(from,KeyTime.FromTimeSpan(TimeSpan.Zero)));
-            motion.KeyFrames.Add(new EasingDoubleKeyFrame(target,KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(milliseconds)),Fluid.Enabled?SpringEase.Liquid:SpringEase.Snappy));return motion;
+            motion.KeyFrames.Add(new EasingDoubleKeyFrame(target,KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(milliseconds)),Fluid.Enabled?SpringEase.Liquid:Glass95.Enabled?(IEasingFunction)SwiftEase.Instance:SpringEase.Snappy));return motion;
+        }
+        // One UI 9.5 size and position changes: fast to leave, no overshoot. Other versions keep the spring tween.
+        internal static DoubleAnimation Morph(double from,double to,int milliseconds)
+        {
+            if(!Glass95.Enabled||Fluid.Enabled)return Tween(from,to,milliseconds);
+            return new DoubleAnimation(from,to,TimeSpan.FromMilliseconds(milliseconds)) {EasingFunction=SwiftEase.Instance,FillBehavior=FillBehavior.Stop};
         }
         // Where a panel buds from: the edge of the bar next to the pointer, which is on the button that opened it.
         internal static Point Anchor(FrameworkElement element,bool fromTop)
@@ -108,7 +114,7 @@ namespace OneTaskBar
                 var fade=new DoubleAnimationUsingKeyFrames {Duration=TimeSpan.FromMilliseconds(wait+230),FillBehavior=FillBehavior.Stop};
                 fade.KeyFrames.Add(new DiscreteDoubleKeyFrame(0,KeyTime.FromTimeSpan(TimeSpan.Zero)));
                 fade.KeyFrames.Add(new DiscreteDoubleKeyFrame(0,KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(wait))));
-                fade.KeyFrames.Add(new EasingDoubleKeyFrame(rest,KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(wait+230)),SpringEase.Smooth));
+                fade.KeyFrames.Add(new EasingDoubleKeyFrame(rest,KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(wait+230)),SwiftEase.Instance));
                 row.BeginAnimation(UIElement.OpacityProperty,fade);
                 if(row.RenderTransform==null||row.RenderTransform.IsFrozen&&row.RenderTransform.Value.IsIdentity)
                 {
@@ -116,7 +122,7 @@ namespace OneTaskBar
                     var lift=new DoubleAnimationUsingKeyFrames {Duration=fade.Duration,FillBehavior=FillBehavior.Stop};
                     lift.KeyFrames.Add(new DiscreteDoubleKeyFrame(9,KeyTime.FromTimeSpan(TimeSpan.Zero)));
                     lift.KeyFrames.Add(new DiscreteDoubleKeyFrame(9,KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(wait))));
-                    lift.KeyFrames.Add(new EasingDoubleKeyFrame(0,KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(wait+230)),SpringEase.Smooth));
+                    lift.KeyFrames.Add(new EasingDoubleKeyFrame(0,KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(wait+230)),SwiftEase.Instance));
                     var original=row.RenderTransform;
                     row.RenderTransform=rise;
                     lift.Completed+=(s,e)=>{if(ReferenceEquals(row.RenderTransform,rise))row.RenderTransform=original;};
