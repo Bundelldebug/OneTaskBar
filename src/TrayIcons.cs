@@ -48,6 +48,7 @@ namespace OneTaskBar
                 {
                     if(context)LeaveNative();
                     if(item.Legacy.Invoke(item.Name,context)&&context)SystemPanels.ContextMenu();
+                    if(!context)TrayWake.AfterClick(item.Executable);
                     return;
                 }
                 if(context){
@@ -55,6 +56,7 @@ namespace OneTaskBar
                     item.Element.SetFocus();SystemPanels.ContextMenu();
                 }else{
                     TrayButtonAction.Invoke(item.Element);
+                    TrayWake.AfterClick(item.Executable);
                 }
             }catch(Exception error){AppLog.Once("tray-action",error.GetType().Name);}
         }

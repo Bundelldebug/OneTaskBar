@@ -39,6 +39,14 @@ namespace OneTaskBar
                 frame.Bottom -= 100;
                 Require(TopBarBand.SampleArea(monitor, frame, scale, bottom).IsEmpty,
                     "A normal window does not color the reserved band");
+                var strip = TopBarBand.MaximizedStrip(monitor, scale, bottom);
+                Require(strip.Width == monitor.Width && (bottom ? strip.Bottom <= monitor.Bottom - band : strip.Top >= monitor.Top + band),
+                    "A maximized window whose frame is reported oddly is sampled just beside the reserved band");
+                int off = (int)Math.Ceiling(8 * scale);
+                frame.Top = monitor.Top + (bottom ? 0 : band + off);
+                frame.Bottom = monitor.Bottom - (bottom ? band + off : 0);
+                Require(!TopBarBand.SampleArea(monitor, frame, scale, bottom).IsEmpty,
+                    "A frame a few pixels off the work area still matches");
             }
             using (var bitmap = new Drawing.Bitmap(280, 6))
             using (var graphics = Drawing.Graphics.FromImage(bitmap))

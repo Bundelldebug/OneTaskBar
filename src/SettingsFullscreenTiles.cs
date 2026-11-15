@@ -54,7 +54,7 @@ namespace OneTaskBar
             picker.Items.Add(new PickerChoice {Label="표시 안 함",Value=""});
             picker.SelectedIndex=0;
             var saved=Preferences.Current.FullscreenTiles??new string[0];
-            foreach(string span in family.Spans)
+            foreach(string span in family.FullscreenSpans)
             {
                 string token=family.Key+":"+span;
                 picker.Items.Add(new PickerChoice {Label=InfoTileCatalog.SpanLabel(token),Value=token});

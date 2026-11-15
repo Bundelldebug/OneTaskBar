@@ -362,7 +362,7 @@ namespace OneTaskBar
             if(selected!=null&&selected.Tile!=null)
             {
                 var family=InfoTileCatalog.Family(selected.Key);
-                foreach(string span in family.Spans)
+                foreach(string span in family.FullscreenSpans)
                 {
                     string token=family.Key+":"+span;
                     row.Children.Add(Chip(InfoTileCatalog.SpanLabel(token),()=>Resize(selected.Key,token),token==selected.Key));

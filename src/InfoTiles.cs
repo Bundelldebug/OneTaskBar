@@ -49,6 +49,8 @@ namespace OneTaskBar
     {
         internal string Key,Title,Icon;
         internal string[] Spans;
+        // The fullscreen tile strip is two rows tall; larger spans are for desktop widgets only.
+        internal System.Collections.Generic.IEnumerable<string> FullscreenSpans {get{return Spans.Where(s=>s[2]-'0'<=2);}}
     }
 
     // A token such as "clock-digital:2x1" names a tile family and its grid span.
@@ -61,7 +63,7 @@ namespace OneTaskBar
             new InfoTileFamily {Key="rain",Title="강수 확률",Icon="brightness",Spans=new[]{"1x1"}},
             new InfoTileFamily {Key="gauges",Title="배터리 상태(원형)",Icon="battery",Spans=new[]{"2x1","2x2","4x1"}},
             new InfoTileFamily {Key="power-list",Title="배터리 상태(목록형)",Icon="battery",Spans=new[]{"2x2","4x2"}},
-            new InfoTileFamily {Key="calendar",Title="달력",Icon="calendar",Spans=new[]{"2x2"}},
+            new InfoTileFamily {Key="calendar",Title="달력",Icon="calendar",Spans=new[]{"2x2","4x4"}},
             new InfoTileFamily {Key="todo",Title="리마인더",Icon="focus",Spans=new[]{"2x1","2x2","4x2"}},
             new InfoTileFamily {Key="clock-digital",Title="디지털 시계",Icon="focus",Spans=new[]{"2x1","2x2","4x1","4x2","1x1"}},
             new InfoTileFamily {Key="clock-analog",Title="아날로그 시계",Icon="focus",Spans=new[]{"2x1","2x2","1x1"}},
@@ -106,24 +108,51 @@ namespace OneTaskBar
 
     internal sealed class CalendarTile : InfoTile
     {
-        readonly TextBlock month=Label("",16);
+        readonly TextBlock month;
         readonly TextBlock[] days=new TextBlock[42];
         readonly Border[] cells=new Border[42];
         readonly Brush Today=TileScheme.Creating.Track;
-        DateTime shown=DateTime.MinValue;
+        DateTime today=DateTime.MinValue,shownMonth=DateTime.MinValue,shownToday=DateTime.MinValue;
+        int shift;
         readonly UniformGrid grid;
         static readonly Brush SundayDark=Paint.Brush("#FF9A2233"),SaturdayDark=Paint.Brush("#FF16479B");
         static readonly Brush SundayLight=Paint.Brush("#FFFFA8A8"),SaturdayLight=Paint.Brush("#FFA9CCFF");
         readonly Brush sunday,saturday;
+        readonly bool large;
         Dictionary<DateTime,string> holidays;
+        int holidayYear;
         internal static int Weeks(DateTime first){return (Offset(first)+DateTime.DaysInMonth(first.Year,first.Month)+6)/7;}
+        internal int MonthShift {get{return shift;}}
         internal CalendarTile(int columns,int rows):base(columns,rows)
         {
-            var stack=new StackPanel {Margin=new Thickness(8)};
+            // A 4x4 calendar is a full month page; the 2x2 keeps the compact one.
+            large=columns>=3||rows>=3;
+            double titleSize=large?24:16,nameSize=large?15:11,daySize=large?20:12.5;
+            month=Label("",titleSize);
+            var layout=new Grid {Margin=new Thickness(large?18:8,large?16:8,large?18:8,large?14:8)};
+            layout.RowDefinitions.Add(new RowDefinition {Height=GridLength.Auto});
+            layout.RowDefinitions.Add(new RowDefinition {Height=GridLength.Auto});
+            layout.RowDefinitions.Add(new RowDefinition {Height=new GridLength(1,GridUnitType.Star)});
+            var header=new Grid {Margin=new Thickness(0,0,0,large?8:2)};
+            header.ColumnDefinitions.Add(new ColumnDefinition {Width=GridLength.Auto});
+            header.ColumnDefinitions.Add(new ColumnDefinition());
+            header.ColumnDefinitions.Add(new ColumnDefinition {Width=GridLength.Auto});
             month.FontWeight=FontWeights.SemiBold;
             month.HorizontalAlignment=HorizontalAlignment.Center;
-            month.Margin=new Thickness(0,0,0,4);
-            stack.Children.Add(month);
+            month.VerticalAlignment=VerticalAlignment.Center;
+            var previous=Step("‹","이전 달",-1);
+            var next=Step("›","다음 달",1);
+            // The month title returns to this month.
+            var title=Paint.Button(month,()=>{shift=0;Render();},"이번 달로 돌아가기");
+            title.Background=Brushes.Transparent;
+            title.Padding=new Thickness(large?10:4,0,large?10:4,0);
+            title.Resources["ButtonRadius"]=new CornerRadius(large?14:8);
+            Grid.SetColumn(title,1);
+            Grid.SetColumn(next,2);
+            header.Children.Add(previous);
+            header.Children.Add(title);
+            header.Children.Add(next);
+            layout.Children.Add(header);
             var names=new UniformGrid {Columns=7};
             bool paleInk=TileScheme.Luminance(((SolidColorBrush)Scheme.Ink).Color)>.5;
             sunday=paleInk?SundayLight:SundayDark;
@@ -131,32 +160,58 @@ namespace OneTaskBar
             var weekdays=new[]{"일","월","화","수","목","금","토"};
             for(int i=0;i<weekdays.Length;i++)
             {
-                var label=Label(weekdays[i],11,i==0?sunday:i==6?saturday:Faint);
+                var label=Label(weekdays[i],nameSize,i==0?sunday:i==6?saturday:Faint);
                 label.HorizontalAlignment=HorizontalAlignment.Center;
                 names.Children.Add(label);
             }
-            stack.Children.Add(names);
-            grid=new UniformGrid {Columns=7,Rows=6,Height=Span(2)-62,Margin=new Thickness(0,2,0,0)};
+            Grid.SetRow(names,1);
+            layout.Children.Add(names);
+            grid=new UniformGrid {Columns=7,Rows=6,Margin=new Thickness(0,large?6:2,0,0)};
             for(int i=0;i<days.Length;i++)
             {
-                days[i]=Label("",12.5);
+                days[i]=Label("",daySize);
                 days[i].HorizontalAlignment=HorizontalAlignment.Center;
-                cells[i]=new Border {CornerRadius=new CornerRadius(5),Child=days[i]};
+                days[i].VerticalAlignment=VerticalAlignment.Center;
+                cells[i]=new Border {CornerRadius=new CornerRadius(large?12:5),Child=days[i],Margin=new Thickness(large?2:0)};
                 grid.Children.Add(cells[i]);
             }
-            stack.Children.Add(grid);
-            Children.Add(stack);
+            Grid.SetRow(grid,2);
+            layout.Children.Add(grid);
+            Children.Add(layout);
+        }
+        Button Step(string arrow,string hint,int direction)
+        {
+            var text=Label(arrow,large?26:18);
+            text.HorizontalAlignment=HorizontalAlignment.Center;
+            text.VerticalAlignment=VerticalAlignment.Center;
+            var button=Paint.Button(text,()=>{shift=Math.Max(-1200,Math.Min(1200,shift+direction));Render();},hint);
+            button.Width=button.Height=large?38:24;
+            button.Padding=new Thickness(0);
+            button.Background=Brushes.Transparent;
+            button.Resources["ButtonRadius"]=new CornerRadius(large?19:12);
+            return button;
         }
         internal static int Offset(DateTime first){return (int)first.DayOfWeek;}
         internal override void Refresh(ShellController shell,DateTime now)
         {
-            if(shown==now.Date)return;
-            if(holidays==null||shown.Year!=now.Year)
-                holidays=CalendarHolidays.ForYear(now.Year,RegionInfo.CurrentRegion.TwoLetterISORegionName);
-            shown=now.Date;
-            month.Text=now.Month+"월";
-            var first=new DateTime(now.Year,now.Month,1);
-            int offset=Offset(first),count=DateTime.DaysInMonth(now.Year,now.Month),weeks=Weeks(first);
+            today=now.Date;
+            Render();
+        }
+        void Render()
+        {
+            if(today==DateTime.MinValue)return;
+            var first=new DateTime(today.Year,today.Month,1).AddMonths(shift);
+            if(shownMonth==first&&shownToday==today)return;
+            if(holidays==null||holidayYear!=first.Year)
+            {
+                holidayYear=first.Year;
+                holidays=CalendarHolidays.ForYear(first.Year,RegionInfo.CurrentRegion.TwoLetterISORegionName);
+            }
+            shownMonth=first;
+            shownToday=today;
+            month.Text=large||shift!=0&&first.Year!=today.Year?first.Year+"년 "+first.Month+"월":first.Month+"월";
+            int offset=Offset(first),count=DateTime.DaysInMonth(first.Year,first.Month),weeks=Weeks(first);
+            bool thisMonth=shift==0;
             // Only the month's weeks take space, so rows spread evenly with no gap below.
             grid.Rows=weeks;
             for(int i=0;i<days.Length;i++)
@@ -165,11 +220,11 @@ namespace OneTaskBar
                 int day=i-offset+1;
                 bool real=day>=1&&day<=count;
                 days[i].Text=real?day.ToString(CultureInfo.InvariantCulture):"";
-                string name;
-                bool holiday=holidays.TryGetValue(first.AddDays(i-offset),out name)&&real;
+                string name=null;
+                bool holiday=real&&holidays.TryGetValue(first.AddDays(i-offset),out name);
                 days[i].Foreground=holiday||i%7==0?sunday:i%7==6?saturday:Scheme.Ink;
                 days[i].FontWeight=holiday?FontWeights.SemiBold:FontWeights.Normal;
-                cells[i].Background=real&&day==now.Day?Today:holiday?Brushes.Transparent:null;
+                cells[i].Background=real&&thisMonth&&day==today.Day?Today:holiday?Brushes.Transparent:null;
                 cells[i].ToolTip=holiday?name:null;
             }
         }

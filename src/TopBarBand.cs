@@ -11,7 +11,8 @@ namespace OneTaskBar
             int band = (int)Math.Ceiling(IslandSafeArea.Height * scale);
             int inset = (int)Math.Ceiling(2 * scale);
             int depth = (int)Math.Ceiling(3 * scale);
-            int tolerance = (int)Math.Ceiling(5 * scale);
+            // Explorer, Settings and other system apps report a frame a few pixels off the work area, so the match is forgiving.
+            int tolerance = (int)Math.Ceiling(10 * scale);
             if (frame.Left > monitor.Left + tolerance || frame.Right < monitor.Right - tolerance)
                 return Rectangle.Empty;
 
@@ -24,6 +25,17 @@ namespace OneTaskBar
             int y = bottom ? edge - inset - depth : edge + inset;
             if (right <= x || y < frame.Top || y + depth > frame.Bottom) return Rectangle.Empty;
             return new Rectangle(x, y, right - x, depth);
+        }
+
+        // A maximized window always fills the work area, so when its reported frame does not line up, the strip
+        // right next to the reserved band is still the window's own edge.
+        internal static Rectangle MaximizedStrip(Rectangle monitor, double scale, bool bottom)
+        {
+            int band = (int)Math.Ceiling(IslandSafeArea.Height * scale);
+            int inset = (int)Math.Ceiling(2 * scale);
+            int depth = (int)Math.Ceiling(3 * scale);
+            int y = bottom ? monitor.Bottom - band - inset - depth : monitor.Top + band + inset;
+            return new Rectangle(monitor.Left, y, monitor.Width, depth);
         }
 
         internal static MediaColor[] Capture(Rectangle area)

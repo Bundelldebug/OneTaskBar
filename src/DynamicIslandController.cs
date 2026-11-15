@@ -167,6 +167,7 @@ namespace OneTaskBar
                 if(window.Monitor!=monitor.Bounds||!window.Framed&&!window.Maximized)continue;
                 if(!window.Maximized)break;
                 area=TopBarBand.SampleArea(monitor.Bounds,Native.VisibleArrangeBounds(window.Window),dpi,bottom);
+                if(area.IsEmpty)area=TopBarBand.MaximizedStrip(monitor.Bounds,dpi,bottom);
                 if(!area.IsEmpty)return window.Window;
                 break;
             }

@@ -33,7 +33,7 @@ namespace OneTaskBar
         public int DockTheme=0;
         public bool DockSolidBackground=false;
         public int DockBackgroundKind=0,DockEdge=3;
-        public int DockScalePercent=100;        public string DockMonitor;
+        public int DockScalePercent=100;public bool DockSearchButton=true,DockDesktopsButton=true;        public string DockMonitor;
         public string PresetDesktopWallpaper,PresetLockScreen;
         // Liquid glass, blur and bottom Now Bar as they were before the Mac style changed them; "lg,blur,nowbar" as 0/1.
         public string DesktopStyleBackup;

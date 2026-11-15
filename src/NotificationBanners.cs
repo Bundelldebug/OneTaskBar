@@ -135,9 +135,13 @@ namespace OneTaskBar
         }
         void Layout()
         {
-            if(visible.Count==0)return;var screen=Forms.Screen.PrimaryScreen??Forms.Screen.FromPoint(Forms.Cursor.Position);double scale=visible[0].IsVisible?Math.Max(96,Native.GetDpiForWindow(new WindowInteropHelper(visible[0]).Handle))/96.0:ShellController.MonitorScale(screen,visible[0]),width=Math.Min(370,screen.WorkingArea.Width/scale-24),y=Math.Max(12,(screen.WorkingArea.Top-screen.Bounds.Top)/scale+12);
-            foreach(var banner in visible.Where(b=>!b.Compact).ToArray()){double h=banner.DesiredHeight;if(y+h>screen.WorkingArea.Height/scale-24){Close(banner,false);break;}banner.PlaceBanner(screen.Bounds,(screen.WorkingArea.Right-screen.Bounds.Left)/scale-width-12,y,width,h);y+=h+9;}
-            LayoutCompact(screen,scale);
+            if(visible.Count==0)return;var screen=Forms.Screen.PrimaryScreen??Forms.Screen.FromPoint(Forms.Cursor.Position);double scale=visible[0].IsVisible?Math.Max(96,Native.GetDpiForWindow(new WindowInteropHelper(visible[0]).Handle))/96.0:ShellController.MonitorScale(screen,visible[0]),width=Math.Min(370,screen.WorkingArea.Width/scale-24);
+            // Like Windows' own notifications, banners sit in the bottom-right corner beside the status area and stack upward.
+            double x=(screen.WorkingArea.Right-screen.Bounds.Left)/scale-width-12,bottom=(screen.WorkingArea.Bottom-screen.Bounds.Top)/scale-12,top=(screen.WorkingArea.Top-screen.Bounds.Top)/scale+12;
+            var dock=shell.DockFor(screen);
+            Native.RectI apps;
+            if(dock!=null&&dock.Apps.IsVisible&&Native.GetWindowRect(new WindowInteropHelper(dock.Apps).Handle,out apps)&&apps.Top>screen.Bounds.Top+screen.Bounds.Height/2&&apps.Right>screen.Bounds.Left+x*scale)bottom=Math.Min(bottom,(apps.Top-screen.Bounds.Top)/scale-10);
+            foreach(var banner in visible.Where(b=>!b.Compact).Reverse().ToArray()){double h=banner.DesiredHeight;if(bottom-h<top){Close(banner,false);continue;}banner.PlaceBanner(screen.Bounds,x,bottom-h,width,h);bottom-=h+9;}            LayoutCompact(screen,scale);
         }
         void LayoutCompact(Forms.Screen screen,double scale)
         {
@@ -187,7 +191,7 @@ namespace OneTaskBar
     }
     internal sealed class NotificationBanner : GlassWindow
     {
-        readonly TextBlock sender=Paint.TextBlock("",11,Paint.Muted),title=Paint.TextBlock("",14,Paint.Text),body=Paint.TextBlock("",12,Paint.Muted);
+        readonly TextBlock sender=Paint.TextBlock("",11,Paint.Brush("#FFC4C7CE")),title=Paint.TextBlock("",14,Paint.Brush("#FFF6F7F9")),body=Paint.TextBlock("",12,Paint.Brush("#FFD3D6DC"));
         readonly Border glow=new Border {IsHitTestVisible=false};
         readonly Border icon=new Border {Width=35,Height=35,VerticalAlignment=VerticalAlignment.Top,Margin=new Thickness(0,4,10,0)};
         readonly Image artwork=new Image {Height=118,Stretch=Stretch.Uniform,Margin=new Thickness(0,9,0,0),Visibility=Visibility.Collapsed};
@@ -208,7 +212,7 @@ namespace OneTaskBar
         internal NotificationBanner(NotificationEntry entry,Action<NotificationBanner> open,Action<NotificationBanner,bool> close,bool compact=false)
         {
             Compact=compact;
-            Title="One TaskBar · 알림 팝업";ShowActivated=false;Focusable=false;Radius=compact?22:27;StableSurface=true;Dark=true;Surface.CornerRadius=new CornerRadius(Radius);Surface.Background=QuickPanel.Glass;Surface.BorderBrush=Paint.Brush("#36FFFFFF");Surface.BorderThickness=new Thickness(.7);
+            Title="One TaskBar · 알림 팝업";ShowActivated=false;Focusable=false;Radius=compact?22:27;StableSurface=true;Dark=true;Surface.CornerRadius=new CornerRadius(Radius);Surface.Background=Paint.Brush("#E6101216");Surface.BorderBrush=Paint.Brush("#36FFFFFF");Surface.BorderThickness=new Thickness(.7);
             var content=new Grid();content.ColumnDefinitions.Add(iconColumn);content.ColumnDefinitions.Add(new ColumnDefinition());content.Children.Add(icon);
             var text=new StackPanel();sender.TextTrimming=TextTrimming.CharacterEllipsis;text.Children.Add(sender);title.FontWeight=FontWeights.SemiBold;title.TextWrapping=TextWrapping.Wrap;title.TextTrimming=TextTrimming.CharacterEllipsis;title.MaxHeight=39;title.Margin=new Thickness(0,5,12,3);text.Children.Add(title);body.TextWrapping=TextWrapping.Wrap;body.TextTrimming=TextTrimming.CharacterEllipsis;body.MaxHeight=34;body.Margin=new Thickness(0,0,4,0);text.Children.Add(body);Grid.SetColumn(text,1);content.Children.Add(text);
             text.Children.Add(artwork);var row=new Grid();var hit=Paint.Button(content,()=>open(this),"알림 열기");hit.Background=Brushes.Transparent;hit.Padding=compact?new Thickness(14,9,30,9):new Thickness(17,14,33,13);hit.HorizontalContentAlignment=HorizontalAlignment.Stretch;glow.CornerRadius=new CornerRadius(Radius);row.Children.Add(glow);row.Children.Add(hit);var dismiss=Paint.Button(new Glyph("close",13),()=>close(this,true),"팝업 닫기 · 알림 기록 유지");dismiss.Background=Brushes.Transparent;dismiss.Width=dismiss.Height=28;dismiss.Padding=new Thickness(6);dismiss.HorizontalAlignment=HorizontalAlignment.Right;dismiss.VerticalAlignment=VerticalAlignment.Top;dismiss.Margin=new Thickness(0,7,7,0);row.Children.Add(dismiss);Surface.Child=row;TransitionContent=row;

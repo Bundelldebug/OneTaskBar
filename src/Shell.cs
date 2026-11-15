@@ -21,7 +21,9 @@ namespace OneTaskBar
 {
     internal sealed class DockLayout
     {
-        internal const double AppOffset=94,FixedWidth=116;
+        // The search and desktops buttons sit in front of the apps; either can be turned off, and the apps move up to fill the space.
+        internal static double AppOffset {get{return 10+(Preferences.Current.DockSearchButton?42:0)+(Preferences.Current.DockDesktopsButton?42:0);}}
+        internal static double FixedWidth {get{return AppOffset+22;}}
         internal double StartX,AppX,AppWidth,StatusX,StatusWidth,Y;
         internal int Capacity;
         internal static double StatusSize(double screenWidth,double powerWidth=58,bool duo=false){return (duo?172:Math.Min(282,Math.Max(226,screenWidth*.25))+powerWidth-58)-(94-DockClock.Width);}
@@ -340,7 +342,7 @@ namespace OneTaskBar
             IslandPreferenceChanged();
             if(!IslandEnabled)CloseIsland();
             RefreshPanelTint();
-            if(!String.Equals(dockDisplayPreference,Preferences.Current.DockMonitor,StringComparison.OrdinalIgnoreCase)||docks.Any(d=>d.Edge!=DockGeometry.Edge||Math.Abs(d.Zoom-DockSizing.Zoom)>.001))
+            if(!String.Equals(dockDisplayPreference,Preferences.Current.DockMonitor,StringComparison.OrdinalIgnoreCase)||docks.Any(d=>d.Edge!=DockGeometry.Edge||Math.Abs(d.Zoom-DockSizing.Zoom)>.001||d.ShowSearch!=Preferences.Current.DockSearchButton||d.ShowDesktops!=Preferences.Current.DockDesktopsButton))
             {
                 dockDisplayPreference=Preferences.Current.DockMonitor;
                 Relayout();

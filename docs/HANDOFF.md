@@ -60,3 +60,11 @@ ight-light, opens ms-settings:nightlight; off by default, added through the togg
 - Test-UI Quick/Settings/Glass/Notifications/Dock/Launcher/Media/Startup/Resources passed on both builds. dynamic-island-probe failed 3 times in a row on the beta build, then passed on the new build and on the A1A7 exe in an A/B (2/2 each): timing flake, not a regression. Test-ReleasePayload passed for the stable package; its version check cannot accept a name ending in Beta, so the beta zip was checked by hand (exe version 10.0.0 A1A8 Beta, same hash as dist, 19 files). Signature check skipped: no certificate, builds are unsigned.
 - Live measure of the installed build before packaging: CPU 0.09-0.80 %, WS 545-637 MiB (private 374-520). It measures the owner's running session and grew with use, so it is not the clean idle number from earlier (0.12 %, 406 MiB). Not measured: clean idle of the final packages. Not checked by eye: dock dot, pouring animation, new motion.
 
+
+### Next-version request 2026-11-15 (Claude Code, not published)
+
+- Issue 28: top-bar match tolerance doubled and a maximized-strip fallback (TopBarBand.MaximizedStrip) for Explorer/Settings-style frames. Root cause not reproduced on a device.
+- Dock: search and multi-desktop buttons can be hidden (Personalization settings; DockSearchButton/DockDesktopsButton, default on). KakaoTalk tray click falls back to relaunching the executable if no window opens (TrayWake.cs); unverified, tray icon not found by UIA in test.
+- Calendar widget: 4x4 size with month arrows (title returns to this month). Now Bar frame cap raised from 120 to 240 Hz (FrameRate.cs).
+- Notification banners: moved from top-right to bottom-right beside the status area (stack upward, above the dock when it overlaps), and the surface/text are now a fixed dark film with light text for legibility. Windows notification center conflict not investigated separately.
+- Not done: "shrink the taskbar itself" (the slider and bar reservation already follow dock size; owner to clarify). Test-UI Notifications/Dock/Settings/Quick/Media/Launcher/Glass passed; installed via Apply-ToPC. Not checked by eye on a device.
