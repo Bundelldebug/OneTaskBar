@@ -36,23 +36,30 @@ namespace OneTaskBar
         // The optional liquid material: light collects along the thick edge of the glass and fades inward, and a
         // specular glint sits on the upper face. Built from several thin soft strokes, not one hard ring, so it
         // reads as a glow and never as a second outline.
+        // The bezel of a lens bends light most at its very edge and not at all toward the middle. The same falloff
+        // (1 - sqrt(u(2-u)), u = depth into the bezel) sets how bright each inward ring is, so the edge reads as a
+        // thick curved rim rather than a flat outline. The outermost ring is cool and the next warm, a hint of the
+        // colour fringe real glass shows.
+        const int BezelRings=5;
+        const double RingWidth=1.5;
         static readonly Pen[] liquidEdge=LiquidEdgePens();
-        static readonly Brush liquidGlint=LiquidGlint();
         static Pen[] LiquidEdgePens()
         {
-            var pens=new Pen[3];
+            var pens=new Pen[BezelRings];
             for(int i=0;i<pens.Length;i++)
             {
+                double u=(i+.5)/BezelRings,weight=1-Math.Sqrt(u*(2-u));
+                byte strong=(byte)Math.Round(62*weight),weak=(byte)Math.Round(16*weight);
+                Color tone=i==0?Color.FromRgb(214,232,255):i==1?Color.FromRgb(255,236,214):Color.FromRgb(255,255,255);
                 var brush=new LinearGradientBrush {StartPoint=new Point(.1,0),EndPoint=new Point(.9,1)};
-                byte strong=(byte)(30-i*9),weak=(byte)(10-i*3);
-                brush.GradientStops.Add(new GradientStop(Color.FromArgb(strong,255,255,255),0));
-                brush.GradientStops.Add(new GradientStop(Color.FromArgb(weak,225,238,255),.5));
-                brush.GradientStops.Add(new GradientStop(Color.FromArgb((byte)(strong*2/3),255,255,255),1));
+                brush.GradientStops.Add(new GradientStop(Color.FromArgb(strong,tone.R,tone.G,tone.B),0));
+                brush.GradientStops.Add(new GradientStop(Color.FromArgb(weak,tone.R,tone.G,tone.B),.5));
+                brush.GradientStops.Add(new GradientStop(Color.FromArgb((byte)(strong*2/3),tone.R,tone.G,tone.B),1));
                 brush.Freeze();
-                var pen=new Pen(brush,3+i*4);pen.Freeze();pens[i]=pen;
+                var pen=new Pen(brush,RingWidth);pen.Freeze();pens[i]=pen;
             }
             return pens;
-        }
+        }        static readonly Brush liquidGlint=LiquidGlint();
         static Brush LiquidGlint()
         {
             var brush=new RadialGradientBrush(Color.FromArgb(54,255,255,255),Colors.Transparent){Center=new Point(.16,.06),GradientOrigin=new Point(.16,.06),RadiusX=.62,RadiusY=.34};
@@ -84,7 +91,7 @@ namespace OneTaskBar
         internal static void LiquidEdge(DrawingContext dc,Rect box,double radius)
         {
             if(box.Width<24||box.Height<24)return;
-            for(int i=liquidEdge.Length-1;i>=0;i--)dc.DrawRoundedRectangle(null,liquidEdge[i],box,radius,radius);
+            for(int i=liquidEdge.Length-1;i>=0;i--){double inset=RingWidth*(i+.5);if(box.Width<=inset*2||box.Height<=inset*2)continue;double r=Math.Max(0,radius-inset);dc.DrawRoundedRectangle(null,liquidEdge[i],new Rect(box.X+inset,box.Y+inset,box.Width-inset*2,box.Height-inset*2),r,r);}
             dc.DrawRectangle(liquidGlint,null,new Rect(box.X,box.Y,box.Width,Math.Min(box.Height*.5,radius*2+30)));
             dc.DrawRectangle(liquidLip,null,new Rect(box.X,box.Y,box.Width,Math.Min(box.Height*.5,16)));
             dc.DrawRoundedRectangle(null,liquidRim,new Rect(box.X+.6,box.Y+.6,box.Width-1.2,box.Height-1.2),Math.Max(0,radius-.6),Math.Max(0,radius-.6));
