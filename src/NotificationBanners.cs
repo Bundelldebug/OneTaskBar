@@ -116,7 +116,7 @@ namespace OneTaskBar
             var existing=visible.FirstOrDefault(b=>String.Equals(NotificationStack.AppKey(b.Entry),NotificationStack.AppKey(item),StringComparison.OrdinalIgnoreCase));
             if(existing!=null){existing.Update(item);Layout();return;}
             while(visible.Count>=3)Close(visible[0],false);
-            var banner=new NotificationBanner(item,Open,Close,connect);visible.Add(banner);Shown++;Layout();banner.Appear();expiry.Start();
+            var banner=new NotificationBanner(item,Open,Close,connect);visible.Add(banner);Shown++;Layout();banner.DockCue=()=>GlowDock(banner);banner.Appear();expiry.Start();
         }
         // Galaxy Connect's phone notifications are small and rise from the bottom centre instead of the top-right stack.
         internal static bool IsGalaxyConnect(NotificationEntry item)
@@ -143,7 +143,39 @@ namespace OneTaskBar
             if(dock!=null&&dock.Apps.IsVisible&&Native.GetWindowRect(new WindowInteropHelper(dock.Apps).Handle,out apps)&&apps.Top>screen.Bounds.Top+screen.Bounds.Height/2&&apps.Right>screen.Bounds.Left+x*scale)bottom=Math.Min(bottom,(apps.Top-screen.Bounds.Top)/scale-10);
             foreach(var banner in visible.Where(b=>!b.Compact).Reverse().ToArray()){double h=banner.DesiredHeight;if(bottom-h<top){Close(banner,false);continue;}banner.PlaceBanner(screen.Bounds,x,bottom-h,width,h);bottom-=h+9;}            LayoutCompact(screen,scale);
         }
-        void LayoutCompact(Forms.Screen screen,double scale)
+        // Before a Fluid banner rises, a glow flares on the top of the bar below it, so the card seems to leave the bar.
+        // Before a Fluid banner rises, the bar piece below it flares with a glow and the card leaves from that piece.
+        // Returns the piece's bounds in device pixels, or null when there is no bar to launch from.
+        // Fixtures stand in for the dock with any window.
+        internal static Func<Native.RectI?> BarForFixture;
+        Native.RectI? GlowDock(NotificationBanner banner)
+        {
+            try
+            {
+                var screen=Forms.Screen.PrimaryScreen??Forms.Screen.FromPoint(Forms.Cursor.Position);
+                if(Program.Inspectable&&BarForFixture!=null)
+                {
+                    var fake=BarForFixture();
+                    if(fake.HasValue){GlowCue.Play(screen.Bounds,fake.Value,(fake.Value.Bottom-fake.Value.Top)/2.0,new Point(.5,0));return fake;}
+                }
+                var dock=shell.DockFor(screen);Native.RectI card;
+                if(dock==null||!Native.GetWindowRect(new WindowInteropHelper(banner).Handle,out card))return null;
+                double center=(card.Left+card.Right)/2.0;GlassWindow best=null;Native.RectI bestRect=new Native.RectI();double bestGap=Double.MaxValue;
+                // The bar piece (start, apps or status) closest below the card.
+                foreach(var piece in new GlassWindow[]{dock.Apps,dock.Status,dock.Start})
+                {
+                    Native.RectI rect;
+                    if(piece==null||!piece.IsVisible||!Native.GetWindowRect(new WindowInteropHelper(piece).Handle,out rect)||rect.Right<=rect.Left)continue;
+                    double gap=center<rect.Left?rect.Left-center:center>rect.Right?center-rect.Right:0;
+                    if(gap<bestGap){bestGap=gap;best=piece;bestRect=rect;}
+                }
+                if(best==null)return null;
+                double x=(center-bestRect.Left)/(bestRect.Right-bestRect.Left);
+                GlowCue.Play(screen.Bounds,bestRect,best.Surface.CornerRadius.TopLeft*Native.GetDpiForWindow(new WindowInteropHelper(best).Handle)/96.0,new Point(Math.Max(.08,Math.Min(.92,x)),0));
+                return bestRect;
+            }
+            catch(Exception error){AppLog.Once("banner-dock-glow",error.GetType().Name);return null;}
+        }        void LayoutCompact(Forms.Screen screen,double scale)
         {
             double width=Math.Min(330,screen.Bounds.Width/scale-24),bottom=(screen.WorkingArea.Bottom-screen.Bounds.Top)/scale-14;
             // The dock floats over the work area, so the popup rises from just above it.
@@ -187,7 +219,7 @@ namespace OneTaskBar
             expiry.Stop();
             if(shell.Island!=null)shell.Island.DismissNotification();
         }
-        public void Dispose(){if(disposed)return;disposed=true;++revision;shell.Notifications.SnapshotReady=null;Clear();if(gate!=null)gate.Dispose();}
+        public void Dispose(){if(disposed)return;disposed=true;GlowCue.Release();++revision;shell.Notifications.SnapshotReady=null;Clear();if(gate!=null)gate.Dispose();}
     }
     internal sealed class NotificationBanner : GlassWindow
     {
@@ -197,6 +229,9 @@ namespace OneTaskBar
         readonly Image artwork=new Image {Height=118,Stretch=Stretch.Uniform,Margin=new Thickness(0,9,0,0),Visibility=Visibility.Collapsed};
         readonly ColumnDefinition iconColumn=new ColumnDefinition();
         readonly List<NotificationEntry> entries=new List<NotificationEntry>();
+        readonly TranslateTransform rise=new TranslateTransform();readonly TransformGroup lift=new TransformGroup();readonly ScaleTransform grow=new ScaleTransform(1,1),iconPop=new ScaleTransform(1,1);Brush glassBrush;bool refracting;StackPanel textPanel;readonly Border bloom=new Border {IsHitTestVisible=false,Opacity=0};System.Windows.Documents.AdornerLayer adorners;
+        // The Fluid banner arrives in stages, as in the GalaxyOS clip: the frosted card swells in, the icon pops, then the words fade in.
+        const double StageMilliseconds=560;
         bool moving;readonly System.Diagnostics.Stopwatch motionWatch=new System.Diagnostics.Stopwatch();
         System.Drawing.Rectangle monitor;Rect bounds;double progress=1,from,to;TaskCompletionSource<bool> completion;
         internal bool Animating {get{return moving;}}
@@ -214,8 +249,8 @@ namespace OneTaskBar
             Compact=compact;
             Title="One TaskBar · 알림 팝업";ShowActivated=false;Focusable=false;Radius=compact?22:27;StableSurface=true;Dark=true;Surface.CornerRadius=new CornerRadius(Radius);Surface.Background=Paint.Brush("#E6101216");Surface.BorderBrush=Paint.Brush("#36FFFFFF");Surface.BorderThickness=new Thickness(.7);
             var content=new Grid();content.ColumnDefinitions.Add(iconColumn);content.ColumnDefinitions.Add(new ColumnDefinition());content.Children.Add(icon);
-            var text=new StackPanel();sender.TextTrimming=TextTrimming.CharacterEllipsis;text.Children.Add(sender);title.FontWeight=FontWeights.SemiBold;title.TextWrapping=TextWrapping.Wrap;title.TextTrimming=TextTrimming.CharacterEllipsis;title.MaxHeight=39;title.Margin=new Thickness(0,5,12,3);text.Children.Add(title);body.TextWrapping=TextWrapping.Wrap;body.TextTrimming=TextTrimming.CharacterEllipsis;body.MaxHeight=34;body.Margin=new Thickness(0,0,4,0);text.Children.Add(body);Grid.SetColumn(text,1);content.Children.Add(text);
-            text.Children.Add(artwork);var row=new Grid();var hit=Paint.Button(content,()=>open(this),"알림 열기");hit.Background=Brushes.Transparent;hit.Padding=compact?new Thickness(14,9,30,9):new Thickness(17,14,33,13);hit.HorizontalContentAlignment=HorizontalAlignment.Stretch;glow.CornerRadius=new CornerRadius(Radius);row.Children.Add(glow);row.Children.Add(hit);var dismiss=Paint.Button(new Glyph("close",13),()=>close(this,true),"팝업 닫기 · 알림 기록 유지");dismiss.Background=Brushes.Transparent;dismiss.Width=dismiss.Height=28;dismiss.Padding=new Thickness(6);dismiss.HorizontalAlignment=HorizontalAlignment.Right;dismiss.VerticalAlignment=VerticalAlignment.Top;dismiss.Margin=new Thickness(0,7,7,0);row.Children.Add(dismiss);Surface.Child=row;TransitionContent=row;
+            var text=new StackPanel();textPanel=text;icon.RenderTransform=iconPop;icon.RenderTransformOrigin=new Point(.5,.5);sender.TextTrimming=TextTrimming.CharacterEllipsis;text.Children.Add(sender);title.FontWeight=FontWeights.SemiBold;title.TextWrapping=TextWrapping.Wrap;title.TextTrimming=TextTrimming.CharacterEllipsis;title.MaxHeight=39;title.Margin=new Thickness(0,5,12,3);text.Children.Add(title);body.TextWrapping=TextWrapping.Wrap;body.TextTrimming=TextTrimming.CharacterEllipsis;body.MaxHeight=34;body.Margin=new Thickness(0,0,4,0);text.Children.Add(body);Grid.SetColumn(text,1);content.Children.Add(text);
+            text.Children.Add(artwork);var row=new Grid();var hit=Paint.Button(content,()=>open(this),"알림 열기");hit.Background=Brushes.Transparent;hit.Padding=compact?new Thickness(14,9,30,9):new Thickness(17,14,33,13);hit.HorizontalContentAlignment=HorizontalAlignment.Stretch;glow.CornerRadius=new CornerRadius(Radius);row.Children.Add(glow);row.Children.Add(hit);bloom.CornerRadius=new CornerRadius(Radius);bloom.Background=BloomBrush();row.Children.Add(bloom);var dismiss=Paint.Button(new Glyph("close",13),()=>close(this,true),"팝업 닫기 · 알림 기록 유지");dismiss.Background=Brushes.Transparent;dismiss.Width=dismiss.Height=28;dismiss.Padding=new Thickness(6);dismiss.HorizontalAlignment=HorizontalAlignment.Right;dismiss.VerticalAlignment=VerticalAlignment.Top;dismiss.Margin=new Thickness(0,7,7,0);row.Children.Add(dismiss);Surface.Child=row;TransitionContent=row;
             SourceInitialized+=(s,e)=> {var h=new WindowInteropHelper(this).Handle;Native.SetWindowLong(h,-20,Native.GetWindowLong(h,-20)|0x08000000);};
             if(compact)
             {
@@ -225,27 +260,119 @@ namespace OneTaskBar
                 body.FontSize=11.5;body.TextWrapping=TextWrapping.NoWrap;body.MaxHeight=18;
                 icon.Width=icon.Height=28;icon.VerticalAlignment=VerticalAlignment.Center;icon.Margin=new Thickness(0,0,9,0);
             }
-            Closed+=(s,e)=>{ClosedFlag=true;StopMotion();motionWatch.Stop();if(completion!=null)completion.TrySetResult(false);};Update(entry);
+            Closed+=(s,e)=>{ClosedFlag=true;if(cueTimer!=null)cueTimer.Stop();StopMotion();motionWatch.Stop();if(completion!=null)completion.TrySetResult(false);};Update(entry);
         }
         internal void PlaceBanner(System.Drawing.Rectangle screen,double x,double y,double width,double height)
         {
-            monitor=screen;var next=new Rect(x,y,width,height);if(!IsVisible){bounds=next;ShowAt(screen,x,y,width,height);}else if(bounds!=next){bounds=next;Width=width;Height=height;Position();}
+            monitor=screen;var next=new Rect(x,y,width,height);if(!IsVisible){bounds=next;Refract(screen,x,y,width,height);ShowAt(screen,x,y,width,height);if(glassBrush!=null)Surface.Background=glassBrush;}else if(bounds!=next){bounds=next;Width=width;Height=height;Position();}
         }
-        internal void Appear(){Animate(true);}
+        // With the refraction option on, the surface is drawn from a one-time read of what is behind it.
+        void Refract(System.Drawing.Rectangle screen,double x,double y,double width,double height)
+        {
+            glassBrush=null;refracting=false;
+            if(!RefractionGlass.Enabled||Compact)return;
+            try
+            {
+                double scale=Native.PrepareMonitor(this,screen);var rect=Native.PlacementBounds(screen,scale,x,y,width,height);
+                var surface=new System.Drawing.Rectangle(rect.Left,rect.Top,rect.Right-rect.Left,rect.Bottom-rect.Top);
+                System.Drawing.Rectangle area;
+                using(var backdrop=RefractionGlass.Capture(surface,(int)Math.Ceiling(RefractionGlass.Margin*scale),out area))
+                {
+                    var image=RefractionGlass.Render(backdrop,area,surface,Radius*scale,scale,true);
+                    if(image==null)return;
+                    var brush=new ImageBrush(image){Stretch=Stretch.Fill};brush.Freeze();glassBrush=brush;refracting=true;
+                }
+            }
+            catch(Exception error){AppLog.Once("banner-refraction",error.GetType().Name);}
+        }
+        internal bool Refracting {get{return refracting;}}
+        internal override void RefreshGlassMaterial(){base.RefreshGlassMaterial();if(glassBrush!=null)Surface.Background=glassBrush;}
+        // Runs just before the banner rises (the dock glow); set by the banner list.
+        internal Func<Native.RectI?> DockCue;
+        // Where the card starts when it leaves the bar: its offset from the final place (dip) and its starting size.
+        double launchX,launchY,startAlong=.34,startAcross=.3;bool launched;
+        System.Windows.Threading.DispatcherTimer cueTimer;
+        // The card starts as the bar piece itself (its size, centred on it) and springs up to its place.
+        void SetLaunch(Native.RectI? bar)
+        {
+            launched=false;launchX=launchY=0;startAlong=.34;startAcross=.3;
+            if(!bar.HasValue||monitor.Width<1)return;
+            double scale=Math.Max(96,Native.GetDpiForWindow(new WindowInteropHelper(this).Handle))/96.0;
+            double barW=bar.Value.Right-bar.Value.Left,barH=bar.Value.Bottom-bar.Value.Top,cardW=bounds.Width*scale,cardH=bounds.Height*scale;
+            if(barW<8||barH<8||cardW<8||cardH<8)return;
+            startAlong=Math.Max(.3,Math.Min(.95,barW/cardW));startAcross=Math.Max(.25,Math.Min(.8,barH/cardH));
+            double barCx=(bar.Value.Left+bar.Value.Right)/2.0,barCy=(bar.Value.Top+bar.Value.Bottom)/2.0;
+            double cardCx=monitor.Left+(bounds.X+bounds.Width/2)*scale,cardBottom=monitor.Top+(bounds.Y+bounds.Height)*scale;
+            launchX=(barCx-cardCx)/scale;launchY=(barCy+startAcross*cardH/2-cardBottom)/scale;launched=true;
+        }
+        internal void Appear()
+        {
+            if(DockCue==null||Compact||!Fluid.Enabled||!Motion.Enabled||!IsVisible){Animate(true);return;}
+            // Glow first, then the card rises out of it.
+            SetLaunch(DockCue());progress=0;Position();
+            if(cueTimer==null){cueTimer=new System.Windows.Threading.DispatcherTimer {Interval=TimeSpan.FromMilliseconds(70)};cueTimer.Tick+=(s,e)=>{cueTimer.Stop();if(!ClosedFlag)Animate(true);};}
+            cueTimer.Stop();cueTimer.Start();
+        }
         internal Task<bool> Disappear(){return Animate(false);}
         Task<bool> Animate(bool opening)
         {
-            if(completion!=null)completion.TrySetResult(false);completion=new TaskCompletionSource<bool>();var pending=completion.Task;StopMotion();from=opening?0:progress;to=opening?1:0;
-            if(!Motion.Enabled||!IsVisible){progress=to;Position();completion.TrySetResult(true);return pending;}progress=from;Position();motionWatch.Restart();StartMotion();return pending;
+            if(completion!=null)completion.TrySetResult(false);completion=new TaskCompletionSource<bool>();var pending=completion.Task;StopMotion();from=opening?0:progress;to=opening?1:0;if(opening&&Fluid.Enabled&&!Compact&&Motion.Enabled)Stage(0);else ResetStage();
+            if(!Motion.Enabled||!IsVisible){ResetStage();progress=to;Position();completion.TrySetResult(true);return pending;}progress=from;Position();motionWatch.Restart();StartMotion();return pending;
         }
         void Frame(object sender,EventArgs args)
         {
             // The Fluid UI arrives on the island's spring, settling a little past its place; closing is quick and does not bounce.
-            bool fluid=Fluid.Enabled&&to==1;
-            double t=Math.Min(1,motionWatch.Elapsed.TotalMilliseconds/(fluid?360:to==1?280:160)),ease=fluid?SpringEase.Position(t,.8):SpringEase.Out(t);
-            progress=from+(to-from)*ease;Position();if(t>=1){StopMotion();motionWatch.Stop();progress=to;Position();completion.TrySetResult(true);}
+            bool fluid=Fluid.Enabled&&to==1,staged=fluid&&!Compact&&Motion.Enabled;
+            double ms=motionWatch.Elapsed.TotalMilliseconds;
+            double t=Math.Min(1,ms/(fluid?360:to==1?280:160)),ease=fluid?SpringEase.Position(t,launched?.62:.8):SpringEase.Out(t);
+            progress=from+(to-from)*ease;Position();
+            if(staged)Stage(ms);
+            if(t>=1&&(!staged||ms>=StageMilliseconds)){StopMotion();motionWatch.Stop();progress=to;Position();if(staged)Stage(StageMilliseconds);completion.TrySetResult(true);}
         }
-        void Position(){double shown=Math.Max(0,Math.Min(1,progress));Opacity=shown;Native.BlurOpacity(this,shown);if(Compact)Native.Place(this,monitor,bounds.X,bounds.Y+(1-progress)*16,bounds.Width,bounds.Height);else Native.Place(this,monitor,bounds.X+(1-progress)*8,bounds.Y,bounds.Width,bounds.Height);}
+        static Brush BloomBrush()
+        {
+            var brush=new RadialGradientBrush {Center=new Point(.5,1),GradientOrigin=new Point(.5,1),RadiusX=.75,RadiusY=1.1};
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(235,255,255,255),0));
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(120,214,232,255),.45));
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(0,214,232,255),1));
+            brush.Freeze();return brush;
+        }
+        static double Part(double ms,double start,double length){return Math.Max(0,Math.Min(1,(ms-start)/length));}
+        // Icon pops in on a spring after the card is up; the title and body fade in last.
+        void Stage(double ms)
+        {
+            double pop=SpringEase.Position(Part(ms,70,380),.72);
+            iconPop.ScaleX=iconPop.ScaleY=.3+.7*pop;
+            icon.Opacity=Part(ms,50,110);
+            // A white glow flares from the pill while the card swells and drains away as it settles.
+            double flare=Part(ms,0,90)*(1-Part(ms,90,420));bloom.Opacity=flare;
+            if(textPanel!=null)textPanel.Opacity=Part(ms,220,260);
+        }
+        void ResetStage()
+        {
+            iconPop.ScaleX=iconPop.ScaleY=1;icon.Opacity=1;bloom.Opacity=0;if(textPanel!=null)textPanel.Opacity=1;
+        }        void Position()
+        {
+            double shown=Math.Max(0,Math.Min(1,progress));
+            // The Fluid banner grows out of its bottom-right corner with the spring, then shrinks back the same way.
+            bool grows=Fluid.Enabled&&!Compact&&Motion.Enabled;
+            Opacity=grows?Math.Min(1,shown*1.7):shown;
+            Native.BlurOpacity(this,refracting?0:grows?shown*shown*shown:shown);
+            if(grows)
+            {
+                double along=Math.Max(.05,startAlong+(1-startAlong)*progress),across=Math.Max(.05,startAcross+(1-startAcross)*progress),back=1-Math.Min(1,progress);grow.ScaleX=along;grow.ScaleY=across;
+                // The card springs out of a small pill at its lower edge, as in the GalaxyOS clip.
+                rise.Y=(1-Math.Min(1,progress))*26;if(lift.Children.Count==0){lift.Children.Add(grow);lift.Children.Add(rise);}
+                Surface.RenderTransformOrigin=new Point(.5,1);Surface.RenderTransform=lift;
+                // The rim adorner keeps the transform it was laid out with unless it is told the surface changed.
+                if(adorners==null)adorners=System.Windows.Documents.AdornerLayer.GetAdornerLayer(Surface);
+                if(adorners!=null)adorners.Update(Surface);
+                Native.Place(this,monitor,bounds.X+back*launchX,bounds.Y+back*launchY,bounds.Width,bounds.Height);return;
+            }
+            if(Surface.RenderTransform==lift){Surface.RenderTransform=Transform.Identity;if(adorners!=null)adorners.Update(Surface);}
+            PositionSlide();
+        }
+        void PositionSlide(){if(Compact)Native.Place(this,monitor,bounds.X,bounds.Y+(1-progress)*16,bounds.Width,bounds.Height);else Native.Place(this,monitor,bounds.X+(1-progress)*8,bounds.Y,bounds.Width,bounds.Height);}
         internal void Update(NotificationEntry entry)
         {
             entries.RemoveAll(n=>NotificationBanners.Key(n)==NotificationBanners.Key(entry));entries.Add(entry);entries.Sort((a,b)=>b.Created.CompareTo(a.Created));if(entries.Count>32)entries.RemoveRange(32,entries.Count-32);Present();Expires=DateTime.UtcNow.AddSeconds(7);

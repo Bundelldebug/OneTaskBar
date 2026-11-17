@@ -25,12 +25,46 @@ namespace OneTaskBar
         Pen sweepPen;
         bool pulsing;
         double swell;
+        // The Fluid flare: a white glow blooms on the glass at the point it grows from, then drains while the surface settles.
+        const double FlareMilliseconds=520;
+        readonly System.Diagnostics.Stopwatch flareWatch=new System.Diagnostics.Stopwatch();
+        RadialGradientBrush flareBrush;
+        Point flarePoint=new Point(.5,1);
+        bool flaring;
+        internal bool Flaring {get{return flaring;}}
+        internal void Flare(Point anchor)
+        {
+            if(!Active||!Motion.Enabled||Performance.Light||!Fluid.Enabled)return;
+            flarePoint=anchor;flareWatch.Restart();
+            if(!flaring){flaring=true;System.Windows.Media.CompositionTarget.Rendering+=FlareFrame;}
+            FlareFrame(null,null);
+        }
+        void StopFlare()
+        {
+            if(!flaring)return;
+            flaring=false;flareWatch.Stop();System.Windows.Media.CompositionTarget.Rendering-=FlareFrame;InvalidateVisual();
+        }
+        void FlareFrame(object sender,EventArgs args)
+        {
+            double ms=flareWatch.Elapsed.TotalMilliseconds;
+            if(ms>=FlareMilliseconds){StopFlare();return;}
+            if(flareBrush==null)
+            {
+                flareBrush=new RadialGradientBrush {RadiusX=.75,RadiusY=1.1};
+                flareBrush.GradientStops.Add(new GradientStop(Color.FromArgb(235,255,255,255),0));
+                flareBrush.GradientStops.Add(new GradientStop(Color.FromArgb(120,214,232,255),.45));
+                flareBrush.GradientStops.Add(new GradientStop(Color.FromArgb(0,214,232,255),1));
+            }
+            flareBrush.Center=flareBrush.GradientOrigin=flarePoint;
+            flareBrush.Opacity=Math.Min(1,ms/90)*(1-Math.Max(0,Math.Min(1,(ms-90)/(FlareMilliseconds-90))));
+            InvalidateVisual();
+        }
         internal GlassLens(GlassWindow owner):base(owner.Surface)
         {
             window=owner;IsHitTestVisible=false;
             for(int i=0;i<5;i++)sweep.GradientStops.Add(new GradientStop(Colors.Transparent,i/4.0));
             owner.IsVisibleChanged+=(s,e)=>{if(owner.IsVisible)Pulse();else StopPulse();};
-            Unloaded+=(s,e)=>StopPulse();
+            Unloaded+=(s,e)=>{StopPulse();StopFlare();};
             edge.GradientStops.Add(new GradientStop(Colors.Transparent,0));
             edge.GradientStops.Add(new GradientStop(Colors.Transparent,.23));
             edge.GradientStops.Add(new GradientStop(Colors.Transparent,.62));
@@ -83,6 +117,7 @@ namespace OneTaskBar
             edge.StartPoint=new Point(light.X*.5,0);
             edge.EndPoint=new Point(.65+light.X*.3,1);
             dc.PushClip(shape);dc.DrawRoundedRectangle(null,rim,bounds,radius,radius);if(LiquidGlass.Enabled)GlassOptics.LiquidEdge(dc,bounds,radius);
+            if(flaring&&flareBrush!=null)dc.DrawRoundedRectangle(flareBrush,null,bounds,radius,radius);
             if(pulsing&&LiquidGlass.Enabled)
             {
                 if(sweepPen==null)sweepPen=new Pen(sweep,2.2);

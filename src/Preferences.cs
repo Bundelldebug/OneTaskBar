@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Web.Script.Serialization;
 using Microsoft.Win32;
@@ -68,6 +68,8 @@ namespace OneTaskBar
         public int WidgetBlur=0;
         public bool WidgetGlass=true;
         public bool LiquidGlass=false;
+        // Real edge refraction on notification banners (a still of the backdrop); off by default.
+        public bool LiquidRefraction=false;
         public int TrayPanelPercent=100;
         public bool MediaFlightToIsland=true;
         public bool TopStatusBar=false;

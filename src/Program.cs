@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -135,6 +135,7 @@ namespace OneTaskBar
             if(args.Contains("--panel-transition-probe"))return PanelTransitionChecks.Run();
             if(args.Contains("--window-preview-probe"))return WindowPreviewChecks.Run(args.Contains("--inspect"));
             if(args.Contains("--popup-probe"))return PopupChecks.Run();
+            if(args.Contains("--banner-refraction-probe"))return BannerRefractionChecks.Run();
             if(args.Contains("--identity-package-probe"))return IdentityPackage.Probe();
             if(args.Contains("--dock-motion-probe"))return DockMotionChecks.Run();
             if(args.Contains("--dock-overflow-probe"))return DockOverflowChecks.Run();

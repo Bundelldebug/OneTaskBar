@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Automation;
@@ -450,10 +450,14 @@ namespace OneTaskBar
             base.Show();
             ShellWindowPolicy.Apply(this);
         }
+        // The Fluid flare shared with the notification: a glow at the point the panel grows from.
+        internal void Flare(Point anchor){if(lens!=null)lens.Flare(anchor);}
+        internal string FlareState {get{return lens==null?"no lens":"active="+lens.Active+" flaring="+lens.Flaring;}}
         public void Pop()
         {
             if(TransitionContent==null)TransitionContent=Surface.Child as FrameworkElement;
             if(!Motion.Enabled){if(SmoothLauncher)LauncherMotion.Cancel(TransitionContent);return;}
+            if(Fluid.Enabled&&!OpaqueSurface&&!DockSurface&&!(this is NowBar)&&!(this is DynamicIsland)&&!(this is NotificationBanner))Flare(Motion.Anchor(Surface,PopFromTop));
             if(BudEligible){++motion;Surface.RenderTransform=Transform.Identity;Surface.Opacity=1;if(bud==null)bud=new FluidBud(this);bud.Open(Motion.Anchor(Surface,PopFromTop),PopFromTop);return;}
             if(StableSurface&&TransitionContent!=null){++motion;Surface.RenderTransform=Transform.Identity;Surface.Opacity=1;if(SmoothLauncher)LauncherMotion.Run(TransitionContent,true,PopFromTop,true);else Motion.Launcher(TransitionContent,true,PopFromTop);return;}
             if(Fluid.Enabled){++motion;Surface.Opacity=1;Motion.Drop(Surface,Motion.Anchor(Surface,PopFromTop),0);return;}
