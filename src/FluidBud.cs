@@ -17,6 +17,11 @@ namespace OneTaskBar
         internal int Cut;
         internal bool Neck;
         internal double CutWidth;
+        // How far the dock part has been taken apart; it lives here so a second panel (a quick settings page) can carry on.
+        internal bool Veiled;
+        internal double LastCut=-1;
+        internal readonly System.Collections.Generic.Dictionary<System.Windows.UIElement,System.Windows.Media.Transform> Shifted=new System.Collections.Generic.Dictionary<System.Windows.UIElement,System.Windows.Media.Transform>();
+        internal readonly System.Windows.Media.TranslateTransform Slide=new System.Windows.Media.TranslateTransform();
     }
     // The Fluid UI's arrival, step by step after the reference recording:
     //   1. a white drop forms on the bar's edge and swells into a glass drop, held to the bar by a thin neck;
@@ -46,14 +51,11 @@ namespace OneTaskBar
         Rect lastCut;
         bool roundedOnce;
         // When the panel comes out of a dock piece, the first shape is that piece itself.
-        bool useSource,detach,veiled;
+        bool useSource,detach,carried;
         Native.RectI? source;
         Rect srcRect;
         GlassWindow piece;
         MorphPlan plan;
-        double lastPieceCut=-1;
-        readonly System.Collections.Generic.Dictionary<UIElement,Transform> shifted=new System.Collections.Generic.Dictionary<UIElement,Transform>();
-        readonly TranslateTransform shift=new TranslateTransform();
         internal FluidBud(GlassWindow owner)
         {
             window=owner;
@@ -88,6 +90,7 @@ namespace OneTaskBar
             fromTop=top;
             if(plan!=window.Morph)ReleasePiece();
             plan=window.Morph;
+            carried=window.TakeCarried();
             source=plan!=null?(Native.RectI?)plan.Source:null;detach=plan!=null&&plan.Neck;piece=plan!=null?plan.Piece:null;
             // On the first open the window has just been shown and may not be laid out yet; without a size there is no
             // shape to animate, which is why a first click used to show no motion at all.
@@ -361,43 +364,51 @@ namespace OneTaskBar
         void ApplyPart(double k)
         {
             if(piece==null||plan==null)return;
-            if(plan.Hide.Length==0){if(!veiled){veiled=true;piece.Veil(true);}return;}
-            if(!veiled){veiled=true;foreach(var part in plan.Hide)part.Visibility=Visibility.Hidden;}
+            // A page opened from the panel that already took the dock part keeps it taken while it opens.
+            if(carried&&!closing)k=1;
+            if(plan.Hide.Length==0){if(!plan.Veiled){plan.Veiled=true;piece.Veil(true);}return;}
+            if(!plan.Veiled){plan.Veiled=true;foreach(var part in plan.Hide)part.Visibility=Visibility.Hidden;}
             if(plan.Cut==0)return;
             double width=piece.Surface.ActualWidth,height=piece.Surface.ActualHeight;
             if(width<8||height<8)return;
-            if(k<.003){if(lastPieceCut>=0)ClearCut();return;}
+            if(k<.003){if(plan.LastCut!=-1)ClearCut();return;}
             double gap=Math.Min(width*.7,plan.CutWidth)*k;
             var cut=plan.Cut<0?new Rect(gap,0,width-gap,height):new Rect(0,0,width-gap,height);
             piece.BackdropClip=cut;piece.RegionClip=cut;
             piece.PieceShape(cut,Math.Min(piece.Radius,Math.Min(cut.Width,cut.Height)/2));
             if(plan.Cut<0)
             {
-                shift.X=gap;
-                foreach(var part in plan.Shift){if(!shifted.ContainsKey(part)){shifted[part]=part.RenderTransform;part.RenderTransform=shift;}}
+                plan.Slide.X=gap;
+                foreach(var part in plan.Shift){if(!plan.Shifted.ContainsKey(part)){plan.Shifted[part]=part.RenderTransform;part.RenderTransform=plan.Slide;}}
             }
             double key=Math.Round(gap*(plan.Cut<0?-1:1));
-            if(key!=lastPieceCut){lastPieceCut=key;Native.Round(piece,piece.Radius);}
+            if(key!=plan.LastCut){plan.LastCut=key;Native.Round(piece,piece.Radius);}
         }
         void ClearCut()
         {
-            lastPieceCut=-1;
-            if(piece==null)return;
+            if(piece==null||plan==null)return;
+            plan.LastCut=-1;
             piece.BackdropClip=null;piece.RegionClip=null;
             piece.PieceShape(null,0);
-            shift.X=0;
-            foreach(var pair in shifted)pair.Key.RenderTransform=pair.Value;
-            shifted.Clear();
+            plan.Slide.X=0;
+            foreach(var pair in plan.Shifted)pair.Key.RenderTransform=pair.Value;
+            plan.Shifted.Clear();
             Native.Round(piece,piece.Radius);
+        }
+        // Another panel takes over the dock part: this one lets go without putting anything back.
+        internal MorphPlan Relinquish()
+        {
+            var held=plan;piece=null;plan=null;
+            return held;
         }
         // The dock goes back to its own shape (the panel was hidden or closed).
         internal void ReleasePiece()
         {
             if(piece==null){plan=null;return;}
             ClearCut();
-            if(veiled)
+            if(plan!=null&&plan.Veiled)
             {
-                veiled=false;
+                plan.Veiled=false;
                 if(plan!=null&&plan.Hide.Length>0)foreach(var part in plan.Hide)part.Visibility=Visibility.Visible;
                 else piece.Veil(false);
             }

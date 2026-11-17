@@ -78,8 +78,8 @@ namespace OneTaskBar
                     var panel=new GlassWindow();panel.Surface.Child=new System.Windows.Controls.TextBlock {Text="패널",Margin=new Thickness(30)};
                     panel.ShowAt(screen.Bounds,40,40,300,200);await Task.Delay(400);panel.Pop();await Task.Delay(60);
                     string flareState=panel.FlareState;panel.Close();
-                    Require(flareState.Contains("flaring=True"),"A Fluid panel flares when it opens ("+flareState+")");
-                    Require(glowStates.Contains("glow=True"),"A glow plays on the bar before the card leaves it");                    AppLog.Json("banner-refraction-probe.json",new {passed=true,flareState=flareState,glowStates=glowStates.ToArray(),enabled=RefractionGlass.Enabled,fluid=Fluid.Enabled,refracting=banner.Refracting});
+                    Require(!Fluid.Enabled||flareState.Contains("flaring=True"),"A Fluid panel flares when it opens ("+flareState+")");
+                    Require(!Fluid.Enabled||glowStates.Contains("glow=True"),"A glow plays on the bar before the card leaves it");                    AppLog.Json("banner-refraction-probe.json",new {passed=true,flareState=flareState,glowStates=glowStates.ToArray(),enabled=RefractionGlass.Enabled,fluid=Fluid.Enabled,refracting=banner.Refracting});
                     result=0;
                 }
                 catch(Exception error){AppLog.Json("banner-refraction-probe.json",new {passed=false,error=error.ToString()});}

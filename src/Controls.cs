@@ -316,9 +316,14 @@ namespace OneTaskBar
         internal Rect? BackdropClip;
         // What a Fluid panel unfolds from (see MorphPlan); MorphFixed lets a fixture set it itself.
         internal MorphPlan Morph;internal bool MorphFixed;
+        bool morphCarried;
+        // A page that opens from this panel carries on from the dock part this one took (it is not put back in between).
+        internal MorphPlan ReleaseMorph(){return bud==null?null:bud.Relinquish();}
+        internal void AdoptMorph(MorphPlan plan){if(plan==null)return;Morph=plan;morphCarried=true;}
+        internal bool TakeCarried(){bool value=morphCarried;morphCarried=false;return value;}
         void ResolveMorph()
         {
-            if(MorphFixed)return;
+            if(MorphFixed||morphCarried)return;
             try{if(bud!=null)bud.ReleasePiece();Morph=DockHost.PlanFor(this);}
             catch(Exception error){Morph=null;AppLog.Once("fluid-morph-plan",error.GetType().Name+": "+error.Message);}
         }

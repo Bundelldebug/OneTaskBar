@@ -78,6 +78,33 @@ namespace OneTaskBar
                         panel.Close();pill.Close();backdrop.Close();panel=null;pill=null;backdrop=null;
                         await Task.Delay(200);
                     }
+                    // A page opened from a panel carries on from the dock part the panel took: the bar is not put back between them.
+                    {
+                        var group2=new DrawingGroup();
+                        backdrop=new Window {WindowStyle=WindowStyle.None,ResizeMode=ResizeMode.NoResize,ShowInTaskbar=false,Topmost=true,ShowActivated=false,Left=work.Right-460,Top=work.Bottom-560,Width=460,Height=560,Background=Brushes.SteelBlue};
+                        backdrop.Show();
+                        pill=new GlassWindow {Radius=20,ShowActivated=false};
+                        var grid=new Grid();var label=new TextBlock {Text="상태",Foreground=Brushes.White,HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(16,0,0,0)};var part=new TextBlock {Text="Wi-Fi",Foreground=Brushes.White,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};grid.Children.Add(label);grid.Children.Add(part);pill.Surface.Child=grid;
+                        pill.ShowAt(screen.Bounds,work.Right-380,work.Bottom-48,360,40);await Task.Delay(200);
+                        Native.RectI rect;Native.GetWindowRect(new System.Windows.Interop.WindowInteropHelper(pill).Handle,out rect);
+                        var plan=new MorphPlan {Piece=pill,Source=rect,Neck=true,Cut=-1,CutWidth=120,Hide=new FrameworkElement[]{part},Shift=new FrameworkElement[]{label}};
+                        var first=new GlassWindow {Width=380,Height=300,ShowActivated=false};first.Surface.Child=new TextBlock {Text="빠른 설정"};first.MorphFixed=true;first.Morph=plan;
+                        first.ShowAt(screen.Bounds,work.Right-400,work.Bottom-48-12-300,380,300);first.Pop();await Task.Delay(900);
+                        double cutBefore=pill.BackdropClip.HasValue?pill.BackdropClip.Value.Width:-1;
+                        Require(cutBefore>0&&part.Visibility==Visibility.Hidden,"carry: the panel took its part of the bar");
+                        var page=new GlassWindow {Width=380,Height=300,ShowActivated=false};page.Surface.Child=new TextBlock {Text="페이지"};
+                        page.AdoptMorph(first.ReleaseMorph());page.MorphFixed=true;first.HideImmediately();
+                        Require(pill.BackdropClip.HasValue&&Math.Abs(pill.BackdropClip.Value.Width-cutBefore)<.5&&part.Visibility==Visibility.Hidden,"carry: the bar is not put back when the panel gives way to a page");
+                        page.ShowAt(screen.Bounds,work.Right-400,work.Bottom-48-12-300,380,300);page.Pop();
+                        await Task.Delay(40);
+                        Require(pill.BackdropClip.HasValue&&Math.Abs(pill.BackdropClip.Value.Width-cutBefore)<.5,"carry: the bar stays taken while the page opens");
+                        await Task.Delay(900);
+                        Require(pill.BackdropClip.HasValue&&part.Visibility==Visibility.Hidden,"carry: the bar stays taken while the page is open");
+                        page.Hide();await Task.Delay(900);
+                        Require(!page.IsVisible&&!pill.BackdropClip.HasValue&&part.Visibility==Visibility.Visible,"carry: the bar comes back when the page closes");
+                        report.Add("carry ok");
+                        first.Close();page.Close();pill.Close();backdrop.Close();first=null;page=null;pill=null;backdrop=null;
+                    }
                     AppLog.Json("fluid-expand-probe.json",new {passed=true,steps=report.ToArray()});
                     result=0;
                 }

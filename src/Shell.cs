@@ -444,7 +444,10 @@ namespace OneTaskBar
             CloseTrayOverflow();CloseDesktopOverview();
             Previews.Close();if(StartMenu!=null)StartMenu.HideImmediately();
             if(Finder!=null)Finder.HideImmediately();
-            if(Detail!=null){Detail.Close();Detail=null;}if(Center!=null)Center.Hide();if(Quick!=null)Quick.Hide();if(Drawer!=null)Drawer.HideImmediately();Detail=new DetailWindow(this,page);
+            if(Detail!=null){Detail.Close();Detail=null;}
+            // From quick settings the page takes over the part of the bar the panel came from, so the bar is not put back in between.
+            MorphPlan carry=null;if(Quick!=null&&Quick.IsVisible&&!Quick.IsDismissing){carry=Quick.ReleaseMorph();if(carry!=null)Quick.HideImmediately();}
+            if(Center!=null)Center.Hide();if(Quick!=null)Quick.Hide();if(Drawer!=null)Drawer.HideImmediately();Detail=new DetailWindow(this,page);Detail.AdoptMorph(carry);
             var screen=Forms.Screen.FromPoint(Forms.Cursor.Position);double scale=MonitorScale(screen,Detail),w=Math.Min(380,screen.Bounds.Width/scale-24),h=Math.Min(540,screen.Bounds.Height/scale-100);
             var position=DockGeometry.Popup(screen.Bounds,scale,w,h,DockGeometry.Edge);Detail.ShowAt(screen.Bounds,position.X,position.Y,w,h);Detail.Pop();Detail.Activate();
         }
