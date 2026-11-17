@@ -1,4 +1,4 @@
-# Shared handoff
+﻿# Shared handoff
 
 Checked: 2026-11-12, Asia/Seoul. Maintained by the active agent.
 
@@ -89,3 +89,9 @@ ight-light, opens ms-settings:nightlight; off by default, added through the togg
 - Option: PreferenceData.LiquidRefraction (default false), settings row under Liquid glass (UI 9.5+). RefractionGlass.cs draws notification banners from a one-time screen read with the Prism menu preset (bevel + lip bend along the edge normal, vibrance, tint, dark line, light-facing rim; blur 2 px, tint .5). It is a still, not a live refraction; only banners use it.
 - Checks: new banner-refraction-probe (Test-UI Notifications) checks the default, bevel/SDF math, banner capture, refracting state, stage frames, the bar glow (a pill window stands in for the dock), the panel flare; screenshots in .qa-data. All 36 probes passed individually; flakes: fluid-island once, settings-visibility 3 times then passed, desktop-overview/desktop-widgets/quick9/window-activation fail in Test-UI -Area All but pass alone, the A1Z8 build fails them the same way (A/B), so it is the busy desktop, not a regression.
 - Not verified on a device: the real dock glow and launch from the real dock, the real notification path, 143 Hz smoothness. The dock pieces are not visible in the fixture shell, so the dock glow was only seen with a stand-in pill.
+
+## Prism liquid glass overhaul (2026-11-17)
+- Liquid material now follows the Prism numbers: vibrance 1.35, flat tint with a top sheen (`LiquidGlass.cs`), blur 8/6; Fluid keeps its own tint at level 0.
+- Tried live GPU edge refraction (D2D DisplacementMap + a map drawn into a CompositionDrawingSurface). Windows.UI.Composition rejects the DisplacementMap effect at `CreateEffectFactory` (E_INVALIDARG, even with no properties; blur/border graphs are accepted). Removed; do not retry without a different host (own D3D swap chain or DirectComposition).
+- The refraction option still only affects notification banners (CPU path, `RefractionGlass.cs`). Not verified: real dock look, GPU cost of the new tint on a real device.
+- Checks run: Glass, Quick, Settings, Notifications, Dock areas passed. Not published.
