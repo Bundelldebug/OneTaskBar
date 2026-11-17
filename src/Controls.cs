@@ -314,6 +314,28 @@ namespace OneTaskBar
         static readonly DependencyProperty SurfaceFadeProperty=DependencyProperty.Register("SurfaceFade",typeof(double),typeof(GlassWindow),new PropertyMetadata(1.0,(d,e)=>{var window=(GlassWindow)d;if(window.Surface!=null)window.Surface.Opacity=(double)e.NewValue;Native.BlurOpacity(window,(double)e.NewValue);}));
         void ResetFade(){BeginAnimation(SurfaceFadeProperty,null);SetValue(SurfaceFadeProperty,1.0);Surface.Opacity=1;Native.BlurOpacity(this,1);}
         internal Rect? BackdropClip;
+        // The dock piece a Fluid panel unfolds from (device pixels), whether the piece stays and shrinks (quick settings,
+        // notifications) or is the panel while it is open (start, search). MorphFixed lets a fixture set these itself.
+        internal Native.RectI? MorphSource;internal bool MorphDetach,MorphFixed;internal GlassWindow MorphPiece;
+        // Clips a dock piece to part of itself (its content is cut to the same shape).
+        RectangleGeometry pieceClip;
+        internal void PieceShape(Rect? cut,double radius)
+        {
+            var host=Content as UIElement;if(host==null)return;
+            if(!cut.HasValue){host.Clip=null;return;}
+            if(pieceClip==null)pieceClip=new RectangleGeometry();
+            pieceClip.Rect=cut.Value;pieceClip.RadiusX=pieceClip.RadiusY=radius;
+            if(host.Clip!=pieceClip)host.Clip=pieceClip;
+        }
+        internal void Veil(bool on){Opacity=on?0:1;Native.BlurOpacity(this,on?0:1);}
+        void ResolveMorph()
+        {
+            if(MorphFixed)return;
+            MorphSource=null;MorphPiece=null;MorphDetach=false;
+            bool detach;var piece=DockHost.PieceFor(this,out detach);
+            if(piece==null)return;
+            MorphPiece=piece;MorphSource=piece.DockBounds;MorphDetach=detach;
+        }
         // While the panel is still a drop on a neck, the window must cover more than the backdrop does.
         internal Rect? RegionClip;
         internal Native.RectI? DockBounds;
@@ -353,8 +375,8 @@ namespace OneTaskBar
                 // The Fluid UI adds its light to every glass window: panels, the dock, the Now Bar, HUDs and banners. The opaque island has its own.
                 SyncFluidLight();
                 ApplyMaterial();if(Program.CaptureReview){ShowInTaskbar=true;var h=new WindowInteropHelper(this).Handle;Native.SetWindowLong(h,-20,(Native.GetWindowLong(h,-20)|0x40000)&~(0x80|0x08000000));}};
-            IsVisibleChanged+=(s,e)=> {if(!IsVisible){HiddenSince=DateTime.UtcNow;rimImage=null;}};
-            Closed+=(s,e)=> {closed=true;++motion;if(fluidLight!=null)fluidLight.Dispose();LauncherMotion.Cancel(TransitionContent);CompleteDismissal(false);Preferences.Changed-=ApplyMaterial;Preferences.AppearanceChanged-=ApplyAppearance;};
+            IsVisibleChanged+=(s,e)=> {if(!IsVisible){HiddenSince=DateTime.UtcNow;rimImage=null;if(bud!=null)bud.ReleasePiece();}};
+            Closed+=(s,e)=> {closed=true;++motion;if(bud!=null)bud.ReleasePiece();if(fluidLight!=null)fluidLight.Dispose();LauncherMotion.Cancel(TransitionContent);CompleteDismissal(false);Preferences.Changed-=ApplyMaterial;Preferences.AppearanceChanged-=ApplyAppearance;};
             PreviewKeyDown+=(s,e)=> { if(e.Key==Key.Escape&&!DragReorder.Active) {if(EscapeConsumed()){e.Handled=true;return;}var overview=this as DesktopOverview;var overflow=this as TrayOverflowWindow;if(overview!=null)overview.Dismiss();else if(overflow!=null)overflow.Dismiss();else Hide(); e.Handled=true; } };
         }
         void ApplyAppearance(){if(DockSurface||this is StartWindow)ApplyMaterial();}
@@ -491,7 +513,7 @@ namespace OneTaskBar
             if(TransitionContent==null)TransitionContent=Surface.Child as FrameworkElement;
             if(!Motion.Enabled){if(SmoothLauncher)LauncherMotion.Cancel(TransitionContent);return;}
             if(Fluid.Enabled&&!OpaqueSurface&&!DockSurface&&!(this is NowBar)&&!(this is DynamicIsland)&&!(this is NotificationBanner))Flare(Motion.Anchor(Surface,PopFromTop));
-            if(BudEligible){++motion;Surface.RenderTransform=Transform.Identity;Surface.Opacity=1;if(bud==null)bud=new FluidBud(this);bud.Open(Motion.Anchor(Surface,PopFromTop),PopFromTop);return;}
+            if(BudEligible){++motion;Surface.RenderTransform=Transform.Identity;Surface.Opacity=1;ResolveMorph();if(bud==null)bud=new FluidBud(this);bud.Open(Motion.Anchor(Surface,PopFromTop),PopFromTop);return;}
             if(StableSurface&&TransitionContent!=null){++motion;Surface.RenderTransform=Transform.Identity;Surface.Opacity=1;if(SmoothLauncher)LauncherMotion.Run(TransitionContent,true,PopFromTop,true);else Motion.Launcher(TransitionContent,true,PopFromTop);return;}
             if(Fluid.Enabled){++motion;Surface.Opacity=1;Motion.Drop(Surface,Motion.Anchor(Surface,PopFromTop),0);return;}
             ++motion;Surface.RenderTransformOrigin=new Point(.5,.5);var scale=new ScaleTransform(.94,.94);double offset=Math.Min(14,Math.Max(0,Surface.ActualHeight)*.025);var translate=new TranslateTransform(0,offset);var group=new TransformGroup();group.Children.Add(scale);group.Children.Add(translate);Surface.RenderTransform=group;

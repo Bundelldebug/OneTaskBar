@@ -137,6 +137,7 @@ namespace OneTaskBar
             if(args.Contains("--popup-probe"))return PopupChecks.Run();
             if(args.Contains("--banner-refraction-probe"))return BannerRefractionChecks.Run();
             if(args.Contains("--panel-refraction-probe"))return PanelRefractionChecks.Run();
+            if(args.Contains("--fluid-expand-probe"))return FluidExpandChecks.Run();
             if(args.Contains("--identity-package-probe"))return IdentityPackage.Probe();
             if(args.Contains("--dock-motion-probe"))return DockMotionChecks.Run();
             if(args.Contains("--dock-overflow-probe"))return DockOverflowChecks.Run();

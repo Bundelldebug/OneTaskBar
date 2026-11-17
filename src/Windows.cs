@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -434,6 +434,31 @@ namespace OneTaskBar
         static readonly System.Collections.Generic.List<DockHost> live=new System.Collections.Generic.List<DockHost>();
         // The screen edge of the visible bar on a monitor, in device pixels: its top when the panel opens above it, its
         // bottom when the panel opens below it. A Fluid drop starts right there, so it comes out of the bar, not over it.
+        // The dock piece a panel grows out of: the start button for the start menu, the status capsule for quick settings and
+        // notifications, and for search whichever piece the pointer is on. detach is true when the piece stays and shrinks.
+        internal static GlassWindow PieceFor(GlassWindow panel,out bool detach)
+        {
+            detach=false;
+            var handle=new WindowInteropHelper(panel).Handle;if(handle==IntPtr.Zero)return null;
+            var screen=Forms.Screen.FromHandle(handle).Bounds;
+            var cursor=Forms.Cursor.Position;
+            foreach(var dock in live)
+            {
+                if(dock.closed||dock.Screen.Bounds!=screen||DockGeometry.Vertical(dock.Edge))continue;
+                GlassWindow piece=null;
+                if(panel is StartWindow)piece=dock.Start;
+                else if(panel is QuickWindow||panel is NotificationWindow){piece=dock.Status;detach=true;}
+                else foreach(var candidate in new[]{dock.Start,dock.Apps,dock.Status})
+                {
+                    if(!candidate.DockBounds.HasValue)continue;
+                    var b=candidate.DockBounds.Value;
+                    if(cursor.X>=b.Left-4&&cursor.X<=b.Right+4&&cursor.Y>=b.Top-4&&cursor.Y<=b.Bottom+4){piece=candidate;detach=candidate==dock.Status;break;}
+                }
+                if(piece==null||!piece.IsVisible||!piece.DockBounds.HasValue||piece.Surface.ActualWidth<8||piece.Surface.ActualHeight<8)return null;
+                return piece;
+            }
+            return null;
+        }
         internal static int? BarEdge(System.Drawing.Rectangle screen,bool panelBelowBar)
         {
             foreach(var dock in live)

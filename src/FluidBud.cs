@@ -34,6 +34,13 @@ namespace OneTaskBar
         double fixedWidth,fixedHeight;
         Rect lastCut;
         bool roundedOnce;
+        // When the panel comes out of a dock piece, the first shape is that piece itself.
+        bool useSource,detach,veiled;
+        Native.RectI? source;
+        Rect srcRect;
+        GlassWindow piece;
+        double pieceOffset,lastPieceCut=-1;
+        readonly LinearGradientBrush pieceMask=new LinearGradientBrush {MappingMode=BrushMappingMode.Absolute,StartPoint=new Point(0,0),EndPoint=new Point(1,0)};
         internal FluidBud(GlassWindow owner)
         {
             window=owner;
@@ -66,6 +73,9 @@ namespace OneTaskBar
             closeSpan=Math.Max(.06,CloseTime*from/.54);
             Cancel();
             fromTop=top;
+            source=window.MorphSource;detach=window.MorphDetach;
+            if(piece!=window.MorphPiece)ReleasePiece();
+            piece=window.MorphPiece;
             // On the first open the window has just been shown and may not be laid out yet; without a size there is no
             // shape to animate, which is why a first click used to show no motion at all.
             if(window.Surface.ActualWidth<2||window.Surface.ActualHeight<2)window.UpdateLayout();
@@ -115,7 +125,7 @@ namespace OneTaskBar
         // only the drop passes through it.
         void GrowToBar()
         {
-            extra=0;grown=false;
+            extra=0;grown=false;useSource=false;
             var handle=new WindowInteropHelper(window).Handle;
             Native.RectI rect;
             if(handle==IntPtr.Zero||!Native.GetWindowRect(handle,out rect))return;
@@ -125,8 +135,15 @@ namespace OneTaskBar
             int? bar=DockHost.BarEdge(monitor.Bounds,fromTop);
             int edge=bar??(fromTop?monitor.WorkingArea.Top:monitor.WorkingArea.Bottom);
             double gap=(fromTop?rect.Top-edge:edge-rect.Bottom)/scale;
+            useSource=false;
+            if(source.HasValue&&piece!=null)
+            {
+                // The window has to reach the far side of the piece for the shape to start inside it.
+                double reach=(fromTop?rect.Top-source.Value.Top:source.Value.Bottom-rect.Bottom)/scale+2;
+                if(reach>=6){gap=reach;useSource=true;}
+            }
             if(gap<6)return;
-            extra=Math.Min(140,gap);
+            extra=Math.Min(useSource?220:140,gap);
             int pixels=(int)Math.Round(extra*scale);
             original=rect;
             var surface=window.Surface;
@@ -138,6 +155,19 @@ namespace OneTaskBar
             surface.Margin=new Thickness(0);
             Native.SetWindowPos(handle,IntPtr.Zero,rect.Left,fromTop?rect.Top-pixels:rect.Top,rect.Right-rect.Left,rect.Bottom-rect.Top+pixels,0x14);
             grown=true;
+            if(useSource)
+            {
+                double windowTop=fromTop?rect.Top-pixels:rect.Top,total=fixedHeight+extra;
+                double sx=(source.Value.Left-rect.Left)/scale,sw=(source.Value.Right-source.Value.Left)/scale,sy=(source.Value.Top-windowTop)/scale,sh=(source.Value.Bottom-source.Value.Top)/scale;
+                srcRect=new Rect(sx,fromTop?total-(sy+sh):sy,sw,sh);
+                srcRect.Intersect(new Rect(0,0,fixedWidth,total));
+                if(srcRect.IsEmpty||srcRect.Width<6||srcRect.Height<6)useSource=false;
+            }
+            if(useSource)
+            {
+                var inside=piece.Surface.Child as FrameworkElement;pieceOffset=0;
+                try{if(inside!=null&&inside.IsLoaded)pieceOffset=inside.TranslatePoint(new Point(0,0),piece.Surface).X;}catch(InvalidOperationException){pieceOffset=0;}
+            }
         }
         void ShrinkBack()
         {
@@ -166,6 +196,7 @@ namespace OneTaskBar
                 return;
             }
             lastStamp=0;
+            if(useSource&&!closing)ApplyPiece(1);
             var done=finished;
             bool wasClosing=closing;
             finished=null;
@@ -193,6 +224,18 @@ namespace OneTaskBar
         {
             lastAt=at;
             lastStamp=Stopwatch.GetTimestamp();
+            if(useSource)
+            {
+                // The piece itself is the first shape: it swells upward on one spring while the other edges follow, a piece that
+                // stays behind is stretched toward the panel on a neck that pinches off, and the picture comes in behind a wavefront.
+                double a=Spring(0,.34,at,.86),d=Spring(.03,.5,at,.84);
+                double neck=detach?1-Smooth(.16,.42,at):0;
+                double glow=Smooth(0,.05,at)*(1-Smooth(.08,.3,at))*.7;
+                double front=at<.24?-1:Math.Min(1,(at-.24)/.24);
+                Apply(a,d,1,neck,glow,front,front<0?0:1);
+                ApplyPiece(Math.Max(0,Math.Min(1,a)));
+                return;
+            }
             double drop=Smooth(0,.12,at);
             double across=Spring(.1,.38,at,.86),down=Spring(.2,.6,at,.84);
             double pinch=1-Smooth(.12,.3,at);
@@ -209,42 +252,50 @@ namespace OneTaskBar
             double width=grown?fixedWidth:window.Surface.ActualWidth,height=grown?fixedHeight:window.Surface.ActualHeight;
             if(width<2||height<2)return;
             double total=height+extra;
+            bool fromPiece=useSource&&grown;
             double orb=Math.Min(Orb,Math.Min(width,height));
             double cx=Math.Max(orb/2,Math.Min(width-orb/2,anchor*width));
             across=Math.Max(0,Math.Min(1.06,across));
             down=Math.Max(0,Math.Min(1.06,down));
             // Before it widens the drop forms at the bar and is pulled up on its neck, so it reads as a drop first.
             double size=orb*(.35+.65*formed),pull=orb*.4*formed*(1-Smooth(0,.45,Math.Max(across,down)));
+            if(fromPiece){cx=Math.Max(srcRect.Left,Math.Min(srcRect.Right,srcRect.Left+srcRect.Width/2));}
             // The drop sits on the bar's edge and moves away from it, toward where the panel opens.
             double dropTop=total-size-pull;
             double left=Mix(cx-size/2,0,across),right=Mix(cx+size/2,width,across);
             double top=Mix(dropTop,0,down),bottom=Mix(dropTop+size,height,down);
+            if(fromPiece)
+            {
+                left=Mix(srcRect.Left,0,across);right=Mix(srcRect.Right,width,across);
+                top=Mix(srcRect.Top,0,down);bottom=Mix(srcRect.Bottom,height,down);
+            }
             var shape=new Rect(left,top,Math.Max(2,right-left),Math.Max(2,bottom-top));
             shape.Intersect(new Rect(0,0,width,total));
             if(shape.IsEmpty)return;
-            double radius=Math.Min(window.Radius,Math.Min(shape.Width,shape.Height)/2);
+            double radius=Math.Min(fromPiece?Mix(Math.Min(srcRect.Width,srcRect.Height)/2,window.Radius,Math.Min(1,across)):window.Radius,Math.Min(shape.Width,shape.Height)/2);
+            double neckBase=fromPiece?srcRect.Top+srcRect.Height*.4:total;
             body.Rect=shape;
             body.RadiusX=body.RadiusY=radius;
             var drawn=shape;
             Rect region=shape;
             // The neck holds the drop to the bar and pinches off as the drop swells.
             while(outline.Children.Count>1)outline.Children.RemoveAt(1);
-            if(pinch>.04&&shape.Bottom<total-1)
+            if(pinch>.04&&shape.Bottom<neckBase-1)
             {
                 double topHalf=Math.Min(shape.Width*.2,7)*pinch,baseHalf=Math.Min(shape.Width*.3,13)*pinch;
-                double y0=shape.Bottom-radius*.5,mid=(y0+total)/2;
+                double y0=shape.Bottom-radius*.5,mid=(y0+neckBase)/2;
                 var neck=new StreamGeometry();
                 using(var dc=neck.Open())
                 {
                     dc.BeginFigure(new Point(cx-topHalf,y0),true,true);
                     dc.LineTo(new Point(cx+topHalf,y0),true,false);
-                    dc.BezierTo(new Point(cx+topHalf*.5,mid),new Point(cx+baseHalf*.4,mid),new Point(cx+baseHalf,total),true,false);
-                    dc.LineTo(new Point(cx-baseHalf,total),true,false);
+                    dc.BezierTo(new Point(cx+topHalf*.5,mid),new Point(cx+baseHalf*.4,mid),new Point(cx+baseHalf,neckBase),true,false);
+                    dc.LineTo(new Point(cx-baseHalf,neckBase),true,false);
                     dc.BezierTo(new Point(cx-baseHalf*.4,mid),new Point(cx-topHalf*.5,mid),new Point(cx-topHalf,y0),true,false);
                 }
                 neck.Freeze();
                 outline.Children.Add(neck);
-                region=Rect.Union(region,new Rect(cx-baseHalf,y0,baseHalf*2,total-y0));
+                region=Rect.Union(region,new Rect(cx-baseHalf,y0,baseHalf*2,neckBase-y0));
             }
             if(flare!=null)flare.Set(drawn,fromTop,height,wave,white,radius);
             if(fromTop)
@@ -286,6 +337,51 @@ namespace OneTaskBar
             revealBehind.Offset=Math.Max(0,Math.Min(1,front-.28));
             revealAhead.Offset=Math.Max(0,Math.Min(1,front));
             if(masked==null){inside.OpacityMask=reveal;masked=inside;}
+        }
+
+        // The piece the panel came from: a piece that is the panel while it is open is hidden; one that stays gives up
+        // part of its width, folding from the left, and takes it back as the panel goes.
+        void ApplyPiece(double k)
+        {
+            if(piece==null)return;
+            if(!detach){if(!veiled){veiled=true;piece.Veil(true);}return;}
+            double width=piece.Surface.ActualWidth,height=piece.Surface.ActualHeight;
+            if(width<8||height<8)return;
+            if(k<.003){if(lastPieceCut>=0)ClearPiece();return;}
+            double target=Math.Min(width*.85,Math.Max(height*1.8,width*.56));
+            double shown=width-(width-target)*k;
+            var cut=new Rect(width-shown,0,shown,height);
+            piece.BackdropClip=cut;piece.RegionClip=cut;
+            double radius=Math.Min(piece.Radius,Math.Min(cut.Width,cut.Height)/2);
+            piece.PieceShape(cut,radius);
+            var inside=piece.Surface.Child;
+            if(inside!=null)
+            {
+                // The left edge of what is left fades out, so a piece of text or an icon is not cut in half.
+                pieceMask.MappingMode=BrushMappingMode.Absolute;
+                double left=cut.Left-pieceOffset;
+                pieceMask.StartPoint=new Point(left,0);pieceMask.EndPoint=new Point(left+Math.Min(30,cut.Width*.4),0);
+                if(pieceMask.GradientStops.Count==0){pieceMask.GradientStops.Add(new GradientStop(Colors.Transparent,0));pieceMask.GradientStops.Add(new GradientStop(Colors.Black,1));}
+                inside.OpacityMask=pieceMask;
+            }
+            if(Math.Abs(lastPieceCut-Math.Round(cut.Left))>=1||lastPieceCut<0){lastPieceCut=Math.Round(cut.Left);Native.Round(piece,piece.Radius);}
+        }
+        void ClearPiece()
+        {
+            lastPieceCut=-1;
+            if(piece==null)return;
+            piece.BackdropClip=null;piece.RegionClip=null;
+            piece.PieceShape(null,0);
+            var inside=piece.Surface.Child;if(inside!=null)inside.OpacityMask=null;
+            Native.Round(piece,piece.Radius);
+        }
+        // The piece goes back to its own shape (the panel was hidden or closed).
+        internal void ReleasePiece()
+        {
+            if(piece==null)return;
+            ClearPiece();
+            if(veiled){veiled=false;piece.Veil(false);}
+            piece=null;
         }
 
         void Stop()
