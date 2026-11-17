@@ -104,7 +104,7 @@ namespace OneTaskBar
             var output=new byte[w*h*4];
             double halfWidth=w/2.0,halfHeight=h/2.0,refr=Refraction*scale,edge=Edge*scale,outerW=OuterWidth*scale,outerR=OuterRefraction*scale;
             // Prism's high level blur (2) with a tint between its high and medium steps, so the bend shows but light text stays readable.
-            double tintR=dark?28:250,tintG=dark?28:250,tintB=dark?30:252,tintA=dark?.5:.5;
+            double tintR=dark?28:250,tintG=dark?28:250,tintB=dark?30:252,tintA=rim?(dark?.62:.5):.5;
             double edgeDark=dark?.32*.4:.32;
             for(int y=0;y<h;y++)
             for(int x=0;x<w;x++)
@@ -114,7 +114,7 @@ namespace OneTaskBar
                 int o=(y*w+x)*4;
                 if(coverage<=0)continue;
                 double depth=Math.Max(-d,0),lip=1-Smooth(0,outerW,depth);
-                double fade=rim?1-Smooth(edge*.4,edge*.95,depth):1;
+                double fade=rim?1-Smooth(edge*.12,edge*.62,depth):1;
                 if(fade<=0)continue;
                 coverage*=fade;
                 double bend=refr*Bevel(depth,edge)+outerR*Bevel(depth,outerW)*lip;

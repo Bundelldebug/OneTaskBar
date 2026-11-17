@@ -442,7 +442,7 @@ namespace OneTaskBar
                     double scale=Math.Max(96,Native.GetDpiForWindow(handle))/96.0;
                     var surface=new System.Drawing.Rectangle(rect.Left,rect.Top,rect.Right-rect.Left,rect.Bottom-rect.Top);
                     System.Drawing.Rectangle area;
-                    using(var backdrop=RefractionGlass.Capture(surface,(int)Math.Ceiling(RefractionGlass.Margin*scale),out area))rimImage=RefractionGlass.Render(backdrop,area,surface,Radius*scale,scale,Dark,true);
+                    using(var backdrop=RefractionGlass.Capture(surface,(int)Math.Ceiling(RefractionGlass.Margin*scale),out area))rimImage=RefractionGlass.Render(backdrop,area,surface,Radius*scale,scale,PanelMaterial.ReadablePanel(this)||PanelMaterial.NotificationPopup(this)||Dark,true);
                 }
             }
             catch(Exception error){AppLog.Once("panel-refraction",error.GetType().Name);}
