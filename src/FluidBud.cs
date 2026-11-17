@@ -7,6 +7,17 @@ using System.Windows.Media;
 
 namespace OneTaskBar
 {
+    // The part of the dock a Fluid panel comes out of: its first shape (device pixels), what disappears with it, what moves
+    // to close the gap and which side of the piece gives up the width.
+    internal sealed class MorphPlan
+    {
+        internal GlassWindow Piece;
+        internal Native.RectI Source;
+        internal System.Windows.FrameworkElement[] Hide=new System.Windows.FrameworkElement[0],Shift=new System.Windows.FrameworkElement[0];
+        internal int Cut;
+        internal bool Neck;
+        internal double CutWidth;
+    }
     // The Fluid UI's arrival, step by step after the reference recording:
     //   1. a white drop forms on the bar's edge and swells into a glass drop, held to the bar by a thin neck;
     //   2. the drop widens into an empty glass pill while the neck pinches off;
@@ -39,8 +50,10 @@ namespace OneTaskBar
         Native.RectI? source;
         Rect srcRect;
         GlassWindow piece;
-        double pieceOffset,lastPieceCut=-1;
-        readonly LinearGradientBrush pieceMask=new LinearGradientBrush {MappingMode=BrushMappingMode.Absolute,StartPoint=new Point(0,0),EndPoint=new Point(1,0)};
+        MorphPlan plan;
+        double lastPieceCut=-1;
+        readonly System.Collections.Generic.Dictionary<UIElement,Transform> shifted=new System.Collections.Generic.Dictionary<UIElement,Transform>();
+        readonly TranslateTransform shift=new TranslateTransform();
         internal FluidBud(GlassWindow owner)
         {
             window=owner;
@@ -73,9 +86,9 @@ namespace OneTaskBar
             closeSpan=Math.Max(.06,CloseTime*from/.54);
             Cancel();
             fromTop=top;
-            source=window.MorphSource;detach=window.MorphDetach;
-            if(piece!=window.MorphPiece)ReleasePiece();
-            piece=window.MorphPiece;
+            if(plan!=window.Morph)ReleasePiece();
+            plan=window.Morph;
+            source=plan!=null?(Native.RectI?)plan.Source:null;detach=plan!=null&&plan.Neck;piece=plan!=null?plan.Piece:null;
             // On the first open the window has just been shown and may not be laid out yet; without a size there is no
             // shape to animate, which is why a first click used to show no motion at all.
             if(window.Surface.ActualWidth<2||window.Surface.ActualHeight<2)window.UpdateLayout();
@@ -162,11 +175,6 @@ namespace OneTaskBar
                 srcRect=new Rect(sx,fromTop?total-(sy+sh):sy,sw,sh);
                 srcRect.Intersect(new Rect(0,0,fixedWidth,total));
                 if(srcRect.IsEmpty||srcRect.Width<6||srcRect.Height<6)useSource=false;
-            }
-            if(useSource)
-            {
-                var inside=piece.Surface.Child as FrameworkElement;pieceOffset=0;
-                try{if(inside!=null&&inside.IsLoaded)pieceOffset=inside.TranslatePoint(new Point(0,0),piece.Surface).X;}catch(InvalidOperationException){pieceOffset=0;}
             }
         }
         void ShrinkBack()
@@ -339,49 +347,61 @@ namespace OneTaskBar
             if(masked==null){inside.OpacityMask=reveal;masked=inside;}
         }
 
-        // The piece the panel came from: a piece that is the panel while it is open is hidden; one that stays gives up
-        // part of its width, folding from the left, and takes it back as the panel goes.
+        // The part of the dock the panel came from goes away with it: the start button is hidden whole, any other part is
+        // hidden by itself, what stood next to it moves over and the capsule gives up that width from its own side.
         void ApplyPiece(double k)
         {
-            if(piece==null)return;
-            if(!detach){if(!veiled){veiled=true;piece.Veil(true);}return;}
+            try{ApplyPart(k);}
+            catch(Exception error)
+            {
+                AppLog.Once("fluid-morph-piece",error.GetType().Name+": "+error.Message);
+                try{ReleasePiece();}catch(Exception){}
+            }
+        }
+        void ApplyPart(double k)
+        {
+            if(piece==null||plan==null)return;
+            if(plan.Hide.Length==0){if(!veiled){veiled=true;piece.Veil(true);}return;}
+            if(!veiled){veiled=true;foreach(var part in plan.Hide)part.Visibility=Visibility.Hidden;}
+            if(plan.Cut==0)return;
             double width=piece.Surface.ActualWidth,height=piece.Surface.ActualHeight;
             if(width<8||height<8)return;
-            if(k<.003){if(lastPieceCut>=0)ClearPiece();return;}
-            double target=Math.Min(width*.85,Math.Max(height*1.8,width*.56));
-            double shown=width-(width-target)*k;
-            var cut=new Rect(width-shown,0,shown,height);
+            if(k<.003){if(lastPieceCut>=0)ClearCut();return;}
+            double gap=Math.Min(width*.7,plan.CutWidth)*k;
+            var cut=plan.Cut<0?new Rect(gap,0,width-gap,height):new Rect(0,0,width-gap,height);
             piece.BackdropClip=cut;piece.RegionClip=cut;
-            double radius=Math.Min(piece.Radius,Math.Min(cut.Width,cut.Height)/2);
-            piece.PieceShape(cut,radius);
-            var inside=piece.Surface.Child;
-            if(inside!=null)
+            piece.PieceShape(cut,Math.Min(piece.Radius,Math.Min(cut.Width,cut.Height)/2));
+            if(plan.Cut<0)
             {
-                // The left edge of what is left fades out, so a piece of text or an icon is not cut in half.
-                pieceMask.MappingMode=BrushMappingMode.Absolute;
-                double left=cut.Left-pieceOffset;
-                pieceMask.StartPoint=new Point(left,0);pieceMask.EndPoint=new Point(left+Math.Min(30,cut.Width*.4),0);
-                if(pieceMask.GradientStops.Count==0){pieceMask.GradientStops.Add(new GradientStop(Colors.Transparent,0));pieceMask.GradientStops.Add(new GradientStop(Colors.Black,1));}
-                inside.OpacityMask=pieceMask;
+                shift.X=gap;
+                foreach(var part in plan.Shift){if(!shifted.ContainsKey(part)){shifted[part]=part.RenderTransform;part.RenderTransform=shift;}}
             }
-            if(Math.Abs(lastPieceCut-Math.Round(cut.Left))>=1||lastPieceCut<0){lastPieceCut=Math.Round(cut.Left);Native.Round(piece,piece.Radius);}
+            double key=Math.Round(gap*(plan.Cut<0?-1:1));
+            if(key!=lastPieceCut){lastPieceCut=key;Native.Round(piece,piece.Radius);}
         }
-        void ClearPiece()
+        void ClearCut()
         {
             lastPieceCut=-1;
             if(piece==null)return;
             piece.BackdropClip=null;piece.RegionClip=null;
             piece.PieceShape(null,0);
-            var inside=piece.Surface.Child;if(inside!=null)inside.OpacityMask=null;
+            shift.X=0;
+            foreach(var pair in shifted)pair.Key.RenderTransform=pair.Value;
+            shifted.Clear();
             Native.Round(piece,piece.Radius);
         }
-        // The piece goes back to its own shape (the panel was hidden or closed).
+        // The dock goes back to its own shape (the panel was hidden or closed).
         internal void ReleasePiece()
         {
-            if(piece==null)return;
-            ClearPiece();
-            if(veiled){veiled=false;piece.Veil(false);}
-            piece=null;
+            if(piece==null){plan=null;return;}
+            ClearCut();
+            if(veiled)
+            {
+                veiled=false;
+                if(plan!=null&&plan.Hide.Length>0)foreach(var part in plan.Hide)part.Visibility=Visibility.Visible;
+                else piece.Veil(false);
+            }
+            piece=null;plan=null;
         }
 
         void Stop()

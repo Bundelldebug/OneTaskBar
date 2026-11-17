@@ -434,30 +434,37 @@ namespace OneTaskBar
         static readonly System.Collections.Generic.List<DockHost> live=new System.Collections.Generic.List<DockHost>();
         // The screen edge of the visible bar on a monitor, in device pixels: its top when the panel opens above it, its
         // bottom when the panel opens below it. A Fluid drop starts right there, so it comes out of the bar, not over it.
-        // The dock piece a panel grows out of: the start button for the start menu, the status capsule for quick settings and
-        // notifications, and for search whichever piece the pointer is on. detach is true when the piece stays and shrinks.
-        internal static GlassWindow PieceFor(GlassWindow panel,out bool detach)
+        // What a Fluid panel unfolds from. The start menu comes out of the start button, search out of the search icon, quick
+        // settings out of the Wi-Fi and speaker icons and notifications out of the clock; only that part leaves the bar.
+        internal static MorphPlan PlanFor(GlassWindow panel)
         {
-            detach=false;
             var handle=new WindowInteropHelper(panel).Handle;if(handle==IntPtr.Zero)return null;
             var screen=Forms.Screen.FromHandle(handle).Bounds;
-            var cursor=Forms.Cursor.Position;
             foreach(var dock in live)
             {
                 if(dock.closed||dock.Screen.Bounds!=screen||DockGeometry.Vertical(dock.Edge))continue;
-                GlassWindow piece=null;
-                if(panel is StartWindow)piece=dock.Start;
-                else if(panel is QuickWindow||panel is NotificationWindow){piece=dock.Status;detach=true;}
-                else foreach(var candidate in new[]{dock.Start,dock.Apps,dock.Status})
-                {
-                    if(!candidate.DockBounds.HasValue)continue;
-                    var b=candidate.DockBounds.Value;
-                    if(cursor.X>=b.Left-4&&cursor.X<=b.Right+4&&cursor.Y>=b.Top-4&&cursor.Y<=b.Bottom+4){piece=candidate;detach=candidate==dock.Status;break;}
-                }
-                if(piece==null||!piece.IsVisible||!piece.DockBounds.HasValue||piece.Surface.ActualWidth<8||piece.Surface.ActualHeight<8)return null;
-                return piece;
+                if(panel is StartWindow)return dock.PlanPiece(dock.Start,null,0,false,null);
+                if(panel is QuickWindow)return dock.PlanPiece(dock.Status,dock.quickAccess,-1,true,new FrameworkElement[]{dock.trayAccess});
+                if(panel is NotificationWindow)return dock.PlanPiece(dock.Status,dock.clockAccess,1,true,null,dock.noticeDot);
+                if(panel is SearchWindow&&dock.ShowSearch)return dock.PlanPiece(dock.Apps,dock.SearchButton,0,false,null);
+                return null;
             }
             return null;
+        }
+        MorphPlan PlanPiece(GlassWindow piece,FrameworkElement part,int cut,bool neck,FrameworkElement[] shift,params FrameworkElement[] also)
+        {
+            if(!piece.IsVisible||!piece.DockBounds.HasValue||piece.Surface.ActualWidth<8||piece.Surface.ActualHeight<8)return null;
+            var plan=new MorphPlan {Piece=piece,Cut=cut,Neck=neck,Shift=shift??new FrameworkElement[0],Source=piece.DockBounds.Value};
+            if(part==null)return plan;
+            if(part.Visibility!=Visibility.Visible||part.ActualWidth<4||part.ActualHeight<4||PresentationSource.FromVisual(part)==null)return null;
+            var a=part.PointToScreen(new Point(0,0));var b=part.PointToScreen(new Point(part.ActualWidth,part.ActualHeight));
+            int left=(int)Math.Round(Math.Min(a.X,b.X)),right=(int)Math.Round(Math.Max(a.X,b.X)),top=(int)Math.Round(Math.Min(a.Y,b.Y)),bottom=(int)Math.Round(Math.Max(a.Y,b.Y));
+            int pad=(int)Math.Round(4*Scale);
+            // A part of the status capsule is as tall as the capsule; a button in the app strip keeps its own size.
+            plan.Source=piece==Status?new Native.RectI {Left=left-pad,Top=piece.DockBounds.Value.Top,Right=right+pad,Bottom=piece.DockBounds.Value.Bottom}:new Native.RectI {Left=left,Top=top,Right=right,Bottom=bottom};
+            plan.CutWidth=part.ActualWidth;
+            plan.Hide=new[]{part}.Concat(also.Where(x=>x!=null)).ToArray();
+            return plan;
         }
         internal static int? BarEdge(System.Drawing.Rectangle screen,bool panelBelowBar)
         {

@@ -314,9 +314,14 @@ namespace OneTaskBar
         static readonly DependencyProperty SurfaceFadeProperty=DependencyProperty.Register("SurfaceFade",typeof(double),typeof(GlassWindow),new PropertyMetadata(1.0,(d,e)=>{var window=(GlassWindow)d;if(window.Surface!=null)window.Surface.Opacity=(double)e.NewValue;Native.BlurOpacity(window,(double)e.NewValue);}));
         void ResetFade(){BeginAnimation(SurfaceFadeProperty,null);SetValue(SurfaceFadeProperty,1.0);Surface.Opacity=1;Native.BlurOpacity(this,1);}
         internal Rect? BackdropClip;
-        // The dock piece a Fluid panel unfolds from (device pixels), whether the piece stays and shrinks (quick settings,
-        // notifications) or is the panel while it is open (start, search). MorphFixed lets a fixture set these itself.
-        internal Native.RectI? MorphSource;internal bool MorphDetach,MorphFixed;internal GlassWindow MorphPiece;
+        // What a Fluid panel unfolds from (see MorphPlan); MorphFixed lets a fixture set it itself.
+        internal MorphPlan Morph;internal bool MorphFixed;
+        void ResolveMorph()
+        {
+            if(MorphFixed)return;
+            try{if(bud!=null)bud.ReleasePiece();Morph=DockHost.PlanFor(this);}
+            catch(Exception error){Morph=null;AppLog.Once("fluid-morph-plan",error.GetType().Name+": "+error.Message);}
+        }
         // Clips a dock piece to part of itself (its content is cut to the same shape).
         RectangleGeometry pieceClip;
         internal void PieceShape(Rect? cut,double radius)
@@ -328,14 +333,6 @@ namespace OneTaskBar
             if(host.Clip!=pieceClip)host.Clip=pieceClip;
         }
         internal void Veil(bool on){Opacity=on?0:1;Native.BlurOpacity(this,on?0:1);}
-        void ResolveMorph()
-        {
-            if(MorphFixed)return;
-            MorphSource=null;MorphPiece=null;MorphDetach=false;
-            bool detach;var piece=DockHost.PieceFor(this,out detach);
-            if(piece==null)return;
-            MorphPiece=piece;MorphSource=piece.DockBounds;MorphDetach=detach;
-        }
         // While the panel is still a drop on a neck, the window must cover more than the backdrop does.
         internal Rect? RegionClip;
         internal Native.RectI? DockBounds;

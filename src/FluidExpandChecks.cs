@@ -41,14 +41,14 @@ namespace OneTaskBar
                         for(int i=0;i<40;i++)group.Children.Add(new GeometryDrawing(i%2==0?Brushes.OrangeRed:Brushes.DeepSkyBlue,null,new RectangleGeometry(new Rect(i*20,0,20,700))));
                         backdrop=new Window {WindowStyle=WindowStyle.None,ResizeMode=ResizeMode.NoResize,ShowInTaskbar=false,Topmost=true,ShowActivated=false,Left=work.Right-460,Top=work.Bottom-560,Width=460,Height=560,Background=new DrawingBrush(group){Stretch=Stretch.None,TileMode=TileMode.None}};
                         backdrop.Show();                        pill=new GlassWindow {Radius=20,ShowActivated=false};
-                        var grid=new Grid();grid.Children.Add(new TextBlock {Text="상태 · 12:34 · 80%",Foreground=Brushes.White,FontSize=14,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(16,0,16,0)});
+                        var grid=new Grid();var label=new TextBlock {Text="상태",Foreground=Brushes.White,FontSize=14,HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(16,0,0,0)};var part=new TextBlock {Text="Wi-Fi 🔊",Foreground=Brushes.White,FontSize=14,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center};grid.Children.Add(label);grid.Children.Add(part);
                         pill.Surface.Child=grid;
                         pill.ShowAt(screen.Bounds,work.Right-380,work.Bottom-48,360,40);
                         await Task.Delay(200);
                         Native.RectI rect;Native.GetWindowRect(new System.Windows.Interop.WindowInteropHelper(pill).Handle,out rect);
                         panel=new GlassWindow {Width=380,Height=300,ShowActivated=false};
                         panel.Surface.Child=new TextBlock {Text="패널",Foreground=Brushes.White,Margin=new Thickness(24),FontSize=18};
-                        panel.MorphFixed=true;panel.MorphSource=rect;panel.MorphPiece=pill;panel.MorphDetach=detach;
+                        panel.MorphFixed=true;panel.Morph=detach?new MorphPlan {Piece=pill,Source=rect,Neck=true,Cut=-1,CutWidth=120,Hide=new FrameworkElement[]{part},Shift=new FrameworkElement[]{label}}:new MorphPlan {Piece=pill,Source=rect};
                         panel.ShowAt(screen.Bounds,work.Right-400,work.Bottom-48-12-300,380,300);
                         panel.Pop();
                         Require(panel.BudActive,name+": the panel opens through the morph");
@@ -62,7 +62,7 @@ namespace OneTaskBar
                         }
                         await Task.Delay(500);
                         Require(!panel.BudActive&&!panel.BackdropClip.HasValue,name+": the unfold ends as the plain panel");
-                        if(detach)Require(pill.BackdropClip.HasValue&&pill.BackdropClip.Value.Width<pill.Surface.ActualWidth-20&&pill.Opacity>.99,name+": the piece that stays has shrunk: "+(pill.BackdropClip.HasValue?pill.BackdropClip.Value.Width.ToString("0"):"none"));
+                        if(detach)Require(pill.BackdropClip.HasValue&&pill.BackdropClip.Value.Width<pill.Surface.ActualWidth-20&&pill.Opacity>.99&&part.Visibility==Visibility.Hidden,name+": the piece that stays has shrunk: "+(pill.BackdropClip.HasValue?pill.BackdropClip.Value.Width.ToString("0"):"none"));
                         else Require(pill.Opacity<.01,name+": the piece that became the panel is hidden");
                         Shot(area,Path.Combine(AppLog.Data,"expand-"+name+"-open.png"));
                         panel.Hide();
@@ -73,7 +73,7 @@ namespace OneTaskBar
                         }
                         await Task.Delay(500);
                         Require(!panel.IsVisible,name+": the panel is hidden after it folds back");
-                        Require(pill.Opacity>.99&&!pill.BackdropClip.HasValue,name+": the piece is whole again");
+                        Require(pill.Opacity>.99&&!pill.BackdropClip.HasValue&&part.Visibility==Visibility.Visible,name+": the piece is whole again");
                         report.Add(name+" ok");
                         panel.Close();pill.Close();backdrop.Close();panel=null;pill=null;backdrop=null;
                         await Task.Delay(200);
