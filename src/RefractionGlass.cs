@@ -95,7 +95,8 @@ namespace OneTaskBar
         }
         static int Index(int along,int line,int width,bool horizontal){return horizontal?line*width+along:along*width+line;}
         // Draws the glass. width/height/radius are the surface in device pixels; scale converts dp to pixels.
-        internal static BitmapSource Render(Bitmap backdrop,Rectangle area,Rectangle surface,double radius,double scale,bool dark)
+        // rim: only the edge band is drawn and it fades out inward, to lie over a live blur that fills the middle.
+        internal static BitmapSource Render(Bitmap backdrop,Rectangle area,Rectangle surface,double radius,double scale,bool dark,bool rim=false)
         {
             if(backdrop==null||surface.Width<8||surface.Height<8)return null;
             int w=surface.Width,h=surface.Height,aw=backdrop.Width,ah=backdrop.Height;
@@ -113,6 +114,9 @@ namespace OneTaskBar
                 int o=(y*w+x)*4;
                 if(coverage<=0)continue;
                 double depth=Math.Max(-d,0),lip=1-Smooth(0,outerW,depth);
+                double fade=rim?1-Smooth(edge*.4,edge*.95,depth):1;
+                if(fade<=0)continue;
+                coverage*=fade;
                 double bend=refr*Bevel(depth,edge)+outerR*Bevel(depth,outerW)*lip;
                 double sx=surface.X+x+.5+nx*bend-area.X,sy=surface.Y+y+.5+ny*bend-area.Y;
                 double fx=Clamp(sx-.5,0,aw-1),fy=Clamp(sy-.5,0,ah-1);

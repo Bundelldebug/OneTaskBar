@@ -353,7 +353,7 @@ namespace OneTaskBar
                 // The Fluid UI adds its light to every glass window: panels, the dock, the Now Bar, HUDs and banners. The opaque island has its own.
                 SyncFluidLight();
                 ApplyMaterial();if(Program.CaptureReview){ShowInTaskbar=true;var h=new WindowInteropHelper(this).Handle;Native.SetWindowLong(h,-20,(Native.GetWindowLong(h,-20)|0x40000)&~(0x80|0x08000000));}};
-            IsVisibleChanged+=(s,e)=> {if(!IsVisible)HiddenSince=DateTime.UtcNow;;};
+            IsVisibleChanged+=(s,e)=> {if(!IsVisible){HiddenSince=DateTime.UtcNow;rimImage=null;}};
             Closed+=(s,e)=> {closed=true;++motion;if(fluidLight!=null)fluidLight.Dispose();LauncherMotion.Cancel(TransitionContent);CompleteDismissal(false);Preferences.Changed-=ApplyMaterial;Preferences.AppearanceChanged-=ApplyAppearance;};
             PreviewKeyDown+=(s,e)=> { if(e.Key==Key.Escape&&!DragReorder.Active) {if(EscapeConsumed()){e.Handled=true;return;}var overview=this as DesktopOverview;var overflow=this as TrayOverflowWindow;if(overview!=null)overview.Dismiss();else if(overflow!=null)overflow.Dismiss();else Hide(); e.Handled=true; } };
         }
@@ -423,7 +423,38 @@ namespace OneTaskBar
             }
             if(tunedStart)Surface.Background=SurfaceMaterial.Tint(false,!Preferences.Current.Blur||!HasBlur);
             if(liquid&&LiquidGlass.Enabled&&!(this is NowBar)&&!DockSurface){Surface.Background=LiquidGlass.Tint(panel||popup||Dark,LiquidLevel);LiquidReadability.Watch(this,panel||popup||Dark);}else LiquidReadability.Release(this);
+            if(liquid&&rimImage!=null&&RimEligible&&Surface.Background!=null)Surface.Background=WithRim(Surface.Background,rimImage);
             if(!OpaqueSurface&&!(this is NowBar)&&!DockSurface)PanelMaterial.RefreshCards(Surface);
+        }
+        // With the refraction option on, the edge of a panel bends what is behind it. The band is read from the screen
+        // just before the panel appears and laid over the live blur, so only the rim is a still.
+        System.Windows.Media.Imaging.BitmapSource rimImage;
+        internal bool RimRefracting {get{return rimImage!=null;}}
+        bool RimEligible {get{return RefractionGlass.Enabled&&!DockSurface&&!OpaqueSurface&&!(this is NowBar)&&!(this is HudWindow)&&!(this is NotificationBanner)&&!(this is NotificationWindow)&&!(this is DynamicIsland)&&BackdropClip==null&&RegionClip==null;}}
+        void PrepareRim()
+        {
+            var before=rimImage;rimImage=null;
+            try
+            {
+                var handle=new WindowInteropHelper(this).Handle;Native.RectI rect;
+                if(RimEligible&&handle!=IntPtr.Zero&&Native.GetWindowRect(handle,out rect)&&rect.Right-rect.Left>=40&&rect.Bottom-rect.Top>=40&&(long)(rect.Right-rect.Left)*(rect.Bottom-rect.Top)<=1500000)
+                {
+                    double scale=Math.Max(96,Native.GetDpiForWindow(handle))/96.0;
+                    var surface=new System.Drawing.Rectangle(rect.Left,rect.Top,rect.Right-rect.Left,rect.Bottom-rect.Top);
+                    System.Drawing.Rectangle area;
+                    using(var backdrop=RefractionGlass.Capture(surface,(int)Math.Ceiling(RefractionGlass.Margin*scale),out area))rimImage=RefractionGlass.Render(backdrop,area,surface,Radius*scale,scale,Dark,true);
+                }
+            }
+            catch(Exception error){AppLog.Once("panel-refraction",error.GetType().Name);}
+            if(before!=null||rimImage!=null)ApplyMaterial();
+        }
+        static Brush WithRim(Brush tint,System.Windows.Media.Imaging.BitmapSource rim)
+        {
+            var unit=new Rect(0,0,1,1);var group=new DrawingGroup();
+            group.Children.Add(new GeometryDrawing(tint,null,new RectangleGeometry(unit)));
+            group.Children.Add(new ImageDrawing(rim,unit));
+            var brush=new DrawingBrush(group){Stretch=Stretch.Fill,Viewbox=unit,ViewboxUnits=BrushMappingMode.Absolute};
+            return brush;
         }
         internal virtual void RefreshGlassMaterial(){ApplyMaterial();if(DockSurface)Glass95.DockInk(Surface);else Glass95.RefreshColors(Surface);}
         internal void MoveGlassHighlight(Point point)
@@ -444,6 +475,7 @@ namespace OneTaskBar
         }
         public new void Show()
         {
+            if(!IsVisible)PrepareRim();
             if(bud!=null)bud.Cancel();
             bool resume=StableSurface&&!UnifiedFade&&IsVisible&&hiding;++motion;hiding=false;CompleteDismissal(false);if(UnifiedFade)ResetFade();Surface.IsHitTestVisible=true;Surface.BeginAnimation(UIElement.OpacityProperty,null);Surface.Opacity=1;Surface.RenderTransform=Transform.Identity;
             if(StableSurface&&TransitionContent!=null){if(resume&&Motion.Enabled){if(SmoothLauncher)LauncherMotion.Run(TransitionContent,true,PopFromTop,true);else Motion.Launcher(TransitionContent,true,PopFromTop);}else{if(SmoothLauncher)LauncherMotion.Cancel(TransitionContent);TransitionContent.BeginAnimation(OpacityProperty,null);TransitionContent.Opacity=1;TransitionContent.RenderTransform=Transform.Identity;}}

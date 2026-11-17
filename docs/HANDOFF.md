@@ -95,3 +95,9 @@ ight-light, opens ms-settings:nightlight; off by default, added through the togg
 - Tried live GPU edge refraction (D2D DisplacementMap + a map drawn into a CompositionDrawingSurface). Windows.UI.Composition rejects the DisplacementMap effect at `CreateEffectFactory` (E_INVALIDARG, even with no properties; blur/border graphs are accepted). Removed; do not retry without a different host (own D3D swap chain or DirectComposition).
 - The refraction option still only affects notification banners (CPU path, `RefractionGlass.cs`). Not verified: real dock look, GPU cost of the new tint on a real device.
 - Checks run: Glass, Quick, Settings, Notifications, Dock areas passed. Not published.
+
+### Refraction on every liquid panel (2026-11-17)
+- The compositor cannot displace, so panels (non-dock `GlassWindow`s) get a still rim: `GlassWindow.PrepareRim` reads the edge band from the screen just before `Show()` and `RefractionGlass.Render(...,rim:true)` draws it, fading inward over the live blur; `WithRim` lays it over the tint in `ApplyMaterial`.
+- Excluded: dock pieces, Now Bar, HUD, island, notification center, windows with `BackdropClip`/`RegionClip`, and panels over 1.5M px. Banners keep their full still.
+- Known limits: the rim is a still, so it goes stale if the desktop behind moves while the panel stays open; a window shown before it is placed gets the rim for its old spot. Show cost ~130 ms for a 380x240 panel.
+- Probe: `panel-refraction-probe` (Notifications area). Areas Glass, Quick, Settings, Notifications, Dock, Launcher, Media passed. Real dock/panels on the owner's screen not looked at.
