@@ -396,7 +396,7 @@ namespace OneTaskBar
                 else glassEdge=null;
                 Surface.Background=custom?DockAppearance.Background:useBlur?LightPanel.DockGlass:Dark?Paint.Brush("#FF29302D"):LightPanel.DockSolid;
                 if(tuned)Surface.Background=SurfaceMaterial.Tint(true,!Preferences.Current.Blur||!HasBlur);
-                if(LiquidGlass.Enabled&&liquidDock)Surface.Background=LiquidGlass.Tint(Dark);
+                if(LiquidGlass.Enabled&&liquidDock){Surface.Background=LiquidGlass.Tint(Dark);ApplyRim();}
                 Surface.BorderBrush=custom?Glass95.Enabled&&!DockAppearance.IconsOnly?Glass95.Rim:Brushes.Transparent:glassEdge??(Brush)Brushes.Transparent;
                 Surface.BorderThickness=new Thickness(custom&&Glass95.Enabled&&!DockAppearance.IconsOnly?.7:0);
                 return;
@@ -408,9 +408,9 @@ namespace OneTaskBar
             Native.SurfaceBlur(this,LiquidGlass.Radius(tunedStart&&enabled?SurfaceMaterial.Blur(false):-1,liquid,false),LiquidGlass.Boost(liquid));
             bool panel=PanelMaterial.ReadablePanel(this),popup=PanelMaterial.NotificationPopup(this);
             var center=this as NotificationWindow;
-            if(center!=null){Dark=Glass95.Dark;Surface.Background=enabled?NotificationStyle.Surface:NotificationStyle.Solid;Surface.BorderBrush=Glass95.Enabled?Glass95.Rim:Paint.Brush("#28FFFFFF");Surface.BorderThickness=new Thickness(.7);center.RefreshChrome();return;}
+            if(center!=null){Dark=Glass95.Dark;Surface.Background=enabled?NotificationStyle.Surface:NotificationStyle.Solid;Surface.BorderBrush=Glass95.Enabled?Glass95.Rim:Paint.Brush("#28FFFFFF");Surface.BorderThickness=new Thickness(.7);center.RefreshChrome();ApplyRim();return;}
             var detail=this as DetailWindow;if(detail!=null&&detail.PageKey=="sound"){Dark=true;if(lens!=null)lens.Active=false;Surface.Background=enabled?AudioOutputView.Glass:AudioOutputView.Solid;Surface.BorderBrush=Brushes.Transparent;Surface.BorderThickness=new Thickness(0);return;}
-            if(this is HudWindow){Dark=Glass95.Dark;if(Glass95.Enabled&&enabled){if(glassEdge==null||edgeDark!=Dark){edgeDark=Dark;glassEdge=Glass95.Edge(Dark);}}else glassEdge=null;Surface.Background=enabled?QuickPanel.Glass:PanelMaterial.Solid(Dark);Surface.BorderBrush=glassEdge??(Brush)Brushes.Transparent;Surface.BorderThickness=new Thickness(Glass95.Enabled?.7:0);return;}
+            if(this is HudWindow){Dark=Glass95.Dark;if(Glass95.Enabled&&enabled){if(glassEdge==null||edgeDark!=Dark){edgeDark=Dark;glassEdge=Glass95.Edge(Dark);}}else glassEdge=null;Surface.Background=enabled?QuickPanel.Glass:PanelMaterial.Solid(Dark);Surface.BorderBrush=glassEdge??(Brush)Brushes.Transparent;Surface.BorderThickness=new Thickness(Glass95.Enabled?.7:0);ApplyRim();return;}
             if(Glass95.Enabled&&!OpaqueSurface&&!(DockSurface&&Preferences.Current.DockSolidBackground)){
                 bool rimDark=panel||popup||Dark;if(glassEdge==null||edgeDark!=rimDark){edgeDark=rimDark;glassEdge=Glass95.Edge(edgeDark);}Surface.BorderBrush=this is NowBar?(Brush)Brushes.Transparent:glassEdge;Surface.BorderThickness=new Thickness(0);
                 Surface.Background=this is NowBar?(enabled?glassTint:solidTint??Glass95.Solid):popup?(enabled?PanelMaterial.PopupSurface(Dark):PanelMaterial.Solid(Dark)):panel?(enabled?PanelMaterial.PanelSurface(Dark,true):PanelMaterial.Solid(Dark)):enabled?PanelMaterial.Surface(Dark,true):Paint.Brush(Dark?"#FF242832":"#FFF1F4FA");
@@ -423,14 +423,15 @@ namespace OneTaskBar
             }
             if(tunedStart)Surface.Background=SurfaceMaterial.Tint(false,!Preferences.Current.Blur||!HasBlur);
             if(liquid&&LiquidGlass.Enabled&&!(this is NowBar)&&!DockSurface){Surface.Background=LiquidGlass.Tint(panel||popup||Dark,LiquidLevel);LiquidReadability.Watch(this,panel||popup||Dark);}else LiquidReadability.Release(this);
-            if(liquid&&rimImage!=null&&RimEligible&&Surface.Background!=null)Surface.Background=WithRim(Surface.Background,rimImage);
+            ApplyRim();
             if(!OpaqueSurface&&!(this is NowBar)&&!DockSurface)PanelMaterial.RefreshCards(Surface);
         }
         // With the refraction option on, the edge of a panel bends what is behind it. The band is read from the screen
         // just before the panel appears and laid over the live blur, so only the rim is a still.
         System.Windows.Media.Imaging.BitmapSource rimImage;
         internal bool RimRefracting {get{return rimImage!=null;}}
-        bool RimEligible {get{return RefractionGlass.Enabled&&!DockSurface&&!OpaqueSurface&&!(this is NowBar)&&!(this is HudWindow)&&!(this is NotificationBanner)&&!(this is NotificationWindow)&&!(this is DynamicIsland)&&BackdropClip==null&&RegionClip==null;}}
+        bool RimEligible {get{return RefractionGlass.Enabled&&!OpaqueSurface&&!(this is NotificationBanner)&&!(this is DynamicIsland)&&BackdropClip==null&&RegionClip==null;}}
+        void ApplyRim(){if(rimImage!=null&&RimEligible&&Surface.Background!=null)Surface.Background=WithRim(Surface.Background,rimImage);}
         void PrepareRim()
         {
             var before=rimImage;rimImage=null;
