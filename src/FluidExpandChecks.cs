@@ -105,6 +105,30 @@ namespace OneTaskBar
                         report.Add("carry ok");
                         first.Close();page.Close();pill.Close();backdrop.Close();first=null;page=null;pill=null;backdrop=null;
                     }
+                    // A piece beside the panel (the start and search buttons) still unfolds into it, and a collapsed part stays collapsed.
+                    {
+                        backdrop=new Window {WindowStyle=WindowStyle.None,ResizeMode=ResizeMode.NoResize,ShowInTaskbar=false,Topmost=true,ShowActivated=false,Left=work.Right-900,Top=work.Bottom-560,Width=900,Height=560,Background=Brushes.SteelBlue};
+                        backdrop.Show();
+                        pill=new GlassWindow {Radius=20,ShowActivated=false};
+                        var dot=new TextBlock {Text="0",Visibility=Visibility.Collapsed};
+                        var grid=new Grid();grid.Children.Add(new TextBlock {Text="시작",Foreground=Brushes.White});grid.Children.Add(dot);pill.Surface.Child=grid;
+                        pill.ShowAt(screen.Bounds,work.Right-860,work.Bottom-48,40,40);await Task.Delay(200);
+                        Native.RectI rect;Native.GetWindowRect(new System.Windows.Interop.WindowInteropHelper(pill).Handle,out rect);
+                        panel=new GlassWindow {Width=380,Height=300,ShowActivated=false};panel.Surface.Child=new TextBlock {Text="패널"};
+                        panel.MorphFixed=true;panel.Morph=new MorphPlan {Piece=pill,Source=rect,Hide=new FrameworkElement[]{dot}};
+                        panel.ShowAt(screen.Bounds,work.Right-400,work.Bottom-48-12-300,380,300);panel.Pop();
+                        Require(panel.BudActive,"side: the panel opens through the morph");
+                        await Task.Delay(20);
+                        Require(panel.BackdropClip.HasValue&&panel.BackdropClip.Value.Width<150&&panel.BackdropClip.Value.Bottom>300+8&&panel.Width>=380,"side: the first shape sits out in the piece left of the panel: "+(panel.BackdropClip.HasValue?panel.BackdropClip.Value.ToString():"none"));
+                        Shot(new Rect(screen.Bounds.Right-900,screen.Bounds.Bottom-420,900,420),Path.Combine(AppLog.Data,"expand-side-20.png"));
+                        foreach(int at in new[]{60,100,150,250}){await Task.Delay(at==60?60:at==100?40:at==150?50:100);Shot(new Rect(screen.Bounds.Right-900,screen.Bounds.Bottom-420,900,420),Path.Combine(AppLog.Data,"expand-side-"+at+".png"));}
+                        await Task.Delay(600);
+                        Require(!panel.BudActive&&dot.Visibility==Visibility.Collapsed,"side: the collapsed dot is not shown while open");
+                        panel.Hide();await Task.Delay(900);
+                        Require(pill.Opacity>.99&&dot.Visibility==Visibility.Collapsed,"side: the collapsed dot stays collapsed after the unfold closes");
+                        report.Add("side ok");
+                        panel.Close();pill.Close();backdrop.Close();panel=null;pill=null;backdrop=null;
+                    }
                     AppLog.Json("fluid-expand-probe.json",new {passed=true,steps=report.ToArray()});
                     result=0;
                 }

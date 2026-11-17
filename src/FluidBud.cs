@@ -19,6 +19,8 @@ namespace OneTaskBar
         internal double CutWidth;
         // How far the dock part has been taken apart; it lives here so a second panel (a quick settings page) can carry on.
         internal bool Veiled;
+        // What each hidden part looked like before, so a part that was collapsed (the empty notification dot) stays collapsed.
+        internal readonly System.Collections.Generic.Dictionary<System.Windows.FrameworkElement,System.Windows.Visibility> Before=new System.Collections.Generic.Dictionary<System.Windows.FrameworkElement,System.Windows.Visibility>();
         internal double LastCut=-1;
         internal readonly System.Collections.Generic.Dictionary<System.Windows.UIElement,System.Windows.Media.Transform> Shifted=new System.Collections.Generic.Dictionary<System.Windows.UIElement,System.Windows.Media.Transform>();
         internal readonly System.Windows.Media.TranslateTransform Slide=new System.Windows.Media.TranslateTransform();
@@ -43,7 +45,9 @@ namespace OneTaskBar
         FluidFlare flare;
         UIElement masked;
         bool running,closing,hooked;
-        double anchor,extra;
+        double anchor,extra,extraLeft,extraRight;
+        readonly TranslateTransform slide=new TranslateTransform();
+        readonly MatrixTransform flipSlide=new MatrixTransform();
         bool fromTop,grown;
         Action finished;
         Native.RectI original;
@@ -141,7 +145,7 @@ namespace OneTaskBar
         // only the drop passes through it.
         void GrowToBar()
         {
-            extra=0;grown=false;useSource=false;
+            extra=0;extraLeft=extraRight=0;grown=false;useSource=false;
             var handle=new WindowInteropHelper(window).Handle;
             Native.RectI rect;
             if(handle==IntPtr.Zero||!Native.GetWindowRect(handle,out rect))return;
@@ -160,7 +164,14 @@ namespace OneTaskBar
             }
             if(gap<6)return;
             extra=Math.Min(useSource?220:140,gap);
-            int pixels=(int)Math.Round(extra*scale);
+            // A piece that is not under the panel (the start and search buttons sit beside it) also needs the window to reach it sideways.
+            if(useSource)
+            {
+                double toLeft=(rect.Left-source.Value.Left)/scale,toRight=(source.Value.Right-rect.Right)/scale;
+                if(toLeft>0)extraLeft=Math.Min(toLeft+4,Math.Max(0,(rect.Left-monitor.Bounds.Left)/scale));
+                if(toRight>0)extraRight=Math.Min(toRight+4,Math.Max(0,(monitor.Bounds.Right-rect.Right)/scale));
+            }
+            int pixels=(int)Math.Round(extra*scale),leftPixels=(int)Math.Round(extraLeft*scale),rightPixels=(int)Math.Round(extraRight*scale);
             original=rect;
             var surface=window.Surface;
             if(surface.ActualWidth<2||surface.ActualHeight<2)return;
@@ -168,23 +179,24 @@ namespace OneTaskBar
             surface.Width=fixedWidth;surface.Height=fixedHeight;
             surface.VerticalAlignment=fromTop?VerticalAlignment.Bottom:VerticalAlignment.Top;
             surface.HorizontalAlignment=HorizontalAlignment.Left;
-            surface.Margin=new Thickness(0);
-            Native.SetWindowPos(handle,IntPtr.Zero,rect.Left,fromTop?rect.Top-pixels:rect.Top,rect.Right-rect.Left,rect.Bottom-rect.Top+pixels,0x14);
+            surface.Margin=new Thickness(extraLeft,0,0,0);
+            Native.SetWindowPos(handle,IntPtr.Zero,rect.Left-leftPixels,fromTop?rect.Top-pixels:rect.Top,rect.Right-rect.Left+leftPixels+rightPixels,rect.Bottom-rect.Top+pixels,0x14);
             grown=true;
             if(useSource)
             {
                 double windowTop=fromTop?rect.Top-pixels:rect.Top,total=fixedHeight+extra;
                 double sx=(source.Value.Left-rect.Left)/scale,sw=(source.Value.Right-source.Value.Left)/scale,sy=(source.Value.Top-windowTop)/scale,sh=(source.Value.Bottom-source.Value.Top)/scale;
                 srcRect=new Rect(sx,fromTop?total-(sy+sh):sy,sw,sh);
-                srcRect.Intersect(new Rect(0,0,fixedWidth,total));
+                srcRect.Intersect(new Rect(-extraLeft,0,fixedWidth+extraLeft+extraRight,total));
                 if(srcRect.IsEmpty||srcRect.Width<6||srcRect.Height<6)useSource=false;
             }
         }
         void ShrinkBack()
         {
             if(!grown)return;
-            grown=false;extra=0;
+            grown=false;extra=0;extraLeft=extraRight=0;
             var surface=window.Surface;
+            surface.Margin=new Thickness(0);
             surface.ClearValue(FrameworkElement.WidthProperty);
             surface.ClearValue(FrameworkElement.HeightProperty);
             surface.VerticalAlignment=VerticalAlignment.Stretch;
@@ -281,7 +293,8 @@ namespace OneTaskBar
                 top=Mix(srcRect.Top,0,down);bottom=Mix(srcRect.Bottom,height,down);
             }
             var shape=new Rect(left,top,Math.Max(2,right-left),Math.Max(2,bottom-top));
-            shape.Intersect(new Rect(0,0,width,total));
+            var bounds=new Rect(-extraLeft,0,width+extraLeft+extraRight,total);
+            shape.Intersect(bounds);
             if(shape.IsEmpty)return;
             double radius=Math.Min(fromPiece?Mix(Math.Min(srcRect.Width,srcRect.Height)/2,window.Radius,Math.Min(1,across)):window.Radius,Math.Min(shape.Width,shape.Height)/2);
             double neckBase=fromPiece?srcRect.Top+srcRect.Height*.4:total;
@@ -311,12 +324,15 @@ namespace OneTaskBar
             if(flare!=null)flare.Set(drawn,fromTop,height,wave,white,radius);
             if(fromTop)
             {
-                outline.Transform=new MatrixTransform(1,0,0,-1,0,total);
+                flipSlide.Matrix=new Matrix(1,0,0,-1,extraLeft,total);
+                outline.Transform=flipSlide;
                 region=new Rect(region.X,total-region.Bottom,region.Width,region.Height);
                 shape=new Rect(shape.X,total-shape.Bottom,shape.Width,shape.Height);
             }
-            else outline.Transform=Transform.Identity;
-            region.Intersect(new Rect(0,0,width,total));
+            else{slide.X=extraLeft;outline.Transform=slide;}
+            region.Intersect(bounds);
+            // The outline is drawn in the panel's own coordinates; the window starts extraLeft further out.
+            shape.X+=extraLeft;region.X+=extraLeft;
             window.BackdropClip=shape;
             window.RegionClip=region;
             var host=window.Content as UIElement;
@@ -367,7 +383,16 @@ namespace OneTaskBar
             // A page opened from the panel that already took the dock part keeps it taken while it opens.
             if(carried&&!closing)k=1;
             if(plan.Hide.Length==0){if(!plan.Veiled){plan.Veiled=true;piece.Veil(true);}return;}
-            if(!plan.Veiled){plan.Veiled=true;foreach(var part in plan.Hide)part.Visibility=Visibility.Hidden;}
+            if(!plan.Veiled)
+            {
+                plan.Veiled=true;
+                plan.Before.Clear();
+                foreach(var part in plan.Hide)
+                {
+                    plan.Before[part]=part.Visibility;
+                    if(part.Visibility==Visibility.Visible)part.Visibility=Visibility.Hidden;
+                }
+            }
             if(plan.Cut==0)return;
             double width=piece.Surface.ActualWidth,height=piece.Surface.ActualHeight;
             if(width<8||height<8)return;
@@ -409,7 +434,13 @@ namespace OneTaskBar
             if(plan!=null&&plan.Veiled)
             {
                 plan.Veiled=false;
-                if(plan!=null&&plan.Hide.Length>0)foreach(var part in plan.Hide)part.Visibility=Visibility.Visible;
+                if(plan!=null&&plan.Hide.Length>0)foreach(var part in plan.Hide)
+                    {
+                        // Only undo what the unfold did; an element that changed on its own meanwhile keeps its state.
+                        if(part.Visibility!=Visibility.Hidden)continue;
+                        Visibility before;
+                        part.Visibility=plan.Before.TryGetValue(part,out before)?before:Visibility.Visible;
+                    }
                 else piece.Veil(false);
             }
             piece=null;plan=null;
