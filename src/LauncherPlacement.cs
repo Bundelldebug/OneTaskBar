@@ -34,7 +34,8 @@ namespace OneTaskBar
                 var work=new Native.RectI {Left=screen.Left,Top=screen.Top,Right=screen.Right,Bottom=screen.Bottom};
                 var value=Fit(screen,work,scale,940,710,edge);
                 if(value.Left<0||value.Top<0||value.Right>screen.Width/scale+.01||value.Bottom>screen.Height/scale+.01)throw new InvalidOperationException("Launcher placement exceeds its monitor");
-                bool reserved=edge==0?value.Left>=76:edge==1?value.Top>=76:edge==2?value.Right<=screen.Width/scale-76:value.Bottom<=screen.Height/scale-68;
+                double sideInset=DockSizing.PopupInset,bottomReserve=DockSizing.Reserved;
+                bool reserved=edge==0?value.Left>=sideInset-.01:edge==1?value.Top>=sideInset-.01:edge==2?value.Right<=screen.Width/scale-sideInset+.01:value.Bottom<=screen.Height/scale-bottomReserve+.01;
                 if(!reserved)throw new InvalidOperationException("Launcher overlaps the dock edge");
             }
         }

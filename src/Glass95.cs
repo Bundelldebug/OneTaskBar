@@ -32,6 +32,9 @@ namespace OneTaskBar
         internal static bool Transparent {get{return Preferences.Current.Blur&&!SystemParameters.HighContrast;}}
         internal static Brush Surface {get{return PanelMaterial.PanelSurface(Dark,true);}}
         internal static Brush Card {get{return Transparent?(Fluid.Enabled?fluidCard:Current.Card):PanelMaterial.Card(Dark);}}
+        // As in the One UI quick panel: the cards are a darker, bluish tint of the blurred backdrop. No shade, rim or film.
+        internal static readonly Brush FlatCard=Paint.Brush("#3A1C2B3B");
+        internal static readonly Brush FlatInactive=Paint.Brush("#47182634");
         internal static Brush Solid {get{return PanelMaterial.Solid(Dark);}}
         internal static Brush Text {get{return SystemParameters.HighContrast?SystemColors.WindowTextBrush:Current.Text;}}
         internal static Brush Muted {get{return SystemParameters.HighContrast?SystemColors.WindowTextBrush:Current.Muted;}}
@@ -79,9 +82,11 @@ namespace OneTaskBar
             // Without the Fluid light the far edge is a thin shade, which reads as the card standing off the surface.
             edge.GradientStops.Add(new GradientStop(warm?Color.FromArgb(isDark?(byte)110:(byte)130,255,255,255):isDark?Color.FromArgb(96,0,0,0):Color.FromArgb(66,80,100,132),1));if(freeze)edge.Freeze();return edge;
         }
+        internal const string FixedInk="fixed-ink";
         internal static void DockInk(DependencyObject root,Brush ink=null)
         {
             if(ink==null)ink=DockForeground;
+            var element=root as FrameworkElement;if(element!=null&&FixedInk.Equals(element.Tag))return;
             var text=root as TextBlock;if(text!=null){text.Foreground=ink;text.Effect=DockAppearance.Readability;}
             var glyph=root as Glyph;if(glyph!=null){glyph.Effect=DockAppearance.Readability;if(glyph.Kind!="windows-start")glyph.Color=ink;glyph.InvalidateVisual();}
             foreach(object child in LogicalTreeHelper.GetChildren(root)){var node=child as DependencyObject;if(node!=null)DockInk(node,ink);}

@@ -24,6 +24,7 @@ namespace OneTaskBar
         internal static bool TaskView(){return Shortcut(0x09);}
         internal static bool Cast(){return Shortcut(0x4b);}
         internal static bool ShowDesktop(){return Shortcut(0x44);}
+        internal static bool InputSwitcher(){return Shortcut(0x20);}
         internal static bool ContextMenu()
         {
             if(ModifiersHeld())return false;

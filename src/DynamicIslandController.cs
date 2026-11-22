@@ -20,8 +20,10 @@ namespace OneTaskBar
         void IslandPreferenceChanged()
         {
             bool next=ReleaseFeatures.GlassUI&&Preferences.Current.DynamicIsland||Preferences.Current.TopStatusBar;
-            if(next==lastIslandPreference)return;
+            bool dexNow=Dex.Enabled;
+            if(next==lastIslandPreference&&dexNow==lastDex)return;
             lastIslandPreference=next;
+            if(dexNow!=lastDex){lastDex=dexNow;RetireDexPanels();CloseTopBar();}
             if(Desktop)Relayout();else CloseIsland();
         }
         void RefreshIsland(IEnumerable<FullscreenCandidate> windows)
@@ -62,11 +64,12 @@ namespace OneTaskBar
                     if(topRight==null)topRight=new TopStatusBar(this,TopStatusBar.Side.Right);
                     topLeft.Present(monitor,dpi,islandSpace.Bottom);Lap("top-left");
                     topRight.Present(monitor,dpi,islandSpace.Bottom);Lap("top-right");
+                    EnsureDexKeys();
                 }
                 else CloseTopBar();
-                var matched=System.Drawing.Rectangle.Empty;
-                IntPtr source=TopBarEnabled?FindTopBarMatch(monitor,dpi,islandSpace.Bottom,windows,out matched):IntPtr.Zero;
-                UpdateCurtain(monitor,dpi,shade||source!=IntPtr.Zero,islandSpace.Bottom,source,matched);
+                // Never paint maximized app window edge colors onto the top status bar (prevents hovered close buttons
+                // and window chrome from tinting the bar, and eliminates continuous 60-100 ms screen capture on battery).
+                UpdateCurtain(monitor,dpi,shade,islandSpace.Bottom,IntPtr.Zero,System.Drawing.Rectangle.Empty);
             }
             catch(Exception error){CloseIsland();AppLog.Once("island-safety-area",error.ToString());}
         }
@@ -116,6 +119,7 @@ namespace OneTaskBar
             if(topRight==null)topRight=new TopStatusBar(this,TopStatusBar.Side.Right);
             topLeft.Present(monitor,dpi,bottom);
             topRight.Present(monitor,dpi,bottom);
+            EnsureDexKeys();
             UpdateCurtain(monitor,dpi,true,bottom,IntPtr.Zero,System.Drawing.Rectangle.Empty);
             return true;
         }
@@ -132,7 +136,7 @@ namespace OneTaskBar
             if(fresh)
             {
                 curtain=new SafeAreaCurtain(monitor,dpi,bottom);
-                curtain.Hold=()=>Quick!=null&&Quick.IsVisible||Center!=null&&Center.IsVisible||Detail!=null&&Detail.IsVisible||topLeft!=null&&topLeft.CardOpen;
+                curtain.Hold=()=>Quick!=null&&Quick.IsVisible||Center!=null&&Center.IsVisible||Detail!=null&&Detail.IsVisible||Calendar!=null&&Calendar.IsVisible||topLeft!=null&&topLeft.CardOpen||topRight!=null&&topRight.CardOpen;
                 curtain.RevealChanged=revealed=>SetTopBarShade(!revealed,true);
                 curtain.MatchChanged=colors=>
                 {
@@ -165,6 +169,7 @@ namespace OneTaskBar
             foreach(var window in windows)
             {
                 if(window.Monitor!=monitor.Bounds||!window.Framed&&!window.Maximized)continue;
+                // Only the window in front decides; whatever lies under it is not looked at.
                 if(!window.Maximized)break;
                 area=TopBarBand.SampleArea(monitor.Bounds,Native.VisibleArrangeBounds(window.Window),dpi,bottom);
                 if(area.IsEmpty)area=TopBarBand.MaximizedStrip(monitor.Bounds,dpi,bottom);
@@ -196,6 +201,7 @@ namespace OneTaskBar
         }
         void CloseTopBar()
         {
+            CloseDexKeys();
             if(topLeft!=null){topLeft.Close();topLeft=null;}
             if(topRight!=null){topRight.Close();topRight=null;}
         }

@@ -27,8 +27,10 @@ namespace OneTaskBar
         internal QuickWidgetFrame(QuickWidgetBoard board,string key,string title,UIElement content,Action<QuickWidgetSlot> resized)
         {
             Key=key;shape=resized;Background=Brushes.Transparent;var transform=new TransformGroup();transform.Children.Add(SizeScale);transform.Children.Add(Offset);RenderTransform=transform;
-            if(Glass95.Enabled){glassShadow=new GlassTileShadow();Children.Add(glassShadow);}
-            Body=new GlassTileBorder {Child=content,Optical=!QuickWidgetLayout.Slider(key)&&key!="media",Background=QuickWidgetLayout.Slider(key)?Brushes.Transparent:QuickPanel.Card,CornerRadius=new CornerRadius(32)};Children.Add(Body);
+            // The 9.5 tiles are flat glass: no shade under them, no lit rim and no light-to-dark film. The Fluid UI keeps its own.
+            bool flat=Glass95.Enabled&&!Fluid.Enabled;
+            if(Glass95.Enabled&&!flat){glassShadow=new GlassTileShadow();Children.Add(glassShadow);}
+            Body=new GlassTileBorder {Child=content,Optical=!flat&&!QuickWidgetLayout.Slider(key)&&key!="media",Background=QuickWidgetLayout.Slider(key)?Brushes.Transparent:flat&&Glass95.Transparent?Glass95.FlatCard:QuickPanel.Card,CornerRadius=new CornerRadius(32)};Children.Add(Body);
             outline=new Border {BorderThickness=new Thickness(2),BorderBrush=Paint.Brush("#88FFFFFF"),IsHitTestVisible=false,Visibility=Visibility.Collapsed};Children.Add(outline);
             var template=new FrameworkElementFactory(typeof(Border));template.SetValue(Border.BackgroundProperty,Brushes.Transparent);
             Mover=new Thumb {Template=new ControlTemplate(typeof(Thumb)){VisualTree=template},Cursor=Cursors.SizeAll,Focusable=true,FocusVisualStyle=null,Visibility=Visibility.Collapsed};Children.Add(Mover);
@@ -131,6 +133,14 @@ namespace OneTaskBar
             foreach(var frame in Frames.Values){frame.AnimateSize(new Size(),false);frame.Offset.BeginAnimation(TranslateTransform.XProperty,null);frame.Offset.BeginAnimation(TranslateTransform.YProperty,null);frame.Offset.X=frame.Offset.Y=0;}
             PresentLayout();InvalidateMeasure();InvalidateArrange();UpdateLayout();
             foreach(var frame in Frames.Values){Point old;if(!positions.TryGetValue(frame.Key,out old)||!frame.IsVisible)continue;Point now=frame.TranslatePoint(new Point(),this);if(animate&&Motion.Enabled&&IsVisible){frame.Offset.BeginAnimation(TranslateTransform.XProperty,Motion.Tween(old.X-now.X,0,180));frame.Offset.BeginAnimation(TranslateTransform.YProperty,Motion.Tween(old.Y-now.Y,0,180));Size previous;if(animateSizes&&sizes.TryGetValue(frame.Key,out previous)&&(Math.Abs(previous.Width-frame.ActualWidth)>.5||Math.Abs(previous.Height-frame.ActualHeight)>.5))frame.AnimateSize(previous,true);}}
+        }
+        internal double PreferredHeight(double width)
+        {
+            PresentLayout();
+            double w=Math.Max(40,width),s=(w+Gap)/4,rs=Math.Min(ControlHeight,s-Gap)+Gap;
+            int bottom=0;
+            foreach(var item in DisplayLayout.Items)if(!item.Hidden&&Frames.ContainsKey(item.Key))bottom=Math.Max(bottom,item.Y+item.Rows);
+            return Math.Max(0,bottom*rs-Gap);
         }
         protected override Size MeasureOverride(Size available)
         {

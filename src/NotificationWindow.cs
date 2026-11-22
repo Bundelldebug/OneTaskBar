@@ -19,6 +19,27 @@ namespace OneTaskBar
         readonly TextBlock clock=Paint.TextBlock("",28,Paint.Text),today=Paint.TextBlock("",12,Paint.Muted),count=Paint.TextBlock("알림",17,Paint.Text);
         readonly Button access,clear,disturb,quickSettings;readonly Glyph disturbGlyph=new Glyph("dnd",20);
         TextBlock emptyMessage,emptyStatus;
+        readonly Border dndNote=new Border {CornerRadius=new CornerRadius(13),Padding=new Thickness(11,4,11,4),HorizontalAlignment=HorizontalAlignment.Center,Margin=new Thickness(0,0,0,9),Visibility=Visibility.Collapsed};
+        Button noticeSettings;
+        FrameworkElement[] lateParts;internal override FrameworkElement[] LateParts {get{return lateParts;}}
+        // The Dex center: one line of time and date, the do-not-disturb note, the cards, and settings and clear at the foot.
+        void DexLayout(Grid root,Grid header,StackPanel heading,Grid labelRow,DockPanel notifications)
+        {
+            Radius=Dex.PanelRadius;Surface.CornerRadius=new CornerRadius(Radius);
+            root.Margin=new Thickness(14,14,14,14);root.RowDefinitions[0].Height=new GridLength(34);
+            header.Margin=new Thickness(6,0,6,6);heading.Orientation=Orientation.Horizontal;
+            clock.FontSize=18;today.FontSize=12;today.VerticalAlignment=VerticalAlignment.Bottom;today.Margin=new Thickness(7,0,0,2);
+            disturb.Visibility=Visibility.Collapsed;labelRow.Visibility=Visibility.Collapsed;quickSettings.Visibility=Visibility.Collapsed;
+            labelRow.Children.Remove(clear);
+            var note=new StackPanel {Orientation=Orientation.Horizontal};note.Children.Add(new Glyph("dnd",12){Color=Paint.ControlWhite,Margin=new Thickness(0,0,5,0),VerticalAlignment=VerticalAlignment.Center});note.Children.Add(Paint.TextBlock("방해 금지 모드가 켜져 있습니다.",11,Paint.ControlWhite));
+            dndNote.Child=note;dndNote.Background=Dex.NoticeDndPill;DockPanel.SetDock(dndNote,Dock.Top);notifications.Children.Insert(0,dndNote);
+            var foot=new Grid {Margin=new Thickness(2,10,2,0)};
+            noticeSettings=Paint.Action("알림 설정",()=>OpenNoticeSettings());noticeSettings.HorizontalAlignment=HorizontalAlignment.Left;noticeSettings.Padding=new Thickness(14,6,14,6);noticeSettings.Background=Dex.NoticeFootButton;noticeSettings.Resources["ButtonRadius"]=new CornerRadius(16);((TextBlock)noticeSettings.Content).Foreground=Paint.ControlWhite;((TextBlock)noticeSettings.Content).FontSize=11.5;foot.Children.Add(noticeSettings);
+            ((TextBlock)clear.Content).Text="지우기";((TextBlock)clear.Content).FontSize=11.5;clear.Padding=new Thickness(14,6,14,6);clear.Background=Dex.NoticeFootButton;clear.Resources["ButtonRadius"]=new CornerRadius(16);foot.Children.Add(clear);
+            DockPanel.SetDock(foot,Dock.Bottom);notifications.Children.Insert(1,foot);
+            lateParts=new FrameworkElement[]{header,dndNote,foot};
+        }
+        async void OpenNoticeSettings(){if(await DismissAsync())Native.Open("ms-settings:notifications");}
         internal TextBlock ClockLabel {get{return clock;}}
         internal TextBlock DateLabel {get{return today;}}
         readonly Dictionary<string,NotificationStackView> retained=new Dictionary<string,NotificationStackView>(StringComparer.OrdinalIgnoreCase);string signature;bool opening,disturbBusy;
@@ -36,6 +57,7 @@ namespace OneTaskBar
             access=Paint.Action("Windows 알림 연결",()=>RequestAccess());access.HorizontalAlignment=HorizontalAlignment.Stretch;access.Height=40;access.Margin=new Thickness(0,8,0,0);DockPanel.SetDock(access,Dock.Bottom);notifications.Children.Add(access);quickSettings=Paint.Action("빠른 설정  ›",shell.QuickFromNotifications);quickSettings.Height=36;quickSettings.Margin=new Thickness(0,8,0,0);DockPanel.SetDock(quickSettings,Dock.Bottom);notifications.Children.Add(quickSettings);
             var feed=new StackPanel();media=new MediaPlayerView(shell.Media,shell.SeekMedia,()=>shell.ShowDetail("sound"),condensed:true,openApp:shell.OpenMediaApplication,dense:true,sourceApp:id=>MediaApplication.Resolve(id,shell.Running.Concat(shell.Apps)));media.SeekBar.WaveInterval=.033;mediaCard=new Border {Child=media,CornerRadius=new CornerRadius(28),Margin=new Thickness(0,0,0,12),Visibility=Visibility.Collapsed};media.PaletteChanged=palette=>mediaCard.Background=media.MediaBackground;mediaCard.Height=130;media.FitWidget(344,130);mediaCard.SizeChanged+=(s,e)=>media.FitWidget(mediaCard.ActualWidth,130);feed.Children.Add(mediaCard);feed.Children.Add(cards);
             notifications.Children.Add(new SmoothScrollViewer {Content=feed,VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,PanningMode=PanningMode.VerticalFirst});Grid.SetRow(notifications,1);root.Children.Add(notifications);Surface.Child=root;StableSurface=true;TransitionContent=root;
+            if(Dex.Enabled)DexLayout(root,header,heading,labelRow,notifications);
             RefreshChrome();
             Deactivated+=(s,e)=> {if(!Program.Inspectable&&IsVisible&&!IsMouseOver)Hide();};
         }
@@ -45,13 +67,14 @@ namespace OneTaskBar
             today.Foreground=Paint.Muted;
             if(emptyMessage!=null)emptyMessage.Foreground=Paint.Text;
             if(emptyStatus!=null)emptyStatus.Foreground=Paint.Muted;
-            foreach(var button in new[]{clear,access,quickSettings})
+            foreach(var button in new[]{clear,access,quickSettings,noticeSettings})
             {
                 if(button==null)continue;
                 var text=button.Content as TextBlock;
-                if(text!=null)text.Foreground=Paint.Text;
-                button.Background=QuickPanel.Card;
+                if(text!=null)text.Foreground=Dex.Enabled&&(button==clear||button==noticeSettings)?Paint.ControlWhite:Paint.Text;
+                button.Background=Dex.Enabled&&(button==clear||button==noticeSettings)?Dex.NoticeFootButton:QuickPanel.Card;
             }
+            if(Dex.Enabled)dndNote.Visibility=shell.Toggles.Disturb.State.Enabled?Visibility.Visible:Visibility.Collapsed;
             if(disturb!=null&&!disturbBusy)
             {
                 bool enabled=shell.Toggles.Disturb.State.Enabled;
@@ -77,8 +100,8 @@ namespace OneTaskBar
         internal void Refresh()
         {
             RefreshChrome();
-            var playing=shell.Services.Media??new MediaState();mediaCard.Visibility=playing.Active?Visibility.Visible:Visibility.Collapsed;media.Update(playing,shell.Services.OutputName);if(playing.Active)mediaCard.Background=media.MediaBackground;
-            var now=DateTime.Now;long second=now.Ticks/TimeSpan.TicksPerSecond;if(second!=clockSecond){clockSecond=second;clock.Text=now.ToString("H:mm:ss");}if(now.Date!=renderedDate){renderedDate=now.Date;today.Text=Loc.Date(now,"M월 d일 dddd");}
+            var playing=shell.Services.Media??new MediaState();bool showMedia=!Dex.Enabled&&playing.Active;mediaCard.Visibility=showMedia?Visibility.Visible:Visibility.Collapsed;if(showMedia){media.Update(playing,shell.Services.OutputName);mediaCard.Background=media.MediaBackground;}
+            var now=DateTime.Now;long second=now.Ticks/TimeSpan.TicksPerSecond;if(second!=clockSecond){clockSecond=second;clock.Text=Dex.Enabled?now.ToString("h:mm",System.Globalization.CultureInfo.InvariantCulture):now.ToString("H:mm:ss");}if(now.Date!=renderedDate){renderedDate=now.Date;today.Text=Loc.Date(now,"M월 d일 dddd");}
             var dnd=shell.Toggles.Disturb.State;disturb.IsEnabled=dnd.Available&&!disturbBusy;System.Windows.Automation.AutomationProperties.SetItemStatus(disturb,dnd.Enabled?"켜짐":"꺼짐");
             var service=shell.Notifications;access.Visibility=service.Allowed?Visibility.Collapsed:Visibility.Visible;count.Text=service.Allowed&&service.Items.Count>0?"알림  "+service.Items.Count:"알림";clear.IsEnabled=service.Allowed&&service.Items.Count>0;clear.Opacity=clear.IsEnabled?1:.4;
             var accessText=access.Content as TextBlock;if(accessText!=null)accessText.Text="Windows 알림 연결";

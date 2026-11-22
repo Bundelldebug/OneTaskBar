@@ -10,7 +10,8 @@ namespace OneTaskBar
     {
         internal static int Clamp(int percent){return Math.Max(60,Math.Min(140,percent));}
         internal static double Zoom {get{return Clamp(Preferences.Current.DockScalePercent)/100.0;}}
-        internal static double Reserved {get{return 68*Zoom;}}
+        internal static double BarSpace {get{return Dex.Enabled?Dex.BarHeight:68;}}
+        internal static double Reserved {get{return BarSpace*Zoom;}}
         internal static double PopupInset {get{return Reserved+8;}}
         internal static Rect DisplayRect(Rect value,double zoom)
         {

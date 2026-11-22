@@ -7,7 +7,7 @@ namespace OneTaskBar
 {
     internal static class DockGeometry
     {
-        internal static int Edge {get{return Preferences.Current.DockEdge>=0&&Preferences.Current.DockEdge<=3?Preferences.Current.DockEdge:3;}}
+        internal static int Edge {get{return Dex.Enabled?3:Preferences.Current.DockEdge>=0&&Preferences.Current.DockEdge<=3?Preferences.Current.DockEdge:3;}}
         internal static bool Vertical(int edge){return edge==0||edge==2;}
         internal const double SideStatusWidth=44;
         internal const double SideStatusInset=2,SideTrayHeight=22,SideQuickHeight=34,SideBatteryHeight=22;
@@ -25,7 +25,7 @@ namespace OneTaskBar
         }
         internal static double Reserved(System.Drawing.Rectangle screen,Native.RectI work,double scale,int edge)
         {
-            double gap=edge==0?work.Left-screen.Left:edge==1?work.Top-screen.Top-IslandSafeArea.BottomOffsetPixels(screen):edge==2?screen.Right-work.Right:screen.Bottom-work.Bottom;return Math.Max(68,gap/scale);
+            double gap=edge==0?work.Left-screen.Left:edge==1?work.Top-screen.Top-IslandSafeArea.BottomOffsetPixels(screen):edge==2?screen.Right-work.Right:screen.Bottom-work.Bottom;return Math.Max(DockSizing.BarSpace,gap/scale);
         }
         internal static Native.RectI Reveal(System.Drawing.Rectangle screen,int edge)
         {
@@ -86,6 +86,7 @@ namespace OneTaskBar
         }
         void PlaceStatus(DockLayout layout,bool show,double y=Double.NaN)
         {
+            if(dex)return;
             if(Double.IsNaN(y))y=layout.Y;Rect rect;
             if(DockGeometry.Vertical(Edge)){var position=DockGeometry.Rect(Screen.Bounds,ContentScale,Edge,new Rect(layout.StatusX,y,layout.StatusWidth,DockGeometry.SideStatusWidth));rect=new Rect(position.X,position.Y,DockGeometry.SideStatusWidth,layout.StatusWidth);}
             else rect=DockGeometry.Rect(Screen.Bounds,ContentScale,Edge,new Rect(layout.StatusX,y,layout.StatusWidth,44));

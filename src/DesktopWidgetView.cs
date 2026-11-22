@@ -96,8 +96,8 @@ namespace OneTaskBar
             Children.Add(card);
             if(InfoTileCatalog.Known(slot.Key))
             {
-                scheme=tileScheme??TileScheme.Desktop();
-                card.Background=scheme.Surface;
+                scheme=WidgetMaterial.Glass&&!Fluid.Enabled&&WidgetMaterial.Weather(slot.Key)?TileScheme.Navy:tileScheme??TileScheme.Desktop();
+                card.Background=scheme==TileScheme.Navy?WidgetMaterial.Navy:scheme.Surface;
                 card.BorderThickness=new Thickness(0);
                 tile=InfoTileCatalog.Create(slot.Key,false,shell,scheme);
                 body.Children.Add(new Viewbox {Stretch=Stretch.Uniform,Child=tile});
@@ -302,13 +302,15 @@ namespace OneTaskBar
             // Under the Fluid UI a glass widget is the same thin glass as the panels, with the glow pooling in its lower
             // corner and a rim that catches it.
             bool fluid=glass&&Fluid.Enabled;
-            if(scheme!=null)card.Background=fluid?Fluid.Tint(Glass95.Dark):glass?scheme.Surface:WidgetMaterial.Surface(scheme,opacity);
+            bool pane=glass&&!fluid;
+            if(scheme!=null)card.Background=fluid?Fluid.Tint(Glass95.Dark):scheme==TileScheme.Navy&&pane?WidgetMaterial.Navy:glass?(pane?WidgetMaterial.Film(scheme.Surface):scheme.Surface):WidgetMaterial.Surface(scheme,opacity);
             else card.Opacity=glass?.8:Math.Max(.1,opacity/100.0);
             fluidRim=fluid;
             if(editor.Visibility!=Visibility.Visible)
             {
                 card.BorderBrush=Rim;
-                if(fluid)card.BorderThickness=new Thickness(1);
+                // A 9.5 widget is a pane of its own with a thin light edge, as in the One UI widgets.
+                if(fluid||pane)card.BorderThickness=new Thickness(1);
             }
         }
         bool fluidRim;

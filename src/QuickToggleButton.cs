@@ -32,7 +32,7 @@ namespace OneTaskBar
             Checked=value;
             initialized=true;
             var previous=Background as SolidColorBrush;
-            var target=(SolidColorBrush)(glass?(value?Glass95.Selected:Glass95.Toggle):value?Paint.ControlWhite:Paint.Brush(QuickPanel.Inactive));
+            var target=(SolidColorBrush)(glass?(value?Glass95.Selected:Glass95.Enabled&&!Fluid.Enabled&&Glass95.Transparent?Glass95.FlatInactive:Glass95.Toggle):value?Paint.ControlWhite:Paint.Brush(QuickPanel.Inactive));
             var brush=new SolidColorBrush(target.Color);
             Background=brush;
             if(Glass95.Enabled)

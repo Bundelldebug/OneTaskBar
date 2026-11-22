@@ -16,7 +16,7 @@ namespace OneTaskBar
     // Dynamic Island. The left piece is the clock and date (the notification center), the playing media and the apps
     // that have notifications; the right piece is the network, sound and battery (quick settings). It sits in the same
     // reserved band as the island, which is as thick as the idle island.
-    internal sealed class TopStatusBar : GlassWindow
+    internal sealed partial class TopStatusBar : GlassWindow
     {
         internal enum Side {Left,Right}
         readonly ShellController shell;
@@ -67,6 +67,7 @@ namespace OneTaskBar
             if(OnBlack!=onBlack){OnBlack=onBlack;if(IsVisible)Refresh();}
             if(concealed==hidden)return;
             concealed=hidden;
+            if(shell.DexKeys!=null)shell.DexKeys.Update();
             if(hidden&&charge!=null)charge.Stop();
             IsHitTestVisible=!hidden;
             var fade=new System.Windows.Media.Animation.DoubleAnimation(hidden?0:1,TimeSpan.FromMilliseconds(hidden?140:180)){FillBehavior=System.Windows.Media.Animation.FillBehavior.HoldEnd};
@@ -90,7 +91,7 @@ namespace OneTaskBar
             row.VerticalAlignment=VerticalAlignment.Top;
             // A nearly clear fill makes every pixel of the piece take the click, including gaps between its parts.
             Surface.Background=Hit;
-            Surface.MouseLeftButtonUp+=(s,e)=>{if(e.Handled)return;e.Handled=true;if(side==Side.Left)shell.ToggleNotifications(Dock(),true);else shell.ToggleQuick(Dock(),false,true);};
+            Surface.MouseLeftButtonUp+=(s,e)=>{if(e.Handled)return;e.Handled=true;if(side==Side.Left)shell.ToggleCalendar(this);else shell.ToggleQuick(Dock(),false,true);};
             Surface.Child=row;
             SourceInitialized+=(s,e)=>
             {
@@ -101,19 +102,28 @@ namespace OneTaskBar
             Closed+=(s,e)=>
             {
                 closed=true;
+                Microsoft.Win32.SystemEvents.UserPreferenceChanged-=UserPreferenceChanged;
                 if(charge!=null)charge.Stop();
                 StopOutside();
                 if(card!=null)card.IsOpen=false;
                 chipArt.Background=null;
                 icons.Children.Clear();
             };
+            Microsoft.Win32.SystemEvents.UserPreferenceChanged+=UserPreferenceChanged;
+        }
+        void UserPreferenceChanged(object sender,Microsoft.Win32.UserPreferenceChangedEventArgs e)
+        {
+            if(closed)return;
+            if(e.Category==Microsoft.Win32.UserPreferenceCategory.Desktop||e.Category==Microsoft.Win32.UserPreferenceCategory.General||e.Category==Microsoft.Win32.UserPreferenceCategory.Color)
+                Dispatcher.BeginInvoke(new Action(()=>{if(!closed){inkAt=DateTime.MinValue;if(IsVisible)Refresh();}}));
         }
         static readonly Brush Hit=HitBrush();
         static Brush HitBrush(){var brush=new SolidColorBrush(Color.FromArgb(3,0,0,0));brush.Freeze();return brush;}
         static readonly Brush darkInk=Paint.Brush("#FF10151C"),lightInk=Paint.Brush("#FFF7FAFC");
         static readonly System.Windows.Media.Effects.Effect lightHalo=Halo(Colors.White);
         static System.Windows.Media.Effects.Effect Halo(Color color){var effect=new System.Windows.Media.Effects.DropShadowEffect {Color=color,BlurRadius=4,ShadowDepth=0,Opacity=.5};effect.Freeze();return effect;}
-        // White text over dark wallpaper, dark over light; read from the strip just under the bar a few times a second.
+        // White text over dark wallpaper, dark over light; read from the 2 px wallpaper edge of the bar itself
+        // (never from the app window underneath), only on show, monitor/wallpaper/theme change, or a slow fallback.
         DateTime inkAt=DateTime.MinValue;bool? lightText;bool sampling;
         Brush Ink
         {
@@ -121,15 +131,14 @@ namespace OneTaskBar
             {
                 if(OnBlack)return lightInk;
                 if(matchedInk!=null)return matchedInk;
-                if(DateTime.UtcNow>=inkAt&&screen!=null&&host.Width>0&&!sampling)
+                if(DateTime.UtcNow>=inkAt&&screen!=null&&host.Width>0&&IsVisible&&!concealed&&!sampling)
                 {
-                    inkAt=DateTime.UtcNow.AddSeconds(2.5);
-                    int thick=(int)Math.Ceiling(IslandSafeArea.Height*scale);
+                    inkAt=DateTime.UtcNow.AddSeconds(RuntimeCadence.OnBattery?300:120);
                     var box=Native.PlacementBounds(screen.Bounds,scale,host.X,host.Y,host.Width,host.Height);
-                    var area=new System.Drawing.Rectangle(box.Left,box.Top,box.Right-box.Left,Math.Min(box.Bottom-box.Top,thick));
-                    // The bar itself is read, since that is what its text sits on; its own text is part of what the screen
-                    // shows there and is taken back out. The read can take tens of milliseconds, so it runs off the
-                    // interface thread and the result is applied when it comes back.
+                    // Sample the outer 2 px strip of the reserved bar itself: untouched by centered pills/icons and never reading app windows below.
+                    int strip=Math.Max(2,(int)Math.Ceiling(2*scale));
+                    int sampleY=bottom?Math.Max(screen.Bounds.Top,box.Bottom-strip):Math.Max(screen.Bounds.Top,box.Top);
+                    var area=new System.Drawing.Rectangle(box.Left,sampleY,Math.Max(4,box.Right-box.Left),strip);
                     sampling=true;
                     BackgroundWork.Run(()=>LiquidReadability.Sample(area)).ContinueWith(task=>
                     {
@@ -137,53 +146,53 @@ namespace OneTaskBar
                         {
                             sampling=false;
                             if(closed||matchedInk!=null||OnBlack||task.Status!=System.Threading.Tasks.TaskStatus.RanToCompletion||task.Result<0)return;
-                            const double coverage=.12;
-                            double own=lightText==false?.06:.97;
-                            double behind=Math.Max(0,Math.Min(1,(task.Result-coverage*own)/(1-coverage)));
+                            double behind=Math.Max(0,Math.Min(1,task.Result));
                             // Two thresholds, so a value near the middle cannot make the text flip back and forth.
                             bool light=lightText.HasValue?(lightText.Value?behind<.60:behind<.50):behind<.55;
                             if(lightText!=light){lightText=light;Refresh();}
                         }));
                     });
-                }                return lightText.HasValue?(lightText.Value?lightInk:darkInk):Glass95.DockForeground;
+                }
+                return lightText.HasValue?(lightText.Value?lightInk:darkInk):Glass95.DockForeground;
             }
         }
+        Border clockPill;
         void BuildLeft()
         {
             var clock=new StackPanel {Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center};
             time.FontWeight=FontWeights.SemiBold;
-            date.Margin=new Thickness(9,0,0,0);
+            time.FontSize=date.FontSize=11.5;
+            date.Margin=new Thickness(8,0,0,0);
             clock.Children.Add(time);clock.Children.Add(date);
-            var clockButton=Paint.Button(clock,()=>shell.ToggleNotifications(Dock(),true),"알림센터");
-            clockButton.Background=Hit;clock.Background=Hit;clockButton.Padding=new Thickness(8,0,8,0);clockButton.VerticalAlignment=VerticalAlignment.Stretch;
+            clockPill=new Border {Height=20,CornerRadius=new CornerRadius(10),Padding=new Thickness(8,0,8,0),Background=Brushes.Transparent,VerticalAlignment=VerticalAlignment.Center,Child=clock};
+            var clockButton=Paint.Button(clockPill,()=>shell.ToggleCalendar(this),"달력");
+            clockButton.Background=Hit;clock.Background=Hit;clockButton.Padding=new Thickness(2,0,2,0);clockButton.VerticalAlignment=VerticalAlignment.Stretch;
+            clockButton.MouseEnter+=(s,e)=>{clockPill.Background=Ink==lightInk?LightCapsuleTint:DarkCapsuleTint;};
+            clockButton.MouseLeave+=(s,e)=>{clockPill.Background=Brushes.Transparent;};
             row.Children.Add(clockButton);
+        }
+        Button BuildChip()
+        {
             var content=new StackPanel {Orientation=Orientation.Horizontal};
             content.Children.Add(chipArt);content.Children.Add(chipTitle);
-            chipTitle.TextTrimming=TextTrimming.CharacterEllipsis;chipTitle.MaxWidth=170;
+            chipTitle.TextTrimming=TextTrimming.CharacterEllipsis;chipTitle.MaxWidth=96;
+            chip.Background=Paint.Brush("#EB2A2F37");
             chip.Child=content;
             chipButton=Paint.Button(chip,ToggleCard,"미디어 컨트롤");
             chipButton.Background=Hit;chipButton.Padding=new Thickness(10,0,0,0);chipButton.VerticalAlignment=VerticalAlignment.Stretch;
-            row.Children.Add(chipButton);
-            var iconButton=Paint.Button(icons,()=>shell.ToggleNotifications(Dock(),true),"알림센터");
-            iconButton.Background=Hit;icons.Background=Hit;iconButton.RenderTransform=iconShift;iconButton.Padding=new Thickness(8,0,8,0);iconButton.VerticalAlignment=VerticalAlignment.Stretch;
-            row.Children.Add(iconButton);
+            Named(chipButton,()=>{var m=shell.Services.Media;if(m==null||!m.Active)return "미디어";string name=!String.IsNullOrWhiteSpace(m.Artist)?m.Artist:m.Title;return String.IsNullOrWhiteSpace(name)?"미디어 재생 중":name+" 재생 중";});
+            return chipButton;
         }
         void BuildRight()
         {
-            var cluster=new StackPanel {Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center};
+            var iconsCluster=new StackPanel {Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center};
             wifi.Margin=new Thickness(0,0,7,0);
-            cluster.Children.Add(wifi);cluster.Children.Add(volume);
+            iconsCluster.Children.Add(wifi);iconsCluster.Children.Add(volume);
+            var cluster=new StackPanel {Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center};
+            cluster.Children.Add(iconsCluster);
             cluster.Children.Add(battery);
-            charge=new TopBarCharge(cluster) {VerticalAlignment=VerticalAlignment.Center};
-            row.HorizontalAlignment=HorizontalAlignment.Right;row.VerticalAlignment=VerticalAlignment.Top;
-            var button=Paint.Button(charge,()=>shell.ToggleQuick(Dock(),false,true),"빠른 설정");
-            button.Background=Hit;charge.Background=Hit;button.Padding=new Thickness(8,0,8,0);button.VerticalAlignment=VerticalAlignment.Stretch;
-            // Hidden tray icons: a down-pointing chevron before the status cluster; the panel opens downward from it.
-            trayGlyph.RenderTransformOrigin=new Point(.5,.5);trayGlyph.RenderTransform=new RotateTransform(90);
-            trayButton=Paint.Button(trayGlyph,OpenTray,"숨겨진 아이콘");
-            trayButton.Background=Hit;trayButton.Padding=new Thickness(6,0,6,0);trayButton.VerticalAlignment=VerticalAlignment.Stretch;
-            row.Children.Add(trayButton);
-            row.Children.Add(button);
+            charge=new TopBarCharge(cluster,battery,iconsCluster) {VerticalAlignment=VerticalAlignment.Center};
+            BuildDexRight(charge);
         }
         readonly Glyph trayGlyph=new Glyph("chevron",14){VerticalAlignment=VerticalAlignment.Center};
         Button trayButton;
@@ -212,7 +221,14 @@ namespace OneTaskBar
             var ink=Ink;
             // A faint halo in the opposite tone keeps the text readable where the picture behind it is busy.
             var effect=!OnBlack&&matchedInk==null&&lightText==false?lightHalo:null;
-            if(side==Side.Left)RefreshLeft(ink,effect);else RefreshRight(ink,effect);
+            if(side==Side.Left)RefreshLeft(ink,effect);
+            else
+            {
+                RefreshMediaChip();
+                RefreshNotificationIcons();
+                RefreshDexTools(ink,effect);
+                RefreshRight(ink,effect);
+            }
             if(screen==null||!layoutDirty&&IsVisible)return;
             layoutDirty=false;
             MeasureAndPlace();
@@ -228,7 +244,7 @@ namespace OneTaskBar
         void MeasureAndPlace()
         {
             row.Measure(new Size(Double.PositiveInfinity,IslandSafeArea.Height));
-            double maximum=Math.Max(80,screen.Bounds.Width/scale*(side==Side.Left?.34:.28));
+            double maximum=Math.Max(80,screen.Bounds.Width/scale*(side==Side.Left?.3:.62));
             double width=Math.Ceiling(Math.Min(maximum,row.DesiredSize.Width+4));
             var next=Place(width);
             if(reposition||host!=next||!IsVisible)
@@ -263,6 +279,9 @@ namespace OneTaskBar
                 date.Text=day;
             }
             time.Foreground=date.Foreground=ink;time.Effect=date.Effect=effect;
+        }
+        void RefreshMediaChip()
+        {
             var media=shell.Services.Media;
             bool playing=Preferences.Current.ShowNowBar&&media!=null&&media.Available&&media.Active;
             chip.Visibility=playing?Visibility.Visible:Visibility.Collapsed;
@@ -299,7 +318,6 @@ namespace OneTaskBar
                 if(card!=null&&card.IsOpen&&player!=null&&!closing){player.Update(media,shell.Services.OutputName);cardSurface.Background=player.MediaBackground??cardSurface.Background;}
             }
             else if(card!=null&&card.IsOpen)FinishClose();
-            RefreshNotificationIcons();
         }
 
         void RefreshNotificationIcons()
@@ -312,8 +330,10 @@ namespace OneTaskBar
             notificationItems=items;
             notificationCount=items.Count;
             notificationSize=size;
-            var apps=items.Where(n=>n!=null&&n.Icon!=null).OrderByDescending(n=>n.Created).GroupBy(n=>n.AppId??n.App).Select(g=>g.First()).Take(5).ToList();
-            string key=String.Join("|",apps.Select(n=>(n.AppId??n.App)+":"+System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(n.Icon)));
+            var grouped=items.Where(n=>n!=null&&n.Icon!=null).OrderByDescending(n=>n.Created).GroupBy(n=>n.AppId??n.App).Select(g=>g.First()).ToList();
+            bool overflow=grouped.Count>3;
+            var apps=grouped.Take(3).ToList();
+            string key=(overflow?"+|":"")+String.Join("|",apps.Select(n=>(n.AppId??n.App)+":"+System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(n.Icon)));
             if(key!=iconKey||sizeChanged)
             {
                 iconKey=key;
@@ -330,9 +350,14 @@ namespace OneTaskBar
                     }
                     catch(Exception){continue;}
                     if(source==null)continue;
-                    var image=new Image {Source=source,Width=14,Height=14,Stretch=Stretch.Uniform,Margin=new Thickness(0,0,5,0),ToolTip=entry.App,SnapsToDevicePixels=true,UseLayoutRounding=true};
+                    var image=new Image {Source=source,Width=13,Height=13,Stretch=Stretch.Uniform,Margin=new Thickness(0,0,4,0),ToolTip=entry.App,SnapsToDevicePixels=true,UseLayoutRounding=true};
                     RenderOptions.SetBitmapScalingMode(image,BitmapScalingMode.HighQuality);
                     icons.Children.Add(image);
+                }
+                if(overflow)
+                {
+                    var dot=new System.Windows.Shapes.Ellipse {Width=3.2,Height=3.2,Fill=Ink,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(1,0,3,0),Tag="overflow-dot"};
+                    icons.Children.Add(dot);
                 }
             }
         }
@@ -376,7 +401,7 @@ namespace OneTaskBar
             if(media==null||!media.Available||!media.Active)return;
             if(card==null)
             {
-                player=new MediaPlayerView(shell.Media,shell.SeekMedia,()=>{CloseCard();shell.ShowDetail("sound");},collapse:CloseCard,openApp:id=>{CloseCard();shell.OpenMediaApplication(id);},sourceApp:id=>MediaApplication.Resolve(id,shell.Running.Concat(shell.Apps))) {Margin=new Thickness(16,8,16,10)};
+                player=new MediaPlayerView(shell.Media,shell.SeekMedia,()=>{CardToOutput();},collapse:CloseCard,openApp:id=>{CloseCard();shell.OpenMediaApplication(id);},sourceApp:id=>MediaApplication.Resolve(id,shell.Running.Concat(shell.Apps))) {Margin=new Thickness(16,8,16,10)};
                 content=new Grid();
                 content.Children.Add(player);
                 miniArt=new Border {Width=13,Height=13,CornerRadius=new CornerRadius(4),Margin=new Thickness(0,0,6,0),VerticalAlignment=VerticalAlignment.Center};
@@ -415,12 +440,12 @@ namespace OneTaskBar
             player.BeginAnimation(UIElement.OpacityProperty,null);player.Opacity=0;
             miniHost.BeginAnimation(UIElement.OpacityProperty,null);miniHost.Opacity=1;
             // The notification icons move left into the place the chip leaves.
-            shiftBy=-(chipButton.ActualWidth);shifted=true;
+            shiftBy=0;shifted=true;
             card.IsOpen=true;
             // The card's own corner has to sit exactly on the chip's, or it opens and folds at a different place.
             AlignCard();
             Dispatcher.BeginInvoke(new Action(AlignCard),System.Windows.Threading.DispatcherPriority.Loaded);
-            Morph(true);
+            if(cardAtOnce)CardInPlace();else Morph(true);
             StopOutside();
             outside=MenuDismiss.Watch(ContainsPoint,CloseCard);
         }
@@ -471,17 +496,17 @@ namespace OneTaskBar
                 chip.BeginAnimation(UIElement.OpacityProperty,null);chip.Opacity=opening?0:1;
                 return;
             }
-            var ease=opening?SpringEase.Snappy:SpringEase.Smooth;
-            int length=opening?380:240;
+            var ease=SpringEase.Smooth;
+            int length=opening?280:200;
             var span=TimeSpan.FromMilliseconds(length);
             var hold=System.Windows.Media.Animation.FillBehavior.HoldEnd;
             var rect=new System.Windows.Media.Animation.RectAnimation(opening?small:cardClip.Rect,opening?full:small,span){EasingFunction=ease,FillBehavior=hold};
             cardClip.BeginAnimation(RectangleGeometry.RectProperty,rect);
-            var radius=new System.Windows.Media.Animation.DoubleAnimation(opening?radius0:cardClip.RadiusX,opening?26:radius0,span){EasingFunction=SpringEase.Smooth,FillBehavior=hold};
+            var radius=new System.Windows.Media.Animation.DoubleAnimation(opening?radius0:cardClip.RadiusX,opening?24:radius0,span){EasingFunction=SpringEase.Smooth,FillBehavior=hold};
             cardClip.BeginAnimation(RectangleGeometry.RadiusXProperty,radius);cardClip.BeginAnimation(RectangleGeometry.RadiusYProperty,radius.Clone());
-            var fade=new System.Windows.Media.Animation.DoubleAnimation(opening?0:player.Opacity,opening?1:0,TimeSpan.FromMilliseconds(opening?200:110)){BeginTime=TimeSpan.FromMilliseconds(opening?130:0),FillBehavior=hold};
+            var fade=new System.Windows.Media.Animation.DoubleAnimation(opening?0:player.Opacity,opening?1:0,TimeSpan.FromMilliseconds(opening?170:100)){BeginTime=TimeSpan.FromMilliseconds(opening?70:0),FillBehavior=hold};
             player.BeginAnimation(UIElement.OpacityProperty,fade);
-            var title=new System.Windows.Media.Animation.DoubleAnimation(opening?1:miniHost.Opacity,opening?0:1,TimeSpan.FromMilliseconds(120)){BeginTime=TimeSpan.FromMilliseconds(opening?0:120),FillBehavior=hold};
+            var title=new System.Windows.Media.Animation.DoubleAnimation(opening?1:miniHost.Opacity,opening?0:1,TimeSpan.FromMilliseconds(100)){BeginTime=TimeSpan.FromMilliseconds(opening?0:90),FillBehavior=hold};
             miniHost.BeginAnimation(UIElement.OpacityProperty,title);
             var slide=new System.Windows.Media.Animation.DoubleAnimation(iconShift.X,opening?shiftBy:0,span){EasingFunction=ease,FillBehavior=hold};
             iconShift.BeginAnimation(TranslateTransform.XProperty,slide);
@@ -490,7 +515,7 @@ namespace OneTaskBar
             chip.BeginAnimation(UIElement.OpacityProperty,chipFade);
         }
         bool closing;
-        readonly System.Windows.Threading.DispatcherTimer closeTimer=new System.Windows.Threading.DispatcherTimer {Interval=TimeSpan.FromMilliseconds(250)};
+        readonly System.Windows.Threading.DispatcherTimer closeTimer=new System.Windows.Threading.DispatcherTimer {Interval=TimeSpan.FromMilliseconds(210)};
         void CloseCard()
         {
             if(card==null||!card.IsOpen||closing)return;
@@ -500,6 +525,7 @@ namespace OneTaskBar
             closeTimer.Tick-=OnCloseTick;closeTimer.Tick+=OnCloseTick;closeTimer.Start();
         }
         void OnCloseTick(object sender,EventArgs e){closeTimer.Stop();FinishClose();}
+        internal void OutputFromCardForFixture(){CardToOutput();}
         void FinishClose()
         {
             if(card!=null)card.IsOpen=false;

@@ -67,6 +67,8 @@ namespace OneTaskBar
                 taskbar.DeleteTab(handle);
             }
             catch(COMException) { }
+            catch(NotImplementedException) { }
+            catch(InvalidCastException) { }
             finally {if(instance!=null)Marshal.ReleaseComObject(instance);}
         }
     }

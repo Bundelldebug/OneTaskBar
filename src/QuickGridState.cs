@@ -71,7 +71,7 @@ namespace OneTaskBar
             if(now.Ticks/TimeSpan.TicksPerSecond!=clock)
             {
                 clock=now.Ticks/TimeSpan.TicksPerSecond;
-                time.Text=now.ToString("H:mm:ss");
+                time.Text=Dex.Enabled?now.ToString("h:mm",System.Globalization.CultureInfo.InvariantCulture):now.ToString("H:mm:ss");
             }
             if(day!=now.Date.Ticks)
             {
@@ -168,7 +168,7 @@ namespace OneTaskBar
             bool changed=mediaIdle!=!state.Active;
             mediaIdle=!state.Active;
             Board.SetMediaIdle(mediaIdle);
-            if(changed)MediaShape();
+            if(changed){MediaShape();if(Dex.Enabled)host.FitDexHeight(true);}
         }
         internal object Snapshot()
         {

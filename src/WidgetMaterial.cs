@@ -38,6 +38,33 @@ namespace OneTaskBar
             brush.Freeze();
             return brush;
         }
+        internal static bool Weather(string key){return InfoTileCatalog.Known(key)&&InfoTileCatalog.Family(key).Key=="weather";}
+        static readonly Brush navyCard=NavyFilm();
+        static Brush NavyFilm()
+        {
+            var film=new LinearGradientBrush {StartPoint=new Point(.1,0),EndPoint=new Point(.9,1)};
+            film.GradientStops.Add(new GradientStop(Color.FromRgb(0x1B,0x2D,0x66),0));
+            film.GradientStops.Add(new GradientStop(Color.FromRgb(0x1B,0x45,0x8E),1));
+            film.Freeze();return film;
+        }
+        // A frosted card: the tint of the widget with a little more light toward the top, so it reads as one lifted pane.
+        static SolidColorBrush filmSource;static Brush film;
+        internal static Brush Film(Brush surface)
+        {
+            if(surface==navyCard)return navyCard;
+            var solid=surface as SolidColorBrush;if(solid==null)return surface;
+            if(solid==filmSource||filmSource!=null&&filmSource.Color==solid.Color)return film;
+            var c=solid.Color;
+            Func<byte,int,byte> lift=(v,amount)=>(byte)Math.Min(255,v+(255-v)*amount/100);
+            var sheet=new LinearGradientBrush {StartPoint=new Point(.15,0),EndPoint=new Point(.7,1)};
+            sheet.GradientStops.Add(new GradientStop(Color.FromArgb((byte)Math.Min(255,c.A+22),lift(c.R,38),lift(c.G,38),lift(c.B,38)),0));
+            sheet.GradientStops.Add(new GradientStop(c,.55));
+            sheet.GradientStops.Add(new GradientStop(c,1));
+            sheet.Freeze();
+            filmSource=solid;film=sheet;
+            return sheet;
+        }
+        internal static Brush Navy {get{return navyCard;}}
         internal static Brush Surface(TileScheme scheme,int opacity)
         {
             var solid=scheme.Surface as SolidColorBrush;

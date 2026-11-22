@@ -15,6 +15,7 @@ namespace OneTaskBar
     internal sealed class SearchWindow : GlassWindow
     {
         readonly ShellController shell;
+        readonly bool dex=Dex.Enabled;internal bool DexStyle {get{return dex;}}
         readonly SearchHistory history=new SearchHistory(Path.Combine(AppLog.Data,"search-history.json"));
         readonly StackPanel cards=new StackPanel {MaxWidth=1000,HorizontalAlignment=HorizontalAlignment.Stretch};
         Border filesCard;
@@ -28,12 +29,21 @@ namespace OneTaskBar
         internal readonly SearchNavigation Navigation;
         internal SearchWindow(ShellController controller)
         {
-            shell=controller;Title="One TaskBar · 검색";Width=720;Height=680;Radius=32;Dark=true;StableSurface=true;SmoothLauncher=true;Surface.CornerRadius=new CornerRadius(32);Surface.BorderBrush=Paint.Brush("#58FFFFFF");Surface.BorderThickness=new Thickness(.7);Surface.Background=QuickPanel.Glass;
+            shell=controller;Title="One TaskBar · 검색";Width=720;Height=680;Radius=dex?Dex.PanelRadius:32;Dark=true;StableSurface=true;SmoothLauncher=true;Surface.CornerRadius=new CornerRadius(Radius);Surface.BorderBrush=Paint.Brush("#58FFFFFF");Surface.BorderThickness=new Thickness(.7);Surface.Background=QuickPanel.Glass;
             var root=new DockPanel {Margin=new Thickness(24,20,24,16)};
             var header=new Grid {Height=36,Margin=new Thickness(4,0,4,12)};var title=Paint.TextBlock("검색",19,Paint.Text);title.FontWeight=FontWeights.SemiBold;header.Children.Add(title);
             var back=Paint.Action("앱 화면",()=>shell.ToggleDrawer(null));back.HorizontalAlignment=HorizontalAlignment.Right;back.Margin=new Thickness(0,0,62,0);header.Children.Add(back);var close=Paint.Button(new Glyph("close",19),()=>Hide(),"검색 닫기");close.HorizontalAlignment=HorizontalAlignment.Right;close.Width=40;close.Padding=new Thickness(8);header.Children.Add(close);DockPanel.SetDock(header,Dock.Top);root.Children.Add(header);
-            field=LauncherSearchField.Create(Query,()=>{Query.Clear();Query.Focus();});field.Margin=new Thickness(0,10,0,0);DockPanel.SetDock(field,Dock.Bottom);root.Children.Add(field);
-            scroll=new SmoothScrollViewer {Content=cards,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};root.Children.Add(scroll);Surface.Child=root;TransitionContent=root;
+            Action clearQuery=()=>{Query.Clear();Query.Focus();};field=dex?LauncherSearchField.CreatePill(Query,clearQuery,"무엇을 찾고 있나요?",Dex.SearchAccent,showIcon:false):LauncherSearchField.Create(Query,clearQuery);field.Margin=new Thickness(0,10,0,0);DockPanel.SetDock(field,Dock.Bottom);root.Children.Add(field);
+            scroll=new SmoothScrollViewer {Content=cards,VerticalScrollBarVisibility=dex?ScrollBarVisibility.Hidden:ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};root.Children.Add(scroll);
+            FrameworkElement whole=root;
+            if(dex)
+            {
+                // The cards fill the panel and the question floats over its lower edge.
+                header.Visibility=Visibility.Collapsed;root.Children.Remove(field);root.Margin=new Thickness(9,9,9,0);cards.Margin=new Thickness(0,0,0,58);
+                field.Margin=new Thickness(0,0,0,14);field.VerticalAlignment=VerticalAlignment.Bottom;field.HorizontalAlignment=HorizontalAlignment.Center;
+                var layers=new Grid();layers.Children.Add(root);layers.Children.Add(field);whole=layers;
+            }
+            Surface.Child=whole;TransitionContent=whole;
             Query.TextChanged+=(s,e)=> {QueueReload();};
 
             PreviewKeyDown+=(s,e)=>{if(Navigation!=null&&!Navigation.Composing&&(e.Key==Key.Enter||e.Key==Key.Down||e.Key==Key.Up||e.Key==Key.Left||e.Key==Key.Right))FlushReload();};Navigation=new SearchNavigation(this,Query);
@@ -41,7 +51,15 @@ namespace OneTaskBar
             IsVisibleChanged+=(s,e)=> {if(!IsVisible){Cancel();Navigation.Clear();cards.Children.Clear();files.Children.Clear();}};Closed+=(s,e)=> {closed=true;Cancel();Navigation.Clear();};
             Deactivated+=(s,e)=> {if(!Program.Inspectable&&IsVisible&&!IsMouseOver)Hide();};
         }
-        internal void Configure(double width,double height) {field.Width=Math.Max(220,Math.Min(620,width-76));cards.MaxWidth=Math.Max(240,Math.Min(1000,width-84));}
+        internal void RefreshDexTheme()
+        {
+            if(!dex)return;
+            field.Background=Dex.LightSheet?Paint.Brush("#FAFFFFFF"):Paint.Brush("#F0272E36");
+            field.BorderBrush=Dex.LightSheet?Paint.Brush("#18000000"):Paint.Brush("#28FFFFFF");
+            Query.Foreground=Dex.SheetInk;
+            if(IsVisible)Reload();
+        }
+        internal void Configure(double width,double height) {if(dex){field.Width=Math.Min(300,width-60);cards.MaxWidth=Math.Max(240,width-18);return;}field.Width=Math.Max(220,Math.Min(620,width-76));cards.MaxWidth=Math.Max(240,Math.Min(1000,width-84));}
         internal void Reset() {renderQueued=false;Query.Text="";Reload();scroll.ScrollToTop();}
         void QueueReload(){if(closed)return;Cancel();Navigation.Clear();if(renderQueued)return;renderQueued=true;Dispatcher.BeginInvoke(new Action(()=>{if(!renderQueued)return;renderQueued=false;if(!closed&&IsVisible)Reload();}),DispatcherPriority.Background);}
         void FlushReload(){if(renderQueued&&!closed){renderQueued=false;Reload();UpdateLayout();}}
@@ -50,7 +68,9 @@ namespace OneTaskBar
         {
             renderQueued=false;ResultBuilds++;Cancel();Navigation.Clear();cards.Children.Clear();string query=Query.Text.Trim();
             var apps=query.Length==0?Recommendations():LauncherSearch.Apps(shell.Apps,query);
+            if(dex&&query.Length==0&&apps.Count==0)apps=shell.Pins.Concat(shell.Apps).GroupBy(a=>a.Key,StringComparer.OrdinalIgnoreCase).Select(g=>g.First()).Take(7).ToList();
             if(apps.Count>0)AppCard(query.Length==0?"추천 앱":"검색된 앱",apps);
+            if(query.Length==0&&dex){if(history.Items.Count>0)RecentCard();return;}
             if(query.Length==0){RecentCard();SettingCard("주제별 설정",LauncherSearch.Settings.Take(6));return;}
             var settings=LauncherSearch.Settings.Where(s=>LauncherSearch.Matches(s.Name+" "+s.Keywords,query)).ToList();
             if(settings.Count>0)SettingCard("설정 및 제어판",settings);
@@ -64,26 +84,44 @@ namespace OneTaskBar
             string address=LauncherSearch.WebAddress(query);
             bool site=LauncherSearch.LooksLikeSite(query);
             var row=new StackPanel {Orientation=Orientation.Horizontal};
-            row.Children.Add(new Glyph("search",18){Color=Paint.Text,Margin=new Thickness(0,0,9,0)});
+            row.Children.Add(new Glyph("search",18){Color=dex?Dex.SheetInk:Paint.Text,Margin=new Thickness(0,0,9,0)});
             row.Children.Add(Label(site?""+query+" 열기":"웹에서 "+query+" 검색",14,Paint.Ink));
             Action launch=()=>Open(()=>LauncherSearch.OpenWeb(address),query);
             var button=Paint.Button(row,launch,site?"기본 브라우저에서 열기":"기본 브라우저로 웹 검색");
-            button.Background=Paint.Brush(QuickPanel.Inactive);button.HorizontalContentAlignment=HorizontalAlignment.Left;button.Padding=new Thickness(15,11,15,11);
+            button.Background=dex?Dex.SheetChip:Paint.Brush(QuickPanel.Inactive);button.HorizontalContentAlignment=HorizontalAlignment.Left;button.Padding=new Thickness(15,11,15,11);
             Navigation.Add(button,launch);
             Card("웹",button);
         }
-        internal List<AppEntry> Recommendations() {return shell.RecentApps.Recommend(shell.Apps,shell.Running,12);}
+        internal List<AppEntry> Recommendations() {return shell.RecentApps.Recommend(shell.Apps,shell.Running,dex?7:12);}
         Border Card(string title,UIElement body,Action extra=null)
         {
-            var panel=new StackPanel();var head=new Grid {Margin=new Thickness(0,0,0,16)};var text=Label(title,17,Paint.Ink);text.FontWeight=FontWeights.SemiBold;head.Children.Add(text);
-            if(extra!=null){var clear=Paint.Action("모두 삭제",extra);clear.Background=Brushes.Transparent;clear.HorizontalAlignment=HorizontalAlignment.Right;clear.Padding=new Thickness(8,2,8,2);head.Children.Add(clear);}panel.Children.Add(head);panel.Children.Add(body);
-            var card=new Border {Background=QuickPanel.Card,CornerRadius=new CornerRadius(28),Padding=new Thickness(16,16,16,16),Margin=new Thickness(0,0,0,12),Child=panel};cards.Children.Add(card);return card;
+            var panel=new StackPanel();var head=new Grid {Margin=new Thickness(0,0,0,dex?10:16)};var text=Label(title,dex?13:17,Paint.Ink);text.FontWeight=FontWeights.SemiBold;head.Children.Add(text);
+            if(extra!=null){var clear=Paint.Action("모두 삭제",extra);clear.Background=Brushes.Transparent;clear.HorizontalAlignment=HorizontalAlignment.Right;clear.Padding=new Thickness(8,2,8,2);if(dex&&clear.Content is TextBlock){((TextBlock)clear.Content).Foreground=Dex.SheetMuted;((TextBlock)clear.Content).FontSize=11.5;}head.Children.Add(clear);}panel.Children.Add(head);panel.Children.Add(body);
+            var card=new Border {Background=dex?Dex.SheetCard:QuickPanel.Card,CornerRadius=new CornerRadius(dex?18:28),Padding=new Thickness(dex?13:16,dex?12:16,dex?13:16,dex?11:16),Margin=new Thickness(0,0,0,dex?9:12),Child=panel};cards.Children.Add(card);return card;
         }
-        static TextBlock Label(string text,double size,Brush color) {var label=Paint.TextBlock(text,size,color==Paint.Ink?Paint.Text:color==LightPanel.Muted?Paint.Muted:color);label.TextTrimming=TextTrimming.CharacterEllipsis;return label;}
+        TextBlock Label(string text,double size,Brush color)
+        {
+            Brush resolved=dex?(color==Paint.Ink?Dex.SheetInk:color==LightPanel.Muted?Dex.SheetMuted:color):(color==Paint.Ink?Paint.Text:color==LightPanel.Muted?Paint.Muted:color);
+            var label=Paint.TextBlock(text,size,resolved);label.TextTrimming=TextTrimming.CharacterEllipsis;
+            string q=dex?Query.Text.Trim():"";
+            if(dex&&q.Length>0&&!String.IsNullOrEmpty(text)&&color==Paint.Ink)
+            {
+                int at=text.IndexOf(q,StringComparison.OrdinalIgnoreCase);
+                if(at>=0)
+                {
+                    label.Inlines.Clear();
+                    if(at>0)label.Inlines.Add(new System.Windows.Documents.Run(text.Substring(0,at)));
+                    label.Inlines.Add(new System.Windows.Documents.Run(text.Substring(at,q.Length)){Foreground=Dex.SearchAccent,FontWeight=FontWeights.SemiBold});
+                    if(at+q.Length<text.Length)label.Inlines.Add(new System.Windows.Documents.Run(text.Substring(at+q.Length)));
+                }
+            }
+            return label;
+        }
         void AppCard(string title,List<AppEntry> apps)
         {
-            var wrap=new WrapPanel();foreach(var entry in apps){var app=entry;var body=new StackPanel {Width=88,Height=96};FrameworkElement icon=AppIcons.Visual(app,44);icon.HorizontalAlignment=HorizontalAlignment.Center;icon.Margin=new Thickness(0,4,0,9);body.Children.Add(icon);var text=Label(app.Name,12,Paint.Ink);text.TextAlignment=TextAlignment.Center;text.TextWrapping=TextWrapping.Wrap;text.MaxHeight=34;body.Children.Add(text);
-                Action launch=()=>{var modifiers=Keyboard.Modifiers;Open(()=>shell.LaunchApp(app,modifiers),app.Name);};var button=Paint.Button(body,launch,app.Name);button.Padding=new Thickness(3);button.Margin=new Thickness(2);button.Background=Brushes.Transparent;button.ContextMenu=WindowPicker.Menu(app,shell,allowAdmin:true);Navigation.Add(button,launch);wrap.Children.Add(button);}Card(title,wrap);
+            Panel host=dex?new System.Windows.Controls.Primitives.UniformGrid {Columns=7}:(Panel)new WrapPanel();
+            foreach(var entry in apps){var app=entry;var body=new StackPanel {Width=dex?62:88,Height=dex?70:96};FrameworkElement icon=AppIcons.Visual(app,dex?42:44);icon.HorizontalAlignment=HorizontalAlignment.Center;icon.Margin=new Thickness(0,dex?2:4,0,dex?5:9);body.Children.Add(icon);var text=Label(app.Name,dex?11:12,Paint.Ink);text.TextAlignment=TextAlignment.Center;text.TextWrapping=dex?TextWrapping.NoWrap:TextWrapping.Wrap;text.MaxHeight=34;body.Children.Add(text);
+                Action launch=()=>{var modifiers=Keyboard.Modifiers;Open(()=>shell.LaunchApp(app,modifiers),app.Name);};var button=Paint.Button(body,launch,app.Name);button.Padding=new Thickness(dex?1:3);button.Margin=new Thickness(dex?1:2);button.Background=Brushes.Transparent;button.ContextMenu=WindowPicker.Menu(app,shell,allowAdmin:true);Navigation.Add(button,launch);host.Children.Add(button);}Card(title,host);
         }
         void SettingCard(string title,IEnumerable<SearchSetting> settings)
         {
@@ -91,11 +129,11 @@ namespace OneTaskBar
             foreach(var setting in settings)
             {
                 var row=new StackPanel {Orientation=Orientation.Horizontal};
-                row.Children.Add(new Glyph(setting.Icon,18){Color=Paint.Text,Margin=new Thickness(0,0,7,0)});
+                row.Children.Add(new Glyph(setting.Icon,18){Color=dex?Dex.SheetInk:Paint.Text,Margin=new Thickness(0,0,7,0)});
                 row.Children.Add(Label(setting.Name,13,Paint.Ink));
                 Action launch=()=>Open(()=>setting.Open(()=>shell.ShowWelcome()),setting.Name);
                 var button=Paint.Button(row,launch,setting.Name);
-                button.Background=Paint.Brush(QuickPanel.Inactive);
+                button.Background=dex?Dex.SheetChip:Paint.Brush(QuickPanel.Inactive);
                 button.Margin=new Thickness(0,0,8,7);
                 button.Padding=new Thickness(13,9,13,9);
                 Navigation.Add(button,launch);
@@ -110,9 +148,10 @@ namespace OneTaskBar
         }
         internal static Border RecentChip(string query,Action repeat,Action remove,out Button button)
         {
-            var row=new StackPanel {Orientation=Orientation.Horizontal};button=Paint.Action(query,repeat);button.Height=34;button.MaxWidth=260;button.Background=Brushes.Transparent;button.Padding=new Thickness(13,0,4,0);var label=button.Content as TextBlock;if(label!=null)label.TextTrimming=TextTrimming.CharacterEllipsis;row.Children.Add(button);
-            var clear=Paint.Button(new Glyph("close",12){Color=Paint.Text},remove,"최근 검색 삭제");clear.Width=26;clear.Height=26;clear.VerticalAlignment=VerticalAlignment.Center;clear.Background=Brushes.Transparent;clear.Padding=new Thickness(0);clear.Margin=new Thickness(0,0,4,0);clear.Resources["ButtonRadius"]=new CornerRadius(13);row.Children.Add(clear);
-            return new Border {Height=34,CornerRadius=new CornerRadius(17),Background=Paint.Brush(QuickPanel.Inactive),Child=row,Margin=new Thickness(0,0,8,8)};
+            bool dexChip=Dex.Enabled;Brush ink=dexChip?Dex.SheetInk:Paint.Text;
+            var row=new StackPanel {Orientation=Orientation.Horizontal};button=Paint.Action(query,repeat);button.Height=dexChip?30:34;button.MaxWidth=260;button.Background=Brushes.Transparent;button.Padding=new Thickness(12,0,4,0);var label=button.Content as TextBlock;if(label!=null){label.TextTrimming=TextTrimming.CharacterEllipsis;label.Foreground=ink;if(dexChip)label.FontSize=12;}row.Children.Add(button);
+            var clear=Paint.Button(new Glyph("close",11){Color=dexChip?Dex.SheetMuted:Paint.Text},remove,"최근 검색 삭제");clear.Width=24;clear.Height=24;clear.VerticalAlignment=VerticalAlignment.Center;clear.Background=Brushes.Transparent;clear.Padding=new Thickness(0);clear.Margin=new Thickness(0,0,4,0);clear.Resources["ButtonRadius"]=new CornerRadius(12);row.Children.Add(clear);
+            return new Border {Height=dexChip?30:34,CornerRadius=new CornerRadius(dexChip?15:17),Background=dexChip?Dex.SheetChip:Paint.Brush(QuickPanel.Inactive),Child=row,Margin=new Thickness(0,0,8,8)};
         }
         async Task FindFiles()
         {

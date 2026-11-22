@@ -34,6 +34,10 @@ namespace OneTaskBar
         }
         internal static void Check()
         {
+            bool savedDex=Preferences.Current.DexDesktop;
+            Preferences.Current.DexDesktop=false;
+            try
+            {
             CheckZoom();
             foreach(int edge in new[]{0,2})foreach(double scale in new[]{1.0,1.25,1.5,1.75,2.0,2.5})foreach(bool modern in new[]{false,true})foreach(bool large in new[]{false,true})foreach(int count in new[]{0,4,40}){
                 var monitor=new System.Drawing.Rectangle(-2560,-600,1920,1080);var dock=DockLayout.Compute(monitor,scale,count,58,true,68,edge);double w=monitor.Width/scale,h=monitor.Height/scale;var folded=Fit(w,h,dock.StartX,Math.Max(12,dock.StartX-56),1500,false,large,0,modern,edge);var opened=Fit(w,h,dock.StartX,Math.Max(12,dock.StartX-56),1500,true,large,0,modern,edge);var bounds=new Rect(0,0,w,h);
@@ -54,6 +58,8 @@ namespace OneTaskBar
                 if(fit.Raised||Math.Abs(fit.Bounds.Y-dock.Y)>.01||fit.Bounds.Right>dock.StartX-11.99||dock.AppX+dock.AppWidth+12>dock.StatusX+.01||fit.Bounds.Width>dock.StatusWidth+.01)throw new Exception("Small/mixed-DPI monitor media allocation");
             }
             foreach(double width in new[]{320.0,640,1440})foreach(double height in new[]{400.0,600,900}){var large=Fit(width,height,320,height-56,180,true,true);if(large.Bounds.Top<12||large.Bounds.Right>width||large.Bounds.Bottom>height-64||large.PosterEdge>288||large.PosterEdge>large.Bounds.Width-56)throw new Exception("Large cover exceeds monitor bounds");}
+            }
+            finally{Preferences.Current.DexDesktop=savedDex;}
         }
         static void CheckZoom()
         {

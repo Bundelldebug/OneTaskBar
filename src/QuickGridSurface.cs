@@ -26,6 +26,16 @@ namespace OneTaskBar
         readonly ShellController shell;
         internal readonly QuickWidgetBoard Board;
         internal readonly QuickToggleOrder ActionOrder=new QuickToggleOrder(Path.Combine(AppLog.Data,"quick-toggle-order-9.json"));
+        Grid dexHeader,dexFooter;
+        internal FrameworkElement[] LateParts {get{return dexHeader!=null?(dexFooter!=null?new FrameworkElement[]{dexHeader,dexFooter}:new FrameworkElement[]{dexHeader}):null;}}
+        internal double PreferredHeight(double width)
+        {
+            double inner=Math.Max(120,width-Root.Margin.Left-Root.Margin.Right);
+            double headerH=dexHeader!=null?44:59;
+            double footerH=40;
+            double extra=(hint.Visibility==Visibility.Visible?72:0)+(notice.Visibility==Visibility.Visible?26:0);
+            return Math.Ceiling(Root.Margin.Top+Root.Margin.Bottom+headerH+footerH+extra+Board.PreferredHeight(inner));
+        }
         internal readonly DockPanel Root=new DockPanel
         {
             Margin=new Thickness(18,19,18,14)
@@ -159,6 +169,7 @@ namespace OneTaskBar
         {
             return actionItems.First(i=>(string)i.Tag==key);
         }
+        internal Button BatteryButton {get{return batteryButton;}}
         internal QuickGridSurface(QuickWindow window,ShellController controller)
         {
             host=window;
@@ -166,11 +177,19 @@ namespace OneTaskBar
             Board=new QuickWidgetBoard(new QuickWidgetLayout(Path.Combine(AppLog.Data,"quick-layout-9.json")));
             Board.Changed+=()=>Feedback("배치를 저장하지 못했습니다. 다시 시도해 주세요.");
             Board.EditContents=()=>EditActions(true);
+            bool dex=Dex.Enabled;
             var header=new Grid
             {
-                Height=47,Margin=new Thickness(4,0,2,12)
+                Height=dex?34:47,Margin=dex?new Thickness(6,0,0,10):new Thickness(4,0,2,12)
             };
+            // The Dex panel has one line: the time and the date, then its tools.
             var clockText=new StackPanel();
+            if(dex)
+            {
+                Root.Margin=new Thickness(16,14,16,16);
+                clockText.Orientation=Orientation.Horizontal;
+                time.FontSize=18;date.FontSize=12;date.VerticalAlignment=VerticalAlignment.Bottom;date.Margin=new Thickness(7,0,0,2);
+            }
             time.FontWeight=FontWeights.SemiBold;
             clockText.Children.Add(time);
             clockText.Children.Add(date);
@@ -192,6 +211,7 @@ namespace OneTaskBar
             tools.Children.Add(power);
             tools.Children.Add(Tool("home","One TaskBar 설정",shell.OpenHomeSettings));
             header.Children.Add(tools);
+            dexHeader=dex?header:null;
             DockPanel.SetDock(header,Dock.Top);
             Root.Children.Add(header);
             var footer=new Grid
@@ -214,6 +234,7 @@ namespace OneTaskBar
             notifications.Padding=new Thickness(8,3,0,3);
             footer.Children.Add(notifications);
             DockPanel.SetDock(footer,Dock.Bottom);
+            dexFooter=dex?footer:null;
             Root.Children.Add(footer);
             var scrolled=new DockPanel();
             notice.TextWrapping=TextWrapping.Wrap;
@@ -358,13 +379,13 @@ namespace OneTaskBar
             {
                 Brightness.Vertical=slot.Rows>1;Brightness.InvalidateVisual();
             });
-            Board.Add("volume","음량",Volume.WithOutputAction(()=>shell.ShowDetail("sound")),slot=>
+            Board.Add("volume","음량",Volume.WithOutputAction(()=>{host.SoundOrigin="volume";shell.ShowDetail("sound");}),slot=>
             {
                 Volume.Vertical=slot.Rows>1;Volume.InvalidateVisual();
             });
             Brightness.Changed+=shell.Bright;
             Volume.Changed+=shell.Volume;
-            media=new MediaPlayerView(shell.Media,shell.SeekMedia,()=>shell.ShowDetail("sound"),condensed:true,openApp:shell.OpenMediaApplication,dense:true,sourceApp:id=>MediaApplication.Resolve(id,shell.Running.Concat(shell.Apps)));media.SeekBar.WaveInterval=.033;
+            media=new MediaPlayerView(shell.Media,shell.SeekMedia,()=>{host.SoundOrigin="media";shell.ShowDetail("sound");},condensed:true,openApp:shell.OpenMediaApplication,dense:true,sourceApp:id=>MediaApplication.Resolve(id,shell.Running.Concat(shell.Apps)));media.SeekBar.WaveInterval=.033;
             media.HorizontalAlignment=HorizontalAlignment.Stretch;
             media.VerticalAlignment=VerticalAlignment.Center;
             mediaBody.Children.Add(mediaGlow);
@@ -406,7 +427,7 @@ namespace OneTaskBar
             miniPlay.Background=Brushes.Transparent;
             Grid.SetColumn(miniPlay,2);
             miniMedia.Children.Add(miniPlay);
-            miniOutput=Tool("audio-output","출력 기기 변경",()=>shell.ShowDetail("sound"));
+            miniOutput=Tool("audio-output","출력 기기 변경",()=>{host.SoundOrigin="media";shell.ShowDetail("sound");});
             Grid.SetColumn(miniOutput,3);
             miniMedia.Children.Add(miniOutput);
             mediaBody.Children.Add(miniMedia);

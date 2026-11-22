@@ -17,6 +17,80 @@ namespace OneTaskBar
         Border outputArtwork;
         // The sound page leads on to a page of its own for each app's volume; the back button returns from it.
         bool appsPage;TextBlock heading;
+        // The Dex page: a large centered title over one card, which is what the quick settings tile grows into.
+        internal Border Sheet {get;private set;}internal Image Under {get;private set;}
+        FrameworkElement[] lateParts;internal override FrameworkElement[] LateParts {get{return lateParts;}}
+        DexSwitch dexSwitch;TextBlock dexState;Grid dexTop;
+        // Set when the output list was opened from the media card of the status row; going back returns there.
+        internal TopStatusBar OutputCard;
+        void DexBack()
+        {
+            if(appsPage){ShowApps(false);return;}
+            if(OutputCard!=null&&OutputCard.ReturnFromOutput(this))return;
+            if(OutputCard!=null){Hide();return;}
+            shell.ReturnToQuick(this);
+        }
+        Button DexTool(string glyph,Action press,string tip,HorizontalAlignment side)
+        {
+            var button=Paint.Button(new Glyph(glyph,17),press,tip);
+            button.Width=button.Height=32;button.Padding=new Thickness(0);button.Background=Brushes.Transparent;button.HorizontalAlignment=side;button.VerticalAlignment=VerticalAlignment.Center;button.Resources["ButtonRadius"]=new CornerRadius(16);
+            return button;
+        }
+        void DexLayout(DockPanel root,Grid header,UIElement scroll)
+        {
+            root.Children.Clear();header.Children.Clear();Surface.Child=null;
+            var layers=new Grid();
+            Under=new Image {HorizontalAlignment=HorizontalAlignment.Left,VerticalAlignment=VerticalAlignment.Top,Stretch=Stretch.Fill,IsHitTestVisible=false,Visibility=Visibility.Collapsed};layers.Children.Add(Under);
+            var page=new DockPanel {Margin=new Thickness(14,0,14,14)};
+            heading.Margin=new Thickness(0);heading.FontSize=23;heading.HorizontalAlignment=HorizontalAlignment.Center;heading.VerticalAlignment=VerticalAlignment.Center;
+            bool output=this.page=="sound";
+            var title=new Grid {Height=output?48:112};title.Children.Add(heading);
+            if(output)
+            {
+                // The output list: a small bar over one dark sheet; the sheet itself starts with what is playing.
+                heading.FontSize=14;heading.Visibility=shell.Services.Media!=null&&shell.Services.Media.Active?Visibility.Collapsed:Visibility.Visible;
+                title.Children.Add(DexTool("back",DexBack,"돌아가기",HorizontalAlignment.Left));
+                title.Children.Add(DexTool("settings",OpenSystemPage,"소리 설정",HorizontalAlignment.Right));
+            }
+            DockPanel.SetDock(title,Dock.Top);page.Children.Add(title);
+            var inside=new DockPanel {Margin=new Thickness(16,12,16,8)};
+            dexTop=new Grid {Height=30,Margin=new Thickness(0,0,0,8)};dexState=Paint.TextBlock("사용 중",14,Paint.Text);dexState.FontWeight=FontWeights.SemiBold;dexState.VerticalAlignment=VerticalAlignment.Center;dexTop.Children.Add(dexState);
+            var right=new StackPanel {Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Center};
+            refreshButton.HorizontalAlignment=HorizontalAlignment.Center;refreshButton.Width=refreshButton.Height=26;refreshButton.Margin=new Thickness(0,0,8,0);right.Children.Add(refreshButton);
+            dexSwitch=new DexSwitch(()=>ToggleRadio(page2));dexSwitch.VerticalAlignment=VerticalAlignment.Center;right.Children.Add(dexSwitch);dexTop.Children.Add(right);
+            dexTop.Visibility=Wireless?Visibility.Visible:Visibility.Collapsed;DockPanel.SetDock(dexTop,Dock.Top);inside.Children.Add(dexTop);
+            if(Wireless)
+            {
+                var divider=new Border {Height=1,Background=Paint.Brush("#24FFFFFF"),Margin=new Thickness(0,2,0,10)};
+                DockPanel.SetDock(divider,Dock.Top);inside.Children.Add(divider);
+            }
+            var foot=new Grid {Height=38,Margin=new Thickness(0,6,0,0)};foot.ColumnDefinitions.Add(new ColumnDefinition());foot.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(1)});foot.ColumnDefinitions.Add(new ColumnDefinition());
+            var more=Paint.Action("상세 설정",()=>OpenSystemPage());more.Background=Brushes.Transparent;more.BorderThickness=new Thickness(0);more.HorizontalAlignment=HorizontalAlignment.Stretch;more.Resources["ButtonRadius"]=new CornerRadius(18);foot.Children.Add(more);
+            var sep=new Border {Width=1,Height=16,VerticalAlignment=VerticalAlignment.Center,Background=Paint.Brush("#28FFFFFF")};Grid.SetColumn(sep,1);foot.Children.Add(sep);
+            var finish=Paint.Action("완료",DexBack);finish.Background=Brushes.Transparent;finish.BorderThickness=new Thickness(0);finish.HorizontalAlignment=HorizontalAlignment.Stretch;finish.Resources["ButtonRadius"]=new CornerRadius(18);Grid.SetColumn(finish,2);foot.Children.Add(finish);
+            foot.Visibility=output?Visibility.Collapsed:Visibility.Visible;
+            DockPanel.SetDock(foot,Dock.Bottom);inside.Children.Add(foot);
+            status.Margin=new Thickness(2,6,2,0);status.Visibility=Wireless?Visibility.Collapsed:Visibility.Visible;DockPanel.SetDock(status,Dock.Bottom);inside.Children.Add(status);
+            inside.Children.Add(scroll);
+            Sheet=new Border {CornerRadius=new CornerRadius(24),Background=output?Paint.Brush("#F5181A1D"):Glass95.FlatCard,Child=inside};page.Children.Add(Sheet);
+            layers.Children.Add(page);Surface.Child=layers;lateParts=new FrameworkElement[]{title};
+            if(this.page=="sound"){SmoothLauncher=true;TransitionContent=inside;}
+        }
+        string page2 {get{return page;}}
+        async void OpenSystemPage()
+        {
+            string target=page=="wifi"?"ms-settings:network-wifi":page=="bluetooth"?"ms-settings:bluetooth":page=="sound"?"ms-settings:sound":page=="power"?"ms-settings:powersleep":page=="focus"?"ms-settings:quiethours":"ms-settings:display";
+            if(await DismissAsync())Native.Open(target);
+        }
+        // Rows lie straight on the card here, and the radio is the switch at its top.
+        void DexRows()
+        {
+            if(Sheet==null)return;
+            foreach(var row in body.Children.OfType<Button>())row.Background=Brushes.Transparent;
+            if(!Wireless)return;
+            bool on=(page=="wifi"?shell.Services.WifiOn:shell.Services.BluetoothOn)==true;
+            dexSwitch.Set(on);dexState.Text=on?"사용 중":"사용 안 함";
+        }
         internal bool AppsPage {get{return appsPage;}}
         internal void ShowApps(bool on){if(page!="sound"||appsPage==on)return;appsPage=on;if(heading!=null)heading.Text=on?"앱별 음량":PageName(page);Reload();}
         internal string PageKey {get{return page;}}
@@ -37,15 +111,16 @@ namespace OneTaskBar
         internal bool TimerActive {get{return ticker.IsEnabled;}}
         internal DetailWindow(ShellController controller,string kind,Func<CancellationToken,Task<WirelessSnapshot>> loader=null)
         {
-            shell=controller;page=kind;scanLoader=loader;Title="One TaskBar · "+PageName(kind);Width=380;Height=540;Radius=30;Dark=true;Surface.CornerRadius=new CornerRadius(30);Surface.Background=QuickPanel.Glass;Surface.BorderBrush=Paint.Brush("#48FFFFFF");Surface.BorderThickness=new Thickness(.7);
+            shell=controller;page=kind;scanLoader=loader;Title="One TaskBar · "+PageName(kind);Width=380;Height=Dex.Enabled?Dex.QuickHeight:540;Radius=Dex.Enabled?Dex.PanelRadius:30;Dark=true;Surface.CornerRadius=new CornerRadius(Radius);Surface.Background=QuickPanel.Glass;Surface.BorderBrush=Paint.Brush("#48FFFFFF");Surface.BorderThickness=new Thickness(.7);
             var root=new DockPanel {Margin=new Thickness(20)};
             var header=new Grid {Height=44,Margin=new Thickness(0,0,0,12)};
-            var back=Paint.Button(new Glyph("back",18),()=> {if(appsPage){ShowApps(false);return;}Hide();shell.ToggleQuick(null);},"빠른 설정으로 돌아가기");back.Width=back.Height=34;back.VerticalAlignment=VerticalAlignment.Center;back.Background=Brushes.Transparent;back.Padding=new Thickness(0);back.HorizontalAlignment=HorizontalAlignment.Left;header.Children.Add(back);
+            var back=Paint.Button(new Glyph("back",18),()=> {if(appsPage){ShowApps(false);return;}shell.ReturnToQuick(this);},"빠른 설정으로 돌아가기");back.Width=back.Height=34;back.VerticalAlignment=VerticalAlignment.Center;back.Background=Brushes.Transparent;back.Padding=new Thickness(0);back.HorizontalAlignment=HorizontalAlignment.Left;header.Children.Add(back);
             var title=Paint.TextBlock(PageName(kind),21,Paint.Text);title.FontWeight=FontWeights.SemiBold;title.Margin=new Thickness(40,0,30,0);heading=title;header.Children.Add(title);
             refreshButton=Paint.Button(scanIndicator,()=>{Reload();if(page=="power")CheckSamsungAccess(true);},"다시 검색");refreshButton.Width=refreshButton.Height=34;refreshButton.VerticalAlignment=VerticalAlignment.Center;refreshButton.Background=Brushes.Transparent;refreshButton.Padding=new Thickness(0);refreshButton.HorizontalAlignment=HorizontalAlignment.Right;header.Children.Add(refreshButton);DockPanel.SetDock(header,Dock.Top);root.Children.Add(header);
             status.TextWrapping=TextWrapping.Wrap;status.Margin=new Thickness(5,10,5,0);DockPanel.SetDock(status,Dock.Bottom);root.Children.Add(status);
-            root.Children.Add(new SmoothScrollViewer {Content=body,VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled});Surface.Child=root;
-            if(page=="sound"){SmoothLauncher=true;var layers=new Grid();var clip=new RectangleGeometry {RadiusX=Radius,RadiusY=Radius};layers.Clip=clip;layers.SizeChanged+=(s,e)=>clip.Rect=new Rect(new Point(),e.NewSize);var fade=new LinearGradientBrush {StartPoint=new Point(0,0),EndPoint=new Point(0,1)};fade.GradientStops.Add(new GradientStop(Color.FromArgb(170,255,255,255),0));fade.GradientStops.Add(new GradientStop(Colors.Transparent,1));fade.Freeze();outputArtwork=new Border {Opacity=.45,Height=260,VerticalAlignment=VerticalAlignment.Top,IsHitTestVisible=false,OpacityMask=fade,Background=ArtworkPalette.OutputSurface(shell.Services.Media.Artwork)};layers.Children.Add(outputArtwork);Surface.Child=null;layers.Children.Add(root);Surface.Child=layers;TransitionContent=layers;}
+            var scroller=new SmoothScrollViewer {Content=body,VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};root.Children.Add(scroller);Surface.Child=root;
+            if(Dex.Enabled)DexLayout(root,header,scroller);
+            else if(page=="sound"){SmoothLauncher=true;var layers=new Grid();var clip=new RectangleGeometry {RadiusX=Radius,RadiusY=Radius};layers.Clip=clip;layers.SizeChanged+=(s,e)=>clip.Rect=new Rect(new Point(),e.NewSize);var fade=new LinearGradientBrush {StartPoint=new Point(0,0),EndPoint=new Point(0,1)};fade.GradientStops.Add(new GradientStop(Color.FromArgb(170,255,255,255),0));fade.GradientStops.Add(new GradientStop(Colors.Transparent,1));fade.Freeze();outputArtwork=new Border {Opacity=.45,Height=260,VerticalAlignment=VerticalAlignment.Top,IsHitTestVisible=false,OpacityMask=fade,Background=ArtworkPalette.OutputSurface(shell.Services.Media.Artwork)};layers.Children.Add(outputArtwork);Surface.Child=null;layers.Children.Add(root);Surface.Child=layers;TransitionContent=layers;}
             Closed+=(s,e)=> {closed=true;ticker.Stop();CancelScan();};Deactivated+=(s,e)=> {if(deviceActions==0&&!Program.Inspectable&&IsVisible&&!IsMouseOver)Hide();};if(!Wireless)Reload();
             ticker.Tick+=(s,e)=> {if(page=="focus")FocusStatus();else if(page=="power"&&!busy&&!changingMode&&!changingSamsung)RefreshPowerSelection();};
             IsVisibleChanged+=(s,e)=> {if(!IsVisible&&appsPage){appsPage=false;heading.Text=PageName(page);}if(IsVisible&&(page=="focus"||page=="power"))ticker.Start();else ticker.Stop();if(Wireless){if(IsVisible)Reload();else CancelScan();}else scanIndicator.SetScanning(busy&&IsVisible);};
@@ -103,7 +178,7 @@ namespace OneTaskBar
                     var slider=new PillSlider("brightness") {Value=Math.Max(0,shell.Brightness),IsEnabled=shell.Brightness>=0,Light=true,DarkTrack=true};slider.Changed+=v=>shell.Bright(v);body.Children.Add(Card(slider));
                     status.Text=shell.Brightness>=0?"노트북의 실제 디스플레이 밝기를 조절합니다.":"이 디스플레이는 Windows 밝기 조절을 지원하지 않습니다.";
                 }
-            }catch(Exception e){status.Text=e.Message;AppLog.Write("details-"+page,e.Message);}finally{busy=false;refreshButton.IsEnabled=true;scanIndicator.SetScanning(false);}
+            }catch(Exception e){status.Text=e.Message;AppLog.Write("details-"+page,e.Message);}finally{busy=false;refreshButton.IsEnabled=true;scanIndicator.SetScanning(false);DexRows();}
         }
         internal void Rescan(){Reload();}
         void CancelScan()
@@ -127,13 +202,14 @@ namespace OneTaskBar
                     status.Text=snapshot.Notice??(snapshot.Devices.Count==0?"주변 기기를 찾지 못했습니다. 기기의 페어링 모드를 켜고 다시 검색해 주세요.":"새 기기를 눌러 페어링합니다. 등록된 기기는 메뉴에서 연결 관리 또는 제거를 선택할 수 있습니다.");
                 }
             }catch(OperationCanceledException){}catch(Exception error){if(!closed&&revision==scanVersion)status.Text="재검색하지 못했습니다: "+error.Message;}
-            finally{if(revision==scanVersion){scan=null;busy=false;refreshButton.IsEnabled=true;scanIndicator.SetScanning(false);}source.Dispose();}
+            finally{DexRows();if(revision==scanVersion){scan=null;busy=false;refreshButton.IsEnabled=true;scanIndicator.SetScanning(false);}source.Dispose();}
         }
         void RadioAction()
         {
             if(page=="wifi"&&shell.Apps.Any(a=>(a.AppID??"").StartsWith("Microsoft.YourPhone_",StringComparison.OrdinalIgnoreCase))){
                 var row=new Grid();row.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(42)});row.ColumnDefinitions.Add(new ColumnDefinition());row.Children.Add(new Glyph("phone",28));var text=new StackPanel();text.Children.Add(Paint.TextBlock("인스턴트 핫스팟",14,Paint.Text));text.Children.Add(Paint.TextBlock("Windows에서 기기 선택 · 연결",11,Paint.Muted));Grid.SetColumn(text,1);row.Children.Add(text);var button=Paint.Button(row,OpenInstantHotspot,"Windows 인스턴트 핫스팟 연결 화면 열기");button.Background=QuickPanel.Card;button.HorizontalContentAlignment=HorizontalAlignment.Stretch;button.Padding=new Thickness(13,12,13,12);button.Margin=new Thickness(0,4,0,7);body.Children.Add(button);
             }
+            if(Sheet!=null){DexRows();return;}
             Action((page=="wifi"?"Wi-Fi":"블루투스")+((page=="wifi"?shell.Services.WifiOn:shell.Services.BluetoothOn)==true?" 끄기":" 켜기"),()=>ToggleRadio(page));
         }
         async void SelectBluetooth(BluetoothPeer peer,Button button,bool menuRequested=false)
@@ -161,7 +237,7 @@ namespace OneTaskBar
         async void OpenInstantHotspot(){if(await DismissAsync())Native.Open("ms-availablenetworks:");}
         async void ToggleRadio(string kind)
         {
-            try {if(!await shell.Services.ToggleRadio(kind)){status.Text="Windows가 무선 장치 제어를 허용하지 않았습니다.";return;}await shell.Services.Refresh();if(!closed)Reload();}
+            try {if(!await shell.Services.ToggleRadio(kind)){status.Text="Windows가 무선 장치 제어를 허용하지 않았습니다.";return;}await shell.Services.Refresh();DexRows();if(!closed)Reload();}
             catch(Exception error){if(!closed)status.Text=error.Message;}
         }
         void FocusStatus() {status.Text=shell.FocusUntil>DateTime.UtcNow?"남은 시간  "+(shell.FocusUntil-DateTime.UtcNow).ToString(@"mm\:ss"):"진행 중인 타이머가 없습니다";}

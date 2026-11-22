@@ -73,6 +73,7 @@ namespace OneTaskBar
         public int TrayPanelPercent=100;
         public bool MediaFlightToIsland=true;
         public bool TopStatusBar=false;
+        public bool DexDesktop=false;
         public bool FullscreenBand=true;
         public bool LightEffects=false;
         // Keeps animations at 60 frames per second on a faster display; read once at startup.

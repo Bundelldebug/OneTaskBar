@@ -21,6 +21,51 @@ namespace OneTaskBar
         readonly QuickGridSurface gridUI;
         internal bool Modern {get{return gridUI!=null;}}
         internal QuickGridSurface GridUI {get{return gridUI;}}
+        internal override FrameworkElement[] LateParts {get{return Modern?gridUI.LateParts:null;}}
+        internal double PreferredHeight(double width,double maxHeight)
+        {
+            if(!Dex.Enabled||gridUI==null)return Math.Min(650,maxHeight);
+            return Math.Min(maxHeight,Math.Max(320,gridUI.PreferredHeight(width)));
+        }
+        internal void FitDexHeight(bool animate)
+        {
+            if(!Dex.Enabled||gridUI==null||!IsVisible||IsDismissing)return;
+            var handle=new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            if(handle==IntPtr.Zero)return;
+            var screen=System.Windows.Forms.Screen.FromHandle(handle);
+            double scale=Math.Max(96,Native.GetDpiForWindow(handle))/96.0;
+            double maxH=screen.Bounds.Height/scale-IslandSafeArea.Height-DockSizing.BarSpace*DockSizing.Zoom-20;
+            double target=PreferredHeight(Width>0?Width:380,Math.Max(320,maxH));
+            if(Math.Abs(target-Height)<2)return;
+            if(animate&&Motion.Enabled)PanelMorph.Resize(this,target);
+            else
+            {
+                Native.RectI rect;
+                if(Native.GetWindowRect(handle,out rect))
+                    Native.SetWindowPos(handle,IntPtr.Zero,rect.Left,rect.Top,rect.Right-rect.Left,(int)Math.Round(target*scale),0x14);
+                Height=target;
+            }
+        }
+        internal string SoundOrigin;
+        string lastSoundOrigin;
+        // Where a page grows from: the tile it belongs to, or the middle of the panel.
+        internal Rect PageOrigin(string page)
+        {
+            if(page=="power"&&Modern&&gridUI.BatteryButton!=null&&gridUI.BatteryButton.IsVisible&&gridUI.BatteryButton.ActualWidth>1)
+            {
+                var at=gridUI.BatteryButton.TranslatePoint(new Point(),Surface);
+                return new Rect(at.X,at.Y,gridUI.BatteryButton.ActualWidth,gridUI.BatteryButton.ActualHeight);
+            }
+            QuickWidgetFrame frame;
+            string key=page=="sound"?(SoundOrigin??lastSoundOrigin??"volume"):page=="display"?"brightness":page;
+            if(page=="sound"&&SoundOrigin!=null){lastSoundOrigin=SoundOrigin;SoundOrigin=null;}
+            if(Modern&&gridUI.Board.Frames.TryGetValue(key,out frame)&&frame.IsVisible&&frame.ActualWidth>1)
+            {
+                var at=frame.TranslatePoint(new Point(),Surface);
+                return new Rect(at.X,at.Y,frame.ActualWidth,frame.ActualHeight);
+            }
+            return new Rect(Math.Max(0,Surface.ActualWidth/2-70),Math.Max(0,Surface.ActualHeight/2-32),140,64);
+        }
         internal bool TogglePending(string key){return pendingToggles.Contains(key);}
         readonly PillSlider brightness=new PillSlider("brightness"),volume=new PillSlider("volume");
         readonly BatteryPill battery=new BatteryPill {Width=62,Height=25};
@@ -83,7 +128,7 @@ namespace OneTaskBar
         bool expanded;int actionMotion;readonly Grid actionArea=new Grid {Height=62,ClipToBounds=true};
         internal QuickWindow(ShellController controller)
         {
-            shell=controller;Title="One TaskBar · 빠른 설정";Width=380;Height=650;Radius=30;Dark=true;Surface.CornerRadius=new CornerRadius(30);Surface.Background=QuickPanel.Glass;Surface.BorderBrush=Paint.Brush("#48FFFFFF");Surface.BorderThickness=new Thickness(.7);
+            shell=controller;Title="One TaskBar · 빠른 설정";Width=380;Height=Dex.Enabled?Dex.QuickHeight:650;Radius=Dex.Enabled?Dex.PanelRadius:30;Dark=true;Surface.CornerRadius=new CornerRadius(Radius);Surface.Background=QuickPanel.Glass;Surface.BorderBrush=Paint.Brush("#48FFFFFF");Surface.BorderThickness=new Thickness(.7);
             if(Preferences.Current.UIVersion>=90){gridUI=new QuickGridSurface(this,shell);Surface.Child=gridUI.Root;Deactivated+=(s,e)=>{if(!Program.Inspectable&&IsVisible&&!IsMouseOver&&!gridUI.Board.GestureActive)Hide();};return;}
             var root=new DockPanel {Margin=new Thickness(18,19,18,14)};
             var header=new Grid {Height=47,Margin=new Thickness(4,0,2,12)};

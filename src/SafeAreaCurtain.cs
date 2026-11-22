@@ -206,6 +206,8 @@ namespace OneTaskBar
         void Watch()
         {
             if(pinned)return;
+            int step=RuntimeCadence.OnBattery?200:100;
+            if(watch.Interval.TotalMilliseconds!=step)watch.Interval=TimeSpan.FromMilliseconds(step);
             var cursor=Forms.Cursor.Position;
             int band=(int)Math.Ceiling(IslandSafeArea.Height*scale)+1;
             bool inside=cursor.X>=bounds.Left&&cursor.X<bounds.Right&&(bottom?cursor.Y>=bounds.Bottom-band&&cursor.Y<bounds.Bottom:cursor.Y>=bounds.Top&&cursor.Y<bounds.Top+band);

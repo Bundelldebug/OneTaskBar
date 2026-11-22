@@ -15,6 +15,8 @@ namespace OneTaskBar
         static readonly Brush Good=Paint.Brush("#FF5FBF6B"),Low=Paint.Brush("#FFE25C5C");
         internal static readonly TileScheme Light=Plain("light","#FF111114","#FF6B6B73","#FFE6E6EA","#FFFBFBFD");
         internal static readonly TileScheme Dark=Plain("dark","#FFF5F5F7","#FFA8A8B0","#FF3A3C42","#FF26282C");
+        // The weather card of the 9.5 widgets: deep blue with white words, whatever the wallpaper.
+        internal static readonly TileScheme Navy=Plain("navy","#FFFFFFFF","#FFC9D6F2","#40FFFFFF","#FF1F3C78");
         internal static readonly TileScheme Unset=Tinted(Colors.Black,false);
         // Set while a tile is being constructed, on the UI thread.
         internal static TileScheme Creating=Light;

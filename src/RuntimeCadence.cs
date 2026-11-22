@@ -16,12 +16,14 @@ namespace OneTaskBar
         }
         // Seconds between background reads. Open panels keep their fast path; events and
         // a foreground change still refresh immediately, so slower reads only save idle work.
-        internal static double Services(bool interactive,bool battery){return interactive?.5:battery?5:3;}
-        internal static double Wifi(bool interactive,bool battery){return interactive?1:battery?20:10;}
-        internal static double RunningApps(bool battery){return battery?10:5;}
-        internal static double Pins(bool battery){return battery?120:60;}
-        internal static double OsdScan(bool battery){return battery?30:10;}
-        internal static double LiveState(bool battery){return battery?120:60;}
+        internal static double Services(bool interactive,bool battery){return interactive?.5:battery?8:3;}
+        internal static double Wifi(bool interactive,bool battery){return interactive?1:battery?30:10;}
+        internal static double RunningApps(bool battery){return battery?15:5;}
+        internal static double Pins(bool battery){return battery?180:60;}
+        internal static double OsdScan(bool battery){return battery?60:15;}
+        internal static double LiveState(bool battery){return battery?300:120;}
+        internal static double AutoHide(bool battery){return battery?12:3;}
+        internal static double BackdropSweep(bool battery){return battery?45:15;}
         internal static void Check(List<string> checks)
         {
             if(Pulse(true,true,false,false,true)!=1500||Pulse(true,true,false,true,true)!=3000||Pulse(true,true,true,false,true)!=200||Pulse(true,false,false,false,true)!=750||Pulse(true,true,false,false,false)!=30000)throw new Exception("Idle/panel/display-off cadence regression");

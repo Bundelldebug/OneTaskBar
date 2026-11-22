@@ -19,6 +19,7 @@ namespace OneTaskBar
             foreach(var pair in outsideMenus)Board.Frames[pair.Key].ContextMenu=value?pair.Value:null;
             ((TextBlock)EditButton.Content).Text=value?"완료":"배치 편집";
             hint.Visibility=value?Visibility.Visible:Visibility.Collapsed;
+            if(Dex.Enabled)host.FitDexHeight(true);
         }
         internal void EditActions(bool value)
         {
@@ -211,14 +212,15 @@ namespace OneTaskBar
                     if(previous.TryGetValue((string)item.Tag,out from))
                     {
                         Point to=item.TranslatePoint(new Point(),Board);
-                        move.BeginAnimation(TranslateTransform.XProperty,Motion.Tween(from.X-to.X,0,220));
-                        move.BeginAnimation(TranslateTransform.YProperty,Motion.Tween(from.Y-to.Y,0,220));
+                        move.BeginAnimation(TranslateTransform.XProperty,Motion.PanelTween(from.X-to.X,0,300));
+                        move.BeginAnimation(TranslateTransform.YProperty,Motion.PanelTween(from.Y-to.Y,0,300));
                     }
                     else Motion.Fade(item,0,1,220);
                     if(value)Motion.Fade((TextBlock)item.Children[1],0,1,220);
                 }
                 frame.AnimateExpansion(height,()=>{actionGrid.Height=Double.NaN;actionGrid.VerticalAlignment=VerticalAlignment.Stretch;});
             }
+            if(Dex.Enabled)host.FitDexHeight(animate);
         }
     }
 }

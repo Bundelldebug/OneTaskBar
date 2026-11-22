@@ -40,7 +40,7 @@ namespace OneTaskBar
         protected override void OnRender(DrawingContext dc)
         {
             if(ActualWidth<=0||ActualHeight<=0)return;
-            double width=DrawWidth,height=ActualHeight+((Compact?24:32)-ActualHeight)*Morph;
+            double width=DrawWidth,height=ActualHeight+((Compact?22:32)-ActualHeight)*Morph;
             // The right edge stays attached to the real icon. Only the capsule geometry changes.
             var rect=new Rect(ActualWidth-width,(ActualHeight-height)/2,width,height);
             var outline=new RectangleGeometry(rect,height/2,height/2);

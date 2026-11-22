@@ -54,6 +54,8 @@ namespace OneTaskBar
             internal void Sample()
             {
                 if(!Window.IsVisible||!LiquidGlass.Enabled)return;
+                int period=RuntimeCadence.OnBattery?4000:2000;
+                if(Timer.Interval.TotalMilliseconds!=period)Timer.Interval=TimeSpan.FromMilliseconds(period);
                 double brightness=Brightness(Window);
                 if(brightness<0)return;
                 if(Last>=0&&Math.Abs(brightness-Last)<Hysteresis)return;

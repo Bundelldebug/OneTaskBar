@@ -139,6 +139,7 @@ namespace OneTaskBar
             if(args.Contains("--panel-refraction-probe"))return PanelRefractionChecks.Run();
             if(args.Contains("--fluid-expand-probe"))return FluidExpandChecks.Run();
             if(args.Contains("--fluid-open-probe"))return FluidOpenChecks.Run();
+            if(args.Contains("--dex-probe"))return DexChecks.Run();
             if(args.Contains("--identity-package-probe"))return IdentityPackage.Probe();
             if(args.Contains("--dock-motion-probe"))return DockMotionChecks.Run();
             if(args.Contains("--dock-overflow-probe"))return DockOverflowChecks.Run();
@@ -197,6 +198,7 @@ namespace OneTaskBar
         static int SelfTest()
         {
             var checks=new List<string>();
+            bool savedDex=Preferences.Current.DexDesktop;int savedScale=Preferences.Current.DockScalePercent;Preferences.Current.DexDesktop=false;Preferences.Current.DockScalePercent=100;
             try {
                 MediaSessionPolicy.Check();
                 checks.Add("playing-media-session-selection");
@@ -282,6 +284,7 @@ namespace OneTaskBar
                 checks.Add("Brightness read: "+BrightnessService.Read());
                 AppLog.Json("self-test.json",new { passed=true,checks=checks.ToArray(),time=DateTimeOffset.Now.ToString("o") }); return 0;
             } catch(Exception e) { AppLog.Json("self-test.json",new { passed=false,error=e.ToString(),checks=checks.ToArray() }); return 1; }
+            finally { Preferences.Current.DexDesktop=savedDex;Preferences.Current.DockScalePercent=savedScale; }
         }
         static int Diagnose()
         {

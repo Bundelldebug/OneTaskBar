@@ -20,10 +20,13 @@ namespace OneTaskBar
         }
         string VolumeIconKind(){return outputKind!=null&&IsEnabled&&value>0?outputKind:SoundIcon.For(value,false,IsEnabled);}
         static readonly Brush normalTrack=Paint.Brush("#3C77817F"),disabledTrack=Paint.Brush("#286E7775"),darkTrack=Paint.Brush("#26000000");
+        static readonly Brush dexFlatTrack=Paint.Brush("#3CFFFFFF"),dexFlatDarkTrack=Paint.Brush("#3A1C2B3B");
         internal Brush UnfilledBrush
         {
             get
             {
+                if(Dex.Enabled&&Tablet&&!Slim)
+                    return Glass95.Transparent?(Glass95.Dark?dexFlatDarkTrack:dexFlatTrack):Glass95.Solid;
                 if(Glass95.Enabled&&Tablet&&!Slim)
                     return Glass95.Transparent?Glass95.Card:Glass95.Solid;
                 return DarkTrack?darkTrack:IsEnabled?normalTrack:disabledTrack;
@@ -40,7 +43,7 @@ namespace OneTaskBar
             dc.DrawRoundedRectangle(UnfilledBrush,null,track,cross/2,cross/2);
             bool clipped=LinearFill;if(clipped)dc.PushClip(new RectangleGeometry(track,cross/2,cross/2));
             if(shown>0)dc.DrawGeometry(Paint.ControlWhite,null,fill);
-            if(GlassStandalone)GlassOptics.Draw(dc,width,height,cross/2,false);
+            if(GlassStandalone&&!Dex.Enabled)GlassOptics.Draw(dc,width,height,cross/2,false);
             string kind=Kind.StartsWith("volume",StringComparison.Ordinal)?VolumeIconKind():Kind;
             var center=ValueIconCenter(width,height,Vertical?new Point(width/2,height-cross*.5):new Point(cross*.5,height/2));
             if(ShowIcon){DrawIcon(dc,kind,Glass95.Text,center,cross*.44);if(shown>0){dc.PushClip(fill);DrawIcon(dc,kind,Paint.Brush("#FF35413B"),center,cross*.44);dc.Pop();}}

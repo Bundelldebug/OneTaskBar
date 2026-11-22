@@ -18,6 +18,8 @@ namespace OneTaskBar
         internal bool Neck;
         internal double CutWidth;
         // How far the dock part has been taken apart; it lives here so a second panel (a quick settings page) can carry on.
+        // The piece is only where the panel starts from; it stays as it is (the Dex keys).
+        internal bool Keep;
         internal bool Veiled;
         // What each hidden part looked like before, so a part that was collapsed (the empty notification dot) stays collapsed.
         internal readonly System.Collections.Generic.Dictionary<System.Windows.FrameworkElement,System.Windows.Visibility> Before=new System.Collections.Generic.Dictionary<System.Windows.FrameworkElement,System.Windows.Visibility>();
@@ -127,6 +129,7 @@ namespace OneTaskBar
 
         void AttachFlare()
         {
+            if(Dex.Enabled)return;
             var layer=AdornerLayer.GetAdornerLayer(window.Surface);
             if(layer==null)return;
             flare=new FluidFlare(window.Surface);
@@ -209,7 +212,7 @@ namespace OneTaskBar
         {
             var rendering=e as RenderingEventArgs;
             if(rendering==null)return;
-            double t=watch.Elapsed.TotalSeconds;
+            double t=watch.Elapsed.TotalSeconds*(Dex.Enabled?Dex.MotionRate:1);
             bool over=closing?t>=closeSpan:from+t>=Total;
             if(!over)
             {
@@ -254,7 +257,7 @@ namespace OneTaskBar
                 double a=Spring(0,.34,at,.86),d=Spring(.03,.5,at,.84);
                 double neck=detach?1-Smooth(.16,.42,at):0;
                 double glow=Smooth(0,.05,at)*(1-Smooth(.08,.3,at))*.7;
-                double front=at<.24?-1:Math.Min(1,(at-.24)/.24);
+                double front=Dex.Enabled?(at<.06?-1:Math.Min(1,(at-.06)/.2)):at<.24?-1:Math.Min(1,(at-.24)/.24);
                 Apply(a,d,1,neck,glow,front,front<0?0:1);
                 ApplyPiece(Math.Max(0,Math.Min(1,a)));
                 return;
@@ -348,6 +351,13 @@ namespace OneTaskBar
         {
             var inside=window.Surface.Child;
             if(inside==null)return;
+            // In the Dex panels the picture simply fades in with the growing glass.
+            if(Dex.Enabled)
+            {
+                if(masked!=null){masked.OpacityMask=null;masked=null;}
+                inside.Opacity=wave<0?0:Smooth(0,1,wave);
+                return;
+            }
             if(wave<0)
             {
                 if(masked!=null){masked.OpacityMask=null;masked=null;}
@@ -379,7 +389,7 @@ namespace OneTaskBar
         }
         void ApplyPart(double k)
         {
-            if(piece==null||plan==null)return;
+            if(piece==null||plan==null||plan.Keep)return;
             // A page opened from the panel that already took the dock part keeps it taken while it opens.
             if(carried&&!closing)k=1;
             if(plan.Hide.Length==0){if(!plan.Veiled){plan.Veiled=true;piece.Veil(true);}return;}
@@ -429,7 +439,7 @@ namespace OneTaskBar
         // The dock goes back to its own shape (the panel was hidden or closed).
         internal void ReleasePiece()
         {
-            if(piece==null){plan=null;return;}
+            if(piece==null||plan!=null&&plan.Keep){piece=null;plan=null;return;}
             ClearCut();
             if(plan!=null&&plan.Veiled)
             {

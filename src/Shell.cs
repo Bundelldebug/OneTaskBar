@@ -22,14 +22,26 @@ namespace OneTaskBar
     internal sealed class DockLayout
     {
         // The search and desktops buttons sit in front of the apps; either can be turned off, and the apps move up to fill the space.
-        internal static double AppOffset {get{return 10+(Preferences.Current.DockSearchButton?42:0)+(Preferences.Current.DockDesktopsButton?42:0);}}
-        internal static double FixedWidth {get{return AppOffset+22;}}
+        internal static double Pitch {get{return Dex.Enabled?Dex.Pitch:46;}}
+        internal static double GroupGap {get{return Dex.Enabled?Dex.GroupGap:12;}}
+        internal static double DividerGap {get{return Dex.Enabled?Dex.DividerGap:6;}}
+        internal static double AppOffset {get{return Dex.Enabled?Dex.AppsStart:10+(Preferences.Current.DockSearchButton?42:0)+(Preferences.Current.DockDesktopsButton?42:0);}}
+        internal static double FixedWidth {get{return Dex.Enabled?Dex.AppsStart+Dex.GroupGap+Dex.TrailingPad:AppOffset+22;}}
         internal double StartX,AppX,AppWidth,StatusX,StatusWidth,Y;
         internal int Capacity;
         internal static double StatusSize(double screenWidth,double powerWidth=58,bool duo=false){return (duo?172:Math.Min(282,Math.Max(226,screenWidth*.25))+powerWidth-58)-(94-DockClock.Width);}
         internal static double BalancedY(double height,double reserved){return height-(Math.Max(68,reserved)+44)/2;}
+        // The Dex bar keeps the pill, the grid and the apps centered as one group, clear of the keys on the right.
+        static DockLayout ComputeDex(System.Drawing.Rectangle screen,double scale,int count,double powerWidth,bool duo)
+        {
+            double width=screen.Width/scale,height=screen.Height/scale,status=StatusSize(width,powerWidth,duo);
+            int capacity=Math.Max(0,(int)Math.Floor((Math.Max(FixedWidth,width-2*Dex.NavReserve)-FixedWidth)/Pitch));
+            double apps=Math.Min(count,capacity)*Pitch+FixedWidth;
+            return new DockLayout {StartX=0,AppX=Math.Max(0,(width-apps)/2),AppWidth=apps,StatusX=width-status-12,StatusWidth=status,Y=height-Dex.BarHeight,Capacity=capacity};
+        }
         internal static DockLayout Compute(System.Drawing.Rectangle screen,double scale,int count,double powerWidth=58,bool media=false,double reserved=68,int edge=3,bool duo=false,double minimumMediaWidth=44)
         {
+            if(Dex.Enabled)return ComputeDex(screen,scale,count,powerWidth,duo);
             bool vertical=DockGeometry.Vertical(edge);double width=(vertical?screen.Height:screen.Width)/scale;
             double status=(vertical?DockGeometry.SideStatusLength(powerWidth):StatusSize(width,powerWidth,duo))+DockStatusItems.Count*24,statusX=width-status-12;
             double mediaMinimum=media?Math.Min(minimumMediaWidth,Math.Max(1,statusX-204)):0;
@@ -105,7 +117,7 @@ namespace OneTaskBar
         DateTime pinsAt;
         double lastAppRefreshMs;
         DateTime servicesAt;
-        DateTime releaseAt;internal int RetiredPanels;
+        DateTime releaseAt,backdropSweepAt;internal int RetiredPanels;
         DateTime autoHideAt;internal bool DockAutoHide;bool autoHideChanging;int autoHideRevision;
         IntPtr lastForeground;
         internal IntPtr LastApplication;
@@ -432,10 +444,11 @@ namespace OneTaskBar
                 if(StartMenu!=null)StartMenu.HideImmediately();if(Finder!=null)Finder.HideImmediately();if(Drawer!=null)Drawer.HideImmediately();if(Detail!=null)Detail.Hide();foreach(var host in docks)if(host.MediaBar!=null)host.MediaBar.SetExpanded(false);
                 GlassWindow other=notifications?(GlassWindow)Quick:Center;if(other!=null&&!await other.DismissAsync())return;
                 if(disposed||request!=panelMotion)return;
-                var screen=dock!=null?dock.Screen:Forms.Screen.FromPoint(Forms.Cursor.Position);double scale=dock!=null?dock.Scale:MonitorScale(screen,target),w=Math.Min(notifications?394:380,screen.Bounds.Width/scale-24),h=Math.Min(notifications?584:650,screen.Bounds.Height/scale-100);
+                var screen=dock!=null?dock.Screen:Forms.Screen.FromPoint(Forms.Cursor.Position);double scale=dock!=null?dock.Scale:MonitorScale(screen,target),w=Math.Min(notifications?394:380,screen.Bounds.Width/scale-24),maxH=Math.Max(320,screen.Bounds.Height/scale-(Dex.Enabled?IslandSafeArea.Height+DockSizing.BarSpace*DockSizing.Zoom+20:100));
                 if(notifications){Banners.Clear();Center.Refresh();}else Quick.Refresh(Power,Brightness,Audio.Value,Audio.Muted,Audio.Available,Brightness>=0);
+                double h=notifications?Math.Min(Dex.Enabled?510:584,maxH):Quick.PreferredHeight(w,maxH);
                 // A panel opened from the top bar drops from the top; one opened from the dock stays at the dock.
-                bool fromTop=top.HasValue?top.Value&&TopBarFor(screen):dock==null&&TopBarFor(screen);
+                bool fromTop=Dex.Enabled?TopBarFor(screen):top.HasValue?top.Value&&TopBarFor(screen):dock==null&&TopBarFor(screen);
                 var position=fromTop?TopBarPopup(screen,scale,w,h,notifications):DockGeometry.Popup(screen.Bounds,scale,w,h,dock!=null?dock.Edge:DockGeometry.Edge);target.PopFromTop=fromTop;target.ShowAt(screen.Bounds,position.X,position.Y,w,h);target.Pop();target.Activate();if(notifications)Center.RefreshNotifications();
             }catch(Exception error){AppLog.Write("panel-switch",error.Message);}finally{if(request==panelMotion)pendingPanel=null;}
         }
@@ -446,10 +459,13 @@ namespace OneTaskBar
             if(Finder!=null)Finder.HideImmediately();
             if(Detail!=null){Detail.Close();Detail=null;}
             // From quick settings the page takes over the part of the bar the panel came from, so the bar is not put back in between.
-            MorphPlan carry=null;if(Quick!=null&&Quick.IsVisible&&!Quick.IsDismissing){carry=Quick.ReleaseMorph();if(carry!=null)Quick.HideImmediately();}
-            if(Center!=null)Center.Hide();if(Quick!=null)Quick.Hide();if(Drawer!=null)Drawer.HideImmediately();Detail=new DetailWindow(this,page);Detail.AdoptMorph(carry);
-            var screen=Forms.Screen.FromPoint(Forms.Cursor.Position);double scale=MonitorScale(screen,Detail),w=Math.Min(380,screen.Bounds.Width/scale-24),h=Math.Min(540,screen.Bounds.Height/scale-100);
-            var position=DockGeometry.Popup(screen.Bounds,scale,w,h,DockGeometry.Edge);Detail.ShowAt(screen.Bounds,position.X,position.Y,w,h);Detail.Pop();Detail.Activate();
+            // In the 9.5 and Dex styles the page takes the same glass: the panel changes shape and the picture changes on it.
+            bool fromQuick=Quick!=null&&Quick.IsVisible&&!Quick.IsDismissing;PanelMorph.Shot sheet=fromQuick&&PanelsMorph?PanelMorph.Capture(Quick):null;
+            MorphPlan carry=null;if(sheet==null&&fromQuick){carry=Quick.ReleaseMorph();if(carry!=null)Quick.HideImmediately();}
+            if(Center!=null)Center.Hide();if(Quick!=null&&sheet==null)Quick.Hide();if(Drawer!=null)Drawer.HideImmediately();Detail=new DetailWindow(this,page);Detail.AdoptMorph(carry);
+            var screen=Forms.Screen.FromPoint(Forms.Cursor.Position);double scale=MonitorScale(screen,Detail),w=Math.Min(380,screen.Bounds.Width/scale-24),maxH=Math.Max(320,screen.Bounds.Height/scale-(Dex.Enabled?IslandSafeArea.Height+DockSizing.BarSpace*DockSizing.Zoom+20:100));
+            double h=Dex.Enabled?(fromQuick&&Quick.ActualHeight>300?Math.Min(maxH,Quick.ActualHeight):Math.Min(maxH,580)):Math.Min(540,maxH);
+            bool fromTop=TopBarFor(screen)&&(Dex.Enabled||fromQuick&&Quick.PopFromTop);Detail.PopFromTop=fromTop;var position=fromTop?TopBarPopup(screen,scale,w,h,false):DockGeometry.Popup(screen.Bounds,scale,w,h,DockGeometry.Edge);Detail.ShowAt(screen.Bounds,position.X,position.Y,w,h);if(sheet!=null){if(Dex.Enabled&&Detail.Sheet!=null&&sheet.Image!=null)PanelMorph.PageOpen(Detail,sheet,Quick.PageOrigin(page));else PanelMorph.Replace(Detail,sheet);Quick.HideImmediately();}else Detail.Pop();Detail.Activate();
         }
         internal void ShowWelcome() { if(StartMenu!=null)StartMenu.HideImmediately();if(Welcome!=null&&Welcome.StyleKey!=Fluid.StyleKey){Welcome.ReleaseIdle();Welcome=null;}if(Welcome==null) Welcome=new WelcomeWindow(this); Welcome.UpdateMode(); Welcome.Show();Welcome.Pop(); Welcome.Activate(); }
         internal int TaskViewRequests;
@@ -525,10 +541,11 @@ namespace OneTaskBar
             if(StartMenu!=null)StartMenu.HideImmediately();
             if(Drawer==null)Drawer=new DrawerWindow(this);
             if(Drawer.IsVisible) { Drawer.Hide(); return; }
-            if(Finder!=null)Finder.HideImmediately();if(Center!=null)Center.Hide();if(Detail!=null)Detail.Hide();
+            if(Finder!=null){if(Dex.Enabled)Finder.Hide();else Finder.HideImmediately();}if(Center!=null)Center.Hide();if(Detail!=null)Detail.Hide();
             if(Quick!=null) Quick.Hide();
             var screen=dock!=null ? dock.Screen : Forms.Screen.FromPoint(Forms.Cursor.Position); double scale=dock!=null ? dock.Scale : MonitorScale(screen,Drawer);
             var layout=LauncherLayout.Fit(screen.Bounds,Native.WorkArea(screen),scale,dock!=null?dock.Edge:DockGeometry.Edge);
+            if(Dex.Enabled){var place=DexDrawerRect(screen,scale);layout=new LauncherLayout {X=place.X,Y=place.Y,Width=place.Width,Height=place.Height};}
             Drawer.Search.Text="";Drawer.Configure(layout.Width,layout.Height);Drawer.Reload();Drawer.ShowAt(screen.Bounds,layout.X,layout.Y,layout.Width,layout.Height);Drawer.Pop();Drawer.Activate();Drawer.Search.Focus();
         }
         internal async void ToggleStartButton(DockHost dock)
@@ -595,13 +612,12 @@ namespace OneTaskBar
             var target=dock??docks.FirstOrDefault(d=>d.Screen.Bounds.Contains(Forms.Cursor.Position))??docks.FirstOrDefault();
             if(target!=null)target.Reveal();
         }
-        // With the top status bar on, the notification center opens under the clock on the left and quick settings under
-        // the status icons on the right, dropping down from the bar.
-        bool TopBarFor(Forms.Screen screen){return topLeft!=null&&topLeft.IsVisible&&Desktop&&islandSpace!=null&&!islandSpace.Bottom&&islandSpace.Monitor==screen.DeviceName;}
+        // With the Dex-style top status bar on, both notifications and quick settings sit on the right and drop down from there.
+        bool TopBarFor(Forms.Screen screen){return topLeft!=null&&topLeft.IsVisible&&Desktop&&fixtureTopBar||topLeft!=null&&topLeft.IsVisible&&Desktop&&islandSpace!=null&&!islandSpace.Bottom&&islandSpace.Monitor==screen.DeviceName;}
         static Rect TopBarPopup(Forms.Screen screen,double scale,double width,double height,bool notifications)
         {
             double wide=screen.Bounds.Width/scale,tall=screen.Bounds.Height/scale,y=IslandSafeArea.Height+4;
-            double x=notifications?8:wide-width-8;
+            double x=wide-width-8;
             return new Rect(Math.Max(8,Math.Min(wide-width-8,x)),y,width,Math.Min(height,tall-y-12));
         }
         internal bool ContainsStartButton(Native.PointI point)
@@ -655,8 +671,9 @@ namespace OneTaskBar
                 if(!await Task.Run(()=>SystemPanels.Search(query))){ShowWelcome();Welcome.Feedback("Windows 검색을 열지 못했습니다. 다시 눌러 주세요.");}return;
             }
             if(Finder==null)Finder=new SearchWindow(this);if(Finder.IsVisible){Finder.Hide();return;}
-            foreach(var panel in new GlassWindow[]{Quick,Center,Detail,Drawer,StartMenu})if(panel!=null)panel.HideImmediately();
+            foreach(var panel in new GlassWindow[]{Quick,Center,Detail,Drawer,StartMenu})if(panel!=null){if(Dex.Enabled&&panel is DrawerWindow)panel.Hide();else panel.HideImmediately();}
             var screen=dock!=null?dock.Screen:Forms.Screen.FromPoint(Forms.Cursor.Position);double scale=dock!=null?dock.Scale:MonitorScale(screen,Finder);var layout=LauncherLayout.Fit(screen.Bounds,Native.WorkArea(screen),scale,dock!=null?dock.Edge:DockGeometry.Edge);
+            if(Dex.Enabled){var place=DexFinderRect(screen,scale,dock);layout=new LauncherLayout {X=place.X,Y=place.Y,Width=place.Width,Height=place.Height};}
             Finder.Configure(layout.Width,layout.Height);Finder.Reset();if(!String.IsNullOrEmpty(query)){Finder.Query.Text=query;Finder.Reload();}Finder.ShowAt(screen.Bounds,layout.X,layout.Y,layout.Width,layout.Height);Finder.Pop();Finder.Activate();Finder.Query.Focus();Finder.Query.CaretIndex=Finder.Query.Text.Length;RevealAutoHideDock(dock);
         }
         internal async void OpenScreenCapture()
@@ -748,11 +765,11 @@ namespace OneTaskBar
             bool battery=Power.Known&&!Power.Connected;RuntimeCadence.OnBattery=battery;
             bool interactive=FullscreenMediaLive||(StartMenu!=null&&StartMenu.IsVisible)||(Quick!=null&&Quick.IsVisible)||(Center!=null&&Center.IsVisible)||(Detail!=null&&Detail.IsVisible)||(Drawer!=null&&Drawer.IsVisible)||(Finder!=null&&Finder.IsVisible)||(Welcome!=null&&Welcome.IsVisible)||IslandExpanded||docks.Any(d=>d.MediaBar!=null&&d.MediaBar.Expanded);
             if(now>=osdScanAt){osdScanAt=now.AddSeconds(RuntimeCadence.OsdScan(battery));if(osdGate!=null)osdGate.Refresh();}
-            LiveBackdrop.SweepOrphans();Lap("sweep");
+            if(now>=backdropSweepAt){backdropSweepAt=now.AddSeconds(RuntimeCadence.BackdropSweep(battery));LiveBackdrop.SweepOrphans();}Lap("sweep");
             if(Desktop)ExplorerBridge.KeepTrayPosition(TrayAnchorNow());Lap("keeptray");
             var foreground=Native.GetForegroundWindow(); uint foregroundPid; Native.GetWindowThreadProcessId(foreground,out foregroundPid);
             if(foregroundPid!=ownPid) LastApplication=foreground;
-            if(foregroundPid!=ownPid)RememberForeground(foreground);Lap("remember");if(Desktop&&foreground!=lastForeground)Switcher.Update(Running);Lap("switcher");
+            if(foregroundPid!=ownPid)RememberForeground(foreground);Lap("remember");if(Desktop&&foreground!=lastForeground){Switcher.Update(Running);if(topRight!=null)topRight.InvalidateLanguage();}Lap("switcher");
             // A window that just came forward may be new; the dock should not wait for the slow battery read.
             if(battery&&foreground!=lastForeground&&foregroundPid!=ownPid&&!Running.Any(a=>a.Windows.Contains(foreground)))appsAt=DateTime.MinValue;
             if(Desktop){browserFullscreen.Update(foreground);Lap("browserfs");SyncAutoHide(false);Lap("pre");var fullscreenWindows=FullscreenVisibility.Capture();Lap("capture");RefreshIsland(fullscreenWindows);Lap("island");foreach(var dock in docks){dock.UpdateVisibility(FullscreenVisibility.IsFullScreen(dock.Screen.Bounds,fullscreenWindows),DockAutoHide,fullscreenWindows.Count==0);if(foreground!=lastForeground)dock.UpdateActive(LastApplication);if(FullscreenVisibility.CaptureLayer!=IntPtr.Zero&&dock.Screen.Bounds==FullscreenVisibility.CaptureLayerMonitor)dock.SinkBelow(FullscreenVisibility.CaptureLayer);else if(dock.Sunk)dock.RiseAgain();}Lap("dockvis");}
@@ -832,7 +849,7 @@ namespace OneTaskBar
         void TaskbarOptionsChanged(){autoHideAt=DateTime.MinValue;Wake();}
         void SyncAutoHide(bool force)
         {
-            if(Demo||disposed||autoHideChanging||!force&&DateTime.UtcNow<autoHideAt)return;autoHideAt=DateTime.UtcNow.AddSeconds(2);TaskbarSpace.Maintain();bool next=Native.TaskbarAutoHide();if(!force&&next==DockAutoHide)return;DockAutoHide=next;foreach(var item in reservations)item.SetAutoHide(next);if(Welcome!=null)Welcome.UpdateAutoHide(next);
+            if(Demo||disposed||autoHideChanging||!force&&DateTime.UtcNow<autoHideAt)return;autoHideAt=DateTime.UtcNow.AddSeconds(RuntimeCadence.AutoHide(RuntimeCadence.OnBattery));TaskbarSpace.Maintain();bool next=Native.TaskbarAutoHide();if(!force&&next==DockAutoHide)return;DockAutoHide=next;foreach(var item in reservations)item.SetAutoHide(next);if(Welcome!=null)Welcome.UpdateAutoHide(next);
         }
         internal async void SetAutoHide(bool value)
         {

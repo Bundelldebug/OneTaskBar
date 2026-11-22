@@ -10,8 +10,8 @@ namespace OneTaskBar
 {
     internal sealed partial class WelcomeWindow
     {
-        static readonly string[] desktopStyleNames={"Windows","Mac","GoogleBook"};
-        static readonly string[] desktopStyleNotes={"기본 하단 작업표시줄","다이나믹 아일랜드 + 하단바 · 나우바 끔 · 듀오 아이콘","상단 안드로이드 바"};
+        static readonly string[] desktopStyleNames={"Windows","Mac","Dex"};
+        static readonly string[] desktopStyleNotes={"기본 하단 작업표시줄","다이나믹 아일랜드 + 하단바 · 나우바 끔 · 듀오 아이콘","상단 상태 표시줄 + 전체 폭 작업표시줄"};
         internal int DesktopStyleCount {get{return desktopStyleNames.Length;}}
         // Each style is a preset of several existing options and is shown as chosen only while every one of them matches.
         // Any option changed on its own leaves no preset matching, and the "custom desktop" card in front is chosen instead.
@@ -19,9 +19,9 @@ namespace OneTaskBar
         internal static int CurrentDesktopStyle()
         {
             var p=Preferences.Current;
+            if(p.DexDesktop)return p.TopStatusBar&&!p.DynamicIsland&&!p.DuoStatusIcon&&p.ShowNowBar?2:CustomStyle;
             if(!p.DynamicIsland&&!p.TopStatusBar&&!p.DuoStatusIcon&&p.ShowNowBar)return 0;
             if(p.DynamicIsland&&!p.TopStatusBar&&p.DuoStatusIcon&&p.LiquidGlass&&p.Blur&&!p.ShowNowBar)return 1;
-            if(p.TopStatusBar&&!p.DynamicIsland&&!p.DuoStatusIcon&&p.ShowNowBar)return 2;
             return CustomStyle;
         }
         internal void ChooseDesktopStyle(int style)
@@ -32,7 +32,7 @@ namespace OneTaskBar
             int from=CurrentDesktopStyle();
             Preferences.Set(p=>
             {
-                p.DynamicIsland=style==1;p.TopStatusBar=style==2;
+                p.DynamicIsland=style==1;p.TopStatusBar=style==2;p.DexDesktop=style==2;
                 if(style==1)
                 {
                     if(from!=1||String.IsNullOrEmpty(p.DesktopStyleBackup))p.DesktopStyleBackup=(p.LiquidGlass?"1":"0")+","+(p.Blur?"1":"0")+","+(p.ShowNowBar?"1":"0");
@@ -109,12 +109,25 @@ namespace OneTaskBar
             var wall=new LinearGradientBrush((Color)ColorConverter.ConvertFromString("#FF6C8DF2"),(Color)ColorConverter.ConvertFromString("#FFB07CE8"),new Point(0,0),new Point(1,1));
             canvas.Children.Add(new Rectangle {Width=w,Height=h,Fill=wall});
             Piece(canvas,46,style<=0?16:24,98,52,7,"#D9FFFFFF");
-            // bottom bar: launcher dot and four apps, status on the right
-            Piece(canvas,w/2-52,h-20,104,16,4,"#CC1B1C22");
-            Piece(canvas,w/2-45,h-16,8,8,4,"#FFE9EDF5");
             string[] colors={"#FFEF741D","#FF55AF39","#FF7868CF","#FFDA9B20"};
-            for(int i=0;i<4;i++)Piece(canvas,w/2-30+i*13,h-16,8,8,2.5,colors[i]);
-            Piece(canvas,w-42,h-16,30,8,4,"#99FFFFFF");
+            if(style==2)
+            {
+                // Full-width bar with the finder pill and the apps in its middle, a thin status row on top.
+                Piece(canvas,0,h-13,w,13,0,"#59FFFFFF");
+                Piece(canvas,w/2-42,h-10,28,7,3.5,"#CCFFFFFF");
+                for(int i=0;i<4;i++)Piece(canvas,w/2-8+i*11,h-10,7,7,2,colors[i]);
+                for(int i=0;i<3;i++)Piece(canvas,w-28+i*8,h-8,3,3,1.5,"#E6FFFFFF");
+                Piece(canvas,5,3,26,3,1.5,"#E6FFFFFF");
+                Piece(canvas,w-44,2,39,5,2.5,"#B3FFFFFF");
+            }
+            else
+            {
+                // bottom bar: launcher dot and four apps, status on the right
+                Piece(canvas,w/2-52,h-20,104,16,4,"#CC1B1C22");
+                Piece(canvas,w/2-45,h-16,8,8,4,"#FFE9EDF5");
+                for(int i=0;i<4;i++)Piece(canvas,w/2-30+i*13,h-16,8,8,2.5,colors[i]);
+                Piece(canvas,w-42,h-16,30,8,4,"#99FFFFFF");
+            }
             // The custom desktop is a plain desktop with a few sliders drawn on it: settings set one by one.
             if(style<0)
             {
@@ -122,13 +135,6 @@ namespace OneTaskBar
                 Piece(canvas,84,21,10,10,5,"#FF3478FD");Piece(canvas,68,33,10,10,5,"#FF3478FD");Piece(canvas,108,45,10,10,5,"#FF3478FD");
             }
             if(style==1)Piece(canvas,w/2-26,5,52,13,6.5,"#FF111114");
-            if(style==2)
-            {
-                Piece(canvas,0,0,w,12,0,"#B3111114");
-                Piece(canvas,8,4,22,4,2,"#E6FFFFFF");
-                Piece(canvas,w/2-14,4,28,4,2,"#99FFFFFF");
-                Piece(canvas,w-34,4,26,4,2,"#E6FFFFFF");
-            }
             // Scaled to the card, so four of them fit side by side without cutting the picture off.
             return new Border {CornerRadius=new CornerRadius(11),ClipToBounds=true,Child=new Viewbox {Stretch=Stretch.Uniform,Child=canvas}};
         }

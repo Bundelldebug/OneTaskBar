@@ -220,7 +220,7 @@ namespace OneTaskBar
         }
         internal void TransformMotion(Rect source,Rect destination,double scale)
         {
-            if(root==null||!motionTransform)return;
+            if(root==null||!motionTransform||source.Width<1||source.Height<1)return;
             var center=new Vector2((float)((source.X+source.Width/2)*scale),(float)((source.Y+source.Height/2)*scale));
             var move=new Vector2((float)((destination.X+destination.Width/2-source.X-source.Width/2)*scale),
                 (float)((destination.Y+destination.Height/2-source.Y-source.Height/2)*scale));

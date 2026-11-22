@@ -368,10 +368,10 @@ namespace OneTaskBar
         void Register(){if(registered||disposed)return;var data=Data();data.Callback=0x8053;registered=Native.SHAppBarMessage(0,ref data)!=UIntPtr.Zero;positioned=false;Update();}
         void Remove(){if(!registered)return;registered=false;positioned=false;var data=Data();Native.SHAppBarMessage(1,ref data);}
         internal void SetAutoHide(bool value){autoHide=value;if(value||Preferences.Current.MaximizedBehindDock)Remove();else Register();}
-        internal static int ReservationTop(System.Drawing.Rectangle screen,double scale,int availableBottom,bool hidden){return hidden?availableBottom:Math.Min(availableBottom,screen.Bottom-(int)Math.Round(68*scale));}
+        internal static int ReservationTop(System.Drawing.Rectangle screen,double scale,int availableBottom,bool hidden){return hidden?availableBottom:Math.Min(availableBottom,screen.Bottom-(int)Math.Round(DockSizing.BarSpace*scale));}
         internal static Native.RectI Reservation(System.Drawing.Rectangle screen,double scale,Native.RectI available,bool hidden,int edge)
         {
-            int size=hidden?0:(int)Math.Round(68*scale);if(edge==0)available.Right=available.Left+size;else if(edge==1)available.Bottom=available.Top+size;else if(edge==2)available.Left=available.Right-size;else available.Top=ReservationTop(screen,scale,available.Bottom,hidden);return available;
+            int size=hidden?0:(int)Math.Round(DockSizing.BarSpace*scale);if(edge==0)available.Right=available.Left+size;else if(edge==1)available.Bottom=available.Top+size;else if(edge==2)available.Left=available.Right-size;else available.Top=ReservationTop(screen,scale,available.Bottom,hidden);return available;
         }
         void Update()
         {

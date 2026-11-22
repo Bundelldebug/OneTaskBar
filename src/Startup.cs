@@ -45,6 +45,7 @@ namespace OneTaskBar
             try{var info=new FileInfo(FileName);if(!info.Exists||info.Length>1048576)return null;var cache=new JavaScriptSerializer().Deserialize<StartupDockCache>(File.ReadAllText(FileName));if(cache==null||cache.Version!=1||cache.Inputs!=Fingerprint()||cache.Pins==null||cache.Pins.Count>256)return null;return cache.Pins.Where(p=>p!=null&&!p.Hidden&&!String.IsNullOrEmpty(p.Key)).GroupBy(p=>p.Key,StringComparer.OrdinalIgnoreCase).Select(g=>{var p=g.First();return new AppEntry {Name=p.Name,AppID=p.AppID,Target=p.Target,Executable=p.Executable,StoredKey=p.Key,Pinned=true};}).ToList();}catch{return null;}
         }
         static readonly object writeGate=new object();
+        static string lastPayload;
         internal static void Save(IEnumerable<AppEntry> pins)
         {
             string temporary=null;
@@ -52,16 +53,20 @@ namespace OneTaskBar
             {
                 lock(writeGate)
                 {
-                    Directory.CreateDirectory(AppLog.Data);
                     var cache=new StartupDockCache {Version=1,Inputs=Fingerprint(),Pins=pins.Take(256).Select(p=>new Catalog.PinPreference {Key=p.Key,Name=p.Name,AppID=p.AppID,Target=p.Target,Executable=p.Executable}).ToList()};
+                    string payload=new JavaScriptSerializer().Serialize(cache);
+                    // Avoid waking the SSD on every periodic pin scan when nothing changed.
+                    if(payload==lastPayload&&File.Exists(FileName))return;
+                    Directory.CreateDirectory(AppLog.Data);
                     temporary=FileName+"."+Guid.NewGuid().ToString("N")+".tmp";
-                    File.WriteAllText(temporary,new JavaScriptSerializer().Serialize(cache));
+                    File.WriteAllText(temporary,payload);
                     for(int attempt=0;;attempt++)
                     {
                         try
                         {
                             if(File.Exists(FileName))File.Replace(temporary,FileName,null);
                             else File.Move(temporary,FileName);
+                            lastPayload=payload;
                             break;
                         }
                         catch(IOException)
