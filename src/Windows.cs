@@ -517,13 +517,17 @@ namespace OneTaskBar
         readonly Dictionary<string,Button> buttons=new Dictionary<string,Button>(StringComparer.OrdinalIgnoreCase);
         readonly Grid folderHeading;readonly TextBox folderName;
         readonly TextBlock count=Paint.TextBlock("",12,Paint.Muted);
+        readonly Button hiddenToggle;bool showHidden;
         internal readonly TextBox Search=new TextBox {FontSize=15,Foreground=Paint.Ink,Background=Brushes.Transparent,BorderThickness=new Thickness(0),Padding=new Thickness(6,8,6,8)};
         internal DrawerWindow(ShellController controller)
         {
             shell=controller;Title="One TaskBar · 앱";Width=720;Height=680;Radius=dex?Dex.PanelRadius:32;Dark=true;StableSurface=true;SmoothLauncher=true;Surface.CornerRadius=new CornerRadius(Radius);Surface.BorderBrush=Paint.Brush("#58FFFFFF");Surface.BorderThickness=new Thickness(.7);Surface.Background=QuickPanel.Glass;
             var root=new DockPanel {Margin=new Thickness(24,20,24,16)};
             var header=new Grid {Height=42,Margin=new Thickness(12,0,12,20)};var title=Paint.TextBlock("앱",22,Paint.Text);title.FontWeight=FontWeights.SemiBold;header.Children.Add(title);
-            var close=Paint.Action("닫기",()=>Hide()); close.HorizontalAlignment=HorizontalAlignment.Right; close.Height=32; header.Children.Add(close); DockPanel.SetDock(header,Dock.Top); root.Children.Add(header);
+            var close=Paint.Action("닫기",()=>Hide()); close.Height=32;
+            hiddenToggle=Paint.Action("숨긴 앱",ToggleHidden);hiddenToggle.Height=32;hiddenToggle.Margin=new Thickness(0,0,8,0);hiddenToggle.Visibility=Visibility.Collapsed;
+            var tools=new StackPanel {Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right};tools.Children.Add(hiddenToggle);tools.Children.Add(close);header.Children.Add(tools);
+            DockPanel.SetDock(header,Dock.Top); root.Children.Add(header);
             folderHeading=new Grid {Height=42,Margin=new Thickness(6,0,6,8),Visibility=Visibility.Collapsed};folderHeading.ColumnDefinitions.Add(new ColumnDefinition {Width=new GridLength(40)});folderHeading.ColumnDefinitions.Add(new ColumnDefinition());
             var back=Paint.Button(new Glyph("back",20),()=>CloseFolder(),"모든 앱으로 돌아가기 · 앱을 놓으면 폴더 밖으로 이동");back.Width=36;back.Background=Brushes.Transparent;folderHeading.Children.Add(back);
             folderName=new TextBox {FontSize=18,FontWeight=FontWeights.SemiBold,Foreground=Paint.Text,Background=Brushes.Transparent,BorderThickness=new Thickness(0),Padding=new Thickness(5,7,5,7),MaxLength=48,ToolTip="폴더 이름 변경"};Grid.SetColumn(folderName,1);folderHeading.Children.Add(folderName);DockPanel.SetDock(folderHeading,Dock.Top);root.Children.Add(folderHeading);
@@ -542,6 +546,7 @@ namespace OneTaskBar
             {
                 // Only the apps, with the search pill floating over the bottom of the grid.
                 header.Visibility=Visibility.Collapsed;count.Visibility=Visibility.Collapsed;root.Children.Remove(bottom);root.Margin=new Thickness(14,16,14,0);
+                tools.Children.Remove(hiddenToggle);hiddenToggle.Height=28;hiddenToggle.Margin=new Thickness(0,0,8,6);hiddenToggle.HorizontalAlignment=HorizontalAlignment.Right;DockPanel.SetDock(hiddenToggle,Dock.Top);root.Children.Insert(0,hiddenToggle);
                 search.Margin=new Thickness(0);bottom.VerticalAlignment=VerticalAlignment.Bottom;bottom.Margin=new Thickness(0,0,0,14);items.Margin=new Thickness(0,0,0,62);
                 var layers=new Grid();layers.Children.Add(root);layers.Children.Add(bottom);whole=layers;
             }
@@ -590,9 +595,37 @@ namespace OneTaskBar
             if(dex)
             {
                 string filter=(Search.Text??"").Trim();
-                if(filter.Length>0)return LauncherSearch.Apps(shell.Apps,filter).Select(a=>new StartTile {Key=a.Key,Name=a.Name,App=a}).ToList();
+                if(filter.Length>0)return Visible(LauncherSearch.Apps(shell.Apps,filter).Select(a=>new StartTile {Key=a.Key,Name=a.Name,App=a}).ToList());
             }
-            var node=tiles.FirstOrDefault(t=>t.Key==folder&&t.Folder);return node==null?tiles:node.Children;
+            var node=tiles.FirstOrDefault(t=>t.Key==folder&&t.Folder);return Visible(node==null?tiles:node.Children);
+        }
+        // Hidden apps drop out of the panel and its folders; a folder left empty drops out too.
+        List<StartTile> Visible(List<StartTile> list)
+        {
+            if(showHidden||Preferences.HiddenAppCount==0)return list;
+            var result=new List<StartTile>();
+            foreach(var tile in list)
+            {
+                if(!tile.Folder)
+                {
+                    if(!Preferences.IsHiddenApp(tile.Key))result.Add(tile);
+                    continue;
+                }
+                var children=tile.Children.Where(c=>!Preferences.IsHiddenApp(c.Key)).ToList();
+                if(children.Count==0)continue;
+                result.Add(children.Count==tile.Children.Count?tile:new StartTile {Key=tile.Key,Name=tile.Name,Children=children});
+            }
+            return result;
+        }
+        int HiddenPresent {get{return Preferences.HiddenAppCount==0?0:shell.Apps.Count(a=>Preferences.IsHiddenApp(a.Key));}}
+        internal void ToggleHidden(){showHidden=!showHidden;RenderApps();}
+        internal Button HiddenToggle {get{return hiddenToggle;}}
+        void SetHidden(StartTile tile,bool hidden)
+        {
+            Preferences.SetHiddenApp(tile.Key,hidden);
+            if(HiddenPresent==0)showHidden=false;
+            if(folder!=null&&Current().Count==0)folder=null;
+            RenderApps();
         }
         void RenderApps()
         {
@@ -602,14 +635,21 @@ namespace OneTaskBar
                 var tile=value;
                 var body=new StackPanel {Width=cellWidth-(dex?8:16),Height=cellHeight-(dex?6:12)};
                 double iconSize=dex?52:Math.Min(48,cellHeight-58);
-                FrameworkElement icon=tile.Folder?StartWindow.FolderIcon(tile):AppIcons.Visual(tile.App,iconSize);if(dex&&tile.Folder)icon=new Viewbox {Width=iconSize,Height=iconSize,Child=icon};icon.Margin=dex?new Thickness(0,2,0,4):tile.Folder&&tile.Key.StartsWith(AppCategories.KeyPrefix,StringComparison.Ordinal)?new Thickness(0,0,0,3):new Thickness(0,7,0,7);icon.HorizontalAlignment=HorizontalAlignment.Center;body.Children.Add(icon);
+                // Folders made by hand are drawn at the same size as the category folders (64), not the 40 px Start size.
+                FrameworkElement icon=tile.Folder?StartWindow.FolderIcon(tile,dex?iconSize:64):AppIcons.Visual(tile.App,iconSize);if(dex&&tile.Folder)icon=new Viewbox {Width=iconSize,Height=iconSize,Child=icon};icon.Margin=dex?new Thickness(0,2,0,4):tile.Folder?new Thickness(0,-1,0,-1):new Thickness(0,7,0,7);icon.HorizontalAlignment=HorizontalAlignment.Center;body.Children.Add(icon);
+                if(showHidden&&!tile.Folder&&Preferences.IsHiddenApp(tile.Key))body.Opacity=.45;
                 var label=Paint.TextBlock(tile.Name,dex?11:12,ink);label.TextAlignment=TextAlignment.Center;label.TextWrapping=dex?TextWrapping.NoWrap:TextWrapping.Wrap;label.TextTrimming=TextTrimming.CharacterEllipsis;label.MaxHeight=dex?16:34;body.Children.Add(label);
                 var cell=Paint.Button(body,()=> {if(tile.Folder)OpenFolder(tile.Key);else Launch(tile.App);},tile.Folder?tile.Name+" · 앱 "+tile.Children.Count+"개":tile.Name);cell.Padding=dex?new Thickness(2):new Thickness(7,4,7,4);cell.Margin=new Thickness(dex?1:2);cell.Background=Brushes.Transparent;items.Children.Add(cell);
                 cell.Width=cellWidth-4;cell.Height=cellHeight-4;cell.ContextMenu=AppMenu(tile);cell.RenderTransform=new TranslateTransform();buttons[tile.Key]=cell;
                 DragReorder.Attach(cell,cell,"drawer.apps",tile.Key,Orientation.Horizontal,()=>!closed&&IsVisible,MoveApp,PreviewMove);
             }
             if(shell.Apps.Count==0) items.Children.Add(Paint.TextBlock("설치된 앱을 불러오는 중…",14,Paint.Text));
-            count.Text=(folder==null?shell.Apps.Count:Current().Count)+"개 앱";
+            int hiddenCount=HiddenPresent;
+            count.Text=(folder==null?shell.Apps.Count-(showHidden?0:hiddenCount):Current().Count)+"개 앱";
+            hiddenToggle.Visibility=hiddenCount>0||showHidden?Visibility.Visible:Visibility.Collapsed;
+            var toggleText=(TextBlock)hiddenToggle.Content;toggleText.Text=showHidden?"숨긴 앱 감추기":"숨긴 앱 "+hiddenCount+"개";
+            if(dex)toggleText.Foreground=Dex.SheetInk;
+            hiddenToggle.ToolTip=showHidden?"숨긴 앱을 다시 목록에서 뺍니다":"숨긴 앱을 흐리게 보여 줍니다. 앱을 오른쪽 클릭해 다시 표시할 수 있습니다";
         }
         async void Launch(AppEntry app){var modifiers=Keyboard.Modifiers;if(await DismissAsync())shell.LaunchApp(app,modifiers);}
         internal void OpenFolder(string key){if(!tiles.Any(t=>t.Key==key&&t.Folder))return;folder=key;RenderApps();LauncherMotion.Page(appScroll);}
@@ -623,6 +663,13 @@ namespace OneTaskBar
         ContextMenu AppMenu(StartTile tile)
         {
             var menu=tile.Folder?new ContextMenu():WindowPicker.Menu(tile.App,shell,allowAdmin:true);
+            if(!tile.Folder)
+            {
+                bool hidden=Preferences.IsHiddenApp(tile.Key);
+                var hide=new MenuItem {Header=hidden?"모든 앱에 다시 표시":"모든 앱에서 숨기기"};
+                hide.Click+=(s,e)=>SetHidden(tile,!hidden);
+                menu.Items.Add(new Separator());menu.Items.Add(hide);
+            }
             if(!tile.Folder&&folder==null)
             {
                 var create=new MenuItem {Header="새 폴더 만들기"};

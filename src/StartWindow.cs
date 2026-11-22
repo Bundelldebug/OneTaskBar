@@ -181,10 +181,11 @@ namespace OneTaskBar
             foreach(var app in tile.Children.Take(9)){var icon=AppIcons.Visual(app.App,16);icon.Margin=new Thickness(1);icon.HorizontalAlignment=HorizontalAlignment.Center;icon.VerticalAlignment=VerticalAlignment.Center;icons.Children.Add(icon);}
             return new Border {Width=64,Height=64,Padding=new Thickness(5),CornerRadius=new CornerRadius(16),Background=Paint.Brush("#32FFFFFF"),UseLayoutRounding=true,Child=icons};
         }
-        internal static FrameworkElement FolderIcon(StartTile tile)
+        internal static FrameworkElement FolderIcon(StartTile tile,double size=40)
         {
             if(tile.Key!=null&&tile.Key.StartsWith(AppCategories.KeyPrefix,StringComparison.Ordinal))return LargeFolderIcon(tile);
-            var icons=new UniformGrid {Columns=2,Rows=2,Width=32,Height=32,UseLayoutRounding=true};foreach(var app in tile.Children.Take(4)){var icon=AppIcons.Visual(app.App,13);icon.Margin=new Thickness(1);icon.HorizontalAlignment=HorizontalAlignment.Center;icon.VerticalAlignment=VerticalAlignment.Center;icons.Children.Add(icon);}return new Border {Width=40,Height=40,Padding=new Thickness(4),CornerRadius=new CornerRadius(11),Background=Paint.Brush("#32FFFFFF"),UseLayoutRounding=true,Child=icons};
+            double scale=Math.Max(.5,size/40);double inner=Math.Round(32*scale);
+            var icons=new UniformGrid {Columns=2,Rows=2,Width=inner,Height=inner,UseLayoutRounding=true};foreach(var app in tile.Children.Take(4)){var icon=AppIcons.Visual(app.App,Math.Round(13*scale));icon.Margin=new Thickness(Math.Max(1,Math.Round(scale)));icon.HorizontalAlignment=HorizontalAlignment.Center;icon.VerticalAlignment=VerticalAlignment.Center;icons.Children.Add(icon);}return new Border {Width=size,Height=size,Padding=new Thickness((size-inner)/2),CornerRadius=new CornerRadius(Math.Round(11*scale)),Background=Paint.Brush("#32FFFFFF"),UseLayoutRounding=true,Child=icons};
         }
         ContextMenu PinMenu(StartTile tile)
         {

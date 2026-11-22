@@ -38,14 +38,11 @@ namespace OneTaskBar
 
         internal static ImageSource Resolve(AppEntry app, ImageSource original)
         {
-            if (!Preferences.Current.SquircleIcons)
+            bool custom = AppIconOverrides.ModeOf(Identity(app)) >= 3;
+            if (!Preferences.Current.SquircleIcons && !custom)
                 return original;
-            if (original == null)
-            {
-                var rule = AppIconOverrides.Find(Identity(app));
-                if (rule == null || rule.Mode != 3)
-                    return null;
-            }
+            if (original == null && !custom)
+                return null;
 
             string key = Identity(app) + "|" + (original == null ? 0 : RuntimeHelpers.GetHashCode(original));
             lock (gate)
@@ -98,11 +95,15 @@ namespace OneTaskBar
         {
             if (rule != null && rule.Mode == 1)
                 return original;
-            if (rule != null && rule.Mode == 3)
+            if (rule != null && rule.Mode >= 3)
             {
                 var custom = AppIconOverrides.Image(rule);
+                if (custom != null && rule.Mode == 4)
+                    return custom;
                 if (custom != null)
                     return AppIconShape.Tile(custom, rule.Color, rule.ArtworkPercent);
+                if (!Preferences.Current.SquircleIcons)
+                    return original;
             }
 
             if (rule != null && rule.Mode == 2)
@@ -153,6 +154,8 @@ namespace OneTaskBar
         {
             if (rule != null && rule.Mode == 1)
                 return "원본 유지";
+            if (rule != null && rule.Mode == 4)
+                return "사용자 이미지 그대로 · 스퀘어클 설정과 관계없이 적용";
             if (rule != null && rule.Mode == 3)
                 return "사용자 이미지";
             if (rule != null && rule.Mode == 2)

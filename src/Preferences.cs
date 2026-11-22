@@ -54,6 +54,7 @@ namespace OneTaskBar
         public bool QuickSliderScroll=false;
         public bool DuoStatusIcon=false,SliderValueNumbers=false;
         public string[] DockStatusItems=new string[0];
+        public string[] HiddenApps=new string[0];
         public bool DockWindowDrop=true;
         public int QuickToggleWidthPercent=100,QuickToggleCollapsedHeight=62;
         public int QuickToggleColumns,QuickToggleRows;
@@ -116,6 +117,26 @@ namespace OneTaskBar
         internal static void SetAppearance(Action<PreferenceData> change)
         {
             change(Current);Normalize(Current);Save();var notify=AppearanceChanged;if(notify!=null)notify();
+        }
+        // Apps hidden from the All apps panel only; search, Start pins and the dock still show them.
+        internal static bool IsHiddenApp(string key)
+        {
+            var list=Current.HiddenApps;
+            if(list==null||String.IsNullOrEmpty(key))return false;
+            foreach(var item in list)
+            {
+                if(String.Equals(item,key,StringComparison.OrdinalIgnoreCase))return true;
+            }
+            return false;
+        }
+        internal static int HiddenAppCount {get{return Current.HiddenApps==null?0:Current.HiddenApps.Length;}}
+        internal static void SetHiddenApp(string key,bool hidden)
+        {
+            if(String.IsNullOrEmpty(key)||IsHiddenApp(key)==hidden)return;
+            var list=new System.Collections.Generic.List<string>(Current.HiddenApps??new string[0]);
+            if(hidden)list.Add(key);
+            else list.RemoveAll(item=>String.Equals(item,key,StringComparison.OrdinalIgnoreCase));
+            Current.HiddenApps=list.ToArray();Save();
         }
         internal static void SetAppIcons(bool enabled)
         {

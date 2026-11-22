@@ -41,7 +41,8 @@ namespace OneTaskBar
                 "자동",
                 "원본 유지",
                 "원본 그림으로 만들기",
-                "사용자 이미지"
+                "사용자 이미지",
+                "사용자 이미지 그대로"
             }
         };
         readonly Slider scale = new Slider
@@ -252,7 +253,7 @@ namespace OneTaskBar
                 if (closed || version != selection)
                     return;
                 AppIconOverride rule = AppIconOverrides.Find(AppIconTheme.Identity(app)) ?? new AppIconOverride();
-                ImageSource custom = rule.Mode == 3 ? await BackgroundWork.Run(() => AppIconOverrides.Image(rule)) : null;
+                ImageSource custom = rule.Mode >= 3 ? await BackgroundWork.Run(() => AppIconOverrides.Image(rule)) : null;
                 if (closed || version != selection)
                     return;
                 original = image;
@@ -274,9 +275,9 @@ namespace OneTaskBar
         void UpdatePreview()
         {
             scaleLabel.Text = "그림 크기 " + draft.ArtworkPercent + "%";
-            bool custom = draft.Mode >= 2;
+            bool custom = draft.Mode == 2 || draft.Mode == 3;
             scale.IsEnabled = custom;
-            if (original == null && !(draft.Mode == 3 && imported != null))
+            if (original == null && !(draft.Mode >= 3 && imported != null))
             {
                 description.Text = "이 앱의 원본 아이콘을 읽지 못했습니다. 이미지를 직접 선택할 수 있습니다.";
                 return;
@@ -285,7 +286,7 @@ namespace OneTaskBar
             try
             {
                 before.Source = original;
-                after.Source = draft.Mode == 3 && imported != null ? AppIconShape.Tile(imported, draft.Color, draft.ArtworkPercent) : AppIconTheme.Preview(selected, original, draft);
+                after.Source = draft.Mode == 4 && imported != null ? imported : draft.Mode == 3 && imported != null ? AppIconShape.Tile(imported, draft.Color, draft.ArtworkPercent) : AppIconTheme.Preview(selected, original, draft);
                 description.Text = AppIconTheme.Description(selected, original, draft);
             }
             catch (Exception error)
@@ -335,8 +336,9 @@ namespace OneTaskBar
                 if (closed || version != selection)
                     return;
                 imported = image;
-                draft.Mode = 3;
-                mode.SelectedIndex = 3;
+                if (draft.Mode != 4)
+                    draft.Mode = 3;
+                mode.SelectedIndex = draft.Mode;
                 UpdatePreview();
             }
             catch (Exception error)
@@ -371,7 +373,7 @@ namespace OneTaskBar
             {
                 AppIconOverrides.Save(selected, draft, imported);
                 draft = AppIconOverrides.Find(AppIconTheme.Identity(selected)) ?? new AppIconOverride();
-                status.Text = Preferences.Current.SquircleIcons ? "저장했습니다." : "저장했습니다. 스퀘어클 앱 아이콘을 켜면 적용됩니다.";
+                status.Text = Preferences.Current.SquircleIcons || draft.Mode >= 3 ? "저장했습니다." : "저장했습니다. 스퀘어클 앱 아이콘을 켜면 적용됩니다.";
             }
             catch (Exception error)
             {

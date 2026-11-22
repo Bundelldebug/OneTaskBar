@@ -40,7 +40,7 @@ namespace OneTaskBar
                     {
                         if (item == null || String.IsNullOrEmpty(item.Identity) || item.Identity.Length > 4096 || values.Count >= 2048)
                             continue;
-                        item.Mode = Math.Max(0, Math.Min(3, item.Mode));
+                        item.Mode = Math.Max(0, Math.Min(4, item.Mode));
                         item.ArtworkPercent = Math.Max(40, Math.Min(100, item.ArtworkPercent));
                         values[item.Identity] = item;
                     }
@@ -58,6 +58,12 @@ namespace OneTaskBar
         {
             AppIconOverride value;
             return Values.TryGetValue(identity ?? "", out value) ? value.Copy() : null;
+        }
+
+        internal static int ModeOf(string identity)
+        {
+            AppIconOverride value;
+            return Values.TryGetValue(identity ?? "", out value) ? value.Mode : 0;
         }
 
         internal static ImageSource Image(AppIconOverride value)
@@ -84,10 +90,10 @@ namespace OneTaskBar
                 throw new ArgumentNullException("change");
             var value = change.Copy();
             value.Identity = identity;
-            value.Mode = Math.Max(0, Math.Min(3, value.Mode));
+            value.Mode = Math.Max(0, Math.Min(4, value.Mode));
             value.ArtworkPercent = Math.Max(40, Math.Min(100, value.ArtworkPercent));
             Directory.CreateDirectory(directory);
-            if (value.Mode == 3)
+            if (value.Mode >= 3)
             {
                 if (imported != null)
                 {

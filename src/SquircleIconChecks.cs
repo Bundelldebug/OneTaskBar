@@ -292,6 +292,21 @@ namespace OneTaskBar
                     Require(AppIconOverrides.Find(AppIconTheme.Identity(app)).Mode == 3 && AppIconOverrides.Image(AppIconOverrides.Find(AppIconTheme.Identity(app))) != null, "Custom icon was not persisted");
                     Require(AppIconShape.AlreadySquircle(AppIconTheme.Resolve(app, raw)), "Custom source conversion failed");
                     Require(AppIconTheme.Resolve(app, null) != null, "Custom icon without a native source did not render");
+                    // Issue 29: "use the image as is" keeps the picked picture untouched, with the squircle option on or off.
+                    AppIconOverrides.Save(app, new AppIconOverride { Mode = 4 }, wide);
+                    var asIs = AppIconOverrides.Find(AppIconTheme.Identity(app));
+                    Require(asIs != null && asIs.Mode == 4, "As-is custom icon was not persisted");
+                    var stored = AppIconOverrides.Image(asIs);
+                    var asIsOn = AppIconTheme.Resolve(app, raw) as BitmapSource;
+                    Require(stored != null && asIsOn != null && AppIconShape.Pixels(asIsOn).SequenceEqual(AppIconShape.Pixels((BitmapSource)stored)), "As-is custom icon was reshaped");
+                    bool squircleBefore = Preferences.Current.SquircleIcons;
+                    Preferences.Current.SquircleIcons = false;
+                    AppIconTheme.NotifyChanged();
+                    var asIsOff = AppIconTheme.Resolve(app, raw) as BitmapSource;
+                    Require(asIsOff != null && !Object.ReferenceEquals(asIsOff, raw) && AppIconShape.Pixels(asIsOff).SequenceEqual(AppIconShape.Pixels((BitmapSource)stored)), "As-is custom icon needs the squircle option");
+                    Require(AppIconTheme.Resolve(app, null) != null, "As-is custom icon without a native source did not render");
+                    Preferences.Current.SquircleIcons = squircleBefore;
+                    AppIconTheme.NotifyChanged();
                     AppIconOverrides.Save(app, new AppIconOverride(), null);
                     Require(AppIconOverrides.Find(AppIconTheme.Identity(app)) == null, "Reset did not remove override");
                     var hostile = new AppIconOverride
