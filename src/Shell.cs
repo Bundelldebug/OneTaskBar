@@ -624,6 +624,7 @@ namespace OneTaskBar
         {
             foreach(var dock in docks)
             {
+                if(dock.DexStartContains(point))return true;
                 if(!dock.Start.IsVisible)continue;
                 Native.RectI bounds;
                 var handle=new WindowInteropHelper(dock.Start).Handle;

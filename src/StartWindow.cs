@@ -122,16 +122,16 @@ namespace OneTaskBar
             if(fitting||closed||autoScreen==null)return;fitting=true;try{double oldWidth=Width,oldHeight=Height;var work=Native.WorkArea(autoScreen);var limits=StartMenuLayout.Fit(autoScreen.Bounds,work,autoScale,620,autoEdge);Configure(limits.Width,Height);var fit=StartMenuLayout.Fit(autoScreen.Bounds,work,autoScale,PreferredHomeHeight(),autoEdge);if(show||Math.Abs(oldWidth-fit.Width)>.1||Math.Abs(oldHeight-fit.Height)>.1){Configure(fit.Width,fit.Height);ShowAt(autoScreen.Bounds,fit.X,fit.Y,fit.Width,fit.Height);}}finally{fitting=false;}
         }
         // Re-placing the window shows it again, which would cut the Fluid arrival short and leave the menu simply appearing.
-        // While the drop is still becoming the menu, the fit waits until it has landed.
+        // While the drop (or the Dex grow from the start key) is still becoming the menu, the fit waits until it has landed.
         System.Windows.Threading.DispatcherTimer fitAfterBud;
         void FitVisible()
         {
-            if(BudActive)
+            if(BudActive||PanelMorph.Running(this))
             {
                 if(fitAfterBud==null)
                 {
                     fitAfterBud=new System.Windows.Threading.DispatcherTimer {Interval=TimeSpan.FromMilliseconds(120)};
-                    fitAfterBud.Tick+=(s,e)=>{if(BudActive)return;fitAfterBud.Stop();FitVisible();};
+                    fitAfterBud.Tick+=(s,e)=>{if(BudActive||PanelMorph.Running(this))return;fitAfterBud.Stop();FitVisible();};
                 }
                 if(!fitAfterBud.IsEnabled)fitAfterBud.Start();
                 return;

@@ -33,6 +33,7 @@ namespace OneTaskBar
             }
             catch(System.ComponentModel.Win32Exception){screenCaptureFailed=true;}
         }
+        static bool DwmCloaked(Window window){int value;return Native.DwmGetWindowAttribute(new WindowInteropHelper(window).Handle,14,out value,4)==0&&value!=0;}
         static Native.RectI Bounds(Window window){Native.RectI rect;Native.GetWindowRect(new WindowInteropHelper(window).Handle,out rect);return rect;}
         static async Task Frames(string name,params int[] times)
         {
@@ -84,7 +85,10 @@ namespace OneTaskBar
                     // The app grid grows out of its key and stays over the bar.
                     shell.ToggleDrawer(dock);
                     Require(shell.Drawer.IsVisible&&PanelMorph.Running(shell.Drawer),"the app grid opens growing");
+                    // Issue 30: the old full-size picture must not be put up before the first grown frame.
+                    Require(DwmCloaked(shell.Drawer),"the app grid stays cloaked until its first frame is drawn");
                     await Frames("drawer",20,70,130,200,300);await Task.Delay(400);
+                    Require(!DwmCloaked(shell.Drawer),"the app grid is uncloaked once it is drawn");
                     Require(!PanelMorph.Running(shell.Drawer)&&!shell.Drawer.BackdropClip.HasValue,"the app grid ends as the plain panel");
                     var drawer=Bounds(shell.Drawer);var wanted=Dex.DrawerRect(wide,tall);
                     Require(Math.Abs((drawer.Right-drawer.Left)/scale-wanted.Width)<2&&Math.Abs((drawer.Left-screen.Bounds.Left)/scale-wanted.X)<2,"the app grid is centered");
@@ -95,7 +99,17 @@ namespace OneTaskBar
                     shell.ToggleStart(dock);
                     Require(shell.StartMenu.IsVisible&&!shell.Drawer.IsVisible,"Start opens the Start menu");
                     Require(PanelMorph.Running(shell.StartMenu),"Start grows out of its button");
-                    await Task.Delay(800);Shot("start-open",shell.StartMenu);shell.StartMenu.HideImmediately();await Task.Delay(120);report.Add("start ok");
+                    await Task.Delay(800);Shot("start-open",shell.StartMenu);
+                    // Issue 30: a press on the bar's start key is the key's own toggle, so the second press closes Start.
+                    var key=dock.DexStartButton.PointToScreen(new Point(dock.DexStartButton.ActualWidth/2,dock.DexStartButton.ActualHeight/2));
+                    var keyPoint=new Native.PointI {X=(int)Math.Round(key.X),Y=(int)Math.Round(key.Y)};
+                    Require(shell.ContainsStartButton(keyPoint),"the bar's start key counts as the start button");
+                    shell.StartMenu.ObserveOutsideForFixture();MenuDismiss.PointerPressed(keyPoint);
+                    Require(shell.StartMenu.IsVisible&&!shell.StartMenu.IsDismissing,"pressing the start key does not dismiss Start as an outside click");
+                    shell.ToggleStart(dock);
+                    Require(shell.StartMenu.IsDismissing||!shell.StartMenu.IsVisible,"the second press closes Start");
+                    await Task.Delay(400);Require(!shell.StartMenu.IsVisible,"Start is closed after the second press");
+                    report.Add("start ok");
                     // The finder stands over its pill.
                     shell.ToggleSearch(dock);
                     Require(shell.Finder.IsVisible&&PanelMorph.Running(shell.Finder),"the finder fades in");

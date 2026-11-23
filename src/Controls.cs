@@ -521,8 +521,10 @@ namespace OneTaskBar
             Width=width; Height=height;
             new WindowInteropHelper(this).EnsureHandle(); Native.Place(this,screen,x,y,width,height);
             deferReveal=dexOpen;
+            bool cloaked=dexOpen&&FirstFrameCloak.Hide(this);
             try{Show();}finally{deferReveal=false;}
             if(dexOpen){Surface.Opacity=0;Native.BlurOpacity(this,0);}
+            if(cloaked)FirstFrameCloak.RevealAfterFrame(this);
             Native.Place(this,screen,x,y,width,height);UpdateLayout(); Native.Round(this,Radius);
         }
         public new void Show()

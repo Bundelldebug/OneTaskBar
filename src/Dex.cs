@@ -94,6 +94,14 @@ namespace OneTaskBar
         }
         internal bool DexBar {get{return dex;}}
         internal Button DexAppsButton {get{return dexApps;}}
+        internal Button DexStartButton {get{return dexStartButton;}}
+        // The start key lives inside the bar here, so a press on it is the key's own toggle, not a click outside Start.
+        internal bool DexStartContains(Native.PointI point)
+        {
+            if(!dex||dexStartButton==null||!Apps.IsVisible)return false;
+            var rect=DeviceRect(dexStartButton);
+            return rect.HasValue&&point.X>=rect.Value.Left&&point.X<rect.Value.Right&&point.Y>=rect.Value.Top&&point.Y<rect.Value.Bottom;
+        }
         double IconSize {get{return dex?Dex.IconSize:30;}}
         internal double DexPillCenter
         {
