@@ -81,6 +81,11 @@ namespace OneTaskBar
         Rect from,to,union;Thickness margin;Transform childTransform;Point childOrigin;Picture picture,cardPicture;bool done,leaving;int length;Action after;
         Transform flyTransform;Geometry flyOldClip;
         double nowK,nowFade=1,leaveK=1,leaveFade=1,lastT=-1;
+        // The clock of an opening panel starts on the first frame after its window is uncloaked, so the grow is not already
+        // half over when it is first seen (issue 30).
+        bool started;
+        // While the outline moves, the content is scaled as one cached picture instead of being drawn again every frame.
+        CacheMode childCache;bool cached;
         HorizontalAlignment across;VerticalAlignment down;object width,height;
         internal static bool Running(GlassWindow window){return window.Reshape!=null;}
         internal static bool Opens(GlassWindow window){return window is QuickWindow||window is NotificationWindow||window is CalendarWindow||window is DetailWindow||window is DrawerWindow||window is StartWindow||window is SearchWindow;}
@@ -246,6 +251,7 @@ namespace OneTaskBar
                 child.RenderTransformOrigin=new Point(0,0);child.RenderTransform=ride;
             }
             else{child.RenderTransformOrigin=new Point(.5,.5);child.RenderTransform=childScale;}
+            if(plan.Carry&&plan.Scale&&child.CacheMode==null){childCache=child.CacheMode;child.CacheMode=new BitmapCache(1);cached=true;}
             if(resizedHost)Native.SetWindowPos(handle,IntPtr.Zero,left,top,right-left,bottom-top,0x14);
             window.UpdateLayout();
             // Drive the live blur backdrop via GPU Composition TransformMatrix instead of calling SetWindowRgn on every frame.
@@ -304,6 +310,13 @@ namespace OneTaskBar
         }
         void Frame(object sender,EventArgs e)
         {
+            if(!leaving&&!started)
+            {
+                watch.Restart();
+                if(FirstFrameCloak.Holding(window))return;
+                started=true;
+                return;
+            }
             double t=watch.Elapsed.TotalMilliseconds/length;
             if(t>=1){Finish();return;}
             if(lastT>=0&&t-lastT<.0004)return;
@@ -386,9 +399,13 @@ namespace OneTaskBar
                 if(plan.Flyer.Child!=null)plan.Flyer.Child.Opacity=1;
             }
             if(plan.Late!=null)foreach(var part in plan.Late)part.Opacity=1;
+            if(cached){child.CacheMode=childCache;cached=false;}
             child.Opacity=1;child.RenderTransform=childTransform;child.RenderTransformOrigin=childOrigin;child.Margin=margin;child.HorizontalAlignment=across;child.VerticalAlignment=down;
             Restore(FrameworkElement.WidthProperty,width);Restore(FrameworkElement.HeightProperty,height);
-            window.Surface.Opacity=1;Native.BlurOpacity(window,1);
+            // A Dex panel that has gone stays see-through: a layered window keeps the last picture WPF draws into it, and a full
+            // picture there would be put up again for a moment the next time the panel is shown (issue 30).
+            bool gone=!window.IsVisible&&Dex.Enabled&&Opens(window);
+            window.Surface.Opacity=gone?0:1;Native.BlurOpacity(window,gone?0:1);
             var host=window.Content as UIElement;if(host!=null&&host.Clip==outline)host.Clip=null;
             window.BackdropClip=null;window.RegionClip=null;
             if(resizedHost)Native.SetWindowPos(handle,IntPtr.Zero,target.Left,target.Top,target.Right-target.Left,target.Bottom-target.Top,0x14);

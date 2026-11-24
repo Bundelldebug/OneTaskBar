@@ -532,7 +532,7 @@ namespace OneTaskBar
             if(!IsVisible)PrepareRim();
             if(bud!=null)bud.Cancel();
             bool resume=StableSurface&&!UnifiedFade&&IsVisible&&hiding;++motion;hiding=false;CompleteDismissal(false);if(UnifiedFade)ResetFade();Surface.IsHitTestVisible=true;Surface.BeginAnimation(UIElement.OpacityProperty,null);Surface.Opacity=deferReveal?0:1;Surface.RenderTransform=Transform.Identity;
-            if(deferReveal)Native.BlurOpacity(this,0);
+            if(deferReveal)Native.BlurOpacity(this,0);else if(!IsVisible&&Dex.Enabled&&PanelMorph.Opens(this))Native.BlurOpacity(this,1);
             if(StableSurface&&TransitionContent!=null){if(resume&&Motion.Enabled){if(SmoothLauncher)LauncherMotion.Run(TransitionContent,true,PopFromTop,true);else Motion.Launcher(TransitionContent,true,PopFromTop);}else{if(SmoothLauncher)LauncherMotion.Cancel(TransitionContent);TransitionContent.BeginAnimation(OpacityProperty,null);TransitionContent.Opacity=1;TransitionContent.RenderTransform=Transform.Identity;}}
             base.Show();
             ShellWindowPolicy.Apply(this);
@@ -583,7 +583,14 @@ namespace OneTaskBar
             if(closed)return Task.FromResult(false);if(!IsVisible)return Task.FromResult(true);
             if(dismissal==null)dismissal=new TaskCompletionSource<bool>();var pending=dismissal.Task;Hide();return pending;
         }
-        internal void HideImmediately(){if(Reshape!=null)Reshape.Finish();++motion;hiding=false;LauncherMotion.Cancel(TransitionContent);if(UnifiedFade)ResetFade();Surface.BeginAnimation(OpacityProperty,null);Surface.Opacity=1;Surface.RenderTransform=Transform.Identity;Surface.IsHitTestVisible=true;if(TransitionContent!=null){TransitionContent.BeginAnimation(OpacityProperty,null);TransitionContent.Opacity=1;TransitionContent.RenderTransform=Transform.Identity;}base.Hide();CompleteDismissal(true);}
+        internal void HideImmediately(){if(Reshape!=null)Reshape.Finish();++motion;hiding=false;LauncherMotion.Cancel(TransitionContent);if(UnifiedFade)ResetFade();Surface.BeginAnimation(OpacityProperty,null);Surface.Opacity=1;Surface.RenderTransform=Transform.Identity;Surface.IsHitTestVisible=true;if(TransitionContent!=null){TransitionContent.BeginAnimation(OpacityProperty,null);TransitionContent.Opacity=1;TransitionContent.RenderTransform=Transform.Identity;}base.Hide();ClearHiddenPicture();CompleteDismissal(true);}
+        // A hidden Dex panel keeps a see-through picture, so its next show cannot flash the old full panel (issue 30).
+        void ClearHiddenPicture()
+        {
+            if(IsVisible||!Dex.Enabled||!PanelMorph.Opens(this))return;
+            Surface.Opacity=0;
+            Native.BlurOpacity(this,0);
+        }
         void CompleteDismissal(bool completed) {var pending=dismissal;dismissal=null;if(pending!=null)pending.TrySetResult(completed);}
     }
 }

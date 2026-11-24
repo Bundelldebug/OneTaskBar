@@ -93,7 +93,7 @@ namespace OneTaskBar
                     var drawer=Bounds(shell.Drawer);var wanted=Dex.DrawerRect(wide,tall);
                     Require(Math.Abs((drawer.Right-drawer.Left)/scale-wanted.Width)<2&&Math.Abs((drawer.Left-screen.Bounds.Left)/scale-wanted.X)<2,"the app grid is centered");
                     Require(dock.SearchButton.Visibility==Visibility.Visible&&dock.Apps.Opacity>.99,"the bar is untouched while the grid is open");
-                    Shot("drawer-open",shell.Drawer);shell.Drawer.Hide();Require(PanelMorph.Running(shell.Drawer),"the app grid leaves on the same glass");await Frames("drawer-close",40,100);await Task.Delay(200);Require(!shell.Drawer.IsVisible&&!PanelMorph.Running(shell.Drawer),"the app grid is gone");report.Add("drawer ok");
+                    Shot("drawer-open",shell.Drawer);shell.Drawer.Hide();Require(PanelMorph.Running(shell.Drawer),"the app grid leaves on the same glass");await Frames("drawer-close",40,100);await Task.Delay(200);Require(!shell.Drawer.IsVisible&&!PanelMorph.Running(shell.Drawer),"the app grid is gone");Require(shell.Drawer.Surface.Opacity<.01,"the hidden app grid keeps a see-through picture for its next show");report.Add("drawer ok");
                     // It is still a taskbar: the Windows key and the start button open the Start menu.
                     shell.StartPins.Replace(shell.Apps.Take(18));shell.StartMenu=new StartWindow(shell);
                     shell.ToggleStart(dock);
