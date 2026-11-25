@@ -12,6 +12,8 @@ namespace OneTaskBar
         public bool NativeTaskView=false;
         public bool NativeTrayOverflow=false;
         public bool DynamicIsland=false;
+        // The island drawn as a squircle with an icon tile and a title, from the owner's One UI clips; off by default.
+        public bool SquircleIsland=false;
         public bool ShowNowBar=true;
         public bool NotificationIntegration=true;
         public bool NotificationPopups=true;public bool NotificationBadge=true;

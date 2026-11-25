@@ -89,6 +89,8 @@ namespace OneTaskBar
             {
                 Row(island,"다이나믹 아일랜드","미디어·새 알림과 충전·음량·밝기를 표시합니다. 위쪽 작업표시줄에서는 화면 아래에 표시합니다",
                     Preferences.Current.DynamicIsland,v=>Preferences.Set(p=>p.DynamicIsland=v));
+                Row(island,"스퀘어클 아일랜드","다이나믹 아일랜드를 스퀘어클 모양으로 바꾸고, 앨범·상태 아이콘과 제목을 함께 표시합니다. 다른 작업이 함께 있으면 왼쪽에 작은 아일랜드가 나옵니다",
+                    Preferences.Current.SquircleIsland,v=>Preferences.Set(p=>p.SquircleIsland=v));
                 Row(nowBar,"미디어 앱 전환 애니메이션","재생 앱을 최소화하거나 복원할 때 미디어 캡슐로 연결합니다",
                     Preferences.Current.MediaWindowAnimation,v=>Preferences.Set(p=>p.MediaWindowAnimation=v));
                 if(Preferences.Current.UIVersion>=95)Row(hardware,"가벼운 효과","포인터를 따라 움직이는 유리 빛, 리퀴드 글래스, 미디어 전환의 배경 흐림을 끄고 파형·제목 갱신을 줄입니다. 사양이 낮은 PC는 자동으로 켜집니다",

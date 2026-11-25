@@ -8,6 +8,8 @@ namespace OneTaskBar
     internal sealed class DynamicIslandState
     {
         internal bool Expanded,Searching;internal int SearchRows;
+        // The squircle island folds wider: its pill carries a tile and the title.
+        internal bool Squircle;
         internal string FeedbackKind;
         internal double Value;
         internal bool Muted;
@@ -29,13 +31,14 @@ namespace OneTaskBar
             if(NotificationVisible(now))return new Size(360,156);
             if(FeedbackVisible(now))return FeedbackKind=="charge"?new Size(DynamicIslandLayout.ChargeWidth,DynamicIslandLayout.ChargeHeight):new Size(286,88);
             // Same height with or without media: playing only widens the island, it never grows downward.
-            return media?new Size(DynamicIslandLayout.MediaWidth,DynamicIslandLayout.CompactHeight):new Size(DynamicIslandLayout.IdleWidth,DynamicIslandLayout.CompactHeight);
+            return media?new Size(DynamicIslandLayout.MediaPillWidth(Squircle),DynamicIslandLayout.CompactHeight):new Size(DynamicIslandLayout.IdleWidth,DynamicIslandLayout.CompactHeight);
         }
         internal void Reset(){Expanded=Searching=false;FeedbackKind=null;FeedbackUntil=NotificationUntil=DateTime.MinValue;}
     }
     internal static class DynamicIslandLayout
     {
-        internal const double MaximumWidth=360,MaximumHeight=244,TopInset=2,CompactHeight=22,ChargeHeight=22,IdleWidth=44,MediaWidth=88,ChargeWidth=208;
+        internal const double MaximumWidth=360,MaximumHeight=244,TopInset=2,CompactHeight=22,ChargeHeight=22,IdleWidth=44,MediaWidth=88,ChargeWidth=208,SquircleMediaWidth=164;
+        internal static double MediaPillWidth(bool squircle){return squircle?SquircleMediaWidth:MediaWidth;}
         internal static Rect Host(System.Drawing.Rectangle screen,System.Drawing.Rectangle work,double scale,bool bottom=false)
         {
             scale=Math.Max(1,scale);

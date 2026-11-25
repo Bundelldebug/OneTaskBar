@@ -132,9 +132,10 @@ namespace OneTaskBar
             compact.Visibility=feedback.Visibility=expanded.Visibility=level.Visibility=notification.Visibility=search.Visibility=Visibility.Hidden;
             Surface.Child=BuildFluid(root);
             SetFluid(Fluid.Enabled);
-            var decorator=(AdornerDecorator)Content;
-            decorator.Child=null;
-            canvas.Children.Add(Surface);decorator.Child=canvas;
+            var decoratorRoot=(AdornerDecorator)Content;
+            decoratorRoot.Child=null;
+            canvas.Children.Add(Surface);decoratorRoot.Child=canvas;
+            BuildSquircle();
             expiry.Tick+=(s,e)=>ExpireFeedback();
             SourceInitialized+=(s,e)=>
             {
@@ -150,7 +151,7 @@ namespace OneTaskBar
             Loaded+=(s,e)=>QueuePlacement();
             LocationChanged+=(s,e)=>{if(!placingHost)QueuePlacement();};
             Deactivated+=(s,e)=>{if(state.Expanded&&!IsMouseOver)SetExpanded(false);if(state.Searching&&!IsMouseOver)CloseSearch();};
-            Closed+=(s,e)=>{closed=true;activity.SetPlaying(false);SetFluidMotion(false);StopMotion();StopOutside();expiry.Stop();ClearNotification();player.Update(new MediaState(),null);media=null;artwork=null;surfaceArtwork=null;art.Background=expanded.Background=null;};
+            Closed+=(s,e)=>{closed=true;activity.SetPlaying(false);SetFluidMotion(false);StopMotion();StopOutside();expiry.Stop();ClearNotification();player.Update(new MediaState(),null);media=null;artwork=null;surfaceArtwork=null;art.Background=expanded.Background=null;pillArt.Background=satelliteArt.Background=null;};
         }
         internal override void RefreshGlassMaterial()
         {
@@ -162,7 +163,10 @@ namespace OneTaskBar
         internal void Present(MediaState value,string output,Forms.Screen monitor,double dpi,System.Drawing.Rectangle? work=null,bool atBottom=false)
         {
             if(closed)return;
-            SetFluid(Fluid.Enabled);
+            // The squircle island has its own look, so it takes the place of the Fluid dress.
+            bool squircleWanted=Preferences.Current.SquircleIsland;
+            SetFluid(Fluid.Enabled&&!squircleWanted);
+            SetSquircle(squircleWanted);
             outputName=output;
             media=value!=null&&value.Available&&value.Active?value:null;
             screen=monitor;scale=dpi;
@@ -307,7 +311,7 @@ namespace OneTaskBar
             bool compactVisible=active&&!show&&!detail&&!notice&&!searching;
             ShowContent(search,searching);
             ShowContent(compact,compactVisible);
-            activity.SetPlaying(compactVisible&&media.Playing&&Motion.Enabled);
+            activity.SetPlaying(compactVisible&&!squircle&&media.Playing&&Motion.Enabled);
             bool open=detail||notice||show||searching;
             SetFluidDress(open);
             // The drifting light is only seen on the open island, so it rests while the island is folded.
@@ -329,6 +333,7 @@ namespace OneTaskBar
                 levelSlider.Kind=kind=="brightness"?"brightness":SoundIcon.For(state.Value,state.Muted,true);
                 levelSlider.Value=state.Muted?0:state.Value;
             }
+            DressSquircle(compactVisible,charge,open);
             var size=state.Size(active,DateTime.UtcNow);
             size.Height=Math.Min(size.Height,host.Height);
             MoveTo(DynamicIslandLayout.Capsule(size,host.Width,host.Height,bottom));
@@ -365,6 +370,7 @@ namespace OneTaskBar
             content.Visibility=visible?Visibility.Visible:Visibility.Hidden;
             if(!visible)return;
             if(fluid&&Motion.Enabled)Reveal(content);
+            else if(squircle&&Motion.Enabled)SquircleReveal(content);
             else Motion.Fade(content,0,1,180);
         }
         internal void SetExpanded(bool value)
@@ -440,12 +446,12 @@ namespace OneTaskBar
         {
             if(target==next)return;
             SpringValue.Handoff(slide,animating,current,from,target,next);
-            slideClock.Restart();
+            slideClock.Restart();held=2;
             target=next;from=current;
             body.Width=next.Width;body.Height=next.Height;
             fromRadius=currentRadius;
             bool card=state.Expanded||state.Searching||NotificationVisible||next.Height>32;
-            targetRadius=Math.Min(Math.Min(next.Width,next.Height)/2,card?(fluid?36:29):100);
+            targetRadius=Math.Min(Math.Min(next.Width,next.Height)/2,card?(fluid?36:squircle?34:29):100);
             if(!Motion.Enabled||current.IsEmpty){StopMotion();current=target;currentRadius=targetRadius;PlaceShape();return;}
             motion.Restart();
             if(!animating){animating=true;lastRendering=TimeSpan.MinValue;CompositionTarget.Rendering+=Frame;}
@@ -454,24 +460,42 @@ namespace OneTaskBar
         {
             var rendering=e as RenderingEventArgs;
             if(rendering!=null){if(rendering.RenderingTime==lastRendering)return;lastRendering=rendering.RenderingTime;}
-            slide.Step(slideClock.Next(rendering!=null?rendering.RenderingTime:motion.Elapsed));bool settled=slide.AtRest;double ease=settled?1:slide.Value;
+            double step=slideClock.Next(rendering!=null?rendering.RenderingTime:motion.Elapsed);
+            // The first frames after a change carry its layout (the media card, the search list) and can take far longer
+            // than a frame; spent on the spring, that time made the island jump to nearly its new size. They move it one frame.
+            if(held>0){held--;step=Math.Min(step,1/120.0);}
+            slide.Step(step);bool settled=slide.AtRest;double ease=settled?1:slide.Value;
             current=new Rect(from.X+(target.X-from.X)*ease,from.Y+(target.Y-from.Y)*ease,from.Width+(target.Width-from.Width)*ease,from.Height+(target.Height-from.Height)*ease);
             currentRadius=fromRadius+(targetRadius-fromRadius)*ease;
-            PlaceShape();
+            // Stopped first, so the last placement cuts the input area down to the settled shape.
             if(settled)StopMotion();
+            PlaceShape();
         }
         void PlaceShape()
         {
             double radius=currentRadius;
-            if(fluid)radius=FluidShape(radius);
+            // Both springs give a little, so both keep the shape inside the host window while it overshoots.
+            if(fluid||squircle)radius=FluidShape(radius);
             Surface.Width=current.Width;Surface.Height=current.Height;
             Surface.CornerRadius=new CornerRadius(radius);
             clip.Rect=new Rect(0,0,current.Width,current.Height);clip.RadiusX=clip.RadiusY=radius;
             Canvas.SetLeft(Surface,current.X);
             Canvas.SetTop(Surface,current.Y);
-            BackdropClip=current;
+            if(squircle)PlaceSquircleShape(radius);
+            else BackdropClip=InputArea();
             Native.Round(this,radius);
         }
+        // While the shape moves, the window region keeps the larger of the old and new shape. The region changes at once,
+        // but the picture follows a frame or more later; a region already cut to a smaller shape showed the old, larger
+        // black surface inside it with square corners. Transparent pixels outside the shape still let clicks through.
+        Rect InputArea()
+        {
+            var area=current;
+            if(animating){if(!from.IsEmpty)area.Union(from);if(!target.IsEmpty)area.Union(target);}
+            if(!host.IsEmpty)area.Intersect(new Rect(0,0,host.Width,host.Height));
+            return area.IsEmpty?current:area;
+        }
+        int held;
         void StopMotion(){if(animating)CompositionTarget.Rendering-=Frame;animating=false;motion.Stop();}
         void StopOutside(){if(outsideClick!=null){outsideClick.Dispose();outsideClick=null;}}
         internal void Suspend()
@@ -484,6 +508,7 @@ namespace OneTaskBar
             if(handle!=IntPtr.Zero)Native.SetWindowLong(handle,-20,Native.GetWindowLong(handle,-20)|0x08000000);
             player.Update(new MediaState(),null);
             media=null;artwork=null;surfaceArtwork=null;art.Background=expanded.Background=null;target=Rect.Empty;
+            HideSatellite(false);pillArt.Background=satelliteArt.Background=null;
             symbolRequest++;symbolKey=null;feedbackGlyph.SetDeviceIcon(null);levelSlider.SetDeviceIcon(null);
             ((Window)this).Hide();
         }
@@ -492,7 +517,7 @@ namespace OneTaskBar
         {
             bounds=Rect.Empty;owner=IntPtr.Zero;
             if(closed||!IsVisible||screen==null||monitor.DeviceName!=screen.DeviceName||host.IsEmpty)return false;
-            var shape=DynamicIslandLayout.Capsule(new Size(DynamicIslandLayout.MediaWidth,DynamicIslandLayout.CompactHeight),host.Width,host.Height,bottom);
+            var shape=DynamicIslandLayout.Capsule(new Size(DynamicIslandLayout.MediaPillWidth(squircle),DynamicIslandLayout.CompactHeight),host.Width,host.Height,bottom);
             var box=Native.PlacementBounds(screen.Bounds,scale,host.X+shape.X,host.Y+shape.Y,shape.Width,shape.Height);
             bounds=new Rect(box.Left,box.Top,box.Right-box.Left,box.Bottom-box.Top);
             owner=new WindowInteropHelper(this).Handle;
